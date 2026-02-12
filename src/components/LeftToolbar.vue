@@ -18,9 +18,9 @@
     <div class="toolbar-section">
       <button 
         class="tool-item"
-        :class="{ active: currentTool === 'seat' }"
-        title="添加座位排"
-        @click="selectTool('seat')"
+        :class="{ active: currentTool === 'drawSeat' }"
+        title="绘制座位排"
+        @click="selectTool('drawSeat')"
       >
         <Icon icon="lucide:circle-dot" class="tool-icon" />
       </button>
@@ -102,84 +102,76 @@
 import { Icon } from '@iconify/vue'
 import type { ToolMode } from '../composables/useDrawing'
 
-interface Props {
+defineProps<{
   currentTool: ToolMode
-}
-
-const props = defineProps<Props>()
-
-const emit = defineEmits<{
-  'select-tool': [tool: ToolMode]
 }>()
 
-function selectTool(tool: ToolMode) {
-  emit('select-tool', tool)
+const emit = defineEmits<{
+  toolChange: [tool: ToolMode]
+}>()
+
+const selectTool = (tool: ToolMode) => {
+  emit('toolChange', tool)
 }
 </script>
 
 <style scoped>
 .left-toolbar {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  width: 56px;
-  background: var(--color-bg-secondary);
-  border-right: 1px solid var(--color-border);
-  padding: 8px 0;
+  gap: 8px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 100;
 }
 
 .toolbar-section {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 100%;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
 }
 
 .tool-item {
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
   border: none;
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
-  color: var(--color-text-secondary);
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
+  transition: all 0.2s ease;
+  color: #6b7280;
 }
 
 .tool-item:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
+  background: #f3f4f6;
+  color: #374151;
 }
 
 .tool-item.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-
-.tool-item.active::before {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
-  background: var(--color-accent);
-  border-radius: 0 2px 2px 0;
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .tool-icon {
-  width: 22px;
-  height: 22px;
-}
-
-.toolbar-divider {
-  width: 32px;
-  height: 1px;
-  background: var(--color-border);
-  margin: 8px auto;
+  width: 20px;
+  height: 20px;
 }
 </style>

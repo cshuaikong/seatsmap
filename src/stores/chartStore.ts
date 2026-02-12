@@ -142,6 +142,18 @@ export const useChartStore = defineStore('chart', () => {
     selectedSectionIds.value = []
   }
 
+  // 移动选中座位
+  function moveSelectedSeats(delta: Point) {
+    const seats = chart.value.sections
+      .flatMap(section => section.rows.flatMap(row => row.seats))
+      .filter(seat => selectedSeatIds.value.includes(seat.id))
+    
+    seats.forEach(seat => {
+      seat.x += delta.x
+      seat.y += delta.y
+    })
+  }
+
   // 添加区域
   function addSection(section: Omit<Section, 'id'>) {
     const newSection: Section = {
@@ -184,38 +196,15 @@ export const useChartStore = defineStore('chart', () => {
       })
     }
 
-    const row: SeatRow = {
+    const newRow: SeatRow = {
       id: rowId,
-      label: String.fromCharCode(65 + section.rows.length), // A, B, C...
+      label: options.rowLabel || '',
       seats,
-      sectionId,
-      seatSpacing: options.seatSpacing,
-      curve: options.curve,
-      x: startPoint.x,
-      y: startPoint.y,
-      rotation: 0
+      sectionId
     }
 
-    section.rows.push(row)
+    section.rows.push(newRow)
     return rowId
-  }
-
-  // 添加单个座位
-  function addSeat(sectionId: string, rowId: string, seat: Omit<Seat, 'id' | 'sectionId' | 'rowId'>) {
-    const section = chart.value.sections.find(s => s.id === sectionId)
-    if (!section) return
-
-    const row = section.rows.find(r => r.id === rowId)
-    if (!row) return
-
-    const newSeat: Seat = {
-      ...seat,
-      id: generateId(),
-      sectionId,
-      rowId
-    }
-    row.seats.push(newSeat)
-    return newSeat.id
   }
 
   // 删除选中项
@@ -223,63 +212,23 @@ export const useChartStore = defineStore('chart', () => {
     // 删除选中的座位
     chart.value.sections.forEach(section => {
       section.rows.forEach(row => {
-        row.seats = row.seats.filter(s => !selectedSeatIds.value.includes(s.id))
+        row.seats = row.seats.filter(seat => !selectedSeatIds.value.includes(seat.id))
       })
+      // 删除空排
+      section.rows = section.rows.filter(row => row.seats.length > 0)
     })
 
     // 删除选中的排
     chart.value.sections.forEach(section => {
-      section.rows = section.rows.filter(r => !selectedRowIds.value.includes(r.id))
+      section.rows = section.rows.filter(row => !selectedRowIds.value.includes(row.id))
     })
 
     // 删除选中的区域
     chart.value.sections = chart.value.sections.filter(
-      s => !selectedSectionIds.value.includes(s.id)
+      section => !selectedSectionIds.value.includes(section.id)
     )
 
     clearSelection()
-  }
-
-  // 移动座位
-  function moveSeats(dx: number, dy: number) {
-    selectedSeats.value.forEach(seat => {
-      seat.x += dx
-      seat.y += dy
-    })
-  }
-
-  // 类别管理
-  function addCategory(category: Omit<Category, 'id'>) {
-    const newCategory: Category = {
-      ...category,
-      id: generateId()
-    }
-    chart.value.categories.push(newCategory)
-    return newCategory.id
-  }
-
-  function updateCategory(categoryId: string, updates: Partial<Category>) {
-    const category = chart.value.categories.find(c => c.id === categoryId)
-    if (category) {
-      Object.assign(category, updates)
-    }
-  }
-
-  function deleteCategory(categoryId: string) {
-    chart.value.categories = chart.value.categories.filter(c => c.id !== categoryId)
-    // 清空使用该类别的座位
-    chart.value.sections.forEach(section => {
-      if (section.categoryId === categoryId) {
-        section.categoryId = null
-      }
-      section.rows.forEach(row => {
-        row.seats.forEach(seat => {
-          if (seat.categoryId === categoryId) {
-            seat.categoryId = null
-          }
-        })
-      })
-    })
   }
 
   // 视图控制
@@ -296,6 +245,63 @@ export const useChartStore = defineStore('chart', () => {
     pan.value = { x: 0, y: 0 }
   }
 
+  // 更新图表属性
+  function updateChart(updates: Partial<ChartData>) {
+    Object.assign(chart.value, updates)
+  }
+
+  // 更新区域属性
+  function updateSection(sectionId: string, updates: Partial<Section>) {
+    const section = chart.value.sections.find(s => s.id === sectionId)
+    if (section) {
+      Object.assign(section, updates)
+    }
+  }
+
+  // 更新座位属性
+  function updateSeat(seatId: string, updates: Partial<Seat>) {
+    for (const section of chart.value.sections) {
+      for (const row of section.rows) {
+        const seat = row.seats.find(s => s.id === seatId)
+        if (seat) {
+          Object.assign(seat, updates)
+          return
+        }
+      }
+    }
+  }
+
+  // 添加类别
+  function addCategory(category: Omit<Category, 'id'>) {
+    const newCategory: Category = {
+      ...category,
+      id: generateId()
+    }
+    chart.value.categories.push(newCategory)
+    return newCategory.id
+  }
+
+  // 更新类别
+  function updateCategory(categoryId: string, updates: Partial<Category>) {
+    const category = chart.value.categories.find(c => c.id === categoryId)
+    if (category) {
+      Object.assign(category, updates)
+    }
+  }
+
+  // 删除类别
+  function deleteCategory(categoryId: string) {
+    const index = chart.value.categories.findIndex(c => c.id === categoryId)
+    if (index > -1) {
+      chart.value.categories.splice(index, 1)
+    }
+  }
+
+  // 设置舞台
+  function setStage(stage: Stage | null) {
+    chart.value.stage = stage
+  }
+
   return {
     // State
     chart,
@@ -310,28 +316,33 @@ export const useChartStore = defineStore('chart', () => {
     showGrid,
     showSeatLabels,
     showRowLabels,
+    
     // Getters
     selectedSeats,
     selectedRows,
     selectedSections,
     hasSelection,
     seatCount,
+    
     // Actions
     setTool,
     selectSeat,
     selectRow,
     selectSection,
     clearSelection,
+    moveSelectedSeats,
     addSection,
     addRow,
-    addSeat,
     deleteSelected,
-    moveSeats,
+    setZoom,
+    setPan,
+    resetView,
+    updateChart,
+    updateSection,
+    updateSeat,
     addCategory,
     updateCategory,
     deleteCategory,
-    setZoom,
-    setPan,
-    resetView
+    setStage
   }
 })

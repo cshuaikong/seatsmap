@@ -51,6 +51,7 @@ const emit = defineEmits<{
   ready: [stage: Konva.Stage]
   seatClick: [seatId: string]
   seatDrag: [seatId: string, x: number, y: number]
+  rowCreated: [seats: Seat[]]
 }>()
 
 // ==================== Refs ====================
@@ -60,6 +61,7 @@ let stage: Konva.Stage | null = null
 let layer: Konva.Layer | null = null
 let gridGroup: Konva.Group | null = null
 let transformLayer: Konva.Layer | null = null
+let drawingLayer: Konva.Layer | null = null
 const sectionGroups = new Map<string, Konva.Group>()
 const seatGroups = new Map<string, Konva.Group>()
 
@@ -70,6 +72,9 @@ const offsetY = ref(0)
 const isDraggingStage = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 
+// 拖拽起始位置记录
+const dragStartPositions = new Map<string, { x: number; y: number }>()
+
 // 颜色映射
 const statusColors = {
   available: '#22a559',
@@ -77,6 +82,17 @@ const statusColors = {
   reserved: '#f59e0b',
   blocked: '#9ca3af'
 }
+
+// ==================== 绘制座位状态 ====================
+
+const isDrawingRow = ref(false)
+const rowStartPoint = ref<{ x: number; y: number } | null>(null)
+const rowEndPoint = ref<{ x: number; y: number } | null>(null)
+let previewLine: Konva.Line | null = null
+let previewSeats: Konva.Group[] = []
+let guideLines: Konva.Line[] = []
+const SEAT_SPACING = 28
+const SEAT_RADIUS = 12
 
 // ==================== 初始化 ====================
 
@@ -99,6 +115,10 @@ const initKonva = () => {
   // 变换层（用于缩放和平移）
   transformLayer = new Konva.Layer()
   stage.add(transformLayer)
+
+  // 绘制层（用于绘制预览）
+  drawingLayer = new Konva.Layer()
+  stage.add(drawingLayer)
 
   // 添加网格背景
   gridGroup = new Konva.Group({ listening: false })
@@ -151,21 +171,24 @@ const setupStageEvents = () => {
     layer!.batchDraw()
   })
 
-  // 鼠标按下 - 统一处理框选和平移
+  // 鼠标按下 - 统一处理框选、平移和绘制
   stage.on('mousedown', (e) => {
     // 只响应左键
     if (e.evt.button !== 0) return
 
-    // 如果点击的不是舞台（是座位等），不启动框选
-    if (e.target !== stage) return
-
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
-    // 转换为舞台坐标
-    const transform = stage!.getAbsoluteTransform().copy()
-    transform.invert()
-    const stagePos = transform.point(pos)
+    // 绘制座位模式
+    if (currentTool.value === 'drawSeat') {
+      if (e.target === stage) {
+        startDrawingRow(pos)
+      }
+      return
+    }
+
+    // 如果点击的不是舞台（是座位等），不启动框选
+    if (e.target !== stage) return
 
     // Shift+点击 = 平移画布
     if (e.evt.shiftKey) {
@@ -176,12 +199,12 @@ const setupStageEvents = () => {
 
     // 普通点击 = 启动框选
     isSelecting.value = true
-    selectionStart = { x: stagePos.x, y: stagePos.y }
+    selectionStart = { x: pos.x, y: pos.y }
 
     if (selectionRect) {
       selectionRect.visible(true)
-      selectionRect.x(stagePos.x)
-      selectionRect.y(stagePos.y)
+      selectionRect.x(pos.x)
+      selectionRect.y(pos.y)
       selectionRect.width(0)
       selectionRect.height(0)
     }
@@ -192,23 +215,24 @@ const setupStageEvents = () => {
     }
   })
 
-  // 鼠标移动 - 处理框选和平移
+  // 鼠标移动 - 处理框选、平移和绘制预览
   stage.on('mousemove', (e) => {
+    const pos = stage!.getPointerPosition()
+    if (!pos) return
+
+    // 处理绘制座位预览
+    if (isDrawingRow.value && rowStartPoint.value) {
+      updateDrawingPreview(pos)
+      return
+    }
+
     // 处理框选
     if (isSelecting.value && selectionStart && selectionRect) {
-      const pos = stage!.getPointerPosition()
-      if (!pos) return
+      const width = pos.x - selectionStart.x
+      const height = pos.y - selectionStart.y
 
-      // 转换为舞台坐标
-      const transform = stage!.getAbsoluteTransform().copy()
-      transform.invert()
-      const stagePos = transform.point(pos)
-
-      const width = stagePos.x - selectionStart.x
-      const height = stagePos.y - selectionStart.y
-
-      selectionRect.x(width >= 0 ? selectionStart.x : stagePos.x)
-      selectionRect.y(height >= 0 ? selectionStart.y : stagePos.y)
+      selectionRect.x(width >= 0 ? selectionStart.x : pos.x)
+      selectionRect.y(height >= 0 ? selectionStart.y : pos.y)
       selectionRect.width(Math.abs(width))
       selectionRect.height(Math.abs(height))
 
@@ -224,8 +248,18 @@ const setupStageEvents = () => {
     }
   })
 
-  // 鼠标释放 - 结束框选或平移
-  stage.on('mouseup', () => {
+  // 鼠标释放 - 结束框选、平移或绘制
+  stage.on('mouseup', (e) => {
+    const pos = stage!.getPointerPosition()
+    if (!pos) return
+
+    // 结束绘制座位
+    if (isDrawingRow.value) {
+      finishDrawingRow(pos)
+      return
+    }
+
+    // 结束框选
     if (isSelecting.value) {
       isSelecting.value = false
       if (selectionRect) {
@@ -241,10 +275,196 @@ const setupStageEvents = () => {
 
   // 点击空白处取消选择
   stage.on('click', (e) => {
-    if (e.target === stage && !e.evt.shiftKey) {
+    if (e.target === stage && !e.evt.shiftKey && currentTool.value === 'select') {
       clearSelection()
     }
   })
+}
+
+// ==================== 绘制座位功能 ====================
+
+const startDrawingRow = (pos: { x: number; y: number }) => {
+  isDrawingRow.value = true
+  rowStartPoint.value = { x: pos.x, y: pos.y }
+  rowEndPoint.value = { x: pos.x, y: pos.y }
+
+  // 创建预览线
+  previewLine = new Konva.Line({
+    points: [pos.x, pos.y, pos.x, pos.y],
+    stroke: '#3b82f6',
+    strokeWidth: 2,
+    dash: [5, 5],
+    listening: false
+  })
+  drawingLayer!.add(previewLine)
+
+  // 创建起点标记
+  const startMarker = new Konva.Circle({
+    x: pos.x,
+    y: pos.y,
+    radius: 8,
+    fill: '#3b82f6',
+    stroke: '#fff',
+    strokeWidth: 2,
+    listening: false
+  })
+  drawingLayer!.add(startMarker)
+  previewSeats.push(startMarker)
+
+  drawingLayer!.batchDraw()
+}
+
+const updateDrawingPreview = (pos: { x: number; y: number }) => {
+  if (!rowStartPoint.value || !previewLine) return
+
+  rowEndPoint.value = { x: pos.x, y: pos.y }
+
+  // 更新预览线
+  previewLine.points([rowStartPoint.value.x, rowStartPoint.value.y, pos.x, pos.y])
+
+  // 清除旧的预览座位和辅助线
+  previewSeats.forEach(seat => seat.destroy())
+  guideLines.forEach(line => line.destroy())
+  previewSeats = []
+  guideLines = []
+
+  // 计算座位数量和位置
+  const dx = pos.x - rowStartPoint.value.x
+  const dy = pos.y - rowStartPoint.value.y
+  const distance = Math.sqrt(dx * dx + dy * dy)
+  const seatCount = Math.max(2, Math.floor(distance / SEAT_SPACING) + 1)
+
+  // 计算单位向量
+  const unitX = dx / distance
+  const unitY = dy / distance
+
+  // 创建预览座位
+  for (let i = 0; i < seatCount; i++) {
+    const x = rowStartPoint.value.x + unitX * i * SEAT_SPACING
+    const y = rowStartPoint.value.y + unitY * i * SEAT_SPACING
+
+    const seat = new Konva.Circle({
+      x,
+      y,
+      radius: SEAT_RADIUS,
+      fill: 'rgba(34, 165, 89, 0.5)',
+      stroke: '#22a559',
+      strokeWidth: 2,
+      listening: false
+    })
+    drawingLayer!.add(seat)
+    previewSeats.push(seat)
+
+    // 添加座位编号
+    const label = new Konva.Text({
+      text: String(i + 1),
+      x: x - 4,
+      y: y - 5,
+      fontSize: 9,
+      fontFamily: 'Inter',
+      fill: '#fff',
+      listening: false
+    })
+    drawingLayer!.add(label)
+    previewSeats.push(label)
+  }
+
+  // 创建辅助线（水平和垂直）
+  // 水平辅助线
+  const hLine = new Konva.Line({
+    points: [rowStartPoint.value.x, rowStartPoint.value.y, pos.x, rowStartPoint.value.y],
+    stroke: 'rgba(59, 130, 246, 0.3)',
+    strokeWidth: 1,
+    dash: [3, 3],
+    listening: false
+  })
+  drawingLayer!.add(hLine)
+  guideLines.push(hLine)
+
+  // 垂直辅助线
+  const vLine = new Konva.Line({
+    points: [rowStartPoint.value.x, rowStartPoint.value.y, rowStartPoint.value.x, pos.y],
+    stroke: 'rgba(59, 130, 246, 0.3)',
+    strokeWidth: 1,
+    dash: [3, 3],
+    listening: false
+  })
+  drawingLayer!.add(vLine)
+  guideLines.push(vLine)
+
+  // 显示距离信息
+  const distanceText = new Konva.Text({
+    text: `${Math.round(distance)}px (${seatCount}座)`,
+    x: (rowStartPoint.value.x + pos.x) / 2 + 10,
+    y: (rowStartPoint.value.y + pos.y) / 2 - 10,
+    fontSize: 12,
+    fontFamily: 'Inter',
+    fill: '#3b82f6',
+    listening: false
+  })
+  drawingLayer!.add(distanceText)
+  previewSeats.push(distanceText)
+
+  drawingLayer!.batchDraw()
+}
+
+const finishDrawingRow = (pos: { x: number; y: number }) => {
+  if (!rowStartPoint.value) return
+
+  const dx = pos.x - rowStartPoint.value.x
+  const dy = pos.y - rowStartPoint.value.y
+  const distance = Math.sqrt(dx * dx + dy * dy)
+
+  // 如果距离太短，取消绘制
+  if (distance < SEAT_SPACING) {
+    clearDrawingPreview()
+    isDrawingRow.value = false
+    rowStartPoint.value = null
+    rowEndPoint.value = null
+    return
+  }
+
+  // 计算座位数量和位置
+  const seatCount = Math.max(2, Math.floor(distance / SEAT_SPACING) + 1)
+  const unitX = dx / distance
+  const unitY = dy / distance
+
+  // 创建座位数据
+  const seats: Seat[] = []
+  for (let i = 0; i < seatCount; i++) {
+    const x = rowStartPoint.value.x + unitX * i * SEAT_SPACING
+    const y = rowStartPoint.value.y + unitY * i * SEAT_SPACING
+
+    seats.push({
+      id: `seat-${Date.now()}-${i}`,
+      label: String(i + 1),
+      x,
+      y,
+      status: 'available',
+      categoryId: 'custom'
+    })
+  }
+
+  // 发送事件
+  emit('rowCreated', seats)
+
+  // 清除预览
+  clearDrawingPreview()
+  isDrawingRow.value = false
+  rowStartPoint.value = null
+  rowEndPoint.value = null
+}
+
+const clearDrawingPreview = () => {
+  previewSeats.forEach(seat => seat.destroy())
+  guideLines.forEach(line => line.destroy())
+  if (previewLine) {
+    previewLine.destroy()
+    previewLine = null
+  }
+  previewSeats = []
+  guideLines = []
+  drawingLayer?.batchDraw()
 }
 
 // ==================== 网格 ====================
@@ -320,7 +540,7 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
   const group = new Konva.Group({
     x: seat.x,
     y: seat.y,
-    draggable: false, // 默认不可拖拽，选中后才可拖拽
+    draggable: false,
     id: seat.id,
     name: `seat row-${rowId}`
   })
@@ -333,7 +553,6 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
     name: 'seatCircle'
   })
 
-  // 开启缓存优化
   circle.cache()
 
   const text = new Konva.Text({
@@ -348,39 +567,65 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
   group.add(circle)
   group.add(text)
 
-  // 座位点击事件
   group.on('click', (e) => {
     e.cancelBubble = true
 
-    // 只有选择工具才能选中
     if (currentTool.value !== 'select') return
 
-    // 检测是否点击了排标签区域（座位左侧）
-    const clickPos = group.getRelativePointerPosition()
-    const isClickOnRowLabel = clickPos && clickPos.x < 0
-
-    if (isClickOnRowLabel) {
-      // 点击排标签，选中整排
-      if (selectedRowIds.value.has(rowId)) {
-        // 如果已选中，取消选择
-        clearSelection()
-      } else {
-        selectRow(rowId, e.evt.shiftKey)
-      }
+    if (selectedSeatIds.value.has(seat.id)) {
+      deselectSeat(seat.id)
     } else {
-      // 点击座位，选中单个座位
-      if (selectedSeatIds.value.has(seat.id)) {
-        deselectSeat(seat.id)
-      } else {
-        selectSeat(seat.id, e.evt.shiftKey)
-      }
+      selectSeat(seat.id, e.evt.shiftKey)
     }
     emit('seatClick', seat.id)
   })
 
-  // 座位拖拽事件
+  group.on('dragstart', () => {
+    dragStartPositions.clear()
+    selectedSeatIds.value.forEach(id => {
+      const g = seatGroups.get(id)
+      if (g) {
+        dragStartPositions.set(id, { x: g.x(), y: g.y() })
+      }
+    })
+  })
+
+  group.on('dragmove', () => {
+    if (!selectedSeatIds.value.has(seat.id)) return
+    
+    const startPos = dragStartPositions.get(seat.id)
+    if (!startPos) return
+    
+    const dx = group.x() - startPos.x
+    const dy = group.y() - startPos.y
+    
+    selectedSeatIds.value.forEach(id => {
+      if (id === seat.id) return
+      
+      const g = seatGroups.get(id)
+      const pos = dragStartPositions.get(id)
+      if (g && pos) {
+        g.x(pos.x + dx)
+        g.y(pos.y + dy)
+      }
+    })
+    
+    if (transformer) {
+      transformer.forceUpdate()
+    }
+    
+    layer?.batchDraw()
+  })
+
   group.on('dragend', () => {
-    emit('seatDrag', seat.id, group.x(), group.y())
+    selectedSeatIds.value.forEach(id => {
+      const g = seatGroups.get(id)
+      if (g) {
+        emit('seatDrag', id, g.x(), g.y())
+      }
+    })
+    
+    dragStartPositions.clear()
   })
 
   return group
@@ -393,17 +638,14 @@ const createSection = (section: Section) => {
     id: `section-${section.id}`
   })
 
-  // 计算区域边界
   let minX = Infinity, minY = Infinity
   let maxX = -Infinity, maxY = -Infinity
 
-  // 创建行和座位
   section.rows.forEach((row, rowIndex) => {
     const rowGroup = new Konva.Group({
       y: 30 + rowIndex * 35
     })
 
-    // 行标签
     const rowLabel = new Konva.Text({
       text: row.label,
       fontSize: 14,
@@ -413,13 +655,11 @@ const createSection = (section: Section) => {
     })
     rowGroup.add(rowLabel)
 
-    // 创建座位
     row.seats.forEach((seat) => {
       const seatGroup = createSeat(seat, row.label, row.id)
       rowGroup.add(seatGroup)
       seatGroups.set(seat.id, seatGroup)
 
-      // 计算边界
       const seatAbsX = seat.x
       const seatAbsY = 30 + rowIndex * 35 + seat.y
       minX = Math.min(minX, seatAbsX - 15)
@@ -431,7 +671,6 @@ const createSection = (section: Section) => {
     sectionGroup.add(rowGroup)
   })
 
-  // 创建区域边框
   const padding = 20
   const rect = new Konva.Rect({
     x: minX - padding,
@@ -445,7 +684,6 @@ const createSection = (section: Section) => {
   })
   sectionGroup.add(rect)
 
-  // 创建区域标题
   const title = new Konva.Text({
     text: section.name,
     x: minX,
@@ -457,7 +695,6 @@ const createSection = (section: Section) => {
   })
   sectionGroup.add(title)
 
-  // 对区域开启缓存优化
   sectionGroup.cache()
 
   return sectionGroup
@@ -468,30 +705,24 @@ const createSection = (section: Section) => {
 const renderVenueData = (data: VenueData) => {
   if (!layer) return
 
-  // 清除选择状态
   clearSelection()
 
-  // 清除现有内容（保留选择框和transformer）
   const children = [...layer.getChildren()]
   children.forEach(child => {
-    // 保留选择框和transformer
     if (child !== selectionRect && child !== transformer) {
       child.destroy()
     }
   })
 
-  // 清空座位映射
   seatGroups.clear()
   sectionGroups.clear()
 
-  // 渲染每个区域
   data.sections.forEach(section => {
     const sectionGroup = createSection(section)
     layer!.add(sectionGroup)
     sectionGroups.set(section.id, sectionGroup)
   })
 
-  // 使用 batchDraw 批量绘制
   layer.batchDraw()
 }
 
@@ -500,7 +731,6 @@ const renderVenueData = (data: VenueData) => {
 const generateTestData = (seatCount: number = 300) => {
   const sections: Section[] = []
 
-  // 区域1: 左侧竖向区域 (8排 x 8座 = 64座)
   const leftRows: Row[] = []
   for (let r = 0; r < 8; r++) {
     const seats: Seat[] = []
@@ -511,7 +741,6 @@ const generateTestData = (seatCount: number = 300) => {
         Math.random() < 0.2 ? 'sold' :
         Math.random() < 0.3 ? 'reserved' : 'available'
 
-      // 竖向排列: x固定, y变化
       seats.push({
         id: `seat-left-${r}-${c}`,
         label: String(c + 1),
@@ -537,7 +766,6 @@ const generateTestData = (seatCount: number = 300) => {
     y: 100
   })
 
-  // 区域2: 中间横向区域 (12排 x 12座 = 144座)
   const centerRows: Row[] = []
   for (let r = 0; r < 12; r++) {
     const seats: Seat[] = []
@@ -573,7 +801,6 @@ const generateTestData = (seatCount: number = 300) => {
     y: 150
   })
 
-  // 区域3: 右侧竖向区域 (8排 x 8座 = 64座)
   const rightRows: Row[] = []
   for (let r = 0; r < 8; r++) {
     const seats: Seat[] = []
@@ -584,7 +811,6 @@ const generateTestData = (seatCount: number = 300) => {
         Math.random() < 0.2 ? 'sold' :
         Math.random() < 0.3 ? 'reserved' : 'available'
 
-      // 竖向排列
       seats.push({
         id: `seat-right-${r}-${c}`,
         label: String(c + 1),
@@ -610,7 +836,6 @@ const generateTestData = (seatCount: number = 300) => {
     y: 100
   })
 
-  // 区域4: 斜向VIP区域 (3排 x 10座 = 30座)
   const vipRows: Row[] = []
   for (let r = 0; r < 3; r++) {
     const seats: Seat[] = []
@@ -621,12 +846,11 @@ const generateTestData = (seatCount: number = 300) => {
         Math.random() < 0.3 ? 'sold' :
         Math.random() < 0.4 ? 'reserved' : 'available'
 
-      // 斜向排列: x和y都变化
       seats.push({
         id: `seat-vip-${r}-${c}`,
         label: String(c + 1),
         x: 30 + c * 28,
-        y: c * 8, // 每座位向下偏移8像素，形成斜线
+        y: c * 8,
         status,
         categoryId: 'vip'
       })
@@ -655,7 +879,6 @@ const generateTestData = (seatCount: number = 300) => {
 const clearCanvas = () => {
   if (!layer) return
 
-  // 清除选择状态
   selectedSeatIds.value.clear()
   if (transformer) {
     transformer.nodes([])
@@ -708,7 +931,6 @@ onUnmounted(() => {
 const currentTool = ref<ToolMode>('select')
 const setTool = (tool: ToolMode) => {
   currentTool.value = tool
-  // 切换工具时清除选择
   if (tool !== 'select') {
     clearSelection()
   }
@@ -726,7 +948,6 @@ let transformer: Konva.Transformer | null = null
 const initSelection = () => {
   if (!stage || !layer) return
 
-  // 创建选择框
   selectionRect = new Konva.Rect({
     visible: false,
     fill: 'rgba(59, 130, 246, 0.1)',
@@ -736,7 +957,6 @@ const initSelection = () => {
   })
   layer.add(selectionRect)
 
-  // 创建 Transformer
   transformer = new Konva.Transformer({
     rotateEnabled: true,
     enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
@@ -749,8 +969,6 @@ const initSelection = () => {
   layer.add(transformer)
 }
 
-
-
 const performSelection = () => {
   if (!selectionRect) return
 
@@ -761,12 +979,11 @@ const performSelection = () => {
     height: selectionRect.height()
   }
 
-  // 遍历所有座位进行碰撞检测
   seatGroups.forEach((group, seatId) => {
-    const seatX = group.x()
-    const seatY = group.y()
+    const seatAbsPos = group.getAbsolutePosition()
+    const seatX = seatAbsPos.x
+    const seatY = seatAbsPos.y
 
-    // 简单的 AABB 碰撞检测
     const isInside =
       seatX >= rect.x &&
       seatX <= rect.x + rect.width &&
@@ -788,7 +1005,6 @@ const selectSeat = (seatId: string, additive = false) => {
 
   selectedSeatIds.value.add(seatId)
 
-  // 高亮选中的座位
   const seatGroup = seatGroups.get(seatId)
   if (seatGroup) {
     const circle = seatGroup.findOne<Konva.Circle>('.seatCircle')
@@ -796,7 +1012,6 @@ const selectSeat = (seatId: string, additive = false) => {
       circle.stroke('#3b82f6')
       circle.strokeWidth(3)
     }
-    // 启用拖拽
     seatGroup.draggable(true)
   }
 
@@ -810,7 +1025,6 @@ const selectRow = (rowId: string, additive = false) => {
 
   selectedRowIds.value.add(rowId)
 
-  // 选中该排的所有座位
   seatGroups.forEach((group, seatId) => {
     if (group.name().includes(`row-${rowId}`)) {
       selectedSeatIds.value.add(seatId)
@@ -820,7 +1034,6 @@ const selectRow = (rowId: string, additive = false) => {
         circle.stroke('#3b82f6')
         circle.strokeWidth(3)
       }
-      // 启用拖拽
       group.draggable(true)
     }
   })
@@ -838,7 +1051,6 @@ const deselectSeat = (seatId: string) => {
       circle.stroke('white')
       circle.strokeWidth(2)
     }
-    // 禁用拖拽
     seatGroup.draggable(false)
   }
 
@@ -846,7 +1058,6 @@ const deselectSeat = (seatId: string) => {
 }
 
 const clearSelection = () => {
-  // 恢复所有座位的样式
   selectedSeatIds.value.forEach(seatId => {
     const seatGroup = seatGroups.get(seatId)
     if (seatGroup) {
@@ -855,7 +1066,6 @@ const clearSelection = () => {
         circle.stroke('white')
         circle.strokeWidth(2)
       }
-      // 禁用拖拽
       seatGroup.draggable(false)
     }
   })
@@ -879,7 +1089,6 @@ const updateTransformer = () => {
   if (selectedNodes.length > 0) {
     transformer.nodes(selectedNodes)
     transformer.visible(true)
-    // 将 transformer 移到最上层
     if (transformer.getParent()) {
       transformer.moveToTop()
     }

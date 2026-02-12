@@ -21,6 +21,7 @@
           :venue-data="venueData"
           @ready="onCanvasReady"
           @seat-click="onSeatClick"
+          @row-created="onRowCreated"
         />
 
         <!-- 状态栏 -->
@@ -179,6 +180,45 @@ const onCanvasReady = (stage: Konva.Stage) => {
 const onSeatClick = (seatId: string) => {
   selectedSeatId.value = seatId
   console.log('座位点击:', seatId)
+}
+
+const onRowCreated = (seats: Seat[]) => {
+  console.log('创建座位排:', seats)
+  
+  // 初始化场地数据
+  if (!venueData.value) {
+    venueData.value = { sections: [] }
+  }
+
+  // 创建一个新的区域来存放绘制的座位
+  const sectionId = `section-custom-${Date.now()}`
+  const rowId = `row-custom-${Date.now()}`
+  
+  // 计算边界
+  let minX = Infinity, minY = Infinity
+  let maxX = -Infinity, maxY = -Infinity
+  
+  seats.forEach(seat => {
+    minX = Math.min(minX, seat.x)
+    minY = Math.min(minY, seat.y)
+    maxX = Math.max(maxX, seat.x)
+    maxY = Math.max(maxY, seat.y)
+  })
+
+  // 创建新区域
+  const newSection = {
+    id: sectionId,
+    name: `自定义区域 ${venueData.value.sections.length + 1}`,
+    rows: [{
+      id: rowId,
+      label: `排${venueData.value.sections.length + 1}`,
+      seats: seats
+    }],
+    x: minX - 30,
+    y: minY - 30
+  }
+
+  venueData.value.sections.push(newSection)
 }
 
 const onToolChange = (tool: ToolMode) => {
