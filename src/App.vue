@@ -1,9 +1,9 @@
 <template>
-  <ChartDesigner />
+  <KonvaDesigner />
 </template>
 
 <script setup lang="ts">
-import ChartDesigner from './components/ChartDesigner.vue'
+import KonvaDesigner from './components/KonvaDesigner.vue'
 </script>
 
 <style>

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",
+    "konva": "^10.2.0",
     "pinia": "^2.1.0",
     "vue": "^3.4.0"
   },
