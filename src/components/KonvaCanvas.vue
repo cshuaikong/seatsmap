@@ -89,10 +89,12 @@ const isDrawingRow = ref(false)
 const rowStartPoint = ref<{ x: number; y: number } | null>(null)
 const rowEndPoint = ref<{ x: number; y: number } | null>(null)
 let previewLine: Konva.Line | null = null
-let previewSeats: Konva.Group[] = []
+let previewSeats: Konva.Node[] = []
 let guideLines: Konva.Line[] = []
-const SEAT_SPACING = 28
-const SEAT_RADIUS = 12
+let cursorPreviewSeat: Konva.Group | null = null  // 鼠标跟随预览座位
+let isFirstPointPlaced = false  // 是否已放置起点
+const SEAT_SPACING = 22
+const SEAT_RADIUS = 9
 
 // ==================== 初始化 ====================
 
@@ -179,11 +181,14 @@ const setupStageEvents = () => {
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
-    // 绘制座位模式
-    if (currentTool.value === 'drawSeat') {
-      if (e.target === stage) {
-        startDrawingRow(pos)
-      }
+    // 将屏幕坐标转换为舞台坐标
+    const transform = stage!.getAbsoluteTransform().copy()
+    transform.invert()
+    const stagePos = transform.point(pos)
+
+    // 画座位排模式 - 点击任意位置开始绘制
+    if (currentTool.value === 'drawRow') {
+      startDrawingRow(stagePos)
       return
     }
 
@@ -197,14 +202,14 @@ const setupStageEvents = () => {
       return
     }
 
-    // 普通点击 = 启动框选
+    // 普通点击 = 启动框选（使用舞台坐标）
     isSelecting.value = true
-    selectionStart = { x: pos.x, y: pos.y }
+    selectionStart = { x: stagePos.x, y: stagePos.y }
 
     if (selectionRect) {
       selectionRect.visible(true)
-      selectionRect.x(pos.x)
-      selectionRect.y(pos.y)
+      selectionRect.x(stagePos.x)
+      selectionRect.y(stagePos.y)
       selectionRect.width(0)
       selectionRect.height(0)
     }
@@ -220,19 +225,24 @@ const setupStageEvents = () => {
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
+    // 将屏幕坐标转换为舞台坐标
+    const transform = stage!.getAbsoluteTransform().copy()
+    transform.invert()
+    const stagePos = transform.point(pos)
+
     // 处理绘制座位预览
     if (isDrawingRow.value && rowStartPoint.value) {
-      updateDrawingPreview(pos)
+      updateDrawingPreview(stagePos)
       return
     }
 
-    // 处理框选
+    // 处理框选（使用舞台坐标）
     if (isSelecting.value && selectionStart && selectionRect) {
-      const width = pos.x - selectionStart.x
-      const height = pos.y - selectionStart.y
+      const width = stagePos.x - selectionStart.x
+      const height = stagePos.y - selectionStart.y
 
-      selectionRect.x(width >= 0 ? selectionStart.x : pos.x)
-      selectionRect.y(height >= 0 ? selectionStart.y : pos.y)
+      selectionRect.x(width >= 0 ? selectionStart.x : stagePos.x)
+      selectionRect.y(height >= 0 ? selectionStart.y : stagePos.y)
       selectionRect.width(Math.abs(width))
       selectionRect.height(Math.abs(height))
 
@@ -253,9 +263,14 @@ const setupStageEvents = () => {
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
+    // 将屏幕坐标转换为舞台坐标
+    const transform = stage!.getAbsoluteTransform().copy()
+    transform.invert()
+    const stagePos = transform.point(pos)
+
     // 结束绘制座位
     if (isDrawingRow.value) {
-      finishDrawingRow(pos)
+      finishDrawingRow(stagePos)
       return
     }
 
@@ -317,10 +332,59 @@ const startDrawingRow = (pos: { x: number; y: number }) => {
 const updateDrawingPreview = (pos: { x: number; y: number }) => {
   if (!rowStartPoint.value || !previewLine) return
 
-  rowEndPoint.value = { x: pos.x, y: pos.y }
+  // 收集所有已有座位的位置用于对齐
+  const existingX: number[] = []
+  const existingY: number[] = []
+  seatGroups.forEach((group) => {
+    const stagePos = group.getAbsolutePosition()
+    existingX.push(stagePos.x)
+    existingY.push(stagePos.y)
+  })
 
-  // 更新预览线
-  previewLine.points([rowStartPoint.value.x, rowStartPoint.value.y, pos.x, pos.y])
+  // 对齐吸附参数
+  const SNAP_THRESHOLD = 8
+  let snappedX = pos.x
+  let snappedY = pos.y
+  let alignedX: number | null = null
+  let alignedY: number | null = null
+
+  // 检测水平对齐（Y坐标）
+  for (const y of existingY) {
+    if (Math.abs(pos.y - y) < SNAP_THRESHOLD) {
+      snappedY = y
+      alignedY = y
+      break
+    }
+  }
+
+  // 检测垂直对齐（X坐标）
+  for (const x of existingX) {
+    if (Math.abs(pos.x - x) < SNAP_THRESHOLD) {
+      snappedX = x
+      alignedX = x
+      break
+    }
+  }
+
+  // 检测起点对齐
+  for (const x of existingX) {
+    if (Math.abs(rowStartPoint.value.x - x) < SNAP_THRESHOLD) {
+      // 如果起点接近某列，调整起点
+      rowStartPoint.value.x = x
+      break
+    }
+  }
+  for (const y of existingY) {
+    if (Math.abs(rowStartPoint.value.y - y) < SNAP_THRESHOLD) {
+      rowStartPoint.value.y = y
+      break
+    }
+  }
+
+  rowEndPoint.value = { x: snappedX, y: snappedY }
+
+  // 更新预览线（使用吸附后的坐标）
+  previewLine.points([rowStartPoint.value.x, rowStartPoint.value.y, snappedX, snappedY])
 
   // 清除旧的预览座位和辅助线
   previewSeats.forEach(seat => seat.destroy())
@@ -329,8 +393,8 @@ const updateDrawingPreview = (pos: { x: number; y: number }) => {
   guideLines = []
 
   // 计算座位数量和位置
-  const dx = pos.x - rowStartPoint.value.x
-  const dy = pos.y - rowStartPoint.value.y
+  const dx = snappedX - rowStartPoint.value.x
+  const dy = snappedY - rowStartPoint.value.y
   const distance = Math.sqrt(dx * dx + dy * dy)
   const seatCount = Math.max(2, Math.floor(distance / SEAT_SPACING) + 1)
 
@@ -343,38 +407,51 @@ const updateDrawingPreview = (pos: { x: number; y: number }) => {
     const x = rowStartPoint.value.x + unitX * i * SEAT_SPACING
     const y = rowStartPoint.value.y + unitY * i * SEAT_SPACING
 
-    const seat = new Konva.Circle({
+    // 预览座位 - 半透明蓝色填充
+    const seatGroup = new Konva.Group({
       x,
       y,
+      listening: false
+    })
+    const seat = new Konva.Circle({
       radius: SEAT_RADIUS,
-      fill: 'rgba(34, 165, 89, 0.5)',
-      stroke: '#22a559',
+      fill: 'rgba(59, 130, 246, 0.2)',
+      stroke: '#3b82f6',
       strokeWidth: 2,
       listening: false
     })
-    drawingLayer!.add(seat)
-    previewSeats.push(seat)
+    seat.cache()
+    seatGroup.add(seat)
+    drawingLayer!.add(seatGroup)
+    previewSeats.push(seatGroup)
 
-    // 添加座位编号
+    // 添加座位编号（相对于 seatGroup）
     const label = new Konva.Text({
-      text: String(i + 1),
-      x: x - 4,
-      y: y - 5,
+      text: '?',
       fontSize: 9,
       fontFamily: 'Inter',
       fill: '#fff',
-      listening: false
+      listening: false,
+      align: 'center',
+      verticalAlign: 'middle'
     })
-    drawingLayer!.add(label)
-    previewSeats.push(label)
+    label.offsetX(label.width() / 2)
+    label.offsetY(label.height() / 2)
+    seatGroup.add(label)
   }
+
+  // 判断是否水平或垂直（用于辅助线颜色）
+  const isHorizontal = Math.abs(dy) < 5
+  const isVertical = Math.abs(dx) < 5
+  const guideLineColor = (isHorizontal || isVertical) ? '#22c55e' : 'rgba(59, 130, 246, 0.3)'
+  const guideLineWidth = (isHorizontal || isVertical) ? 2 : 1
 
   // 创建辅助线（水平和垂直）
   // 水平辅助线
   const hLine = new Konva.Line({
-    points: [rowStartPoint.value.x, rowStartPoint.value.y, pos.x, rowStartPoint.value.y],
-    stroke: 'rgba(59, 130, 246, 0.3)',
-    strokeWidth: 1,
+    points: [rowStartPoint.value.x, rowStartPoint.value.y, snappedX, rowStartPoint.value.y],
+    stroke: guideLineColor,
+    strokeWidth: guideLineWidth,
     dash: [3, 3],
     listening: false
   })
@@ -383,23 +460,47 @@ const updateDrawingPreview = (pos: { x: number; y: number }) => {
 
   // 垂直辅助线
   const vLine = new Konva.Line({
-    points: [rowStartPoint.value.x, rowStartPoint.value.y, rowStartPoint.value.x, pos.y],
-    stroke: 'rgba(59, 130, 246, 0.3)',
-    strokeWidth: 1,
+    points: [rowStartPoint.value.x, rowStartPoint.value.y, rowStartPoint.value.x, snappedY],
+    stroke: guideLineColor,
+    strokeWidth: guideLineWidth,
     dash: [3, 3],
     listening: false
   })
   drawingLayer!.add(vLine)
   guideLines.push(vLine)
 
+  // 如果吸附了对齐线，显示高亮对齐线
+  if (alignedY !== null) {
+    const alignHLine = new Konva.Line({
+      points: [Math.min(rowStartPoint.value.x, snappedX) - 50, alignedY, Math.max(rowStartPoint.value.x, snappedX) + 50, alignedY],
+      stroke: '#f59e0b',
+      strokeWidth: 2,
+      dash: [5, 5],
+      listening: false
+    })
+    drawingLayer!.add(alignHLine)
+    guideLines.push(alignHLine)
+  }
+  if (alignedX !== null) {
+    const alignVLine = new Konva.Line({
+      points: [alignedX, Math.min(rowStartPoint.value.y, snappedY) - 50, alignedX, Math.max(rowStartPoint.value.y, snappedY) + 50],
+      stroke: '#f59e0b',
+      strokeWidth: 2,
+      dash: [5, 5],
+      listening: false
+    })
+    drawingLayer!.add(alignVLine)
+    guideLines.push(alignVLine)
+  }
+
   // 显示距离信息
   const distanceText = new Konva.Text({
     text: `${Math.round(distance)}px (${seatCount}座)`,
-    x: (rowStartPoint.value.x + pos.x) / 2 + 10,
-    y: (rowStartPoint.value.y + pos.y) / 2 - 10,
+    x: (rowStartPoint.value.x + snappedX) / 2 + 10,
+    y: (rowStartPoint.value.y + snappedY) / 2 - 10,
     fontSize: 12,
     fontFamily: 'Inter',
-    fill: '#3b82f6',
+    fill: (isHorizontal || isVertical) ? '#22c55e' : '#3b82f6',
     listening: false
   })
   drawingLayer!.add(distanceText)
@@ -445,8 +546,15 @@ const finishDrawingRow = (pos: { x: number; y: number }) => {
     })
   }
 
-  // 发送事件
-  emit('rowCreated', seats)
+  // 创建实际的座位排并渲染
+  const rowId = `row-${Date.now()}`
+  const rowGroup = createRowGroup(seats, rowStartPoint.value.x, rowStartPoint.value.y, 
+    Math.atan2(dy, dx) * 180 / Math.PI, rowId)
+  
+  if (layer) {
+    layer.add(rowGroup)
+    layer.batchDraw()
+  }
 
   // 清除预览
   clearDrawingPreview()
@@ -464,7 +572,79 @@ const clearDrawingPreview = () => {
   }
   previewSeats = []
   guideLines = []
-  drawingLayer?.batchDraw()
+}
+
+// 创建座位排组
+const createRowGroup = (seats: Seat[], x: number, y: number, rotation: number, rowId: string) => {
+  const group = new Konva.Group({
+    x: x,
+    y: y,
+    rotation: rotation,
+    id: `row-group-${rowId}`
+  })
+
+  // 创建座位（沿着 Group 的 X 轴排列，因为 Group 已经旋转了）
+  seats.forEach((seat, index) => {
+    // 座位沿着 Group 的本地 X 轴排列，Y 保持为 0
+    const relativeX = index * SEAT_SPACING
+    const relativeY = 0
+    
+    const seatGroup = new Konva.Group({
+      x: relativeX,
+      y: relativeY,
+      draggable: false,
+      id: seat.id,
+      name: `seat row-${rowId}`
+    })
+
+    // 新绘制的座位 - 红色填充和边框（无边框视觉差）
+    const circle = new Konva.Circle({
+      radius: SEAT_RADIUS,
+      fill: '#ef4444',
+      stroke: '#ef4444',
+      strokeWidth: 1,
+      name: 'seatCircle'
+    })
+    circle.cache()
+
+    // 新绘制的座位 - 编号显示 ?
+    const text = new Konva.Text({
+      text: '?',
+      fontSize: 9,
+      fontFamily: 'Inter',
+      fill: '#fff',
+      x: 0,
+      y: 0,
+      offsetX: 0,
+      offsetY: 0,
+      align: 'center',
+      verticalAlign: 'middle'
+    })
+    // 文字居中定位
+    text.offsetX(text.width() / 2)
+    text.offsetY(text.height() / 2)
+
+    seatGroup.add(circle)
+    seatGroup.add(text)
+
+    // 座位点击事件
+    seatGroup.on('click', (e) => {
+      e.cancelBubble = true
+      if (currentTool.value !== 'select') return
+
+      if (selectedSeatIds.value.has(seat.id)) {
+        deselectSeat(seat.id)
+      } else {
+        selectSeat(seat.id, e.evt.shiftKey)
+      }
+      emit('seatClick', seat.id)
+    })
+
+    group.add(seatGroup)
+    seatGroups.set(seat.id, seatGroup)
+  })
+
+  return group
 }
 
 // ==================== 网格 ====================
@@ -546,10 +726,10 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
   })
 
   const circle = new Konva.Circle({
-    radius: 12,
+    radius: SEAT_RADIUS,
     fill: statusColors[seat.status],
-    stroke: 'white',
-    strokeWidth: 2,
+    stroke: statusColors[seat.status],
+    strokeWidth: 1,
     name: 'seatCircle'
   })
 
@@ -931,8 +1111,36 @@ onUnmounted(() => {
 const currentTool = ref<ToolMode>('select')
 const setTool = (tool: ToolMode) => {
   currentTool.value = tool
-  if (tool !== 'select') {
-    clearSelection()
+  // 清除选择状态
+  clearSelection()
+  // 清除绘制预览
+  clearDrawingPreview()
+  // 更新鼠标样式
+  updateCursor()
+}
+
+// 黑色十字准星光标 (base64 SVG)
+const blackCrosshairCursor = 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="M9 0h2v20H9zM0 9h20v2H0z" fill="#000"/></svg>`)
+
+const updateCursor = () => {
+  if (!stage) return
+  const container = stage.container()
+  
+  switch (currentTool.value) {
+    case 'select':
+      container.style.cursor = 'default'
+      break
+    case 'drawRow':
+    case 'drawCircle':
+    case 'drawTable':
+      // 使用黑色十字准星
+      container.style.cursor = `url("${blackCrosshairCursor}") 10 10, crosshair`
+      break
+    case 'text':
+      container.style.cursor = 'text'
+      break
+    default:
+      container.style.cursor = 'default'
   }
 }
 
@@ -970,7 +1178,7 @@ const initSelection = () => {
 }
 
 const performSelection = () => {
-  if (!selectionRect) return
+  if (!selectionRect || !stage) return
 
   const rect = {
     x: selectionRect.x(),
@@ -980,9 +1188,10 @@ const performSelection = () => {
   }
 
   seatGroups.forEach((group, seatId) => {
-    const seatAbsPos = group.getAbsolutePosition()
-    const seatX = seatAbsPos.x
-    const seatY = seatAbsPos.y
+    // 获取座位在舞台坐标系中的位置
+    const seatPos = group.position()
+    const seatX = seatPos.x
+    const seatY = seatPos.y
 
     const isInside =
       seatX >= rect.x &&

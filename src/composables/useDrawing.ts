@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import type { Row, Seat, Position } from '../types'
 
-export type ToolMode = 'select' | 'pan' | 'drawSeat' | 'seat' | 'row' | 'section' | 'booth' | 'table' | 'shape' | 'text' | 'image' | 'restroom'
+export type ToolMode = 'select' | 'pan' | 'drawRow' | 'drawCircle' | 'drawTable' | 'text' | 'stage'
 export type DrawingState = 'idle' | 'placingStart' | 'placingEnd' | 'placed'
 
 export function useDrawing() {

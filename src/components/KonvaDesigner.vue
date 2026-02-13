@@ -8,7 +8,7 @@
       <!-- 左侧工具栏 -->
       <LeftToolbar
         :current-tool="currentTool"
-        @select-tool="onToolChange"
+        @tool-change="onToolChange"
       />
 
       <!-- 中间画布区域 -->
@@ -45,6 +45,9 @@
           <span class="status-item" style="margin-left: auto; color: var(--color-accent); font-weight: 600">
             <Icon icon="lucide:mouse-pointer-2" class="status-icon" />
             已选中: {{ selectedCount }}
+          </span>
+          <span class="status-item">
+            当前工具: {{ currentToolLabel }}
           </span>
           <span class="status-item">
             缩放: {{ Math.round(zoomLevel * 100) }}%
@@ -170,6 +173,18 @@ const reservedSeats = computed(() => {
 
 const selectedCount = computed(() => {
   return canvasRef.value?.selectedSeatIds?.size || 0
+})
+
+const currentToolLabel = computed(() => {
+  const labels: Record<string, string> = {
+    'select': '选择',
+    'drawRow': '画座位排',
+    'drawCircle': '画圆形区域',
+    'drawTable': '画桌子',
+    'text': '文字标注',
+    'stage': '舞台'
+  }
+  return labels[currentTool.value] || currentTool.value
 })
 
 // 事件处理

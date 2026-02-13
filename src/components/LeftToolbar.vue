@@ -5,7 +5,7 @@
       <button 
         class="tool-item"
         :class="{ active: currentTool === 'select' }"
-        title="选择 (V)"
+        title="选择工具 (V)"
         @click="selectTool('select')"
       >
         <Icon icon="lucide:mouse-pointer-2" class="tool-icon" />
@@ -14,85 +14,53 @@
 
     <div class="toolbar-divider"></div>
 
-    <!-- 绘制工具组 -->
+    <!-- 绘制座位工具 - 参考 seats.io -->
     <div class="toolbar-section">
       <button 
         class="tool-item"
-        :class="{ active: currentTool === 'drawSeat' }"
-        title="绘制座位排"
-        @click="selectTool('drawSeat')"
+        :class="{ active: currentTool === 'drawRow' }"
+        title="画座位排"
+        @click="selectTool('drawRow')"
       >
-        <Icon icon="lucide:circle-dot" class="tool-icon" />
+        <Icon icon="lucide:rows-3" class="tool-icon" />
       </button>
       <button 
         class="tool-item"
-        :class="{ active: currentTool === 'row' }"
-        title="添加排"
-        @click="selectTool('row')"
+        :class="{ active: currentTool === 'drawCircle' }"
+        title="画圆形区域"
+        @click="selectTool('drawCircle')"
       >
-        <Icon icon="lucide:users" class="tool-icon" />
+        <Icon icon="lucide:circle" class="tool-icon" />
       </button>
       <button 
         class="tool-item"
-        :class="{ active: currentTool === 'section' }"
-        title="添加区域"
-        @click="selectTool('section')"
-      >
-        <Icon icon="lucide:square-dashed" class="tool-icon" />
-      </button>
-      <button 
-        class="tool-item"
-        :class="{ active: currentTool === 'booth' }"
-        title="添加展位"
-        @click="selectTool('booth')"
-      >
-        <Icon icon="lucide:layout-grid" class="tool-icon" />
-      </button>
-      <button 
-        class="tool-item"
-        :class="{ active: currentTool === 'table' }"
-        title="添加桌子"
-        @click="selectTool('table')"
+        :class="{ active: currentTool === 'drawTable' }"
+        title="画桌子"
+        @click="selectTool('drawTable')"
       >
         <Icon icon="lucide:armchair" class="tool-icon" />
-      </button>
-      <button 
-        class="tool-item"
-        :class="{ active: currentTool === 'shape' }"
-        title="添加形状"
-        @click="selectTool('shape')"
-      >
-        <Icon icon="lucide:triangle" class="tool-icon" />
       </button>
     </div>
 
     <div class="toolbar-divider"></div>
 
-    <!-- 标注工具组 -->
+    <!-- 标注工具 -->
     <div class="toolbar-section">
       <button 
         class="tool-item"
         :class="{ active: currentTool === 'text' }"
-        title="文字"
+        title="文字标注"
         @click="selectTool('text')"
       >
         <Icon icon="lucide:type" class="tool-icon" />
       </button>
       <button 
         class="tool-item"
-        :class="{ active: currentTool === 'image' }"
-        title="图片"
-        @click="selectTool('image')"
+        :class="{ active: currentTool === 'stage' }"
+        title="舞台"
+        @click="selectTool('stage')"
       >
-        <Icon icon="lucide:image" class="tool-icon" />
-      </button>
-      <button 
-        class="tool-item"
-        :class="{ active: currentTool === 'restroom' }"
-        title="卫生间"
-        @click="selectTool('restroom')"
-      >
-        <Icon icon="lucide:users" class="tool-icon" />
+        <Icon icon="lucide:monitor" class="tool-icon" />
       </button>
     </div>
   </div>
