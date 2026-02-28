@@ -575,19 +575,29 @@ const clearDrawingPreview = () => {
 }
 
 // 创建座位排组
-const createRowGroup = (seats: Seat[], x: number, y: number, rotation: number, rowId: string) => {
+const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
   const group = new Konva.Group({
-    x: x,
-    y: y,
+    x: startX,
+    y: startY,
     rotation: rotation,
     id: `row-group-${rowId}`
   })
 
-  // 创建座位（沿着 Group 的 X 轴排列，因为 Group 已经旋转了）
-  seats.forEach((seat, index) => {
-    // 座位沿着 Group 的本地 X 轴排列，Y 保持为 0
-    const relativeX = index * SEAT_SPACING
-    const relativeY = 0
+  // 计算旋转角度的弧度
+  const angleRad = (rotation * Math.PI) / 180
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+
+  // 创建座位（使用传入的世界坐标，转换为相对于 Group 起点的本地坐标）
+  seats.forEach((seat) => {
+    // 将世界坐标转换为相对于 Group 起点的本地坐标
+    // 世界坐标 = Group起点 + 本地X * cos - 本地Y * sin
+    // 所以：本地X = (世界X - Group起点X) * cos + (世界Y - Group起点Y) * sin
+    //       本地Y = -(世界X - Group起点X) * sin + (世界Y - Group起点Y) * cos
+    const dx = seat.x - startX
+    const dy = seat.y - startY
+    const relativeX = dx * cos + dy * sin
+    const relativeY = -dx * sin + dy * cos
     
     const seatGroup = new Konva.Group({
       x: relativeX,
@@ -640,9 +650,126 @@ const createRowGroup = (seats: Seat[], x: number, y: number, rotation: number, r
       emit('seatClick', seat.id)
     })
 
+    // 拖拽事件 - 支持多选整体移动
+    seatGroup.on('dragstart', (e) => {
+      // 如果没有被选中，先选中这个座位
+      if (!selectedSeatIds.value.has(seat.id)) {
+        selectSeat(seat.id, e.evt.shiftKey)
+      }
+      
+      dragStartPositions.clear()
+      selectedSeatIds.value.forEach(id => {
+        const g = seatGroups.get(id)
+        if (g) {
+          dragStartPositions.set(id, { x: g.x(), y: g.y() })
+        }
+      })
+    })
+
+    seatGroup.on('dragmove', (e) => {
+      const currentSeatId = seat.id
+      if (!selectedSeatIds.value.has(currentSeatId)) return
+      
+      const currentGroup = seatGroups.get(currentSeatId)
+      const startPos = dragStartPositions.get(currentSeatId)
+      if (!startPos || !currentGroup) return
+      
+      // 计算当前拖拽的偏移量
+      const dx = currentGroup.x() - startPos.x
+      const dy = currentGroup.y() - startPos.y
+      
+      // 应用到所有选中的座位（除了当前正在拖拽的）
+      selectedSeatIds.value.forEach(id => {
+        if (id === currentSeatId) return
+        
+        const g = seatGroups.get(id)
+        const pos = dragStartPositions.get(id)
+        if (g && pos) {
+          g.x(pos.x + dx)
+          g.y(pos.y + dy)
+        }
+      })
+      
+      // 更新transformer
+      if (transformer) {
+        transformer.forceUpdate()
+      }
+      
+      layer?.batchDraw()
+    })
+
+    seatGroup.on('dragend', () => {
+      selectedSeatIds.value.forEach(id => {
+        const g = seatGroups.get(id)
+        if (g) {
+          emit('seatDrag', id, g.x(), g.y())
+        }
+      })
+      
+      dragStartPositions.clear()
+    })
+
     group.add(seatGroup)
     seatGroups.set(seat.id, seatGroup)
   })
+
+  // 添加点击区域 - 用于点击排时选中整排
+  // 计算排的边界
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  if (seats.length > 0) {
+    seats.forEach((seat) => {
+      const dx = seat.x - startX
+      const dy = seat.y - startY
+      const relativeX = dx * cos + dy * sin
+      const relativeY = -dx * sin + dy * cos
+      minX = Math.min(minX, relativeX - SEAT_RADIUS)
+      minY = Math.min(minY, relativeY - SEAT_RADIUS)
+      maxX = Math.max(maxX, relativeX + SEAT_RADIUS)
+      maxY = Math.max(maxY, relativeY + SEAT_RADIUS)
+    })
+    // 添加一些padding，使点击区域更大
+    const padding = 8
+    minX -= padding
+    minY -= padding
+    maxX += padding
+    maxY += padding
+  }
+
+  // 创建透明点击区域
+  const clickArea = new Konva.Rect({
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+    fill: 'transparent',
+    listening: true,
+    name: `row-click-area row-${rowId}`
+  })
+  clickArea.on('click', (e) => {
+    e.cancelBubble = true
+    if (currentTool.value !== 'select') return
+
+    // 点击排背景时，选中整排
+    if (selectedRowIds.value.has(rowId)) {
+      // 如果已选中，取消选中（除非按住Shift）
+      if (!e.evt.shiftKey) {
+        // 检查是否点击在座位之外（即排背景）
+        // 如果座位已经被选中，并且点击背景，则保持选中状态
+        // 只有在单独点击背景时才切换
+      }
+    }
+    selectRow(rowId, e.evt.shiftKey)
+  })
+  // 鼠标悬停效果
+  clickArea.on('mouseenter', () => {
+    if (currentTool.value === 'select') {
+      document.body.style.cursor = 'pointer'
+    }
+  })
+  clickArea.on('mouseleave', () => {
+    document.body.style.cursor = 'default'
+  })
+  group.add(clickArea)
 
   return group
 }
@@ -760,7 +887,12 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
     emit('seatClick', seat.id)
   })
 
-  group.on('dragstart', () => {
+  group.on('dragstart', (e) => {
+    // 如果没有被选中，先选中这个座位
+    if (!selectedSeatIds.value.has(seat.id)) {
+      selectSeat(seat.id, e.evt.shiftKey)
+    }
+    
     dragStartPositions.clear()
     selectedSeatIds.value.forEach(id => {
       const g = seatGroups.get(id)
@@ -771,16 +903,18 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
   })
 
   group.on('dragmove', () => {
-    if (!selectedSeatIds.value.has(seat.id)) return
+    const currentSeatId = seat.id
+    if (!selectedSeatIds.value.has(currentSeatId)) return
     
-    const startPos = dragStartPositions.get(seat.id)
-    if (!startPos) return
+    const currentGroup = seatGroups.get(currentSeatId)
+    const startPos = dragStartPositions.get(currentSeatId)
+    if (!startPos || !currentGroup) return
     
-    const dx = group.x() - startPos.x
-    const dy = group.y() - startPos.y
+    const dx = currentGroup.x() - startPos.x
+    const dy = currentGroup.y() - startPos.y
     
     selectedSeatIds.value.forEach(id => {
-      if (id === seat.id) return
+      if (id === currentSeatId) return
       
       const g = seatGroups.get(id)
       const pos = dragStartPositions.get(id)
@@ -1187,6 +1321,10 @@ const performSelection = () => {
     height: selectionRect.height()
   }
 
+  // 收集被框选到的座位和按排统计
+  const selectedSeatIdsInRect: string[] = []
+  const rowSeatCount = new Map<string, { total: number; selected: number }>()
+
   seatGroups.forEach((group, seatId) => {
     // 获取座位在舞台坐标系中的位置
     const seatPos = group.position()
@@ -1200,9 +1338,50 @@ const performSelection = () => {
       seatY <= rect.y + rect.height
 
     if (isInside) {
-      selectSeat(seatId, true)
+      selectedSeatIdsInRect.push(seatId)
+      
+      // 提取排ID
+      const rowMatch = group.name().match(/row-([^\s]+)/)
+      if (rowMatch) {
+        const rowId = rowMatch[1]
+        const stats = rowSeatCount.get(rowId) || { total: 0, selected: 0 }
+        stats.selected++
+        rowSeatCount.set(rowId, stats)
+      }
     }
   })
+
+  // 统计每排的总座位数
+  seatGroups.forEach((group) => {
+    const rowMatch = group.name().match(/row-([^\s]+)/)
+    if (rowMatch) {
+      const rowId = rowMatch[1]
+      const stats = rowSeatCount.get(rowId) || { total: 0, selected: 0 }
+      stats.total++
+      rowSeatCount.set(rowId, stats)
+    }
+  })
+
+  // 判断是否选中整排（框选区域包含该排70%以上座位，或框选了3个以上该排座位）
+  const rowsToSelect: string[] = []
+  rowSeatCount.forEach((stats, rowId) => {
+    const ratio = stats.selected / stats.total
+    if (stats.selected >= 3 || ratio >= 0.7) {
+      rowsToSelect.push(rowId)
+    }
+  })
+
+  // 如果有排被选中，使用排选择模式；否则使用座位选择模式
+  if (rowsToSelect.length > 0) {
+    rowsToSelect.forEach(rowId => {
+      selectRow(rowId, true)
+    })
+  } else {
+    // 普通座位选择模式
+    selectedSeatIdsInRect.forEach(seatId => {
+      selectSeat(seatId, true)
+    })
+  }
 
   updateTransformer()
 }
