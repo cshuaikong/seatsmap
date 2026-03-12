@@ -1,73 +1,200 @@
 <template>
   <div class="chart-designer">
     <!-- 顶部工具栏 -->
-    <TopToolbar :chart-name="chartName" />
+    <div class="top-toolbar">
+      <!-- 左侧：Logo和图表名称 -->
+      <div class="toolbar-left">
+        <div class="logo">
+          <Icon icon="lucide:armchair" class="logo-icon" />
+        </div>
+        <span class="chart-name">{{ chartName }}</span>
+      </div>
 
-    <!-- 主内容区 -->
+      <!-- 右侧：操作按钮 -->
+      <div class="toolbar-right">
+        <button class="action-btn secondary">
+          <Icon icon="lucide:eye" class="btn-icon" />
+          预览
+        </button>
+        <button class="action-btn primary">
+          <Icon icon="lucide:check" class="btn-icon" />
+          保存
+        </button>
+      </div>
+    </div>
+
+    <!-- 主内容区 - 三栏布局 -->
     <div class="designer-main">
       <!-- 左侧工具栏 -->
-      <LeftToolbar
-        :current-tool="currentTool"
-        @tool-change="onToolChange"
-      />
-
-      <!-- 中间画布区域 -->
-      <div class="canvas-container">
-        <KonvaCanvas
-          ref="canvasRef"
-          :width="canvasWidth"
-          :height="canvasHeight"
-          :show-grid="showGrid"
-          :venue-data="venueData"
-          @ready="onCanvasReady"
-          @seat-click="onSeatClick"
-          @row-created="onRowCreated"
-        />
-
-        <!-- 状态栏 -->
-        <div class="status-bar">
-          <span class="status-item">
-            <Icon icon="lucide:chair" class="status-icon" />
-            座位总数: {{ totalSeats }}
-          </span>
-          <span class="status-item">
-            <span class="status-dot status-available"></span>
-            可用: {{ availableSeats }}
-          </span>
-          <span class="status-item">
-            <span class="status-dot status-sold"></span>
-            已售: {{ soldSeats }}
-          </span>
-          <span class="status-item">
-            <span class="status-dot status-reserved"></span>
-            已预定: {{ reservedSeats }}
-          </span>
-          <span class="status-item" style="margin-left: auto; color: var(--color-accent); font-weight: 600">
-            <Icon icon="lucide:mouse-pointer-2" class="status-icon" />
-            已选中: {{ selectedCount }}
-          </span>
-          <span class="status-item">
-            当前工具: {{ currentToolLabel }}
-          </span>
-          <span class="status-item">
-            缩放: {{ Math.round(zoomLevel * 100) }}%
-          </span>
+      <div class="left-toolbar">
+        <div class="toolbar-section">
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'select' }"
+            title="选择工具 (V)"
+            @click="onToolChange('select')"
+          >
+            <Icon icon="lucide:mouse-pointer-2" class="tool-icon" />
+          </button>
         </div>
 
-        <!-- 控制按钮 -->
-        <div class="control-buttons">
-          <button @click="generateTestSeats" class="control-btn">
-            <Icon icon="lucide:refresh-cw" class="btn-icon" />
-            生成300座位
+        <div class="toolbar-divider"></div>
+
+        <!-- 座位绘制工具 -->
+        <div class="toolbar-section">
+          <!-- 单行座位 - 三个圆点 -->
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'drawRow' }"
+            title="单行座位"
+            @click="onToolChange('drawRow')"
+          >
+            <Icon icon="tabler:dots" class="tool-icon" />
           </button>
-          <button @click="clearCanvas" class="control-btn">
-            <Icon icon="lucide:trash-2" class="btn-icon" />
-            清空
+          <!-- 弧形座位 - 带角度 -->
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'drawArcRow' }"
+            title="弧形座位"
+            @click="onToolChange('drawArcRow')"
+          >
+            <Icon icon="mdi:seat-flat-angled" class="tool-icon" />
           </button>
-          <button @click="resetView" class="control-btn">
-            <Icon icon="lucide:maximize" class="btn-icon" />
-            重置视图
+          <!-- 多行座位 - 多行排列 -->
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'drawMultiRow' }"
+            title="多行座位"
+            @click="onToolChange('drawMultiRow')"
+          >
+            <Icon icon="tabler:grip-vertical" class="tool-icon" />
           </button>
+          <!-- 圆形区域 -->
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'drawCircle' }"
+            title="圆形区域"
+            @click="onToolChange('drawCircle')"
+          >
+            <Icon icon="lucide:circle" class="tool-icon" />
+          </button>
+          <!-- 桌子 -->
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'drawTable' }"
+            title="画桌子"
+            @click="onToolChange('drawTable')"
+          >
+            <Icon icon="lucide:armchair" class="tool-icon" />
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <div class="toolbar-section">
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'text' }"
+            title="文字标注"
+            @click="onToolChange('text')"
+          >
+            <Icon icon="lucide:type" class="tool-icon" />
+          </button>
+          <button 
+            class="tool-item"
+            :class="{ active: currentTool === 'stage' }"
+            title="舞台"
+            @click="onToolChange('stage')"
+          >
+            <Icon icon="lucide:monitor" class="tool-icon" />
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <div class="toolbar-section">
+          <button class="tool-item" title="撤销 (Ctrl+Z)">
+            <Icon icon="lucide:undo-2" class="tool-icon" />
+          </button>
+          <button class="tool-item" title="重做 (Ctrl+Y)">
+            <Icon icon="lucide:redo-2" class="tool-icon" />
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <div class="toolbar-section">
+          <button class="tool-item" title="复制 (Ctrl+C)">
+            <Icon icon="lucide:copy" class="tool-icon" />
+          </button>
+          <button class="tool-item" title="粘贴 (Ctrl+V)">
+            <Icon icon="lucide:clipboard-paste" class="tool-icon" />
+          </button>
+          <button class="tool-item danger" title="删除 (Delete)">
+            <Icon icon="lucide:trash-2" class="tool-icon" />
+          </button>
+        </div>
+      </div>
+
+      <!-- 中间画布区域 -->
+      <div class="canvas-wrapper">
+        <div class="canvas-container">
+          <KonvaCanvas
+            ref="canvasRef"
+            :width="canvasWidth"
+            :height="canvasHeight"
+            :show-grid="showGrid"
+            :venue-data="venueData"
+            @ready="onCanvasReady"
+            @seat-click="onSeatClick"
+            @row-created="onRowCreated"
+          />
+
+          <!-- 状态栏 -->
+          <div class="status-bar">
+            <span class="status-item">
+              <Icon icon="lucide:chair" class="status-icon" />
+              座位总数: {{ totalSeats }}
+            </span>
+            <span class="status-item">
+              <span class="status-dot status-available"></span>
+              可用: {{ availableSeats }}
+            </span>
+            <span class="status-item">
+              <span class="status-dot status-sold"></span>
+              已售: {{ soldSeats }}
+            </span>
+            <span class="status-item">
+              <span class="status-dot status-reserved"></span>
+              已预定: {{ reservedSeats }}
+            </span>
+            <span class="status-item" style="margin-left: auto; color: var(--color-accent); font-weight: 600">
+              <Icon icon="lucide:mouse-pointer-2" class="status-icon" />
+              已选中: {{ selectedCount }}
+            </span>
+            <span class="status-item">
+              当前工具: {{ currentToolLabel }}
+            </span>
+            <span class="status-item">
+              缩放: {{ Math.round(zoomLevel * 100) }}%
+            </span>
+          </div>
+
+          <!-- 控制按钮 -->
+          <div class="control-buttons">
+            <button @click="generateTestSeats" class="control-btn">
+              <Icon icon="lucide:refresh-cw" class="btn-icon" />
+              生成300座位
+            </button>
+            <button @click="clearCanvas" class="control-btn">
+              <Icon icon="lucide:trash-2" class="btn-icon" />
+              清空
+            </button>
+            <button @click="resetView" class="control-btn">
+              <Icon icon="lucide:maximize" class="btn-icon" />
+              重置视图
+            </button>
+          </div>
         </div>
       </div>
 
@@ -87,8 +214,6 @@
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import Konva from 'konva'
-import TopToolbar from './TopToolbar.vue'
-import LeftToolbar from './LeftToolbar.vue'
 import RightPanel from './RightPanel.vue'
 import KonvaCanvas from './KonvaCanvas.vue'
 import type { ToolMode } from '../composables/useDrawing'
@@ -178,8 +303,10 @@ const selectedCount = computed(() => {
 const currentToolLabel = computed(() => {
   const labels: Record<string, string> = {
     'select': '选择',
-    'drawRow': '画座位排',
-    'drawCircle': '画圆形区域',
+    'drawRow': '单行座位',
+    'drawArcRow': '弧形座位',
+    'drawMultiRow': '多行座位',
+    'drawCircle': '圆形区域',
     'drawTable': '画桌子',
     'text': '文字标注',
     'stage': '舞台'
@@ -268,12 +395,176 @@ const resetView = () => {
   overflow: hidden;
 }
 
-.designer-main {
+/* 顶部工具栏 */
+.top-toolbar {
   display: flex;
-  flex: 1;
-  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 16px;
+  flex-shrink: 0;
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--color-accent);
+  border-radius: 8px;
+}
+
+.logo-icon {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.chart-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-btn.primary {
+  background: var(--color-accent);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-1px);
+}
+
+.action-btn.secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.action-btn.secondary:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border-hover);
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* 主内容区 - 三栏布局 */
+.designer-main {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  padding: 12px;
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* 左侧工具栏 */
+.left-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 8px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow-y: auto;
+  min-width: 56px;
+  max-height: 100%;
+}
+
+.toolbar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toolbar-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+.tool-item {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.tool-item:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.tool-item.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.tool-item.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.tool-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* 中间画布包装器 */
+.canvas-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/* 画布容器 */
 .canvas-container {
   flex: 1;
   position: relative;
@@ -299,12 +590,15 @@ const resetView = () => {
   color: var(--color-text-secondary);
   font-family: var(--font-sans);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  flex-wrap: wrap;
+  row-gap: 8px;
 }
 
 .status-item {
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .status-icon {
@@ -355,6 +649,7 @@ const resetView = () => {
   font-family: var(--font-sans);
   transition: all 0.2s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
 }
 
 .control-btn:hover {
@@ -366,8 +661,46 @@ const resetView = () => {
   transform: scale(0.98);
 }
 
-.btn-icon {
-  width: 16px;
-  height: 16px;
+/* 响应式处理 */
+@media (max-width: 1024px) {
+  .designer-main {
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+  
+  .status-bar {
+    gap: 12px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .designer-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  
+  .left-toolbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px;
+    min-width: auto;
+    max-height: none;
+  }
+  
+  .toolbar-section {
+    flex-direction: row;
+  }
+  
+  .toolbar-divider {
+    width: 1px;
+    height: 40px;
+    margin: 0 4px;
+  }
+  
+  .control-buttons {
+    display: none;
+  }
 }
 </style>

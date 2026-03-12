@@ -1,7 +1,7 @@
 import { ref, computed, shallowRef } from 'vue'
 import type { Row, Seat, Position } from '../types'
 
-export type ToolMode = 'select' | 'pan' | 'seat' | 'row' | 'section' | 'booth' | 'table' | 'shape' | 'text' | 'image' | 'restroom'
+export type ToolMode = 'select' | 'pan' | 'seat' | 'row' | 'section' | 'booth' | 'table' | 'shape' | 'text' | 'image' | 'restroom' | 'drawRow' | 'drawArcRow' | 'drawMultiRow' | 'drawCircle' | 'drawTable' | 'stage'
 export type DrawingState = 'idle' | 'placingSeat' | 'dragging'
 
 export function useDrawing() {
