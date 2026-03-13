@@ -1,7 +1,19 @@
 import { ref, computed, shallowRef } from 'vue'
 import type { Row, Seat, Position } from '../types'
 
-export type ToolMode = 'select' | 'pan' | 'seat' | 'row' | 'section' | 'booth' | 'table' | 'shape' | 'text' | 'image' | 'restroom' | 'drawRow' | 'drawArcRow' | 'drawMultiRow' | 'drawCircle' | 'drawTable' | 'stage'
+export type ToolMode = 
+  // 基础工具
+  | 'select' | 'pan' | 'selectseat'
+  // 绘制工具 (三种座位排列)
+  | 'drawRow' | 'drawSegmentRow' | 'drawMultiRow'
+  // 座位区工具
+  | 'drawCircle' | 'drawRect' | 'drawPolygon' | 'drawPolyline' | 'drawSector' | 'drawRoundTable'
+  // 线条
+  | 'drawLine'
+  // 标注工具
+  | 'text' | 'image' | 'restroom'
+  // 旧兼容
+  | 'seat' | 'row' | 'section' | 'booth' | 'table' | 'shape' | 'stage' | 'drawSeat' | 'drawFreehand' | 'drawLineRow' | 'drawArcRow' | 'drawText' | 'drawStage'
 export type DrawingState = 'idle' | 'placingSeat' | 'dragging'
 
 export function useDrawing() {

@@ -5,7 +5,7 @@
       <!-- 左侧：Logo和图表名称 -->
       <div class="toolbar-left">
         <div class="logo">
-          <Icon icon="lucide:armchair" class="logo-icon" />
+          <i class="iconfont icon-selectseat"></i>
         </div>
         <span class="chart-name">{{ chartName }}</span>
       </div>
@@ -26,115 +26,14 @@
     <!-- 主内容区 - 三栏布局 -->
     <div class="designer-main">
       <!-- 左侧工具栏 -->
-      <div class="left-toolbar">
-        <div class="toolbar-section">
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'select' }"
-            title="选择工具 (V)"
-            @click="onToolChange('select')"
-          >
-            <Icon icon="lucide:mouse-pointer-2" class="tool-icon" />
-          </button>
-        </div>
-
-        <div class="toolbar-divider"></div>
-
-        <!-- 座位绘制工具 -->
-        <div class="toolbar-section">
-          <!-- 单行座位 - 三个圆点 -->
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'drawRow' }"
-            title="单行座位"
-            @click="onToolChange('drawRow')"
-          >
-            <Icon icon="tabler:dots" class="tool-icon" />
-          </button>
-          <!-- 弧形座位 - 带角度 -->
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'drawArcRow' }"
-            title="弧形座位"
-            @click="onToolChange('drawArcRow')"
-          >
-            <Icon icon="mdi:seat-flat-angled" class="tool-icon" />
-          </button>
-          <!-- 多行座位 - 多行排列 -->
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'drawMultiRow' }"
-            title="多行座位"
-            @click="onToolChange('drawMultiRow')"
-          >
-            <Icon icon="tabler:grip-vertical" class="tool-icon" />
-          </button>
-          <!-- 圆形区域 -->
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'drawCircle' }"
-            title="圆形区域"
-            @click="onToolChange('drawCircle')"
-          >
-            <Icon icon="lucide:circle" class="tool-icon" />
-          </button>
-          <!-- 桌子 -->
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'drawTable' }"
-            title="画桌子"
-            @click="onToolChange('drawTable')"
-          >
-            <Icon icon="lucide:armchair" class="tool-icon" />
-          </button>
-        </div>
-
-        <div class="toolbar-divider"></div>
-
-        <div class="toolbar-section">
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'text' }"
-            title="文字标注"
-            @click="onToolChange('text')"
-          >
-            <Icon icon="lucide:type" class="tool-icon" />
-          </button>
-          <button 
-            class="tool-item"
-            :class="{ active: currentTool === 'stage' }"
-            title="舞台"
-            @click="onToolChange('stage')"
-          >
-            <Icon icon="lucide:monitor" class="tool-icon" />
-          </button>
-        </div>
-
-        <div class="toolbar-divider"></div>
-
-        <div class="toolbar-section">
-          <button class="tool-item" title="撤销 (Ctrl+Z)">
-            <Icon icon="lucide:undo-2" class="tool-icon" />
-          </button>
-          <button class="tool-item" title="重做 (Ctrl+Y)">
-            <Icon icon="lucide:redo-2" class="tool-icon" />
-          </button>
-        </div>
-
-        <div class="toolbar-divider"></div>
-
-        <div class="toolbar-section">
-          <button class="tool-item" title="复制 (Ctrl+C)">
-            <Icon icon="lucide:copy" class="tool-icon" />
-          </button>
-          <button class="tool-item" title="粘贴 (Ctrl+V)">
-            <Icon icon="lucide:clipboard-paste" class="tool-icon" />
-          </button>
-          <button class="tool-item danger" title="删除 (Delete)">
-            <Icon icon="lucide:trash-2" class="tool-icon" />
-          </button>
-        </div>
-      </div>
+      <LeftToolbar 
+        v-model="currentTool"
+        @undo="onUndo"
+        @redo="onRedo"
+        @copy="onCopy"
+        @paste="onPaste"
+        @delete="onDelete"
+      />
 
       <!-- 中间画布区域 -->
       <div class="canvas-wrapper">
@@ -211,10 +110,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import Konva from 'konva'
 import RightPanel from './RightPanel.vue'
+import LeftToolbar from './LeftToolbar.vue'
 import KonvaCanvas from './KonvaCanvas.vue'
 import type { ToolMode } from '../composables/useDrawing'
 import type { VenueData, Seat, Row } from './KonvaCanvas.vue'
@@ -303,13 +203,18 @@ const selectedCount = computed(() => {
 const currentToolLabel = computed(() => {
   const labels: Record<string, string> = {
     'select': '选择',
+    'selectseat': '选择座位',
     'drawRow': '单行座位',
-    'drawArcRow': '弧形座位',
+    'drawSegmentRow': '分段座位',
     'drawMultiRow': '多行座位',
     'drawCircle': '圆形区域',
-    'drawTable': '画桌子',
+    'drawRect': '方形区域',
+    'drawPolygon': '多边形',
+    'drawSector': '扇形',
+    'drawRoundTable': '圆桌',
+    'drawLine': '线条',
     'text': '文字标注',
-    'stage': '舞台'
+    'image': '图片'
   }
   return labels[currentTool.value] || currentTool.value
 })
@@ -365,9 +270,12 @@ const onRowCreated = (seats: Seat[]) => {
 
 const onToolChange = (tool: ToolMode) => {
   currentTool.value = tool
-  // 通知 Canvas 工具已切换
-  canvasRef.value?.setTool?.(tool)
 }
+
+// 监听工具变化，通知 Canvas
+watch(currentTool, (newTool) => {
+  canvasRef.value?.setTool?.(newTool)
+})
 
 const generateTestSeats = () => {
   if (!canvasRef.value) return
@@ -383,6 +291,27 @@ const clearCanvas = () => {
 const resetView = () => {
   canvasRef.value?.resetView()
   zoomLevel.value = 1
+}
+
+// 编辑操作
+const onUndo = () => {
+  console.log('撤销')
+}
+
+const onRedo = () => {
+  console.log('重做')
+}
+
+const onCopy = () => {
+  console.log('复制')
+}
+
+const onPaste = () => {
+  console.log('粘贴')
+}
+
+const onDelete = () => {
+  console.log('删除')
 }
 </script>
 
@@ -421,12 +350,8 @@ const resetView = () => {
   height: 32px;
   background: var(--color-accent);
   border-radius: 8px;
-}
-
-.logo-icon {
-  width: 20px;
-  height: 20px;
   color: white;
+  font-size: 20px;
 }
 
 .chart-name {
@@ -489,68 +414,6 @@ const resetView = () => {
   flex: 1;
   overflow: hidden;
   min-width: 0;
-}
-
-/* 左侧工具栏 */
-.left-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 8px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  overflow-y: auto;
-  min-width: 56px;
-  max-height: 100%;
-}
-
-.toolbar-section {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.toolbar-divider {
-  width: 100%;
-  height: 1px;
-  background: var(--color-border);
-  margin: 4px 0;
-}
-
-.tool-item {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-
-.tool-item:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
-}
-
-.tool-item.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-
-.tool-item.danger:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-}
-
-.tool-icon {
-  width: 20px;
-  height: 20px;
 }
 
 /* 中间画布包装器 */
@@ -679,24 +542,6 @@ const resetView = () => {
   .designer-main {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr;
-  }
-  
-  .left-toolbar {
-    flex-direction: row;
-    flex-wrap: wrap;
-    padding: 8px;
-    min-width: auto;
-    max-height: none;
-  }
-  
-  .toolbar-section {
-    flex-direction: row;
-  }
-  
-  .toolbar-divider {
-    width: 1px;
-    height: 40px;
-    margin: 0 4px;
   }
   
   .control-buttons {
