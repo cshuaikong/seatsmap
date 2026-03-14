@@ -152,17 +152,15 @@ interface SelectedItem {
 }
 
 const selectedItems = ref<SelectedItem[]>([])
-const isDraggingSelection = ref(false)
-const isRotating = ref(false)
-const dragStartPos = ref<{ x: number; y: number } | null>(null)
 const selectionStartPos = ref<{ x: number; y: number } | null>(null)
 const selectionRectKonva = ref<Konva.Rect | null>(null)
+const isBoxSelecting = ref(false)  // 是否正在框选
 
 // 选择装饰层
 let selectionDecorationLayer: Konva.Layer | null = null
-let selectionBorder: Konva.Rect | null = null
-let rotationHandle: Konva.Circle | null = null
-let rotationLine: Konva.Line | null = null
+
+// Transformer 用于变换（移动、旋转）
+let transformer: Konva.Transformer | null = null
 
 // 网格配置
 const GRID_SIZE = 20
@@ -210,6 +208,9 @@ const initKonva = () => {
   // 添加事件监听
   setupStageEvents()
 
+  // 初始化 Transformer
+  initTransformer()
+
   emit('ready', stage)
 
   // 初始化框选功能
@@ -229,7 +230,9 @@ const findSelectableParent = (node: Konva.Node): Konva.Group | null => {
         return current
       }
     }
-    current = current.parent()
+    // 安全获取父节点
+    const parent = current.getParent ? current.getParent() : null
+    current = parent
   }
   return null
 }
@@ -237,43 +240,16 @@ const findSelectableParent = (node: Konva.Node): Konva.Group | null => {
 const setupStageEvents = () => {
   if (!stage) return
 
-  // 滚轮缩放
-  stage.on('wheel', (e) => {
-    e.evt.preventDefault()
-
-    const delta = e.evt.deltaY > 0 ? 0.9 : 1.1
-    const newScale = Math.max(0.1, Math.min(5, scale.value * delta))
-
-    // 以鼠标位置为中心缩放
-    const pointer = stage!.getPointerPosition()
-    if (!pointer) return
-
-    const mousePointTo = {
-      x: (pointer.x - stage!.x()) / scale.value,
-      y: (pointer.y - stage!.y()) / scale.value
-    }
-
-    scale.value = newScale
-
-    const newPos = {
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale
-    }
-
-    stage.x(newPos.x)
-    stage.y(newPos.y)
-
-    // 使用 batchDraw 优化性能
-    layer!.batchDraw()
-  })
+  // 滚轮缩放（已禁用，避免与页面滚动冲突）
+  // stage.on('wheel', (e) => {
+  //   e.evt.preventDefault()
+  //   ...缩放逻辑...
+  // })
 
   // 鼠标按下 - 统一处理框选、平移和绘制
   stage.on('mousedown', (e) => {
-    // 只响应左键
-    if (e.evt.button !== 0) return
-    
-    // 如果正在旋转，不处理其他事件
-    if (isRotating.value) return
+    // 只响应左键 (buttons & 1 表示左键按下)
+    if (!(e.evt.buttons & 1)) return
 
     const pos = stage!.getPointerPosition()
     if (!pos) return
@@ -336,28 +312,45 @@ const setupStageEvents = () => {
       return
     }
 
-    // 点击对象
-    const clickedNode = findSelectableParent(e.target)
-    console.log('点击对象:', e.target.name(), '找到父节点:', clickedNode?.name())
+    // 在 mousedown 中不处理选中，让 click 事件处理
+    // 这样 Konva 可以正常开始拖拽
+  })
+  
+  // 点击事件处理选中
+  stage.on('click', (e) => {
+    if (currentTool.value !== 'select') return
     
-    if (clickedNode) {
-      const type = getNodeType(clickedNode)
-      console.log('对象类型:', type)
-      
-      if (type) {
-        // 检查是否已经选中
-        const isSelected = selectedItems.value.some(item => item.node === clickedNode)
-        
-        if (isSelected) {
-          // 点击已选中对象 = 开始拖拽
-          startDragSelection(stagePos)
-        } else {
-          // 点击未选中对象 = 选中它
-          selectItem(clickedNode, type, e.evt.shiftKey)
-          // 立即开始拖拽
-          startDragSelection(stagePos)
-        }
+    // 如果刚刚完成框选，忽略这次点击
+    if (isBoxSelecting.value) {
+      isBoxSelecting.value = false
+      return
+    }
+    
+    // 点击空白处取消选择
+    if (e.target === stage) {
+      if (!e.evt.shiftKey) {
+        clearSelection()
       }
+      return
+    }
+    
+    // 点击对象 - 处理选中
+    const clickedNode = findSelectableParent(e.target)
+    if (!clickedNode) return
+    
+    const type = getNodeType(clickedNode)
+    if (!type) return
+    
+    const isSelected = selectedItems.value.some(item => item.node === clickedNode)
+    
+    if (isSelected) {
+      // 已选中且没有按住 shift = 取消选中（如果是唯一选中的）
+      if (!e.evt.shiftKey && selectedItems.value.length === 1) {
+        deselectItem(clickedNode.id())
+      }
+    } else {
+      // 未选中：选中它
+      selectItem(clickedNode, type, e.evt.shiftKey)
     }
   })
 
@@ -406,12 +399,6 @@ const setupStageEvents = () => {
       updatePolylinePreview(stagePos)
       return
     }
-    
-    // 处理选中对象拖拽
-    if (isDraggingSelection.value) {
-      dragSelection(stagePos)
-      return
-    }
 
     // 处理框选
     if (selectionStartPos.value && selectionRectKonva.value?.visible()) {
@@ -457,26 +444,13 @@ const setupStageEvents = () => {
 
     // 多边形/扇形/折线绘制通过点击完成，不在mouseup中处理
 
-    // 结束选中对象拖拽
-    if (isDraggingSelection.value) {
-      endDragSelection()
-      return
-    }
-
     // 结束框选
     if (selectionStartPos.value) {
       endBoxSelection(e.evt.shiftKey)
-      return
     }
 
+    // 重置状态
     isDraggingStage.value = false
-  })
-
-  // 点击空白处取消选择
-  stage.on('click', (e) => {
-    if (e.target === stage && !e.evt.shiftKey && currentTool.value === 'select') {
-      clearSelection()
-    }
   })
   
   // 键盘事件 - Delete 删除选中
@@ -586,12 +560,12 @@ const createEllipseGroup = (centerX: number, centerY: number, radiusX: number, r
   })
   group.add(ellipseBoundary)
 
-  // 添加透明点击区域
+  // 添加透明点击区域（与椭圆大小一致，不扩展）
   const clickArea = new Konva.Ellipse({
     x: 0,
     y: 0,
-    radiusX: radiusX + 10,
-    radiusY: radiusY + 10,
+    radiusX: radiusX,
+    radiusY: radiusY,
     fill: 'transparent',
     listening: true,
     name: `ellipse-click-area ellipse-${ellipseId}`
@@ -603,13 +577,13 @@ const createEllipseGroup = (centerX: number, centerY: number, radiusX: number, r
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      document.body.style.cursor = 'pointer'
+      stage!.container().style.cursor = 'move'
       ellipseBoundary.fill('rgba(156, 163, 175, 0.8)')
       layer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    document.body.style.cursor = 'default'
+    stage!.container().style.cursor = 'default'
     ellipseBoundary.fill('rgba(156, 163, 175, 0.6)')
     layer?.batchDraw()
   })
@@ -620,9 +594,10 @@ const createEllipseGroup = (centerX: number, centerY: number, radiusX: number, r
 
 // 选择椭圆区域
 const selectEllipse = (ellipseId: string, additive = false) => {
-  // 椭圆区域只选中边界高亮，不生成座位
-  // 可以扩展为选中后显示操作手柄
-  console.log('选中椭圆区域:', ellipseId)
+  const group = layer?.findOne(`#ellipse-group-${ellipseId}`) as Konva.Group
+  if (group) {
+    selectItem(group, 'ellipse', additive)
+  }
 }
 
 // ==================== 绘制矩形功能 ====================
@@ -723,12 +698,12 @@ const createRectGroup = (x: number, y: number, width: number, height: number, re
   })
   group.add(rect)
 
-  // 添加透明点击区域（比实际矩形大一些，方便选中）
+  // 添加透明点击区域（与实际矩形大小一致）
   const clickArea = new Konva.Rect({
-    x: -5,
-    y: -5,
-    width: width + 10,
-    height: height + 10,
+    x: 0,
+    y: 0,
+    width: width,
+    height: height,
     fill: 'transparent',
     listening: true,
     name: `rect-click-area rect-${rectId}`
@@ -740,13 +715,13 @@ const createRectGroup = (x: number, y: number, width: number, height: number, re
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      document.body.style.cursor = 'pointer'
+      stage!.container().style.cursor = 'move'
       rect.fill('rgba(156, 163, 175, 0.8)') // 悬停时加深颜色
       layer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    document.body.style.cursor = 'default'
+    stage!.container().style.cursor = 'default'
     rect.fill('rgba(156, 163, 175, 0.6)') // 恢复原始颜色
     layer?.batchDraw()
   })
@@ -757,8 +732,10 @@ const createRectGroup = (x: number, y: number, width: number, height: number, re
 
 // 选择矩形区域
 const selectRect = (rectId: string, additive = false) => {
-  // 矩形区域选中时高亮显示
-  console.log('选中矩形区域:', rectId)
+  const group = layer?.findOne(`#rect-group-${rectId}`) as Konva.Group
+  if (group) {
+    selectItem(group, 'rect', additive)
+  }
 }
 
 // ==================== 绘制多边形功能 ====================
@@ -952,9 +929,9 @@ const createPolygonGroup = (points: { x: number; y: number }[], polygonId: strin
   })
   group.add(polygon)
 
-  // 添加透明点击区域
+  // 添加透明点击区域（与多边形大小一致）
   const clickArea = new Konva.Line({
-    points: relativePoints.map((p, i) => i % 2 === 0 ? p * 1.1 : p * 1.1), // 稍微放大一点
+    points: relativePoints,
     fill: 'transparent',
     closed: true,
     listening: true,
@@ -967,13 +944,13 @@ const createPolygonGroup = (points: { x: number; y: number }[], polygonId: strin
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      document.body.style.cursor = 'pointer'
+      stage!.container().style.cursor = 'move'
       polygon.fill('rgba(156, 163, 175, 0.8)')
       layer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    document.body.style.cursor = 'default'
+    stage!.container().style.cursor = 'default'
     polygon.fill('rgba(156, 163, 175, 0.6)')
     layer?.batchDraw()
   })
@@ -984,7 +961,10 @@ const createPolygonGroup = (points: { x: number; y: number }[], polygonId: strin
 
 // 选择多边形区域
 const selectPolygon = (polygonId: string, additive = false) => {
-  console.log('选中多边形区域:', polygonId)
+  const group = layer?.findOne(`#polygon-group-${polygonId}`) as Konva.Group
+  if (group) {
+    selectItem(group, 'polygon', additive)
+  }
 }
 
 // ==================== 绘制线段（折线）功能 ====================
@@ -1118,11 +1098,11 @@ const createPolylineGroup = (points: { x: number; y: number }[], polylineId: str
   })
   group.add(polyline)
   
-  // 添加透明点击区域（稍宽一点）
+  // 添加透明点击区域（与折线宽度一致）
   const clickArea = new Konva.Line({
     points: flatPoints,
     stroke: 'transparent',
-    strokeWidth: 10,
+    strokeWidth: 4,
     listening: true,
     name: `polyline-click-area polyline-${polylineId}`
   })
@@ -1133,14 +1113,14 @@ const createPolylineGroup = (points: { x: number; y: number }[], polylineId: str
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      document.body.style.cursor = 'pointer'
+      stage!.container().style.cursor = 'move'
       polyline.stroke('rgba(156, 163, 175, 1)')
       polyline.strokeWidth(3)
       layer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    document.body.style.cursor = 'default'
+    stage!.container().style.cursor = 'default'
     polyline.stroke('rgba(156, 163, 175, 0.8)')
     polyline.strokeWidth(2)
     layer?.batchDraw()
@@ -1152,7 +1132,31 @@ const createPolylineGroup = (points: { x: number; y: number }[], polylineId: str
 
 // 选择折线
 const selectPolyline = (polylineId: string, additive = false) => {
-  console.log('选中折线:', polylineId)
+  const group = layer?.findOne(`#polyline-group-${polylineId}`) as Konva.Group
+  if (group) {
+    selectItem(group, 'polyline', additive)
+  }
+}
+
+// 选择座位（使用新的选择系统）
+const selectSeat = (seatId: string, additive = false) => {
+  const group = seatGroups.get(seatId)
+  if (group) {
+    selectItem(group, 'seat', additive)
+  }
+}
+
+// 取消选择座位
+const deselectSeat = (seatId: string) => {
+  deselectItem(seatId)
+}
+
+// 选择排（使用新的选择系统）
+const selectRow = (rowId: string, additive = false) => {
+  const group = layer?.findOne(`#row-group-${rowId}`) as Konva.Group
+  if (group) {
+    selectItem(group, 'row', additive)
+  }
 }
 
 // ==================== 绘制扇形功能 ====================
@@ -1725,6 +1729,16 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
       }
       emit('seatClick', seat.id)
     })
+    
+    // 鼠标悬停显示移动光标
+    seatGroup.on('mouseenter', () => {
+      if (currentTool.value === 'select') {
+        stage!.container().style.cursor = 'move'
+      }
+    })
+    seatGroup.on('mouseleave', () => {
+      stage!.container().style.cursor = 'default'
+    })
 
     // 拖拽事件 - 支持多选整体移动
     seatGroup.on('dragstart', (e) => {
@@ -1790,7 +1804,7 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
   })
 
   // 添加点击区域 - 用于点击排时选中整排
-  // 计算排的边界
+  // 计算排的边界（只计算座位实际占用区域，不加padding）
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   if (seats.length > 0) {
     seats.forEach((seat) => {
@@ -1803,12 +1817,7 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
       maxX = Math.max(maxX, relativeX + SEAT_RADIUS)
       maxY = Math.max(maxY, relativeY + SEAT_RADIUS)
     })
-    // 添加一些padding，使点击区域更大
-    const padding = 8
-    minX -= padding
-    minY -= padding
-    maxX += padding
-    maxY += padding
+    // 不再添加padding，确保边界框精确贴合座位
   }
 
   // 创建透明点击区域
@@ -2358,6 +2367,66 @@ const updateCursor = () => {
   }
 }
 
+// ==================== Transformer ====================
+
+// 初始化 Transformer
+const initTransformer = () => {
+  if (!selectionDecorationLayer) return
+  
+  transformer = new Konva.Transformer({
+    // 禁用 Transformer 的拖拽功能，使用节点原生拖拽
+    resizeEnabled: false,
+    rotateEnabled: true,
+    rotateAnchorOffset: 20,
+    rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
+    visible: false,
+    borderStroke: '#3b82f6',
+    borderStrokeWidth: 1,
+    anchorStroke: '#3b82f6',
+    anchorFill: '#fff',
+    anchorSize: 8,
+    // 关键：确保边框贴合对象
+    padding: 0,
+    // 使用精确边界框，不包含 stroke
+    ignoreStroke: true,
+    // 不使用固定比例
+    keepRatio: false,
+    // 不使用中心缩放
+    centeredScaling: false,
+    // 边界框函数，确保精确贴合
+    boundBoxFunc: (oldBox, newBox) => newBox,
+  })
+  
+  selectionDecorationLayer.add(transformer)
+}
+
+// 更新 Transformer 的节点
+const updateTransformer = () => {
+  console.log('updateTransformer, 选中数:', selectedItems.value.length)
+  if (!transformer || !selectionDecorationLayer) {
+    console.log('transformer 或 selectionDecorationLayer 不存在')
+    return
+  }
+  
+  if (selectedItems.value.length === 0) {
+    transformer.nodes([])
+    transformer.visible(false)
+  } else {
+    // 获取所有选中的节点
+    const nodes = selectedItems.value.map(item => item.node)
+    console.log('更新 transformer nodes:', nodes.length)
+    transformer.nodes(nodes)
+    transformer.visible(true)
+    transformer.moveToTop()
+    // 强制更新以显示正确位置
+    transformer.forceUpdate()
+  }
+  
+  // 确保 layer 刷新
+  selectionDecorationLayer.batchDraw()
+  layer?.batchDraw()
+}
+
 // ==================== 框选功能 ====================
 
 // ==================== 新的选择系统 ====================
@@ -2373,45 +2442,6 @@ const initSelection = () => {
     listening: false
   })
   selectionDecorationLayer?.add(selectionRectKonva.value)
-  
-  // 初始化选择边框
-  selectionBorder = new Konva.Rect({
-    visible: false,
-    stroke: '#3b82f6',
-    strokeWidth: 1,
-    dash: [4, 4],
-    listening: false
-  })
-  
-  // 初始化旋转手柄
-  rotationHandle = new Konva.Circle({
-    radius: 6,
-    fill: '#fff',
-    stroke: '#3b82f6',
-    strokeWidth: 2,
-    visible: false,
-    listening: true,
-    name: 'rotation-handle'
-  })
-  
-  // 初始化旋转连线
-  rotationLine = new Konva.Line({
-    stroke: '#3b82f6',
-    strokeWidth: 1,
-    dash: [4, 4],
-    visible: false,
-    listening: false
-  })
-  
-  selectionDecorationLayer?.add(selectionBorder)
-  selectionDecorationLayer?.add(rotationLine)
-  selectionDecorationLayer?.add(rotationHandle)
-  
-  // 绑定旋转手柄事件
-  rotationHandle.on('mousedown', (e) => {
-    e.cancelBubble = true
-    startRotation(e.evt)
-  })
 }
 
 // 网格对齐辅助函数
@@ -2438,52 +2468,9 @@ const getAllSelectableNodes = (): Konva.Group[] => {
   return nodes
 }
 
-// 更新选择装饰（边框、旋转手柄）
+// 更新选择装饰 - 使用 Transformer
 const updateSelectionDecoration = () => {
-  if (!selectionDecorationLayer || selectedItems.value.length === 0) {
-    selectionBorder?.visible(false)
-    rotationHandle?.visible(false)
-    rotationLine?.visible(false)
-    selectionDecorationLayer?.batchDraw()
-    return
-  }
-  
-  // 计算选中对象的边界框
-  let minX = Infinity, minY = Infinity
-  let maxX = -Infinity, maxY = -Infinity
-  
-  selectedItems.value.forEach(item => {
-    const box = item.node.getClientRect()
-    minX = Math.min(minX, box.x)
-    minY = Math.min(minY, box.y)
-    maxX = Math.max(maxX, box.x + box.width)
-    maxY = Math.max(maxY, box.y + box.height)
-  })
-  
-  // 更新选择边框
-  selectionBorder?.setAttrs({
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
-    visible: true
-  })
-  
-  // 更新旋转手柄位置（边框上方中心）
-  const centerX = (minX + maxX) / 2
-  rotationHandle?.setAttrs({
-    x: centerX,
-    y: minY - 20,
-    visible: true
-  })
-  
-  // 更新旋转连线
-  rotationLine?.setAttrs({
-    points: [centerX, minY, centerX, minY - 14],
-    visible: true
-  })
-  
-  selectionDecorationLayer.batchDraw()
+  updateTransformer()
 }
 
 // 选择对象
@@ -2502,6 +2489,48 @@ const selectItem = (node: Konva.Group, type: SelectableType, additive = false) =
     return
   }
   
+  // 设置为可拖拽
+  node.draggable(true)
+  
+  // 移除旧的事件监听（避免重复）
+  node.off('dragstart')
+  node.off('dragmove')
+  node.off('dragend')
+  
+  // 添加拖拽事件监听
+  node.on('dragstart', () => {
+    document.body.style.cursor = 'grabbing'
+  })
+  node.on('dragmove', (e) => {
+    // 拖拽时更新 Transformer
+    transformer?.forceUpdate()
+    
+    // 多选时：让其他选中对象跟随移动
+    if (selectedItems.value.length > 1) {
+      const draggedItem = selectedItems.value.find(item => item.node === node)
+      if (draggedItem) {
+        // 计算当前拖拽的偏移量
+        const dx = node.x() - draggedItem.originalPos.x
+        const dy = node.y() - draggedItem.originalPos.y
+        
+        // 应用到其他选中的对象
+        selectedItems.value.forEach(item => {
+          if (item.node !== node) {
+            item.node.x(item.originalPos.x + dx)
+            item.node.y(item.originalPos.y + dy)
+          }
+        })
+      }
+    }
+  })
+  node.on('dragend', () => {
+    document.body.style.cursor = 'move'
+    // 更新所有选中对象的原始位置
+    selectedItems.value.forEach(item => {
+      item.originalPos = { x: item.node.x(), y: item.node.y() }
+    })
+  })
+  
   // 保存原始位置和旋转
   selectedItems.value.push({
     id: node.id(),
@@ -2514,6 +2543,9 @@ const selectItem = (node: Konva.Group, type: SelectableType, additive = false) =
   // 添加选中视觉反馈
   node.setAttr('selected', true)
   
+  // 应用选中高亮效果
+  applySelectionHighlight(node, true)
+  
   updateSelectionDecoration()
 }
 
@@ -2522,6 +2554,14 @@ const deselectItem = (id: string) => {
   const item = selectedItems.value.find(i => i.id === id)
   if (item) {
     item.node.setAttr('selected', false)
+    // 禁用拖拽
+    item.node.draggable(false)
+    // 移除事件监听
+    item.node.off('dragstart')
+    item.node.off('dragmove')
+    item.node.off('dragend')
+    // 移除选中高亮效果
+    applySelectionHighlight(item.node, false)
     selectedItems.value = selectedItems.value.filter(i => i.id !== id)
   }
   updateSelectionDecoration()
@@ -2531,133 +2571,50 @@ const deselectItem = (id: string) => {
 const clearSelection = () => {
   selectedItems.value.forEach(item => {
     item.node.setAttr('selected', false)
+    // 禁用拖拽
+    item.node.draggable(false)
+    // 移除事件监听
+    item.node.off('dragstart')
+    item.node.off('dragmove')
+    item.node.off('dragend')
+    // 移除选中高亮效果
+    applySelectionHighlight(item.node, false)
   })
   selectedItems.value = []
   updateSelectionDecoration()
 }
 
-// 开始拖拽选中对象
+// 手动拖拽已由 Transformer 处理，这些函数保留供兼容
 const startDragSelection = (pos: { x: number; y: number }) => {
-  if (selectedItems.value.length === 0) return
-  
-  isDraggingSelection.value = true
-  dragStartPos.value = pos
-  
-  // 保存原始位置
-  selectedItems.value.forEach(item => {
-    item.originalPos = { x: item.node.x(), y: item.node.y() }
-  })
+  // Transformer 会自动处理拖拽，这里不需要额外逻辑
 }
 
-// 拖拽移动
 const dragSelection = (pos: { x: number; y: number }) => {
-  if (!isDraggingSelection.value || !dragStartPos.value) return
-  
-  const dx = pos.x - dragStartPos.value.x
-  const dy = pos.y - dragStartPos.value.y
-  
-  selectedItems.value.forEach(item => {
-    // 计算新位置（带网格对齐）
-    const newX = item.originalPos.x + dx
-    const newY = item.originalPos.y + dy
-    
-    // 网格对齐
-    const snappedX = snapToGrid(newX)
-    const snappedY = snapToGrid(newY)
-    
-    item.node.x(snappedX)
-    item.node.y(snappedY)
-  })
-  
-  updateSelectionDecoration()
-  layer?.batchDraw()
+  // Transformer 会自动处理拖拽
 }
 
-// 结束拖拽
 const endDragSelection = () => {
-  isDraggingSelection.value = false
-  dragStartPos.value = null
+  // Transformer 会自动处理拖拽结束
 }
 
-// 开始旋转
+// 旋转已由 Transformer 处理
 const startRotation = (e: MouseEvent) => {
-  if (selectedItems.value.length === 0) return
-  
-  isRotating.value = true
-  
-  // 计算整体中心点
-  let minX = Infinity, minY = Infinity
-  let maxX = -Infinity, maxY = -Infinity
-  
-  selectedItems.value.forEach(item => {
-    const box = item.node.getClientRect()
-    minX = Math.min(minX, box.x)
-    minY = Math.min(minY, box.y)
-    maxX = Math.max(maxX, box.x + box.width)
-    maxY = Math.max(maxY, box.y + box.height)
-  })
-  
-  const centerX = (minX + maxX) / 2
-  const centerY = (minY + maxY) / 2
-  
-  // 保存原始旋转
-  selectedItems.value.forEach(item => {
-    item.originalRotation = item.node.rotation()
-  })
-  
-  // 计算起始角度
-  const startAngle = Math.atan2(e.offsetY - centerY, e.offsetX - centerX)
-  
-  // 绑定全局鼠标移动事件
-  const handleRotateMove = (moveE: MouseEvent) => {
-    if (!isRotating.value) return
-    
-    const currentAngle = Math.atan2(moveE.offsetY - centerY, moveE.offsetX - centerX)
-    const rotationDelta = (currentAngle - startAngle) * 180 / Math.PI
-    
-    selectedItems.value.forEach(item => {
-      // 围绕整体中心旋转每个对象
-      const box = item.node.getClientRect()
-      const itemCenterX = box.x + box.width / 2
-      const itemCenterY = box.y + box.height / 2
-      
-      // 计算相对于整体中心的偏移
-      const dx = itemCenterX - centerX
-      const dy = itemCenterY - centerY
-      
-      // 旋转偏移
-      const rad = rotationDelta * Math.PI / 180
-      const newDx = dx * Math.cos(rad) - dy * Math.sin(rad)
-      const newDy = dx * Math.sin(rad) + dy * Math.cos(rad)
-      
-      // 应用新位置
-      item.node.x(item.node.x() + (newDx - dx))
-      item.node.y(item.node.y() + (newDy - dy))
-      
-      // 应用旋转（保持相对旋转）
-      item.node.rotation(item.originalRotation + rotationDelta)
-    })
-    
-    updateSelectionDecoration()
-    layer?.batchDraw()
-  }
-  
-  const handleRotateEnd = () => {
-    isRotating.value = false
-    window.removeEventListener('mousemove', handleRotateMove)
-    window.removeEventListener('mouseup', handleRotateEnd)
-  }
-  
-  window.addEventListener('mousemove', handleRotateMove)
-  window.addEventListener('mouseup', handleRotateEnd)
+  // Transformer 会自动处理旋转
 }
 
 // 开始框选
 const startBoxSelection = (pos: { x: number; y: number }) => {
-  selectionStartPos.value = pos
+  if (!stage) return
+  
+  // 直接使用屏幕坐标（指针位置）
+  const pointer = stage.getPointerPosition()
+  if (!pointer) return
+  
+  isBoxSelecting.value = true  // 标记正在框选
+  selectionStartPos.value = pointer
   selectionRectKonva.value?.setAttrs({
-    x: pos.x,
-    y: pos.y,
+    x: pointer.x,
+    y: pointer.y,
     width: 0,
     height: 0,
     visible: true
@@ -2666,12 +2623,16 @@ const startBoxSelection = (pos: { x: number; y: number }) => {
 
 // 更新框选框
 const updateBoxSelection = (pos: { x: number; y: number }) => {
-  if (!selectionStartPos.value || !selectionRectKonva.value) return
+  if (!selectionStartPos.value || !selectionRectKonva.value || !stage) return
   
-  const x = Math.min(selectionStartPos.value.x, pos.x)
-  const y = Math.min(selectionStartPos.value.y, pos.y)
-  const width = Math.abs(pos.x - selectionStartPos.value.x)
-  const height = Math.abs(pos.y - selectionStartPos.value.y)
+  // 使用屏幕坐标
+  const pointer = stage.getPointerPosition()
+  if (!pointer) return
+  
+  const x = Math.min(selectionStartPos.value.x, pointer.x)
+  const y = Math.min(selectionStartPos.value.y, pointer.y)
+  const width = Math.abs(pointer.x - selectionStartPos.value.x)
+  const height = Math.abs(pointer.y - selectionStartPos.value.y)
   
   selectionRectKonva.value.setAttrs({ x, y, width, height })
   selectionDecorationLayer?.batchDraw()
@@ -2679,18 +2640,46 @@ const updateBoxSelection = (pos: { x: number; y: number }) => {
 
 // 结束框选
 const endBoxSelection = (additive: boolean) => {
-  if (!selectionRectKonva.value || !selectionStartPos.value) return
+  if (!selectionRectKonva.value || !selectionStartPos.value || !stage || !layer) return
   
-  const box = selectionRectKonva.value.getClientRect()
+  // 获取框选框相对于 layer 的边界
+  const selRect = selectionRectKonva.value.getClientRect({ relativeTo: layer })
+  
+  console.log('框选框:', selRect)
+  
+  // 框选区域太小，忽略
+  if (selRect.width < 5 || selRect.height < 5) {
+    selectionRectKonva.value.visible(false)
+    selectionStartPos.value = null
+    return
+  }
   
   // 获取所有可选中对象
   const allNodes = getAllSelectableNodes()
+  console.log('总对象:', allNodes.length)
   
-  // 找到与框选区域相交的对象
+  // 找到与框选区域相交的对象（部分相交或完全包含）
   const intersectingNodes = allNodes.filter(node => {
-    const nodeBox = node.getClientRect()
-    return Konva.Util.haveIntersection(box, nodeBox)
+    // 获取节点相对于 layer 的边界
+    const nodeRect = node.getClientRect({ relativeTo: layer })
+    
+    console.log('检查:', node.id(), nodeRect)
+    
+    // AABB 相交检测（包含部分重叠和完全包含）
+    const intersects = (
+      nodeRect.x < selRect.x + selRect.width &&
+      nodeRect.x + nodeRect.width > selRect.x &&
+      nodeRect.y < selRect.y + selRect.height &&
+      nodeRect.y + nodeRect.height > selRect.y
+    )
+    
+    if (intersects) {
+      console.log('✓ 选中:', node.id())
+    }
+    return intersects
   })
+  
+  console.log('最终选中:', intersectingNodes.length)
   
   if (!additive) {
     clearSelection()
@@ -2704,10 +2693,80 @@ const endBoxSelection = (additive: boolean) => {
     }
   })
   
+  // 强制更新 Transformer
+  updateTransformer()
+  
   // 隐藏选择框
   selectionRectKonva.value.visible(false)
   selectionStartPos.value = null
   selectionDecorationLayer?.batchDraw()
+  layer?.batchDraw()
+  
+  // 标记框选已完成（在 click 事件中使用）
+  isBoxSelecting.value = true
+}
+
+// 应用选中高亮效果
+const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
+  console.log('applySelectionHighlight:', node.id(), isSelected, node.name())
+  const name = node.name() || ''
+  
+  // 处理座位组
+  if (name.includes('seat')) {
+    const circle = node.findOne<Konva.Circle>('.seatCircle')
+    if (circle) {
+      if (isSelected) {
+        // 选中时：蓝色填充，白色边框，加粗
+        circle.stroke('#3b82f6')
+        circle.strokeWidth(3)
+        circle.shadowColor('#3b82f6')
+        circle.shadowBlur(8)
+        circle.shadowOpacity(0.5)
+      } else {
+        // 取消选中时：恢复原状
+        const isNewSeat = circle.fill() === '#ef4444'
+        circle.stroke(isNewSeat ? '#ef4444' : circle.fill())
+        circle.strokeWidth(1)
+        circle.shadowEnabled(false)
+      }
+    }
+  }
+  // 处理形状组（矩形、椭圆、多边形等）
+  else if (name.includes('shape-group') || name.includes('rect-group') || 
+           name.includes('ellipse-group') || name.includes('polygon-group')) {
+    // 查找实际的可视形状（第一个非点击区域的子元素）
+    const shapes = node.getChildren((child) => {
+      const childName = child.name() || ''
+      return !childName.includes('click-area') && child instanceof Konva.Shape
+    })
+    
+    shapes.forEach((shape) => {
+      if (isSelected) {
+        // 选中时添加蓝色边框和发光效果
+        shape.stroke('#3b82f6')
+        shape.strokeWidth(2)
+        shape.shadowColor('#3b82f6')
+        shape.shadowBlur(8)
+        shape.shadowOpacity(0.5)
+      } else {
+        // 取消选中时恢复原状
+        shape.stroke(null)
+        shape.strokeWidth(0)
+        shape.shadowEnabled(false)
+      }
+    })
+  }
+  // 处理排组
+  else if (name.includes('row-group')) {
+    // 排组的选中效果：给所有子座位添加高亮
+    node.getChildren().forEach((child) => {
+      if (child instanceof Konva.Group && child.name()?.includes('seat')) {
+        applySelectionHighlight(child, isSelected)
+      }
+    })
+  }
+  
+  layer?.batchDraw()
 }
 
 // 获取节点类型
