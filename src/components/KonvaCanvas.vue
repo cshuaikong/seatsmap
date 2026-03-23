@@ -66,7 +66,6 @@ let activeLayer: Konva.Layer | null = null
 // 兼容旧代码的别名（后续逐步替换）
 let layer: Konva.Layer | null = null
 
-let gridGroup: Konva.Group | null = null
 let transformLayer: Konva.Layer | null = null
 let drawingLayer: Konva.Layer | null = null
 const sectionGroups = new Map<string, Konva.Group>()
@@ -176,11 +175,111 @@ const selectionStartPos = ref<{ x: number; y: number } | null>(null)
 const selectionRectKonva = ref<Konva.Rect | null>(null)
 const isBoxSelecting = ref(false)  // 是否正在框选
 
+// 拖拽完成标志 - 用于区分拖拽和点击
+let justDragged = false
+
 // 选择装饰层
 let selectionDecorationLayer: Konva.Layer | null = null
 
 // Transformer 用于变换（移动、旋转）
 let transformer: Konva.Transformer | null = null
+
+// 光标状态缓存（避免重复写 DOM）
+let currentCursor = 'default'
+const setCursor = (cursor: string) => {
+  if (currentCursor === cursor) return
+  currentCursor = cursor
+  if (stage) stage.container().style.cursor = cursor
+}
+
+// 统一拖拽状态（非响应式，避免 Vue 开销）
+interface DragAllItem {
+  node: Konva.Node
+  startX: number
+  startY: number
+}
+interface UnifiedDragState {
+  active: boolean
+  startScreenX: number
+  startScreenY: number
+  items: DragAllItem[]
+}
+const unifiedDragState: UnifiedDragState = {
+  active: false,
+  startScreenX: 0,
+  startScreenY: 0,
+  items: []
+}
+
+const startDragAll = (screenPos: { x: number; y: number }) => {
+  unifiedDragState.active = true
+  unifiedDragState.startScreenX = screenPos.x
+  unifiedDragState.startScreenY = screenPos.y
+  unifiedDragState.items = selectedItems.value.map(item => ({
+    node: item.node as Konva.Group,
+    startX: item.node.x(),
+    startY: item.node.y()
+  }))
+  // 拖拽开始时隐藏所有座位标签，提升性能
+  unifiedDragState.items.forEach(item => {
+    const label = (item.node as any).findOne('.seatLabel')
+    if (label) label.visible(false)
+  })
+  setCursor('grabbing')
+  document.body.style.cursor = 'grabbing'
+}
+
+let dragRafId = 0
+let lastDragRenderTime = 0
+const DRAG_RENDER_INTERVAL = 33 // ~30fps
+
+const updateDragAll = (screenPos: { x: number; y: number }) => {
+  if (!unifiedDragState.active || !stage) return
+  const scaleVal = stage.scaleX()
+  const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
+  const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
+  // 先同步更新节点位置（纯数学，无渲染开销）
+  unifiedDragState.items.forEach(item => {
+    item.node.x(item.startX + dx)
+    item.node.y(item.startY + dy)
+  })
+  // 节流到 30fps，减少重绘开销
+  const now = performance.now()
+  if (now - lastDragRenderTime < DRAG_RENDER_INTERVAL) return
+  lastDragRenderTime = now
+  transformer?.forceUpdate()
+  staticLayer?.batchDraw()
+  selectionDecorationLayer?.batchDraw()
+}
+
+const endDragAll = () => {
+  if (!unifiedDragState.active) return
+  // 取消未执行的渲染帧
+  if (dragRafId) {
+    cancelAnimationFrame(dragRafId)
+    dragRafId = 0
+  }
+  // 拖拽结束，恢复座位标签显示
+  unifiedDragState.items.forEach(item => {
+    const label = (item.node as any).findOne('.seatLabel')
+    if (label) label.visible(true)
+  })
+  // 只有真正移动了才设 justDragged，防止误取消选中
+  const moved = unifiedDragState.items.some(item =>
+    Math.abs(item.node.x() - item.startX) > 2 ||
+    Math.abs(item.node.y() - item.startY) > 2
+  )
+  justDragged = moved
+  unifiedDragState.active = false
+  document.body.style.cursor = ''
+  // 更新 originalPos
+  selectedItems.value.forEach(item => {
+    item.originalPos = { x: item.node.x(), y: item.node.y() }
+  })
+  unifiedDragState.items = []
+  // 最终重绘，恢复标签
+  staticLayer?.batchDraw()
+}
 
 // 网格配置
 const GRID_SIZE = 20
@@ -223,11 +322,7 @@ const initKonva = () => {
   drawingLayer = new Konva.Layer()
   stage.add(drawingLayer)
 
-  // 添加网格背景
-  gridGroup = new Konva.Group({ listening: false })
-  updateGrid()
-
-  transformLayer.add(gridGroup)
+  // 网格背景已移除（性能优化）
 
   // 选择装饰层（在最上层）
   selectionDecorationLayer = new Konva.Layer()
@@ -329,6 +424,21 @@ const setupStageEvents = () => {
     // ===== 选择模式 =====
     if (currentTool.value !== 'select') return
 
+    // 检查是否在 Transformer 框内 → 进入统一拖拽模式
+    if (transformer && transformer.visible() && selectedItems.value.length > 0) {
+      const trRect = transformer.getClientRect()
+      const insideTr = (
+        pos.x >= trRect.x &&
+        pos.x <= trRect.x + trRect.width &&
+        pos.y >= trRect.y &&
+        pos.y <= trRect.y + trRect.height
+      )
+      if (insideTr) {
+        startDragAll(pos)
+        return  // 不触发框选或其他逻辑
+      }
+    }
+
     // 点击舞台空白处
     if (e.target === stage) {
       // Shift+点击 = 平移画布
@@ -342,14 +452,31 @@ const setupStageEvents = () => {
       startBoxSelection(stagePos)
       return
     }
+    
+    // 检查是否点击了已选中的节点或其子元素
+    // 如果是，让 Transformer 处理拖拽，不启动框选
+    const clickedNode = findSelectableParent(e.target)
+    if (clickedNode) {
+      const isAlreadySelected = selectedItems.value.some(item => item.node === clickedNode)
+      if (isAlreadySelected) {
+        // 已选中，让 Transformer 处理拖拽，不干预
+        return
+      }
+    }
 
-    // 在 mousedown 中不处理选中，让 click 事件处理
-    // 这样 Konva 可以正常开始拖拽
+    // 点击未选中的对象，不在这里处理（交给 click 事件）
+    // 但也不启动框选
   })
-  
-  // 点击事件处理选中
+
+// 点击事件处理选中
   stage.on('click', (e) => {
     if (currentTool.value !== 'select') return
+    
+    // 如果刚刚完成拖拽，忽略这次点击（避免拖拽结束后误触发取消选中）
+    if (justDragged) {
+      justDragged = false
+      return
+    }
     
     // 如果刚刚完成框选，忽略这次点击
     if (isBoxSelecting.value) {
@@ -389,6 +516,12 @@ const setupStageEvents = () => {
   stage.on('mousemove', (e) => {
     const pos = stage!.getPointerPosition()
     if (!pos) return
+
+    // 统一拖拽模式优先处理
+    if (unifiedDragState.active) {
+      updateDragAll(pos)
+      return
+    }
 
     // 将屏幕坐标转换为舞台坐标
     const transform = stage!.getAbsoluteTransform().copy()
@@ -431,11 +564,6 @@ const setupStageEvents = () => {
       return
     }
 
-    // 拖拽模式下，mousemove 不需要额外处理（由 node dragmove 处理）
-    if (dragState.isDragging) {
-      return
-    }
-
     // 处理框选
     if (selectionStartPos.value && selectionRectKonva.value?.visible()) {
       updateBoxSelection(stagePos)
@@ -447,6 +575,19 @@ const setupStageEvents = () => {
       stage!.x(stage!.x() + e.evt.movementX)
       stage!.y(stage!.y() + e.evt.movementY)
       staticLayer!.batchDraw()
+      return
+    }
+
+    // 选择模式下：判断鼠标是否在 Transformer 框内，控制光标
+    if (currentTool.value === 'select' && transformer && transformer.visible() && selectedItems.value.length > 0) {
+      const trRect = transformer.getClientRect()
+      const insideTr = (
+        pos.x >= trRect.x &&
+        pos.x <= trRect.x + trRect.width &&
+        pos.y >= trRect.y &&
+        pos.y <= trRect.y + trRect.height
+      )
+      setCursor(insideTr ? 'move' : 'default')
     }
   })
 
@@ -455,6 +596,11 @@ const setupStageEvents = () => {
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
+    // 统一拖拽结束优先处理
+    if (unifiedDragState.active) {
+      endDragAll()
+      return
+    }
     // 将屏幕坐标转换为舞台坐标
     const transform = stage!.getAbsoluteTransform().copy()
     transform.invert()
@@ -613,13 +759,13 @@ const createEllipseGroup = (centerX: number, centerY: number, radiusX: number, r
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      stage!.container().style.cursor = 'move'
+      setCursor('move')
       ellipseBoundary.fill('rgba(156, 163, 175, 0.8)')
       staticLayer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    stage!.container().style.cursor = 'default'
+    setCursor('default')
     ellipseBoundary.fill('rgba(156, 163, 175, 0.6)')
     staticLayer?.batchDraw()
   })
@@ -751,13 +897,13 @@ const createRectGroup = (x: number, y: number, width: number, height: number, re
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      stage!.container().style.cursor = 'move'
+      setCursor('move')
       rect.fill('rgba(156, 163, 175, 0.8)') // 悬停时加深颜色
       staticLayer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    stage!.container().style.cursor = 'default'
+    setCursor('default')
     rect.fill('rgba(156, 163, 175, 0.6)') // 恢复原始颜色
     staticLayer?.batchDraw()
   })
@@ -980,13 +1126,13 @@ const createPolygonGroup = (points: { x: number; y: number }[], polygonId: strin
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      stage!.container().style.cursor = 'move'
+      setCursor('move')
       polygon.fill('rgba(156, 163, 175, 0.8)')
       staticLayer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    stage!.container().style.cursor = 'default'
+    setCursor('default')
     polygon.fill('rgba(156, 163, 175, 0.6)')
     staticLayer?.batchDraw()
   })
@@ -1149,14 +1295,14 @@ const createPolylineGroup = (points: { x: number; y: number }[], polylineId: str
   })
   clickArea.on('mouseenter', () => {
     if (currentTool.value === 'select') {
-      stage!.container().style.cursor = 'move'
+      setCursor('move')
       polyline.stroke('rgba(156, 163, 175, 1)')
       polyline.strokeWidth(3)
       staticLayer?.batchDraw()
     }
   })
   clickArea.on('mouseleave', () => {
-    stage!.container().style.cursor = 'default'
+    setCursor('default')
     polyline.stroke('rgba(156, 163, 175, 0.8)')
     polyline.strokeWidth(2)
     staticLayer?.batchDraw()
@@ -1706,6 +1852,22 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
     name: 'row-group',
     perfectDrawEnabled: false // 禁用精确绘制提升性能
   })
+  
+  // 在 Group 级别绑定鼠标事件，确保无论点击区域还是座位都能统一响应
+  group.on('mouseenter', () => {
+    if (currentTool.value !== 'select') return
+    // 使用 setTimeout 确保能获取到最新的 selected 状态
+    setTimeout(() => {
+      if (group.getAttr('selected')) {
+        document.body.style.cursor = 'grabbing'
+      } else {
+        document.body.style.cursor = 'grab'
+      }
+    }, 0)
+  })
+  group.on('mouseleave', () => {
+    document.body.style.cursor = 'default'
+  })
 
   // 计算旋转角度的弧度
   const angleRad = (rotation * Math.PI) / 180
@@ -1737,7 +1899,8 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
       fill: '#ef4444',
       stroke: '#ef4444',
       strokeWidth: 1,
-      name: 'seatCircle'
+      name: 'seatCircle',
+      listening: false // 关键：不拦截事件，让事件穿透到 Group
     })
     circle.cache()
 
@@ -1752,7 +1915,8 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
       offsetX: 0,
       offsetY: 0,
       align: 'center',
-      verticalAlign: 'middle'
+      verticalAlign: 'middle',
+      listening: false // 关键：不拦截事件，让事件穿透到 Group
     })
     // 文字居中定位
     text.offsetX(text.width() / 2)
@@ -1761,36 +1925,30 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
     seatGroup.add(circle)
     seatGroup.add(text)
 
-    // 座位点击事件（仅用于选中/取消选中）
+    // 座位点击事件 - 默认选中整排
     seatGroup.on('click tap', (e) => {
       if (currentTool.value !== 'select') return
       
-      // 如果父排组已选中，不处理点击（让排组处理）
+      // 获取父排组
       const parentRow = seatGroup.getParent()
-      if (parentRow && parentRow.getAttr('selected')) {
-        return
-      }
+      if (!parentRow) return
       
+      // 默认行为：点击座位选中整排
       e.cancelBubble = true
-      if (selectedSeatIds.value.has(seat.id)) {
-        deselectSeat(seat.id)
+      const rowId = parentRow.id().replace('row-group-', '')
+      
+      const isSelected = selectedItems.value.some(item => item.id === parentRow.id())
+      if (isSelected) {
+        // 已选中，Shift 追加，否则取消选中
+        if (!e.evt.shiftKey) {
+          deselectItem(parentRow.id())
+        }
       } else {
-        selectSeat(seat.id, e.evt.shiftKey)
+        selectRow(rowId, e.evt.shiftKey)
       }
-      emit('seatClick', seat.id)
     })
     
-    // 鼠标悬停光标
-    seatGroup.on('mouseenter', () => {
-      if (currentTool.value === 'select' && stage) {
-        stage.container().style.cursor = 'pointer'
-      }
-    })
-    seatGroup.on('mouseleave', () => {
-      if (stage) {
-        stage.container().style.cursor = 'default'
-      }
-    })
+    // 鼠标事件已移至 Group 级别统一处理
 
     group.add(seatGroup)
     seatGroups.set(seat.id, seatGroup)
@@ -1824,28 +1982,15 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
     name: `row-click-area row-${rowId}`
   })
   clickArea.on('click', (e) => {
-    e.cancelBubble = true
     if (currentTool.value !== 'select') return
-
-    // 点击排背景时，选中整排
-    if (selectedRowIds.value.has(rowId)) {
-      // 如果已选中，取消选中（除非按住Shift）
-      if (!e.evt.shiftKey) {
-        // 检查是否点击在座位之外（即排背景）
-        // 如果座位已经被选中，并且点击背景，则保持选中状态
-        // 只有在单独点击背景时才切换
-      }
+    
+    // 如果排组已选中，不处理点击（避免重复触发）
+    if (group.getAttr('selected')) {
+      return
     }
+    
+    e.cancelBubble = true
     selectRow(rowId, e.evt.shiftKey)
-  })
-  // 鼠标悬停效果
-  clickArea.on('mouseenter', () => {
-    if (currentTool.value === 'select') {
-      document.body.style.cursor = 'pointer'
-    }
-  })
-  clickArea.on('mouseleave', () => {
-    document.body.style.cursor = 'default'
   })
   group.add(clickArea)
 
@@ -1853,36 +1998,6 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
 }
 
 // ==================== 网格 ====================
-
-const updateGrid = () => {
-  if (!gridGroup || !props.showGrid || !stage) return
-
-  gridGroup.destroyChildren()
-  const gridSize = 20
-  const width = stage.width()
-  const height = stage.height()
-
-  for (let x = 0; x <= width; x += gridSize) {
-    const line = new Konva.Line({
-      points: [x, 0, x, height],
-      stroke: '#d4d0c8',
-      strokeWidth: 0.5,
-      opacity: 0.6
-    })
-    gridGroup.add(line)
-  }
-
-  for (let y = 0; y <= height; y += gridSize) {
-    const line = new Konva.Line({
-      points: [0, y, width, y],
-      stroke: '#d4d0c8',
-      strokeWidth: 0.5,
-      opacity: 0.6
-    })
-    gridGroup.add(line)
-  }
-}
-
 // ==================== 视图控制 ====================
 
 const resetView = () => {
@@ -1935,7 +2050,8 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
     fill: statusColors[seat.status],
     stroke: statusColors[seat.status],
     strokeWidth: 1,
-    name: 'seatCircle'
+    name: 'seatCircle',
+    listening: false // 关键：不拦截事件，让事件穿透到 Group
   })
 
   circle.cache()
@@ -1946,7 +2062,9 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
     fontFamily: 'Inter',
     fill: '#fff',
     offsetX: -4,
-    offsetY: -5
+    offsetY: -5,
+    listening: false, // 关键：不拦截事件，让事件穿透到 Group
+    name: 'seatLabel' // 用于拖拽时隐藏
   })
 
   group.add(circle)
@@ -2241,10 +2359,6 @@ const updateSeatStatus = (seatId: string, status: Seat['status']) => {
 
 // ==================== 监听变化 ====================
 
-watch(() => props.showGrid, () => {
-  updateGrid()
-})
-
 watch(() => props.venueData, (data) => {
   if (data) {
     renderVenueData(data)
@@ -2291,7 +2405,6 @@ const updateCursor = () => {
     case 'drawPolygon':
     case 'drawPolyline':
     case 'drawSector':
-    case 'drawTable':
       // 使用黑色十字准星
       container.style.cursor = `url("${blackCrosshairCursor}") 10 10, crosshair`
       break
@@ -2310,7 +2423,6 @@ const initTransformer = () => {
   if (!selectionDecorationLayer) return
   
   transformer = new Konva.Transformer({
-    // 禁用 Transformer 的拖拽功能，使用节点原生拖拽
     resizeEnabled: false,
     rotateEnabled: true,
     rotateAnchorOffset: 20,
@@ -2321,18 +2433,35 @@ const initTransformer = () => {
     anchorStroke: '#3b82f6',
     anchorFill: '#fff',
     anchorSize: 8,
-    // 关键：确保边框贴合对象
     padding: 0,
-    // 使用精确边界框，不包含 stroke
     ignoreStroke: true,
-    // 不使用固定比例
     keepRatio: false,
-    // 不使用中心缩放
     centeredScaling: false,
-    // 边界框函数，确保精确贴合
     boundBoxFunc: (oldBox, newBox) => newBox,
-    // 关键：禁用 transformer 自身的拖拽，完全由节点原生拖拽控制
+    // Transformer 不处理拖拽，只显示边框和旋转锚点
     draggable: false,
+    listening: true,
+  })
+
+  // 点击 Transformer 框内空白区域 → 取消选中
+  transformer.on('click', (e) => {
+    if (currentTool.value !== 'select') return
+    if (justDragged) return
+    // 只有点击到 Transformer 背景（非锚点）才取消选中
+    const targetName = (e.target as any)?.name?.() || ''
+    const isAnchor = targetName.includes('anchor') || targetName.includes('rotater')
+    if (!isAnchor && !e.evt.shiftKey) {
+      clearSelection()
+    }
+  })
+  
+  // 绑定旋转事件
+  transformer.on('transform', (e: any) => {
+    // 更新原始旋转记录
+    selectedItems.value.forEach(item => {
+      item.originalRotation = item.node.rotation()
+    })
+    staticLayer?.batchDraw()
   })
   
   selectionDecorationLayer.add(transformer)
@@ -2348,6 +2477,8 @@ const updateTransformer = (forceFullUpdate = false) => {
   
   requestAnimationFrame(() => {
     transformerUpdateQueued = false
+    
+    if (!transformer) return
     
     if (selectedItems.value.length === 0) {
       transformer.nodes([])
@@ -2433,8 +2564,8 @@ const updateSelectionDecorationOnDrag = () => {
   requestAnimationFrame(() => {
     dragUpdateQueued = false
     lastDragUpdateTime = performance.now()
-    // 多选时更新 transformer，但隐藏锚点以提升性能
-    if (dragState.nodes.size > 1) {
+    // 拖拽时更新 transformer
+    if (selectedItems.value.length > 1) {
       transformer.anchorSize(0) // 拖拽时隐藏锚点
       transformer.forceUpdate()
       selectionDecorationLayer.batchDraw()
@@ -2458,116 +2589,15 @@ const selectItem = (node: Konva.Group, type: SelectableType, additive = false, s
     return
   }
   
-  // 设置为可拖拽
-  node.draggable(true)
+  // 确保节点不可单独拖拽（由统一拖拽系统接管）
+  node.draggable(false)
+  node.off('dragstart')
+  node.off('dragmove')
+  node.off('dragend')
+  node.off('mouseenter.select')
+  node.off('mouseleave.select')
   
-  // 简化的拖拽事件
-  node.on('dragstart', () => {
-    const items = selectedItems.value
-    if (items.length === 0) return
-    
-    // 检查当前拖拽的节点是否在所有选中节点中
-    const isDraggedNodeSelected = items.some(item => item.id === node.id())
-    if (!isDraggedNodeSelected) return
-    
-    // 防止多个节点重复触发
-    if (dragState.isDragging) return
-    
-    document.body.style.cursor = 'grabbing'
-    dragState.isDragging = true
-    dragState.nodeId = node.id()
-    dragState.nodes.clear()
-    
-    // 记录所有选中节点及其原始位置
-    items.forEach(item => {
-      dragState.nodes.set(item.id, {
-        node: item.node,
-        startX: item.node.x(),
-        startY: item.node.y()
-      })
-    })
-    
-    // 多选时隐藏真实节点（保留被拖拽节点的交互）
-    if (items.length > 1) {
-      // 隐藏其他节点，但被拖拽的节点设为透明但可交互
-      items.forEach(item => {
-        if (item.id === dragState.nodeId) {
-          item.node.opacity(0.01) // 透明但可交互
-        } else {
-          item.node.visible(false) // 完全隐藏
-        }
-      })
-      
-      // 拖拽时隐藏 transformer 锚点（只保留边框），提升性能
-      if (transformer) {
-        transformer.anchorSize(0)
-      }
-    }
-    
-    staticLayer?.listening(false)
-  })
-  
-  node.on('dragmove', () => {
-    if (!dragState.isDragging) return
-    
-    const draggedItem = dragState.nodes.get(dragState.nodeId!)
-    if (!draggedItem) return
-    
-    const dx = draggedItem.node.x() - draggedItem.startX
-    const dy = draggedItem.node.y() - draggedItem.startY
-    
-    // 多选时批量更新其他节点的位置（本地坐标 + 偏移）
-    if (dragState.nodes.size > 1) {
-      dragState.nodes.forEach((item, id) => {
-        if (id !== dragState.nodeId) {
-          item.node.x(item.startX + dx)
-          item.node.y(item.startY + dy)
-        }
-      })
-    }
-    
-    // 更新 transformer 位置
-    transformer?.forceUpdate()
-    staticLayer?.batchDraw()
-  })
-  
-  node.on('dragend', () => {
-    document.body.style.cursor = 'move'
-    
-    const draggedItem = dragState.nodes.get(dragState.nodeId!)
-    if (draggedItem) {
-      const dx = draggedItem.node.x() - draggedItem.startX
-      const dy = draggedItem.node.y() - draggedItem.startY
-      
-      // 批量更新所有节点位置并恢复显示
-      dragState.nodes.forEach((item) => {
-        item.node.x(item.startX + dx)
-        item.node.y(item.startY + dy)
-        item.node.visible(true)
-        item.node.opacity(1)
-      })
-    }
-    
-    // 恢复 transformer 锚点显示
-    if (transformer) {
-      transformer.anchorSize(8)
-    }
-    
-    // 更新数据
-    selectedItems.value.forEach(item => {
-      item.originalPos = { x: item.node.x(), y: item.node.y() }
-    })
-    
-    // 重置状态
-    dragState.isDragging = false
-    dragState.nodeId = null
-    dragState.nodes.clear()
-    
-    staticLayer?.listening(true)
-    staticLayer?.batchDraw()
-  })
-  
-  // 保存原始位置和旋转
+  // 保存选中项
   selectedItems.value.push({
     id: node.id(),
     type,
@@ -2593,12 +2623,8 @@ const deselectItem = (id: string) => {
   const item = selectedItems.value.find(i => i.id === id)
   if (item) {
     item.node.setAttr('selected', false)
-    // 禁用拖拽
-    item.node.draggable(false)
-    // 移除事件监听
-    item.node.off('dragstart')
-    item.node.off('dragmove')
-    item.node.off('dragend')
+    item.node.off('mouseenter.select')
+    item.node.off('mouseleave.select')
     // 移除选中高亮效果
     applySelectionHighlight(item.node, false)
     selectedItems.value = selectedItems.value.filter(i => i.id !== id)
@@ -2610,17 +2636,15 @@ const deselectItem = (id: string) => {
 const clearSelection = () => {
   selectedItems.value.forEach(item => {
     item.node.setAttr('selected', false)
-    // 禁用拖拽
-    item.node.draggable(false)
-    // 移除事件监听
-    item.node.off('dragstart')
-    item.node.off('dragmove')
-    item.node.off('dragend')
+    item.node.off('mouseenter.select')
+    item.node.off('mouseleave.select')
     // 移除选中高亮效果
     applySelectionHighlight(item.node, false)
   })
   selectedItems.value = []
   updateSelectionDecoration()
+  // 恢复默认光标
+  setCursor('default')
 }
 
 // 手动拖拽已由 Transformer 处理，这些函数保留供兼容
@@ -2735,6 +2759,22 @@ const endBoxSelection = (additive: boolean) => {
   selectionStartPos.value = null
   selectionDecorationLayer?.batchDraw()
   
+  // 框选结束后若有选中对象，判断鼠标是否在 Transformer 框内
+  if (intersectingNodes.length > 0 && stage && transformer) {
+    const pointerPos = stage.getPointerPosition()
+    if (pointerPos) {
+      const trRect = transformer.getClientRect()
+      const insideTr = (
+        pointerPos.x >= trRect.x &&
+        pointerPos.x <= trRect.x + trRect.width &&
+        pointerPos.y >= trRect.y &&
+        pointerPos.y <= trRect.y + trRect.height
+      )
+      if (insideTr) {
+        stage.container().style.cursor = 'move'
+      }
+    }
+  }
   // 标记框选已完成（在 click 事件中使用）
   isBoxSelecting.value = true
 }
@@ -2790,14 +2830,11 @@ const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
   }
   // 处理排组
   else if (name.includes('row-group')) {
-    // 排组整体可拖拽
+    // 排组选中时高亮内部座位
     if (isSelected) {
-      node.draggable(true)
-      // 禁用 clickArea 的事件监听
-      const clickArea = node.findOne('.row-click-area')
-      if (clickArea) {
-        clickArea.listening(false)
-      }
+      // 关键：clickArea 必须保持 listening=true，否则排组没有可点击区域！
+      // 但 clickArea 的 click 事件会被忽略（通过排组的 selected 属性判断）
+      
       // 排组选中时：内部座位只显示高亮，不参与事件
       node.getChildren().forEach((child) => {
         if (child instanceof Konva.Group && child.name()?.includes('seat')) {
@@ -2813,12 +2850,6 @@ const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
         }
       })
     } else {
-      node.draggable(false)
-      // 恢复 clickArea 的事件监听
-      const clickArea = node.findOne('.row-click-area')
-      if (clickArea) {
-        clickArea.listening(true)
-      }
       // 恢复内部座位的事件监听
       node.getChildren().forEach((child) => {
         if (child instanceof Konva.Group && child.name()?.includes('seat')) {
