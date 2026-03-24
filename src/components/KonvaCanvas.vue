@@ -152,7 +152,7 @@ type SelectableType = 'seat' | 'row' | 'rect' | 'ellipse' | 'polygon' | 'sector'
 interface SelectedItem {
   id: string
   type: SelectableType
-  node: Konva.Group
+  node: Konva.Node
   originalPos: { x: number; y: number }
   originalRotation: number
 }
@@ -220,36 +220,31 @@ const startDragAll = (screenPos: { x: number; y: number }) => {
     startX: item.node.x(),
     startY: item.node.y()
   }))
-  // 拖拽开始时隐藏所有座位标签，提升性能
-  unifiedDragState.items.forEach(item => {
-    const label = (item.node as any).findOne('.seatLabel')
-    if (label) label.visible(false)
-  })
   setCursor('grabbing')
   document.body.style.cursor = 'grabbing'
 }
 
 let dragRafId = 0
 let lastDragRenderTime = 0
-const DRAG_RENDER_INTERVAL = 33 // ~30fps
+let lastTransformerUpdateTime = 0
+const DRAG_RENDER_INTERVAL = 16 // ~60fps
 
 const updateDragAll = (screenPos: { x: number; y: number }) => {
   if (!unifiedDragState.active || !stage) return
   const scaleVal = stage.scaleX()
   const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
   const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
-  // 先同步更新节点位置（纯数学，无渲染开销）
+  
+  // 批量更新节点位置（使用 setAttrs 减少开销）
   unifiedDragState.items.forEach(item => {
-    item.node.x(item.startX + dx)
-    item.node.y(item.startY + dy)
+    item.node.setAttrs({
+      x: item.startX + dx,
+      y: item.startY + dy
+    })
   })
-  // 节流到 30fps，减少重绘开销
-  const now = performance.now()
-  if (now - lastDragRenderTime < DRAG_RENDER_INTERVAL) return
-  lastDragRenderTime = now
-  transformer?.forceUpdate()
+  
+  // 直接渲染，测试延迟
   staticLayer?.batchDraw()
-  selectionDecorationLayer?.batchDraw()
 }
 
 const endDragAll = () => {
@@ -259,11 +254,6 @@ const endDragAll = () => {
     cancelAnimationFrame(dragRafId)
     dragRafId = 0
   }
-  // 拖拽结束，恢复座位标签显示
-  unifiedDragState.items.forEach(item => {
-    const label = (item.node as any).findOne('.seatLabel')
-    if (label) label.visible(true)
-  })
   // 只有真正移动了才设 justDragged，防止误取消选中
   const moved = unifiedDragState.items.some(item =>
     Math.abs(item.node.x() - item.startX) > 2 ||
@@ -290,8 +280,10 @@ const SNAP_THRESHOLD = 10
 const initKonva = () => {
   if (!containerRef.value) return
 
-  const width = props.width || window.innerWidth
-  const height = props.height || window.innerHeight
+  // 获取父容器实际大小
+  const containerParent = containerRef.value.parentElement
+  const width = props.width || containerParent?.clientWidth || window.innerWidth
+  const height = props.height || containerParent?.clientHeight || window.innerHeight
 
   stage = new Konva.Stage({
     container: containerRef.value,
@@ -344,21 +336,25 @@ const initKonva = () => {
 }
 
 // 辅助函数：查找可选中的父节点
-const findSelectableParent = (node: Konva.Node): Konva.Group | null => {
+const findSelectableParent = (node: Konva.Node): Konva.Node | null => {
   let current: Konva.Node | null = node
   while (current) {
+    const name = current.name() || ''
+    const id = current.id() || ''
     if (current instanceof Konva.Group) {
-      const name = current.name() || ''
-      if (name.includes('seat') || name.includes('row') || 
-          name.includes('rect') || name.includes('ellipse') || 
+      // rowGroup 是基础选中单位（id 格式：row-group-xxx）
+      if (id.startsWith('row-group-') && name.includes('row-group')) {
+        return current
+      }
+      // 其他形状类型
+      if (name.includes('rect') || name.includes('ellipse') || 
           name.includes('polygon') || name.includes('sector') || 
-          name.includes('polyline')) {
+          name.includes('polyline') || name.includes('shape-group')) {
         return current
       }
     }
-    // 安全获取父节点
-    const parent = current.getParent ? current.getParent() : null
-    current = parent
+    const parentNode: Konva.Node | null = current.getParent ? current.getParent() : null
+    current = parentNode
   }
   return null
 }
@@ -1531,69 +1527,19 @@ const startDrawingRow = (pos: { x: number; y: number }) => {
 const updateDrawingPreview = (pos: { x: number; y: number }) => {
   if (!rowStartPoint.value || !previewLine) return
 
-  // 收集所有已有座位的位置用于对齐
-  const existingX: number[] = []
-  const existingY: number[] = []
-  seatGroups.forEach((group) => {
-    const stagePos = group.getAbsolutePosition()
-    existingX.push(stagePos.x)
-    existingY.push(stagePos.y)
-  })
+  // 无吸附效果，直接使用鼠标位置
+  rowEndPoint.value = { x: pos.x, y: pos.y }
 
-  // 对齐吸附参数
-  const SNAP_THRESHOLD = 8
-  let snappedX = pos.x
-  let snappedY = pos.y
-  let alignedX: number | null = null
-  let alignedY: number | null = null
+  // 更新预览线
+  previewLine.points([rowStartPoint.value.x, rowStartPoint.value.y, pos.x, pos.y])
 
-  // 检测水平对齐（Y坐标）
-  for (const y of existingY) {
-    if (Math.abs(pos.y - y) < SNAP_THRESHOLD) {
-      snappedY = y
-      alignedY = y
-      break
-    }
-  }
-
-  // 检测垂直对齐（X坐标）
-  for (const x of existingX) {
-    if (Math.abs(pos.x - x) < SNAP_THRESHOLD) {
-      snappedX = x
-      alignedX = x
-      break
-    }
-  }
-
-  // 检测起点对齐
-  for (const x of existingX) {
-    if (Math.abs(rowStartPoint.value.x - x) < SNAP_THRESHOLD) {
-      // 如果起点接近某列，调整起点
-      rowStartPoint.value.x = x
-      break
-    }
-  }
-  for (const y of existingY) {
-    if (Math.abs(rowStartPoint.value.y - y) < SNAP_THRESHOLD) {
-      rowStartPoint.value.y = y
-      break
-    }
-  }
-
-  rowEndPoint.value = { x: snappedX, y: snappedY }
-
-  // 更新预览线（使用吸附后的坐标）
-  previewLine.points([rowStartPoint.value.x, rowStartPoint.value.y, snappedX, snappedY])
-
-  // 清除旧的预览座位和辅助线
+  // 清除旧的预览座位
   previewSeats.forEach(seat => seat.destroy())
-  guideLines.forEach(line => line.destroy())
   previewSeats = []
-  guideLines = []
 
   // 计算座位数量和位置
-  const dx = snappedX - rowStartPoint.value.x
-  const dy = snappedY - rowStartPoint.value.y
+  const dx = pos.x - rowStartPoint.value.x
+  const dy = pos.y - rowStartPoint.value.y
   const distance = Math.sqrt(dx * dx + dy * dy)
   
   // 如果距离太小，不创建预览
@@ -1626,7 +1572,6 @@ const updateDrawingPreview = (pos: { x: number; y: number }) => {
       strokeWidth: 2,
       listening: false
     })
-    seat.cache()
     seatGroup.add(seat)
     drawingLayer!.add(seatGroup)
     previewSeats.push(seatGroup)
@@ -1646,78 +1591,13 @@ const updateDrawingPreview = (pos: { x: number; y: number }) => {
     seatGroup.add(label)
   }
 
-  // 判断是否水平或垂直（用于辅助线颜色）
-  const isHorizontal = Math.abs(dy) < 5
-  const isVertical = Math.abs(dx) < 5
-  const guideLineColor = (isHorizontal || isVertical) ? '#22c55e' : 'rgba(59, 130, 246, 0.3)'
-  const guideLineWidth = (isHorizontal || isVertical) ? 2 : 1
-
-  // 创建辅助线（水平和垂直）
-  // 水平辅助线
-  const hLine = new Konva.Line({
-    points: [rowStartPoint.value.x, rowStartPoint.value.y, snappedX, rowStartPoint.value.y],
-    stroke: guideLineColor,
-    strokeWidth: guideLineWidth,
-    dash: [3, 3],
-    listening: false
-  })
-  drawingLayer!.add(hLine)
-  guideLines.push(hLine)
-
-  // 垂直辅助线
-  const vLine = new Konva.Line({
-    points: [rowStartPoint.value.x, rowStartPoint.value.y, rowStartPoint.value.x, snappedY],
-    stroke: guideLineColor,
-    strokeWidth: guideLineWidth,
-    dash: [3, 3],
-    listening: false
-  })
-  drawingLayer!.add(vLine)
-  guideLines.push(vLine)
-
-  // 如果吸附了对齐线，显示高亮对齐线
-  if (alignedY !== null) {
-    const alignHLine = new Konva.Line({
-      points: [Math.min(rowStartPoint.value.x, snappedX) - 50, alignedY, Math.max(rowStartPoint.value.x, snappedX) + 50, alignedY],
-      stroke: '#f59e0b',
-      strokeWidth: 2,
-      dash: [5, 5],
-      listening: false
-    })
-    drawingLayer!.add(alignHLine)
-    guideLines.push(alignHLine)
-  }
-  if (alignedX !== null) {
-    const alignVLine = new Konva.Line({
-      points: [alignedX, Math.min(rowStartPoint.value.y, snappedY) - 50, alignedX, Math.max(rowStartPoint.value.y, snappedY) + 50],
-      stroke: '#f59e0b',
-      strokeWidth: 2,
-      dash: [5, 5],
-      listening: false
-    })
-    drawingLayer!.add(alignVLine)
-    guideLines.push(alignVLine)
-  }
-
-  // 显示距离信息
-  const distanceText = new Konva.Text({
-    text: `${Math.round(distance)}px (${seatCount}座)`,
-    x: (rowStartPoint.value.x + snappedX) / 2 + 10,
-    y: (rowStartPoint.value.y + snappedY) / 2 - 10,
-    fontSize: 12,
-    fontFamily: 'Inter',
-    fill: (isHorizontal || isVertical) ? '#22c55e' : '#3b82f6',
-    listening: false
-  })
-  drawingLayer!.add(distanceText)
-  previewSeats.push(distanceText)
-
   drawingLayer!.batchDraw()
 }
 
 const finishDrawingRow = (pos: { x: number; y: number }) => {
   if (!rowStartPoint.value) return
 
+  // 使用传入的终点位置（鼠标释放位置）
   const dx = pos.x - rowStartPoint.value.x
   const dy = pos.y - rowStartPoint.value.y
   const distance = Math.sqrt(dx * dx + dy * dy)
@@ -1736,17 +1616,18 @@ const finishDrawingRow = (pos: { x: number; y: number }) => {
   const unitX = dx / distance
   const unitY = dy / distance
 
-  // 创建座位数据
+  // 创建座位数据（本地坐标，相对于排起点）
   const seats: Seat[] = []
   for (let i = 0; i < seatCount; i++) {
-    const x = rowStartPoint.value.x + unitX * i * SEAT_SPACING
-    const y = rowStartPoint.value.y + unitY * i * SEAT_SPACING
+    // 本地坐标：相对于排起点的偏移
+    const localX = unitX * i * SEAT_SPACING
+    const localY = unitY * i * SEAT_SPACING
 
     seats.push({
       id: `seat-${Date.now()}-${i}`,
       label: String(i + 1),
-      x,
-      y,
+      x: localX,
+      y: localY,
       status: 'available',
       categoryId: 'custom'
     })
@@ -1874,84 +1755,21 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
   const cos = Math.cos(angleRad)
   const sin = Math.sin(angleRad)
 
-  // 创建座位（使用传入的世界坐标，转换为相对于 Group 起点的本地坐标）
+  // 每个座位用独立 Circle 绘制
   seats.forEach((seat) => {
-    // 将世界坐标转换为相对于 Group 起点的本地坐标
-    // 世界坐标 = Group起点 + 本地X * cos - 本地Y * sin
-    // 所以：本地X = (世界X - Group起点X) * cos + (世界Y - Group起点Y) * sin
-    //       本地Y = -(世界X - Group起点X) * sin + (世界Y - Group起点Y) * cos
-    const dx = seat.x - startX
-    const dy = seat.y - startY
-    const relativeX = dx * cos + dy * sin
-    const relativeY = -dx * sin + dy * cos
-    
-    const seatGroup = new Konva.Group({
-      x: relativeX,
-      y: relativeY,
-      draggable: false,
-      id: seat.id,
-      name: `seat row-${rowId}`
-    })
-
-    // 新绘制的座位 - 红色填充和边框（无边框视觉差）
     const circle = new Konva.Circle({
+      x: seat.x,
+      y: seat.y,
+      id: seat.id,
       radius: SEAT_RADIUS,
       fill: '#ef4444',
       stroke: '#ef4444',
       strokeWidth: 1,
-      name: 'seatCircle',
-      listening: false // 关键：不拦截事件，让事件穿透到 Group
+      perfectDrawEnabled: false,
+      listening: false
     })
-    circle.cache()
-
-    // 新绘制的座位 - 编号显示 ?
-    const text = new Konva.Text({
-      text: '?',
-      fontSize: 9,
-      fontFamily: 'Inter',
-      fill: '#fff',
-      x: 0,
-      y: 0,
-      offsetX: 0,
-      offsetY: 0,
-      align: 'center',
-      verticalAlign: 'middle',
-      listening: false // 关键：不拦截事件，让事件穿透到 Group
-    })
-    // 文字居中定位
-    text.offsetX(text.width() / 2)
-    text.offsetY(text.height() / 2)
-
-    seatGroup.add(circle)
-    seatGroup.add(text)
-
-    // 座位点击事件 - 默认选中整排
-    seatGroup.on('click tap', (e) => {
-      if (currentTool.value !== 'select') return
-      
-      // 获取父排组
-      const parentRow = seatGroup.getParent()
-      if (!parentRow) return
-      
-      // 默认行为：点击座位选中整排
-      e.cancelBubble = true
-      const rowId = parentRow.id().replace('row-group-', '')
-      
-      const isSelected = selectedItems.value.some(item => item.id === parentRow.id())
-      if (isSelected) {
-        // 已选中，Shift 追加，否则取消选中
-        if (!e.evt.shiftKey) {
-          deselectItem(parentRow.id())
-        }
-      } else {
-        selectRow(rowId, e.evt.shiftKey)
-      }
-    })
-    
-    // 鼠标事件已移至 Group 级别统一处理
-
-    group.add(seatGroup)
-    seatGroups.set(seat.id, seatGroup)
+    group.add(circle)
+    seatGroups.set(seat.id, group as any)
   })
 
   // 添加点击区域 - 用于点击排时选中整排
@@ -1959,14 +1777,11 @@ const createRowGroup = (seats: Seat[], startX: number, startY: number, rotation:
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   if (seats.length > 0) {
     seats.forEach((seat) => {
-      const dx = seat.x - startX
-      const dy = seat.y - startY
-      const relativeX = dx * cos + dy * sin
-      const relativeY = -dx * sin + dy * cos
-      minX = Math.min(minX, relativeX - SEAT_RADIUS)
-      minY = Math.min(minY, relativeY - SEAT_RADIUS)
-      maxX = Math.max(maxX, relativeX + SEAT_RADIUS)
-      maxY = Math.max(maxY, relativeY + SEAT_RADIUS)
+      // seat.x/y 已经是本地坐标
+      minX = Math.min(minX, seat.x - SEAT_RADIUS)
+      minY = Math.min(minY, seat.y - SEAT_RADIUS)
+      maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
+      maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
     })
     // 不再添加padding，确保边界框精确贴合座位
   }
@@ -2054,21 +1869,7 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
     listening: false // 关键：不拦截事件，让事件穿透到 Group
   })
 
-  circle.cache()
-
-  const text = new Konva.Text({
-    text: seat.label,
-    fontSize: 9,
-    fontFamily: 'Inter',
-    fill: '#fff',
-    offsetX: -4,
-    offsetY: -5,
-    listening: false, // 关键：不拦截事件，让事件穿透到 Group
-    name: 'seatLabel' // 用于拖拽时隐藏
-  })
-
   group.add(circle)
-  group.add(text)
 
   // 点击事件（仅用于选中）
   group.on('click tap', (e) => {
@@ -2093,64 +1894,17 @@ const createSection = (section: Section) => {
     id: `section-${section.id}`
   })
 
-  let minX = Infinity, minY = Infinity
-  let maxX = -Infinity, maxY = -Infinity
-
   section.rows.forEach((row, rowIndex) => {
-    const rowGroup = new Konva.Group({
-      y: 30 + rowIndex * 35
-    })
-
-    const rowLabel = new Konva.Text({
-      text: row.label,
-      fontSize: 14,
-      fontFamily: 'Inter',
-      fill: '#666',
-      offsetY: -5
-    })
-    rowGroup.add(rowLabel)
-
-    row.seats.forEach((seat) => {
-      const seatGroup = createSeat(seat, row.label, row.id)
-      rowGroup.add(seatGroup)
-      seatGroups.set(seat.id, seatGroup)
-
-      const seatAbsX = seat.x
-      const seatAbsY = 30 + rowIndex * 35 + seat.y
-      minX = Math.min(minX, seatAbsX - 15)
-      minY = Math.min(minY, seatAbsY - 15)
-      maxX = Math.max(maxX, seatAbsX + 15)
-      maxY = Math.max(maxY, seatAbsY + 15)
-    })
-
+    // 统一调用 createRowGroup，与手动绘制逻辑一致
+    const rowGroup = createRowGroup(
+      row.seats,
+      0,
+      30 + rowIndex * 35,
+      0,
+      row.id
+    )
     sectionGroup.add(rowGroup)
   })
-
-  const padding = 20
-  const rect = new Konva.Rect({
-    x: minX - padding,
-    y: minY - padding,
-    width: maxX - minX + padding * 2,
-    height: maxY - minY + padding * 2,
-    stroke: '#d4d0c8',
-    strokeWidth: 2,
-    cornerRadius: 8,
-    listening: false
-  })
-  sectionGroup.add(rect)
-
-  const title = new Konva.Text({
-    text: section.name,
-    x: minX,
-    y: minY - 25,
-    fontSize: 14,
-    fontFamily: 'Inter',
-    fill: '#5c5854',
-    fontWeight: '600'
-  })
-  sectionGroup.add(title)
-
-  sectionGroup.cache()
 
   return sectionGroup
 }
@@ -2191,7 +1945,7 @@ const renderVenueData = (data: VenueData) => {
 
 // ==================== 生成测试数据 ====================
 
-const generateTestData = (seatCount: number = 50) => {
+const generateTestData = (seatCount: number = 100) => {
   const startTime = performance.now()
   const sections: Section[] = []
   
@@ -2239,8 +1993,8 @@ const generateTestData = (seatCount: number = 50) => {
     id: 'section-test',
     name: '测试区域',
     rows: rows,
-    x: 100,
-    y: 100
+    x: 200,
+    y: 200
   })
 
   const endTime = performance.now()
@@ -2447,12 +2201,14 @@ const snapToGrid = (value: number): number => {
 }
 
 // 获取所有可选中对象
-const getAllSelectableNodes = (): Konva.Group[] => {
-  const nodes: Konva.Group[] = []
+const getAllSelectableNodes = (): Konva.Node[] => {
+  const nodes: Konva.Node[] = []
   
-  // 收集所有座位
-  seatGroups.forEach((group) => {
-    nodes.push(group)
+  // 收集所有排组（rowGroup 是基础选中单位，id 格式：row-group-xxx）
+  staticLayer?.find('Group').forEach((node) => {
+    if (node.name() === 'row-group' && node.id().startsWith('row-group-')) {
+      nodes.push(node)
+    }
   })
   
   // 收集所有形状（矩形、椭圆、多边形、扇形、折线）
@@ -2496,7 +2252,7 @@ const updateSelectionDecorationOnDrag = () => {
 }
 
 // 选择对象
-const selectItem = (node: Konva.Group, type: SelectableType, additive = false, skipUpdate = false) => {
+const selectItem = (node: Konva.Node, type: SelectableType, additive = false, skipUpdate = false) => {
   if (!additive) {
     clearSelection()
   }
@@ -2702,102 +2458,59 @@ const endBoxSelection = (additive: boolean) => {
 }
 
 // 应用选中高亮效果
-const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
+const applySelectionHighlight = (node: Konva.Node, isSelected: boolean) => {
   const name = node.name() || ''
   
-  // 处理座位组
-  if (name.includes('seat')) {
+  // 处理排组 / sectionGroup（Group 类型）
+  if (name.includes('row-group')) {
+    if (isSelected) {
+      node.find('Circle').forEach((c) => {
+        (c as Konva.Circle).stroke('#3b82f6')
+        ;(c as Konva.Circle).strokeWidth(3)
+      })
+    } else {
+      node.find('Circle').forEach((c) => {
+        (c as Konva.Circle).stroke('#ef4444')
+        ;(c as Konva.Circle).strokeWidth(1)
+      })
+    }
+  }
+  // 处理座位组（旧代码兼容）
+  else if (name.includes('seat') && node instanceof Konva.Group) {
     const circle = node.findOne<Konva.Circle>('.seatCircle')
     if (circle) {
       if (isSelected) {
-        // 选中时：蓝色填充，白色边框，加粗
         circle.stroke('#3b82f6')
         circle.strokeWidth(3)
-        // 阴影已全局禁用以提升性能
-        // circle.shadowColor('#3b82f6')
-        // circle.shadowBlur(8)
-        // circle.shadowOpacity(0.5)
       } else {
-        // 取消选中时：恢复原状
-        const isNewSeat = circle.fill() === '#ef4444'
-        circle.stroke(isNewSeat ? '#ef4444' : circle.fill())
+        circle.stroke('#ef4444')
         circle.strokeWidth(1)
-        // 阴影已全局禁用
-        // circle.shadowEnabled(false)
       }
     }
   }
   // 处理形状组（矩形、椭圆、多边形等）
-  else if (name.includes('shape-group') || name.includes('rect-group') || 
-           name.includes('ellipse-group') || name.includes('polygon-group')) {
-    // 查找实际的可视形状（第一个非点击区域的子元素）
+  else if (node instanceof Konva.Group && (name.includes('shape-group') || name.includes('rect-group') || 
+           name.includes('ellipse-group') || name.includes('polygon-group'))) {
     const shapes = node.getChildren((child) => {
       const childName = child.name() || ''
       return !childName.includes('click-area') && child instanceof Konva.Shape
     })
-    
     shapes.forEach((shape) => {
       if (isSelected) {
-        // 选中时添加蓝色边框和发光效果
         shape.stroke('#3b82f6')
         shape.strokeWidth(2)
-        // 阴影已全局禁用以提升性能
-        // shape.shadowColor('#3b82f6')
-        // shape.shadowBlur(8)
-        // shape.shadowOpacity(0.5)
       } else {
-        // 取消选中时恢复原状
         shape.stroke(null)
         shape.strokeWidth(0)
-        // 阴影已全局禁用
-        // shape.shadowEnabled(false)
       }
     })
-  }
-  // 处理排组
-  else if (name.includes('row-group')) {
-    // 排组选中时高亮内部座位
-    if (isSelected) {
-      // 关键：clickArea 必须保持 listening=true，否则排组没有可点击区域！
-      // 但 clickArea 的 click 事件会被忽略（通过排组的 selected 属性判断）
-      
-      // 排组选中时：内部座位只显示高亮，不参与事件
-      node.getChildren().forEach((child) => {
-        if (child instanceof Konva.Group && child.name()?.includes('seat')) {
-          child.listening(false)
-          const circle = child.findOne<Konva.Circle>('.seatCircle')
-          if (circle) {
-            circle.stroke('#3b82f6')
-            circle.strokeWidth(3)
-            // 阴影已全局禁用以提升性能
-            // circle.shadowColor('#3b82f6')
-            // circle.shadowBlur(8)
-            // circle.shadowOpacity(0.5)
-          }
-        }
-      })
-    } else {
-      // 恢复内部座位的事件监听
-      node.getChildren().forEach((child) => {
-        if (child instanceof Konva.Group && child.name()?.includes('seat')) {
-          child.listening(true)
-          const circle = child.findOne<Konva.Circle>('.seatCircle')
-          if (circle) {
-            circle.stroke('#ef4444')
-            circle.strokeWidth(1)
-            // 阴影已全局禁用
-            // circle.shadowEnabled(false)
-          }
-        }
-      })
-    }
   }
   
   staticLayer?.batchDraw()
 }
 
 // 获取节点类型
-const getNodeType = (node: Konva.Group): SelectableType | null => {
+const getNodeType = (node: Konva.Node): SelectableType | null => {
   const name = node.name() || ''
   if (name.includes('seat')) return 'seat'
   if (name.includes('row')) return 'row'

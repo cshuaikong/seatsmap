@@ -124,6 +124,46 @@ import { Icon } from '@iconify/vue'
 - **Tabler**: https://tabler-icons.io/ (MIT License)
 - **Material Design Icons**: https://pictogrammers.com/library/mdi/ (Apache 2.0 License)
 
+---
+
+## 核心交互架构（Konva 实现规范）
+
+### 节点层级
+```
+staticLayer
+  └── sectionGroup (id: section-xxx)                        ← 纯容器，不参与选中
+        └── rowGroup (id: row-group-xxx, name: row-group)   ← 基础选中单位 ★
+              ├── Circle × N  (listening: false)            ← 每座一个 Circle
+              └── Rect (row-click-area, listening: true)    ← 透明点击区域
+```
+
+### ID 命名规范
+| 节点 | ID 格式 | Name |
+|------|---------|------|
+| sectionGroup | `section-${section.id}` | 无 |
+| rowGroup | `row-group-${rowId}` | `row-group` |
+| Circle | `${seat.id}` | 无 |
+
+### 选中规范
+- **基础选中单位**：rowGroup（一整排）
+- `findSelectableParent`：向上遍历，匹配 `id.startsWith('row-group-') && name === 'row-group'`
+- `getAllSelectableNodes`：`staticLayer.find('Group')` 过滤同样条件，供框选使用
+- 高亮：选中时所有 Circle `stroke('#3b82f6')`，取消时恢复 `stroke('#ef4444')`
+
+### 拖拽规范
+- 统一由 `stage.mousedown/mousemove/mouseup` 驱动（unifiedDragState）
+- Transformer 框内点击 → `startDragAll` → `updateDragAll` 批量 `setAttrs({x,y})`
+- 渲染：直接 `staticLayer.batchDraw()`，不使用 RAF 节流
+
+### 性能规范
+- Circle 禁止调用 `cache()`
+- Circle 设置 `listening: false`，`perfectDrawEnabled: false`
+- 事件由父 rowGroup 统一处理
+
+### 创建统一
+- 手动绘制 和 按钮生成 均调用同一个 `createRowGroup(seats, x, y, rotation, rowId)`
+- `createSection` 内部遍历 rows，每排调用一次 `createRowGroup`
+
 ## 工具类型定义
 
 ```typescript
