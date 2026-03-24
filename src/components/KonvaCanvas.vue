@@ -268,22 +268,11 @@ const updateDragAll = (screenPos: { x: number; y: number }) => {
     })
   })
   
-  // 性能分析：拆解各步骤耗时
-  const t1 = performance.now()
-  
-  // 节流渲染：最多 30fps
+  // 节流渲染：最多 10fps（400节点优化，牺牲流畅度换性能）
   const now2 = performance.now()
-  if (now2 - lastDragRenderTime > 33) {
+  if (now2 - lastDragRenderTime > 100) {
     lastDragRenderTime = now2
-    const t2 = performance.now()
     staticLayer?.batchDraw()
-    const t3 = performance.now()
-    
-    const batchDrawTime = Math.round(t3 - t2)
-    const totalTime = Math.round(t3 - t1)
-    if (totalTime > 16) {
-      console.log(`[耗时] setAttrs:${Math.round(t2-t1)}ms batchDraw:${batchDrawTime}ms 总计:${totalTime}ms 节点:${unifiedDragState.items.length}排`)
-    }
   }
 }
 
@@ -1991,17 +1980,17 @@ const renderVenueData = (data: VenueData) => {
 
 // ==================== 生成测试数据 ====================
 
-const generateTestData = (seatCount: number = 30) => {
+const generateTestData = (seatCount: number = 400) => {
   const startTime = performance.now()
   const sections: Section[] = []
   
-  // 固定参数
+  // 20×20 方阵布局
   const SEAT_SPACING = 28
   const ROW_SPACING = 35
-  const SEATS_PER_ROW = 10
+  const SEATS_PER_ROW = 20  // 每排20座
   
-  // 计算需要的排数
-  const rowCount = Math.ceil(seatCount / SEATS_PER_ROW)
+  // 计算需要的排数（20排）
+  const rowCount = Math.ceil(seatCount / SEATS_PER_ROW)  // 400座 = 20排
   const rows: Row[] = []
   let seatIdCounter = 0
   

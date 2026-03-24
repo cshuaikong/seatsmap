@@ -279,7 +279,7 @@ watch(currentTool, (newTool) => {
 
 const generateTestSeats = () => {
   if (!canvasRef.value) return
-  const testData = canvasRef.value.generateTestData(100)
+  const testData = canvasRef.value.generateTestData(400)
   venueData.value = testData
 }
 
