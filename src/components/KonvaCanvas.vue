@@ -2160,6 +2160,9 @@ const createSection = (section: Section) => {
 const renderVenueData = (data: VenueData) => {
   if (!staticLayer) return
 
+  const startTime = performance.now()
+  let seatCount = 0
+
   clearSelection()
 
   const children = [...staticLayer.getChildren()]
@@ -2174,155 +2177,74 @@ const renderVenueData = (data: VenueData) => {
     const sectionGroup = createSection(section)
     staticLayer!.add(sectionGroup)
     sectionGroups.set(section.id, sectionGroup)
+    // 统计座位数
+    section.rows.forEach(row => {
+      seatCount += row.seats.length
+    })
   })
 
   staticLayer?.batchDraw()
+  
+  const endTime = performance.now()
+  console.log(`[性能] 渲染 ${seatCount} 个座位耗时: ${(endTime - startTime).toFixed(2)}ms`)
 }
 
 // ==================== 生成测试数据 ====================
 
-const generateTestData = (seatCount: number = 300) => {
+const generateTestData = (seatCount: number = 50) => {
+  const startTime = performance.now()
   const sections: Section[] = []
-
-  const leftRows: Row[] = []
-  for (let r = 0; r < 8; r++) {
+  
+  // 固定参数
+  const SEAT_SPACING = 28
+  const ROW_SPACING = 35
+  const SEATS_PER_ROW = 10
+  
+  // 计算需要的排数
+  const rowCount = Math.ceil(seatCount / SEATS_PER_ROW)
+  const rows: Row[] = []
+  let seatIdCounter = 0
+  
+  for (let r = 0; r < rowCount && seatIdCounter < seatCount; r++) {
     const seats: Seat[] = []
     const rowLabel = String.fromCharCode(65 + r)
-
-    for (let c = 0; c < 8; c++) {
+    
+    // 每排座位数（最后一排可能不足）
+    const seatsInThisRow = Math.min(SEATS_PER_ROW, seatCount - seatIdCounter)
+    
+    for (let c = 0; c < seatsInThisRow; c++) {
       const status: Seat['status'] =
         Math.random() < 0.2 ? 'sold' :
         Math.random() < 0.3 ? 'reserved' : 'available'
 
       seats.push({
-        id: `seat-left-${r}-${c}`,
+        id: `seat-test-${seatIdCounter}`,
         label: String(c + 1),
-        x: 0,
-        y: 30 + c * 28,
-        status,
-        categoryId: 'left'
-      })
-    }
-
-    leftRows.push({
-      id: `row-left-${r}`,
-      label: rowLabel,
-      seats
-    })
-  }
-
-  sections.push({
-    id: 'section-left',
-    name: '左侧区域',
-    rows: leftRows,
-    x: 80,
-    y: 100
-  })
-
-  const centerRows: Row[] = []
-  for (let r = 0; r < 12; r++) {
-    const seats: Seat[] = []
-    const rowLabel = String.fromCharCode(65 + r)
-
-    for (let c = 0; c < 12; c++) {
-      const status: Seat['status'] =
-        Math.random() < 0.2 ? 'sold' :
-        Math.random() < 0.3 ? 'reserved' : 'available'
-
-      seats.push({
-        id: `seat-center-${r}-${c}`,
-        label: String(c + 1),
-        x: 30 + c * 28,
+        x: c * SEAT_SPACING,
         y: 0,
         status,
-        categoryId: 'center'
+        categoryId: 'default'
       })
+      seatIdCounter++
     }
 
-    centerRows.push({
-      id: `row-center-${r}`,
+    rows.push({
+      id: `row-test-${r}`,
       label: rowLabel,
       seats
     })
   }
 
   sections.push({
-    id: 'section-center',
-    name: '中间区域',
-    rows: centerRows,
-    x: 350,
-    y: 150
-  })
-
-  const rightRows: Row[] = []
-  for (let r = 0; r < 8; r++) {
-    const seats: Seat[] = []
-    const rowLabel = String.fromCharCode(65 + r)
-
-    for (let c = 0; c < 8; c++) {
-      const status: Seat['status'] =
-        Math.random() < 0.2 ? 'sold' :
-        Math.random() < 0.3 ? 'reserved' : 'available'
-
-      seats.push({
-        id: `seat-right-${r}-${c}`,
-        label: String(c + 1),
-        x: 0,
-        y: 30 + c * 28,
-        status,
-        categoryId: 'right'
-      })
-    }
-
-    rightRows.push({
-      id: `row-right-${r}`,
-      label: rowLabel,
-      seats
-    })
-  }
-
-  sections.push({
-    id: 'section-right',
-    name: '右侧区域',
-    rows: rightRows,
-    x: 750,
+    id: 'section-test',
+    name: '测试区域',
+    rows: rows,
+    x: 100,
     y: 100
   })
 
-  const vipRows: Row[] = []
-  for (let r = 0; r < 3; r++) {
-    const seats: Seat[] = []
-    const rowLabel = `VIP${r + 1}`
-
-    for (let c = 0; c < 10; c++) {
-      const status: Seat['status'] =
-        Math.random() < 0.3 ? 'sold' :
-        Math.random() < 0.4 ? 'reserved' : 'available'
-
-      seats.push({
-        id: `seat-vip-${r}-${c}`,
-        label: String(c + 1),
-        x: 30 + c * 28,
-        y: c * 8,
-        status,
-        categoryId: 'vip'
-      })
-    }
-
-    vipRows.push({
-      id: `row-vip-${r}`,
-      label: rowLabel,
-      seats
-    })
-  }
-
-  sections.push({
-    id: 'section-vip',
-    name: 'VIP区域',
-    rows: vipRows,
-    x: 380,
-    y: 520
-  })
+  const endTime = performance.now()
+  console.log(`[性能] 生成 ${seatCount} 个座位数据耗时: ${(endTime - startTime).toFixed(2)}ms`)
 
   return { sections }
 }
@@ -2791,15 +2713,17 @@ const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
         // 选中时：蓝色填充，白色边框，加粗
         circle.stroke('#3b82f6')
         circle.strokeWidth(3)
-        circle.shadowColor('#3b82f6')
-        circle.shadowBlur(8)
-        circle.shadowOpacity(0.5)
+        // 阴影已全局禁用以提升性能
+        // circle.shadowColor('#3b82f6')
+        // circle.shadowBlur(8)
+        // circle.shadowOpacity(0.5)
       } else {
         // 取消选中时：恢复原状
         const isNewSeat = circle.fill() === '#ef4444'
         circle.stroke(isNewSeat ? '#ef4444' : circle.fill())
         circle.strokeWidth(1)
-        circle.shadowEnabled(false)
+        // 阴影已全局禁用
+        // circle.shadowEnabled(false)
       }
     }
   }
@@ -2817,14 +2741,16 @@ const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
         // 选中时添加蓝色边框和发光效果
         shape.stroke('#3b82f6')
         shape.strokeWidth(2)
-        shape.shadowColor('#3b82f6')
-        shape.shadowBlur(8)
-        shape.shadowOpacity(0.5)
+        // 阴影已全局禁用以提升性能
+        // shape.shadowColor('#3b82f6')
+        // shape.shadowBlur(8)
+        // shape.shadowOpacity(0.5)
       } else {
         // 取消选中时恢复原状
         shape.stroke(null)
         shape.strokeWidth(0)
-        shape.shadowEnabled(false)
+        // 阴影已全局禁用
+        // shape.shadowEnabled(false)
       }
     })
   }
@@ -2843,9 +2769,10 @@ const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
           if (circle) {
             circle.stroke('#3b82f6')
             circle.strokeWidth(3)
-            circle.shadowColor('#3b82f6')
-            circle.shadowBlur(8)
-            circle.shadowOpacity(0.5)
+            // 阴影已全局禁用以提升性能
+            // circle.shadowColor('#3b82f6')
+            // circle.shadowBlur(8)
+            // circle.shadowOpacity(0.5)
           }
         }
       })
@@ -2858,7 +2785,8 @@ const applySelectionHighlight = (node: Konva.Group, isSelected: boolean) => {
           if (circle) {
             circle.stroke('#ef4444')
             circle.strokeWidth(1)
-            circle.shadowEnabled(false)
+            // 阴影已全局禁用
+            // circle.shadowEnabled(false)
           }
         }
       })

@@ -83,7 +83,7 @@
           <div class="control-buttons">
             <button @click="generateTestSeats" class="control-btn">
               <Icon icon="lucide:refresh-cw" class="btn-icon" />
-              生成300座位
+              生成50座位
             </button>
             <button @click="clearCanvas" class="control-btn">
               <Icon icon="lucide:trash-2" class="btn-icon" />
