@@ -160,6 +160,24 @@ staticLayer
 - Circle 设置 `listening: false`，`perfectDrawEnabled: false`
 - 事件由父 rowGroup 统一处理
 
+### ⚠️ 关键性能优化（mousemove 节流）
+**问题**：`stage.on('mousemove')` 每帧触发，即使不拖拽也会执行坐标转换、Transformer 边界计算等，导致 30ms+ 帧时。
+
+**解决**：`mousemove` 节流到 30fps（33ms 间隔），大幅减少 CPU 占用。
+
+```typescript
+// mousemove 节流：最多 30fps
+let lastMouseMoveTime = 0
+stage.on('mousemove', (e) => {
+  const now = performance.now()
+  if (now - lastMouseMoveTime < 33) return // 30fps 节流
+  lastMouseMoveTime = now
+  // ... 后续处理
+})
+```
+
+**效果**：`mousemove` 耗时从 30ms+ 降到 < 10ms，拖拽 100 个座位流畅。
+
 ### 创建统一
 - 手动绘制 和 按钮生成 均调用同一个 `createRowGroup(seats, x, y, rotation, rowId)`
 - `createSection` 内部遍历 rows，每排调用一次 `createRowGroup`

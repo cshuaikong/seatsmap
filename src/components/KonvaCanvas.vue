@@ -1,6 +1,7 @@
 <template>
   <div class="konva-wrapper">
     <div ref="containerRef" class="konva-container"></div>
+    <!-- 性能监控面板已禁用（避免 Vue 重渲染影响性能） -->
   </div>
 </template>
 
@@ -229,8 +230,32 @@ let lastDragRenderTime = 0
 let lastTransformerUpdateTime = 0
 const DRAG_RENDER_INTERVAL = 16 // ~60fps
 
+// ==================== 性能监控（非响应式，避免 Vue 重渲染）====================
+let perfFps = 0
+let perfFrameTime = 0
+let perfLastTime = 0
+let perfFrameCount = 0
+let perfFpsTimer = 0
+
 const updateDragAll = (screenPos: { x: number; y: number }) => {
   if (!unifiedDragState.active || !stage) return
+  
+  // FPS 计算
+  const now = performance.now()
+  const frameTime = now - perfLastTime
+  perfFrameTime = Math.round(frameTime)
+  perfLastTime = now
+  perfFrameCount++
+  if (now - perfFpsTimer >= 500) {
+    perfFps = Math.round(perfFrameCount * 1000 / (now - perfFpsTimer))
+    perfFrameCount = 0
+    perfFpsTimer = now
+    // 只在 FPS 低时打印
+    if (perfFps < 40) {
+      console.log(`[性能警告] FPS: ${perfFps}, 帧时: ${perfFrameTime}ms`)
+    }
+  }
+  
   const scaleVal = stage.scaleX()
   const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
   const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
@@ -243,8 +268,23 @@ const updateDragAll = (screenPos: { x: number; y: number }) => {
     })
   })
   
-  // 直接渲染，测试延迟
-  staticLayer?.batchDraw()
+  // 性能分析：拆解各步骤耗时
+  const t1 = performance.now()
+  
+  // 节流渲染：最多 30fps
+  const now2 = performance.now()
+  if (now2 - lastDragRenderTime > 33) {
+    lastDragRenderTime = now2
+    const t2 = performance.now()
+    staticLayer?.batchDraw()
+    const t3 = performance.now()
+    
+    const batchDrawTime = Math.round(t3 - t2)
+    const totalTime = Math.round(t3 - t1)
+    if (totalTime > 16) {
+      console.log(`[耗时] setAttrs:${Math.round(t2-t1)}ms batchDraw:${batchDrawTime}ms 总计:${totalTime}ms 节点:${unifiedDragState.items.length}排`)
+    }
+  }
 }
 
 const endDragAll = () => {
@@ -509,7 +549,13 @@ const setupStageEvents = () => {
   })
 
   // 鼠标移动 - 处理框选、平移和绘制预览
+  // mousemove 节流：最多 30fps，减少 CPU 占用
+  let lastMouseMoveTime = 0
   stage.on('mousemove', (e) => {
+    const now = performance.now()
+    if (now - lastMouseMoveTime < 33) return // 30fps 节流
+    lastMouseMoveTime = now
+    
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
@@ -1945,7 +1991,7 @@ const renderVenueData = (data: VenueData) => {
 
 // ==================== 生成测试数据 ====================
 
-const generateTestData = (seatCount: number = 100) => {
+const generateTestData = (seatCount: number = 30) => {
   const startTime = performance.now()
   const sections: Section[] = []
   
