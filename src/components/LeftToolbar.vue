@@ -24,30 +24,30 @@
 
     <!-- 2-5. 绘制工具区 - 三种座位排列方式 -->
     <div class="toolbar-section">
-      <!-- 单行座位 -->
+      <!-- 单行座位 row-straight：两点式直行 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'drawRow' }"
+        :class="{ active: modelValue === 'row-straight' }"
         title="单行座位"
-        @click="onToolChange('drawRow')"
+        @click="onToolChange('row-straight')"
       >
         <i class="iconfont icon-dorwrow tool-iconfont"></i>
       </button>
-      <!-- 分段座位 -->
+      <!-- 分段座位 section：三点式折线行 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'drawSegmentRow' }"
+        :class="{ active: modelValue === 'section' }"
         title="分段座位"
-        @click="onToolChange('drawSegmentRow')"
+        @click="onToolChange('section')"
       >
         <i class="iconfont icon-drowseatswithsegment tool-iconfont"></i>
       </button>
-      <!-- 多行座位 -->
+      <!-- 多行座位 section-diagonal：对角区块 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'drawMultiRow' }"
+        :class="{ active: modelValue === 'section-diagonal' }"
         title="多行座位"
-        @click="onToolChange('drawMultiRow')"
+        @click="onToolChange('section-diagonal')"
       >
         <i class="iconfont icon-drowmultrows tool-iconfont"></i>
       </button>

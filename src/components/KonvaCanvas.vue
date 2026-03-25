@@ -8,8 +8,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
-import type { ToolMode } from '../composables/useDrawing'
-import { defaultSeatMapConfig, type SeatStatus } from '../types'
+import type { ToolMode, DrawStep } from '../composables/useDrawing'
+import { defaultSeatMapConfig, type SeatStatus, type SeatStatus as SeatStatusType, type SeatType } from '../types'
 
 // ==================== 类型定义 ====================
 
@@ -111,6 +111,30 @@ let previewSeats: Konva.Node[] = []
 let guideLines: Konva.Line[] = []
 let cursorPreviewSeat: Konva.Group | null = null  // 鼠标跟随预览座位
 let isFirstPointPlaced = false  // 是否已放置起点
+
+// ==================== 三点式绘制状态（section、section-diagonal）====================
+
+// 绘制步骤：'idle' | 'first' | 'second' | 'third'
+const drawStep = ref<DrawStep>('idle')
+
+// 三点式绘制的三个关键点
+const drawPoints = ref<{
+  first: { x: number; y: number } | null
+  second: { x: number; y: number } | null
+  third: { x: number; y: number } | null
+}>({
+  first: null,
+  second: null,
+  third: null
+})
+
+// 三点式预览元素
+let sectionPreviewLines: Konva.Line[] = []
+let sectionPreviewSeats: Konva.Shape | null = null
+
+// 行号计数器（自动递增）
+let rowCounter = 0
+const getNextRowLabel = () => String.fromCharCode(65 + (rowCounter++ % 26))
 
 // ==================== 绘制圆形状态 ====================
 
@@ -469,9 +493,33 @@ const setupStageEvents = () => {
     transform.invert()
     const stagePos = transform.point(pos)
 
-    // 画座位排模式 - 点击任意位置开始绘制
+    // 旧版画座位排模式（拖拽式）
     if (currentTool.value === 'drawRow') {
       startDrawingRow(stagePos)
+      return
+    }
+
+    // 单座位模式 - 点击创建单个座位
+    if (currentTool.value === 'single-seat') {
+      createSingleSeat(stagePos)
+      return
+    }
+
+    // 直行模式（两点式点击）
+    if (currentTool.value === 'row-straight') {
+      handleRowStraightClick(stagePos)
+      return
+    }
+
+    // 三点式折线行模式
+    if (currentTool.value === 'section') {
+      handleSectionClick(stagePos)
+      return
+    }
+
+    // 对角区块模式
+    if (currentTool.value === 'section-diagonal') {
+      handleSectionDiagonalClick(stagePos)
       return
     }
 
@@ -618,9 +666,15 @@ const setupStageEvents = () => {
     transform.invert()
     const stagePos = transform.point(pos)
 
-    // 处理绘制座位预览
-    if (isDrawingRow.value && rowStartPoint.value) {
+    // 处理绘制座位预览（旧版拖拽式 drawRow）
+    if (isDrawingRow.value && rowStartPoint.value && currentTool.value === 'drawRow') {
       updateDrawingPreview(stagePos)
+      return
+    }
+
+    // 直行模式/三点式模式预览
+    if ((currentTool.value === 'row-straight' || currentTool.value === 'section' || currentTool.value === 'section-diagonal') && drawStep.value !== 'idle') {
+      updateMultiPointPreview(stagePos)
       return
     }
 
@@ -696,8 +750,8 @@ const setupStageEvents = () => {
     transform.invert()
     const stagePos = transform.point(pos)
 
-    // 结束绘制座位
-    if (isDrawingRow.value) {
+    // 结束绘制座位（仅旧版拖拽式 drawRow 工具）
+    if (isDrawingRow.value && currentTool.value === 'drawRow') {
       finishDrawingRow(stagePos)
       return
     }
@@ -725,8 +779,17 @@ const setupStageEvents = () => {
     isDraggingStage.value = false
   })
   
-  // 键盘事件 - Delete 删除选中
+  // 键盘事件 - Delete 删除选中 / ESC 取消绘制
   window.addEventListener('keydown', (e) => {
+    // ESC - 取消当前绘制
+    if (e.key === 'Escape') {
+      cancelMultiPointDraw()
+      clearDrawingPreview()
+      isDrawingRow.value = false
+      rowStartPoint.value = null
+      rowEndPoint.value = null
+      return
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       // 如果正在绘制，不处理
       if (isDrawingRow.value || isDrawingCircle.value || isDrawingRect.value || 
@@ -1820,8 +1883,10 @@ const clearDrawingPreview = () => {
 }
 
 // 创建座位排 Shape - 高性能批次绘制
+// startX/startY 对应第一个座位的绝对坐标（也是旋转原点）
+// seats 中每个座位的 x/y 是相对于 startX/startY 的局部偏移
 const createRowShape = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
-  // 计算排的边界
+  // 计算排的边界（用于 hitFunc）
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   seats.forEach((seat) => {
     minX = Math.min(minX, seat.x - SEAT_RADIUS)
@@ -1829,9 +1894,6 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
     maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
   })
-  
-  const width = maxX - minX
-  const height = maxY - minY
 
   const shape = new Konva.Shape({
     x: startX,
@@ -1839,10 +1901,6 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     rotation: rotation,
     id: `row-shape-${rowId}`,
     name: 'row-shape',
-    width: width,
-    height: height,
-    offsetX: minX + width / 2,
-    offsetY: minY + height / 2,
     perfectDrawEnabled: false,
     transformsEnabled: 'all',
     // 存储座位数据和边界信息
@@ -1958,7 +2016,441 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
   return shape
 }
 
-// ==================== 网格 ====================
+// ==================== 新绘制模式（single-seat / row-straight / section / section-diagonal）====================
+
+// ---------- 辅助函数 ----------
+
+/** 根据两点计算方向单位向量 */
+const getUnitVec = (from: { x: number; y: number }, to: { x: number; y: number }) => {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  if (dist < 0.001) return { ux: 1, uy: 0, dist }
+  return { ux: dx / dist, uy: dy / dist, dist }
+}
+
+/** 沿方向生成座位坐标列表（起点相对 shape 自身，旋转 0） */
+const genSeatsAlongLine = (
+  count: number,
+  startIdOffset = 0
+): Seat[] => {
+  const seats: Seat[] = []
+  for (let i = 0; i < count; i++) {
+    seats.push({
+      id: `seat-${Date.now()}-${startIdOffset + i}`,
+      label: String(startIdOffset + i + 1),
+      x: i * SEAT_SPACING,
+      y: 0,
+      status: 'available',
+      categoryId: 'custom'
+    })
+  }
+  return seats
+}
+
+/** 清理三点式/直行预览元素 */
+const clearMultiPointPreview = () => {
+  sectionPreviewLines.forEach(l => l.destroy())
+  sectionPreviewLines = []
+  if (sectionPreviewSeats) {
+    sectionPreviewSeats.destroy()
+    sectionPreviewSeats = null
+  }
+  drawingLayer?.batchDraw()
+}
+
+/** 重置三点式绘制状态 */
+const cancelMultiPointDraw = () => {
+  clearMultiPointPreview()
+  drawStep.value = 'idle'
+  drawPoints.value = { first: null, second: null, third: null }
+}
+
+/** 绘制预览座位 Shape（绘制层，不可交互） */
+const buildPreviewSeatShape = (
+  positions: { x: number; y: number }[],
+): Konva.Shape => {
+  const shape = new Konva.Shape({
+    listening: false,
+    perfectDrawEnabled: false,
+  })
+  shape.sceneFunc((ctx) => {
+    ctx.beginPath()
+    positions.forEach(p => {
+      ctx.moveTo(p.x + SEAT_RADIUS, p.y)
+      ctx.arc(p.x, p.y, SEAT_RADIUS, 0, Math.PI * 2)
+    })
+    ctx.fillStyle = 'rgba(59,130,246,0.25)'
+    ctx.fill()
+    ctx.strokeStyle = '#3b82f6'
+    ctx.lineWidth = 1.5
+    positions.forEach(p => {
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, SEAT_RADIUS, 0, Math.PI * 2)
+      ctx.stroke()
+    })
+  })
+  return shape
+}
+
+/** 在绘制层添加辅助线 */
+const addPreviewLine = (
+  points: number[],
+  dash = true
+): Konva.Line => {
+  const line = new Konva.Line({
+    points,
+    stroke: '#3b82f6',
+    strokeWidth: 1.5,
+    dash: dash ? [5, 4] : undefined,
+    listening: false,
+  })
+  drawingLayer!.add(line)
+  return line
+}
+
+/** 在绘制层添加点位标记 */
+const addPreviewDot = (
+  x: number, y: number,
+  color = '#3b82f6'
+): Konva.Circle => {
+  const dot = new Konva.Circle({
+    x, y,
+    radius: 5,
+    fill: color,
+    stroke: '#fff',
+    strokeWidth: 1.5,
+    listening: false,
+  })
+  drawingLayer!.add(dot)
+  return dot as unknown as Konva.Circle
+}
+
+// ---------- 单座位 ----------
+
+const createSingleSeat = (pos: { x: number; y: number }) => {
+  const rowId = `row-${Date.now()}`
+  const seats: Seat[] = [{
+    id: `seat-${Date.now()}-0`,
+    label: '1',
+    x: 0,
+    y: 0,
+    status: 'available',
+    categoryId: 'custom',
+  }]
+  const shape = createRowShape(seats, pos.x, pos.y, 0, rowId)
+  staticLayer?.add(shape)
+  staticLayer?.batchDraw()
+}
+
+// ---------- 直行模式（两点式点击）----------
+
+const handleRowStraightClick = (pos: { x: number; y: number }) => {
+  if (drawStep.value === 'idle') {
+    // 第一点：记录起点
+    drawStep.value = 'first'
+    drawPoints.value.first = { ...pos }
+
+    clearMultiPointPreview()
+    const dot = addPreviewDot(pos.x, pos.y)
+    sectionPreviewLines.push(dot as unknown as Konva.Line)
+    drawingLayer?.batchDraw()
+  } else if (drawStep.value === 'first') {
+    // 第二点：创建整行座位
+    drawPoints.value.second = { ...pos }
+    const from = drawPoints.value.first!
+    const to = pos
+    const { ux, uy, dist } = getUnitVec(from, to)
+
+    if (dist >= SEAT_SPACING) {
+      const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
+      const seats: Seat[] = []
+      for (let i = 0; i < count; i++) {
+        seats.push({
+          id: `seat-${Date.now()}-${i}`,
+          label: String(i + 1),
+          x: i * SEAT_SPACING,
+          y: 0,
+          status: 'available',
+          categoryId: 'custom',
+        })
+      }
+      const angle = Math.atan2(uy, ux) * 180 / Math.PI
+      const rowId = `row-${Date.now()}`
+      const shape = createRowShape(seats, from.x, from.y, angle, rowId)
+      staticLayer?.add(shape)
+      staticLayer?.batchDraw()
+    }
+
+    // 重置状态
+    cancelMultiPointDraw()
+  }
+}
+
+// ---------- 三点式折线行 (section) ----------
+
+const handleSectionClick = (pos: { x: number; y: number }) => {
+  if (drawStep.value === 'idle') {
+    // 第一点：起点
+    drawStep.value = 'first'
+    drawPoints.value.first = { ...pos }
+
+    clearMultiPointPreview()
+    const dot = addPreviewDot(pos.x, pos.y)
+    sectionPreviewLines.push(dot as unknown as Konva.Line)
+    drawingLayer?.batchDraw()
+
+  } else if (drawStep.value === 'first') {
+    // 第二点：第一段终点/转折点
+    drawStep.value = 'second'
+    drawPoints.value.second = { ...pos }
+
+    // 绘制第一段座位预览（固定）
+    const from = drawPoints.value.first!
+    const { ux, uy, dist } = getUnitVec(from, pos)
+    if (dist >= SEAT_SPACING) {
+      const count = Math.floor(dist / SEAT_SPACING) + 1
+      const positions = Array.from({ length: count }, (_, i) => ({
+        x: from.x + ux * i * SEAT_SPACING,
+        y: from.y + uy * i * SEAT_SPACING,
+      }))
+      clearMultiPointPreview()
+      // 点1标记
+      sectionPreviewLines.push(addPreviewDot(from.x, from.y) as unknown as Konva.Line)
+      // 点2标记
+      sectionPreviewLines.push(addPreviewDot(pos.x, pos.y, '#22c55e') as unknown as Konva.Line)
+      // 第一段辅助线
+      sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
+      // 第一段座位预览
+      if (sectionPreviewSeats) sectionPreviewSeats.destroy()
+      sectionPreviewSeats = buildPreviewSeatShape(positions)
+      drawingLayer!.add(sectionPreviewSeats)
+    }
+    drawingLayer?.batchDraw()
+
+  } else if (drawStep.value === 'second') {
+    // 第三点：第二段方向，创建折线行
+    drawPoints.value.third = { ...pos }
+    const p1 = drawPoints.value.first!
+    const p2 = drawPoints.value.second!
+    const p3 = pos
+
+    const { ux: ux1, uy: uy1, dist: dist1 } = getUnitVec(p1, p2)
+    const { ux: ux2, uy: uy2, dist: dist2 } = getUnitVec(p2, p3)
+
+    const count1 = dist1 >= SEAT_SPACING ? Math.floor(dist1 / SEAT_SPACING) + 1 : 0
+    const count2 = dist2 >= SEAT_SPACING ? Math.floor(dist2 / SEAT_SPACING) : 0
+
+    // 第一段（以 p1 为 shape 原点，旋转 = 第一段角度）
+    if (count1 > 0) {
+      const angle1 = Math.atan2(uy1, ux1) * 180 / Math.PI
+      const seats1 = genSeatsAlongLine(count1, 0)
+      const rowId1 = `row-${Date.now()}-1`
+      const shape1 = createRowShape(seats1, p1.x, p1.y, angle1, rowId1)
+      staticLayer?.add(shape1)
+    }
+
+    // 第二段：从第一段最后一个座位位置出发
+    if (count2 > 0 && count1 > 0) {
+      const lastSeatX = p1.x + ux1 * (count1 - 1) * SEAT_SPACING
+      const lastSeatY = p1.y + uy1 * (count1 - 1) * SEAT_SPACING
+      const angle2 = Math.atan2(uy2, ux2) * 180 / Math.PI
+      // 第二段从最后座位 + 一个间距开始，生成新座位
+      const startX = lastSeatX + ux2 * SEAT_SPACING
+      const startY = lastSeatY + uy2 * SEAT_SPACING
+      const seats2 = genSeatsAlongLine(count2, count1)
+      const rowId2 = `row-${Date.now()}-2`
+      const shape2 = createRowShape(seats2, startX, startY, angle2, rowId2)
+      staticLayer?.add(shape2)
+    }
+
+    staticLayer?.batchDraw()
+    cancelMultiPointDraw()
+  }
+}
+
+// ---------- 对角区块模式 (section-diagonal) ----------
+
+const handleSectionDiagonalClick = (pos: { x: number; y: number }) => {
+  if (drawStep.value === 'idle') {
+    // 第一点：区块起点
+    drawStep.value = 'first'
+    drawPoints.value.first = { ...pos }
+
+    clearMultiPointPreview()
+    sectionPreviewLines.push(addPreviewDot(pos.x, pos.y) as unknown as Konva.Line)
+    drawingLayer?.batchDraw()
+
+  } else if (drawStep.value === 'first') {
+    // 第二点：第一行方向/长度
+    drawStep.value = 'second'
+    drawPoints.value.second = { ...pos }
+
+    const from = drawPoints.value.first!
+    const { dist } = getUnitVec(from, pos)
+    if (dist >= SEAT_SPACING) {
+      clearMultiPointPreview()
+      sectionPreviewLines.push(addPreviewDot(from.x, from.y) as unknown as Konva.Line)
+      sectionPreviewLines.push(addPreviewDot(pos.x, pos.y, '#22c55e') as unknown as Konva.Line)
+      sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
+      drawingLayer?.batchDraw()
+    }
+
+  } else if (drawStep.value === 'second') {
+    // 第三点：行排列方向/行数
+    drawPoints.value.third = { ...pos }
+    const p1 = drawPoints.value.first!
+    const p2 = drawPoints.value.second!
+    const p3 = pos
+
+    // 行方向（每行座位方向）
+    const { ux: rowUx, uy: rowUy, dist: rowDist } = getUnitVec(p1, p2)
+    // 行排列方向（行与行之间的偏移方向）
+    const { ux: colUx, uy: colUy, dist: colDist } = getUnitVec(p2, p3)
+
+    const seatsPerRow = Math.max(1, Math.floor(rowDist / SEAT_SPACING) + 1)
+    const rowCount = Math.max(1, Math.floor(colDist / ROW_SPACING) + 1)
+    const rowAngle = Math.atan2(rowUy, rowUx) * 180 / Math.PI
+
+    for (let r = 0; r < rowCount; r++) {
+      // 每行起点：沿行排列方向偏移 r * ROW_SPACING
+      const startX = p1.x + colUx * r * ROW_SPACING
+      const startY = p1.y + colUy * r * ROW_SPACING
+
+      const seats = genSeatsAlongLine(seatsPerRow, r * seatsPerRow)
+      const rowId = `row-${Date.now()}-${r}`
+      const shape = createRowShape(seats, startX, startY, rowAngle, rowId)
+      staticLayer?.add(shape)
+    }
+
+    staticLayer?.batchDraw()
+    cancelMultiPointDraw()
+  }
+}
+
+// ---------- mousemove 预览更新（直行/三点式/对角）----------
+
+const updateMultiPointPreview = (pos: { x: number; y: number }) => {
+  const tool = currentTool.value
+  const step = drawStep.value
+
+  if (tool === 'row-straight' && step === 'first') {
+    // 预览：起点到当前鼠标的直行座位
+    const from = drawPoints.value.first!
+    const { ux, uy, dist } = getUnitVec(from, pos)
+    clearMultiPointPreview()
+    sectionPreviewLines.push(addPreviewDot(from.x, from.y) as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
+    if (dist >= SEAT_SPACING) {
+      const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
+      const positions = Array.from({ length: count }, (_, i) => ({
+        x: from.x + ux * i * SEAT_SPACING,
+        y: from.y + uy * i * SEAT_SPACING,
+      }))
+      sectionPreviewSeats = buildPreviewSeatShape(positions)
+      drawingLayer!.add(sectionPreviewSeats)
+    }
+    drawingLayer?.batchDraw()
+
+  } else if (tool === 'section' && step === 'first') {
+    // 第一段预览
+    const from = drawPoints.value.first!
+    const { ux, uy, dist } = getUnitVec(from, pos)
+    clearMultiPointPreview()
+    sectionPreviewLines.push(addPreviewDot(from.x, from.y) as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
+    if (dist >= SEAT_SPACING) {
+      const count = Math.floor(dist / SEAT_SPACING) + 1
+      const positions = Array.from({ length: count }, (_, i) => ({
+        x: from.x + ux * i * SEAT_SPACING,
+        y: from.y + uy * i * SEAT_SPACING,
+      }))
+      sectionPreviewSeats = buildPreviewSeatShape(positions)
+      drawingLayer!.add(sectionPreviewSeats)
+    }
+    drawingLayer?.batchDraw()
+
+  } else if (tool === 'section' && step === 'second') {
+    // 第二段预览（叠加在已固定的第一段上）
+    const p1 = drawPoints.value.first!
+    const p2 = drawPoints.value.second!
+    const { ux: ux1, uy: uy1, dist: dist1 } = getUnitVec(p1, p2)
+    const { ux: ux2, uy: uy2, dist: dist2 } = getUnitVec(p2, pos)
+
+    const count1 = dist1 >= SEAT_SPACING ? Math.floor(dist1 / SEAT_SPACING) + 1 : 0
+    const lastX = p1.x + ux1 * (count1 - 1) * SEAT_SPACING
+    const lastY = p1.y + uy1 * (count1 - 1) * SEAT_SPACING
+
+    const pos1Array = Array.from({ length: count1 }, (_, i) => ({
+      x: p1.x + ux1 * i * SEAT_SPACING,
+      y: p1.y + uy1 * i * SEAT_SPACING,
+    }))
+    const startX2 = lastX + ux2 * SEAT_SPACING
+    const startY2 = lastY + uy2 * SEAT_SPACING
+    const count2 = dist2 >= SEAT_SPACING ? Math.floor(dist2 / SEAT_SPACING) : 0
+    const pos2Array = Array.from({ length: count2 }, (_, i) => ({
+      x: startX2 + ux2 * i * SEAT_SPACING,
+      y: startY2 + uy2 * i * SEAT_SPACING,
+    }))
+
+    clearMultiPointPreview()
+    sectionPreviewLines.push(addPreviewDot(p1.x, p1.y) as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewDot(p2.x, p2.y, '#22c55e') as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewLine([p1.x, p1.y, p2.x, p2.y], false))
+    sectionPreviewLines.push(addPreviewLine([p2.x, p2.y, pos.x, pos.y]))
+    sectionPreviewSeats = buildPreviewSeatShape([...pos1Array, ...pos2Array])
+    drawingLayer!.add(sectionPreviewSeats)
+    drawingLayer?.batchDraw()
+
+  } else if (tool === 'section-diagonal' && step === 'first') {
+    // 预览第一行
+    const from = drawPoints.value.first!
+    const { ux, uy, dist } = getUnitVec(from, pos)
+    clearMultiPointPreview()
+    sectionPreviewLines.push(addPreviewDot(from.x, from.y) as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
+    if (dist >= SEAT_SPACING) {
+      const count = Math.floor(dist / SEAT_SPACING) + 1
+      const positions = Array.from({ length: count }, (_, i) => ({
+        x: from.x + ux * i * SEAT_SPACING,
+        y: from.y + uy * i * SEAT_SPACING,
+      }))
+      sectionPreviewSeats = buildPreviewSeatShape(positions)
+      drawingLayer!.add(sectionPreviewSeats)
+    }
+    drawingLayer?.batchDraw()
+
+  } else if (tool === 'section-diagonal' && step === 'second') {
+    // 预览整个区块
+    const p1 = drawPoints.value.first!
+    const p2 = drawPoints.value.second!
+    const { ux: rowUx, uy: rowUy, dist: rowDist } = getUnitVec(p1, p2)
+    const { ux: colUx, uy: colUy, dist: colDist } = getUnitVec(p2, pos)
+
+    const seatsPerRow = Math.max(1, Math.floor(rowDist / SEAT_SPACING) + 1)
+    const rowCount = Math.max(1, Math.floor(colDist / ROW_SPACING) + 1)
+
+    const allPositions: { x: number; y: number }[] = []
+    for (let r = 0; r < rowCount; r++) {
+      for (let s = 0; s < seatsPerRow; s++) {
+        allPositions.push({
+          x: p1.x + colUx * r * ROW_SPACING + rowUx * s * SEAT_SPACING,
+          y: p1.y + colUy * r * ROW_SPACING + rowUy * s * SEAT_SPACING,
+        })
+      }
+    }
+
+    clearMultiPointPreview()
+    sectionPreviewLines.push(addPreviewDot(p1.x, p1.y) as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewDot(p2.x, p2.y, '#22c55e') as unknown as Konva.Line)
+    sectionPreviewLines.push(addPreviewLine([p1.x, p1.y, p2.x, p2.y], false))
+    sectionPreviewLines.push(addPreviewLine([p2.x, p2.y, pos.x, pos.y]))
+    sectionPreviewSeats = buildPreviewSeatShape(allPositions)
+    drawingLayer!.add(sectionPreviewSeats)
+    drawingLayer?.batchDraw()
+  }
+}
+
 // ==================== 视图控制 ====================
 
 const resetView = () => {

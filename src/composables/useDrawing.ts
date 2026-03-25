@@ -1,19 +1,29 @@
 import { ref, computed, shallowRef } from 'vue'
 import type { Row, Seat, Position } from '../types'
+import { defaultSeatMapConfig, type SeatStatus, type SeatType } from '../types'
 
-export type ToolMode = 
+// 绘制模式类型
+export type ToolMode =
   // 基础工具
-  | 'select' | 'pan' | 'selectseat'
-  // 绘制工具 (三种座位排列)
-  | 'drawRow' | 'drawSegmentRow' | 'drawMultiRow'
-  // 座位区工具
-  | 'drawCircle' | 'drawRect' | 'drawPolygon' | 'drawPolyline' | 'drawSector' | 'drawRoundTable'
-  // 线条
-  | 'drawLine'
+  | 'select' | 'pan'
+  // 座位绘制工具
+  | 'single-seat'      // 单座位
+  | 'row-straight'     // 直行模式（两点式）
+  | 'section'          // 三点式折线行
+  | 'section-diagonal' // 对角区块模式
+  // 形状绘制工具
+  | 'drawCircle' | 'drawRect' | 'drawPolygon' | 'drawPolyline' | 'drawSector'
   // 标注工具
-  | 'text' | 'image' | 'restroom'
-  // 旧兼容
-  | 'seat' | 'row' | 'section' | 'booth' | 'table' | 'shape' | 'stage' | 'drawSeat' | 'drawFreehand' | 'drawLineRow' | 'drawArcRow' | 'drawText' | 'drawStage'
+  | 'text' | 'image'
+  // 兼容旧模式
+  | 'drawRow' | 'drawSegmentRow' | 'drawMultiRow' | 'selectseat'
+  | 'drawLine' | 'restroom' | 'drawRoundTable'
+  | 'seat' | 'row' | 'section-old' | 'booth' | 'table' | 'shape' | 'stage' 
+  | 'drawSeat' | 'drawFreehand' | 'drawLineRow' | 'drawArcRow' | 'drawText' | 'drawStage'
+
+// 绘制步骤（三点式绘制使用）
+export type DrawStep = 'idle' | 'first' | 'second' | 'third'
+
 export type DrawingState = 'idle' | 'placingSeat' | 'dragging'
 
 export function useDrawing() {
@@ -188,18 +198,34 @@ export function useDrawing() {
     
     const { row, index } = snapInfo.value
     
+    // 创建座位的辅助函数
+    const createSeat = (id: string, x: number, y: number, rowId: string, label: string): Seat => ({
+      id,
+      label,
+      x,
+      y,
+      radius: defaultSeatMapConfig.defaultSeatRadius,
+      status: 'available' as SeatStatus,
+      type: 'seat' as SeatType,
+      category: '普通席',
+      categoryId: '1',
+      rowId,
+      sectionId: 'default',
+      rowNumber: '',
+      seatNumber: label,
+      isWheelchair: false,
+      isCompanion: false
+    })
+    
     if (row && index >= 0) {
       // 在现有排中插入座位
-      const newSeat: Seat = {
-        id: `seat-${Date.now()}`,
-        label: '?',
-        x: index * SEAT_SPACING,
-        y: 0,
-        radius: 12,
-        categoryId: row.seats[0]?.categoryId || '1',
-        rowId: row.id,
-        sectionId: row.sectionId || 'default'
-      }
+      const newSeat = createSeat(
+        `seat-${Date.now()}`,
+        index * SEAT_SPACING,
+        0,
+        row.id,
+        '?'
+      )
       
       row.seats.splice(index, 0, newSeat)
       
@@ -212,22 +238,14 @@ export function useDrawing() {
       selectedRowId.value = row.id
     } else {
       // 创建新排
+      const newRowId = `row-${Date.now()}`
       const newRow: Row = {
-        id: `row-${Date.now()}`,
+        id: newRowId,
         label: String.fromCharCode(65 + rows.value.length),
         x: previewSeatPos.value.x,
         y: previewSeatPos.value.y,
         rotation: previewSeatRotation.value,
-        seats: [{
-          id: `seat-${Date.now()}`,
-          label: '1',
-          x: 0,
-          y: 0,
-          radius: 12,
-          categoryId: '1',
-          rowId: `row-${Date.now()}`,
-          sectionId: 'default'
-        }]
+        seats: [createSeat(`seat-${Date.now()}`, 0, 0, newRowId, '1')]
       }
       rows.value.push(newRow)
       selectedRowId.value = newRow.id
