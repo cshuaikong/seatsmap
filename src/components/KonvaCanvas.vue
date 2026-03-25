@@ -9,6 +9,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
 import type { ToolMode } from '../composables/useDrawing'
+import { defaultSeatMapConfig, type SeatStatus } from '../types'
 
 // ==================== 类型定义 ====================
 
@@ -17,7 +18,7 @@ export interface Seat {
   label: string
   x: number
   y: number
-  status: 'available' | 'sold' | 'reserved' | 'blocked'
+  status: 'available' | 'booked' | 'reserved' | 'disabled'
   categoryId: string
 }
 
@@ -89,13 +90,16 @@ const dragStart = ref({ x: 0, y: 0 })
 // 拖拽起始位置记录
 const dragStartPositions = new Map<string, { x: number; y: number }>()
 
-// 颜色映射
-const statusColors = {
-  available: '#22a559',
-  sold: '#ef4444',
-  reserved: '#f59e0b',
-  blocked: '#9ca3af'
-}
+// 使用统一配置（来自 defaultSeatMapConfig）
+const SEAT_RADIUS = defaultSeatMapConfig.defaultSeatRadius
+const SEAT_SPACING = defaultSeatMapConfig.defaultSeatSpacing
+const ROW_SPACING = defaultSeatMapConfig.defaultRowSpacing
+
+// 状态颜色（使用统一配置）
+const statusColors: Record<SeatStatus, string> = defaultSeatMapConfig.statusColors
+
+// 分类颜色（使用统一配置）
+const categoryColors: Record<string, string> = defaultSeatMapConfig.categoryColors
 
 // ==================== 绘制座位状态 ====================
 
@@ -107,8 +111,6 @@ let previewSeats: Konva.Node[] = []
 let guideLines: Konva.Line[] = []
 let cursorPreviewSeat: Konva.Group | null = null  // 鼠标跟随预览座位
 let isFirstPointPlaced = false  // 是否已放置起点
-const SEAT_SPACING = 22
-const SEAT_RADIUS = 9
 
 // ==================== 绘制圆形状态 ====================
 
@@ -1860,9 +1862,9 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     // 按状态分组，减少 fillStyle 切换
     const statusGroups: Record<string, Seat[]> = {
       available: [],
-      sold: [],
+      booked: [],
       reserved: [],
-      blocked: []
+      disabled: []
     }
     
     seatsData.forEach(seat => {
@@ -2035,11 +2037,11 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
 const createSection = (section: Section): Konva.Shape[] => {
   return section.rows.map((row, rowIndex) => {
     // 统一调用 createRowShape，与手动绘制逻辑一致
-    // 加上 section 的偏移量
+    // 加上 section 的偏移量，使用全局配置的行间距
     return createRowShape(
       row.seats,
       section.x + 0,
-      section.y + 30 + rowIndex * 35,
+      section.y + 30 + rowIndex * ROW_SPACING,
       0,
       row.id
     )
@@ -2088,13 +2090,11 @@ const generateTestData = (seatCount: number = 400) => {
   const startTime = performance.now()
   const sections: Section[] = []
   
-  // 20×20 方阵布局
-  const SEAT_SPACING = 28
-  const ROW_SPACING = 35
-  const SEATS_PER_ROW = 20  // 每排20座
+  // 使用全局配置（如果需要覆盖可以在函数内重新定义）
+  const SEATS_PER_ROW = defaultSeatMapConfig.sectionConfig.seatsPerRow
   
-  // 计算需要的排数（20排）
-  const rowCount = Math.ceil(seatCount / SEATS_PER_ROW)  // 400座 = 20排
+  // 计算需要的排数
+  const rowCount = Math.ceil(seatCount / SEATS_PER_ROW)
   const rows: Row[] = []
   let seatIdCounter = 0
   
@@ -2107,7 +2107,7 @@ const generateTestData = (seatCount: number = 400) => {
     
     for (let c = 0; c < seatsInThisRow; c++) {
       const status: Seat['status'] =
-        Math.random() < 0.2 ? 'sold' :
+        Math.random() < 0.2 ? 'booked' :
         Math.random() < 0.3 ? 'reserved' : 'available'
 
       seats.push({
