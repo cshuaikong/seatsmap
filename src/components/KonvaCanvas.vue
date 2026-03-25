@@ -69,6 +69,10 @@ let layer: Konva.Layer | null = null
 
 let transformLayer: Konva.Layer | null = null
 let drawingLayer: Konva.Layer | null = null
+
+// 拖拽时使用的临时 layer（只包含选中节点，优化400+节点性能）
+let dragLayer: Konva.Layer | null = null
+
 const sectionGroups = new Map<string, Konva.Group>()
 const seatGroups = new Map<string, Konva.Group>()
 
@@ -203,12 +207,16 @@ interface UnifiedDragState {
   active: boolean
   startScreenX: number
   startScreenY: number
+  currentX: number
+  currentY: number
   items: DragAllItem[]
 }
 const unifiedDragState: UnifiedDragState = {
   active: false,
   startScreenX: 0,
   startScreenY: 0,
+  currentX: 0,
+  currentY: 0,
   items: []
 }
 
@@ -221,6 +229,17 @@ const startDragAll = (screenPos: { x: number; y: number }) => {
     startX: item.node.x(),
     startY: item.node.y()
   }))
+  
+  // 方案2：把选中节点移到 dragLayer（只渲染选中节点，staticLayer保持显示）
+  if (dragLayer && staticLayer) {
+    unifiedDragState.items.forEach(item => {
+      item.node.moveTo(dragLayer)
+    })
+    dragLayer.visible(true)
+    dragLayer.batchDraw()
+    // staticLayer 保持显示，只是不更新（避免闪烁）
+  }
+  
   setCursor('grabbing')
   document.body.style.cursor = 'grabbing'
 }
@@ -240,39 +259,42 @@ let perfFpsTimer = 0
 const updateDragAll = (screenPos: { x: number; y: number }) => {
   if (!unifiedDragState.active || !stage) return
   
-  // FPS 计算
-  const now = performance.now()
-  const frameTime = now - perfLastTime
-  perfFrameTime = Math.round(frameTime)
-  perfLastTime = now
-  perfFrameCount++
-  if (now - perfFpsTimer >= 500) {
-    perfFps = Math.round(perfFrameCount * 1000 / (now - perfFpsTimer))
-    perfFrameCount = 0
-    perfFpsTimer = now
-    // 只在 FPS 低时打印
-    if (perfFps < 40) {
-      console.log(`[性能警告] FPS: ${perfFps}, 帧时: ${perfFrameTime}ms`)
-    }
-  }
+  // 记录当前鼠标位置（用于拖拽结束时计算最终位置）
+  unifiedDragState.currentX = screenPos.x
+  unifiedDragState.currentY = screenPos.y
   
+  const frameStart = performance.now()
+  
+  // 1. 坐标计算时间
+  const t1 = performance.now()
   const scaleVal = stage.scaleX()
   const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
   const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
+  const calcTime = Math.round(performance.now() - t1)
   
-  // 批量更新节点位置（使用 setAttrs 减少开销）
+  // 2. 节点更新时间（直接更新 Group 位置）
+  const t2 = performance.now()
   unifiedDragState.items.forEach(item => {
-    item.node.setAttrs({
-      x: item.startX + dx,
-      y: item.startY + dy
-    })
+    item.node.x(item.startX + dx)
+    item.node.y(item.startY + dy)
   })
+  const updateTime = Math.round(performance.now() - t2)
   
-  // 节流渲染：最多 10fps（400节点优化，牺牲流畅度换性能）
-  const now2 = performance.now()
-  if (now2 - lastDragRenderTime > 100) {
-    lastDragRenderTime = now2
-    staticLayer?.batchDraw()
+  // 3. 渲染时间
+  const t3 = performance.now()
+  dragLayer?.batchDraw()
+  const renderTime = Math.round(performance.now() - t3)
+  
+  // 4. 总帧时
+  const totalTime = Math.round(performance.now() - frameStart)
+  
+  // 每 500ms 打印一次详细数据
+  perfFrameCount++
+  if (frameStart - perfFpsTimer >= 500) {
+    perfFps = Math.round(perfFrameCount * 1000 / (frameStart - perfFpsTimer))
+    perfFrameCount = 0
+    perfFpsTimer = frameStart
+    console.log(`[拖拽性能] FPS:${perfFps} 总:${totalTime}ms | 坐标:${calcTime}ms 更新:${updateTime}ms 渲染:${renderTime}ms | 节点:${unifiedDragState.items.length}排`)
   }
 }
 
@@ -283,10 +305,26 @@ const endDragAll = () => {
     cancelAnimationFrame(dragRafId)
     dragRafId = 0
   }
+  
+  // 方案2：把节点从 dragLayer 移回 staticLayer，并更新最终位置
+  if (dragLayer && staticLayer) {
+    unifiedDragState.items.forEach(item => {
+      // 计算最终位置（只执行一次，不是在每帧）
+      const scaleVal = stage!.scaleX()
+      const dx = (unifiedDragState.currentX - unifiedDragState.startScreenX) / scaleVal
+      const dy = (unifiedDragState.currentY - unifiedDragState.startScreenY) / scaleVal
+      item.node.x(item.startX + dx)
+      item.node.y(item.startY + dy)
+      item.node.moveTo(staticLayer)
+    })
+    dragLayer.visible(false)
+    // staticLayer 本来就是显示的，不需要恢复
+  }
+  
   // 只有真正移动了才设 justDragged，防止误取消选中
   const moved = unifiedDragState.items.some(item =>
-    Math.abs(item.node.x() - item.startX) > 2 ||
-    Math.abs(item.node.y() - item.startY) > 2
+    Math.abs(item.node.x() + item.node.offsetX() - item.startX) > 2 ||
+    Math.abs(item.node.y() + item.node.offsetY() - item.startY) > 2
   )
   justDragged = moved
   unifiedDragState.active = false
@@ -296,7 +334,7 @@ const endDragAll = () => {
     item.originalPos = { x: item.node.x(), y: item.node.y() }
   })
   unifiedDragState.items = []
-  // 最终重绘，恢复标签
+  // 最终重绘
   staticLayer?.batchDraw()
 }
 
@@ -348,6 +386,13 @@ const initKonva = () => {
   // 选择装饰层（在最上层）
   selectionDecorationLayer = new Konva.Layer()
   stage.add(selectionDecorationLayer)
+
+  // 拖拽临时层（只包含选中节点，优化400+节点性能）
+  dragLayer = new Konva.Layer({
+    listening: false,
+    visible: false
+  })
+  stage.add(dragLayer)
 
   // 设置初始视图
   resetView()
@@ -1922,26 +1967,19 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
   return group
 }
 
-const createSection = (section: Section) => {
-  const sectionGroup = new Konva.Group({
-    x: section.x,
-    y: section.y,
-    id: `section-${section.id}`
-  })
-
-  section.rows.forEach((row, rowIndex) => {
+// 去掉 sectionGroup，直接返回 rowGroup 数组（平铺结构，减少嵌套）
+const createSection = (section: Section): Konva.Group[] => {
+  return section.rows.map((row, rowIndex) => {
     // 统一调用 createRowGroup，与手动绘制逻辑一致
-    const rowGroup = createRowGroup(
+    // 加上 section 的偏移量
+    return createRowGroup(
       row.seats,
-      0,
-      30 + rowIndex * 35,
+      section.x + 0,
+      section.y + 30 + rowIndex * 35,
       0,
       row.id
     )
-    sectionGroup.add(rowGroup)
   })
-
-  return sectionGroup
 }
 
 // ==================== 渲染场地数据 ====================
@@ -1963,9 +2001,11 @@ const renderVenueData = (data: VenueData) => {
   sectionGroups.clear()
 
   data.sections.forEach(section => {
-    const sectionGroup = createSection(section)
-    staticLayer!.add(sectionGroup)
-    sectionGroups.set(section.id, sectionGroup)
+    // 去掉 sectionGroup，直接添加 rowGroup 到 staticLayer
+    const rowGroups = createSection(section)
+    rowGroups.forEach(rowGroup => {
+      staticLayer!.add(rowGroup)
+    })
     // 统计座位数
     section.rows.forEach(row => {
       seatCount += row.seats.length
