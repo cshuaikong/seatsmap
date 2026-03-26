@@ -95,12 +95,8 @@ let viewportCullingEnabled = true
 const VIEWPORT_PADDING = 200 // 视口外扩像素，提前加载边界外内容
 let allRowNodes: Konva.Node[] = [] // 缓存所有排组节点，用于视口剔除
 
-// ==================== 绘制座位状态 ====================
+// ==================== 绘制预览状态 ====================
 
-const isDrawingRow = ref(false)
-const rowStartPoint = ref<{ x: number; y: number } | null>(null)
-const rowEndPoint = ref<{ x: number; y: number } | null>(null)
-let previewLine: Konva.Line | null = null
 let previewSeats: Konva.Node[] = []
 let guideLines: Konva.Line[] = []
 
@@ -547,18 +543,6 @@ const setupStageEvents = () => {
     transform.invert()
     const stagePos = transform.point(pos)
 
-    // 旧版画座位排模式（拖拽式）
-    if (currentTool.value === 'drawRow') {
-      startDrawingRow(stagePos)
-      return
-    }
-
-    // 单座位模式 - 点击创建单个座位
-    if (currentTool.value === 'single-seat') {
-      createSingleSeat(stagePos)
-      return
-    }
-
     // 直行模式（两点式点击）
     if (currentTool.value === 'row-straight') {
       handleRowStraightClick(stagePos)
@@ -723,12 +707,6 @@ const setupStageEvents = () => {
     transform.invert()
     const stagePos = transform.point(pos)
 
-    // 处理绘制座位预览（旧版拖拽式 drawRow）
-    if (isDrawingRow.value && rowStartPoint.value && currentTool.value === 'drawRow') {
-      updateDrawingPreview(stagePos)
-      return
-    }
-
     // 直行模式/三点式模式预览
     if ((currentTool.value === 'row-straight' || currentTool.value === 'section' || currentTool.value === 'section-diagonal') && drawStep.value !== 'idle') {
       updateMultiPointPreview(stagePos)
@@ -807,12 +785,6 @@ const setupStageEvents = () => {
     transform.invert()
     const stagePos = transform.point(pos)
 
-    // 结束绘制座位（仅旧版拖拽式 drawRow 工具）
-    if (isDrawingRow.value && currentTool.value === 'drawRow') {
-      finishDrawingRow(stagePos)
-      return
-    }
-
     // 结束绘制椭圆
     if (isDrawingCircle.value) {
       finishDrawingCircle(stagePos)
@@ -842,14 +814,11 @@ const setupStageEvents = () => {
     if (e.key === 'Escape') {
       cancelMultiPointDraw()
       clearDrawingPreview()
-      isDrawingRow.value = false
-      rowStartPoint.value = null
-      rowEndPoint.value = null
       return
     }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       // 如果正在绘制，不处理
-      if (isDrawingRow.value || isDrawingCircle.value || isDrawingRect.value || 
+      if (isDrawingCircle.value || isDrawingRect.value || 
           isDrawingPolygon.value || isDrawingSector.value || isDrawingPolyline.value) {
         return
       }
@@ -1709,166 +1678,9 @@ const finishDrawingSector = () => {
 
 // ==================== 绘制座位功能 ====================
 
-const startDrawingRow = (pos: { x: number; y: number }) => {
-  isDrawingRow.value = true
-  rowStartPoint.value = { x: pos.x, y: pos.y }
-  rowEndPoint.value = { x: pos.x, y: pos.y }
-
-  // 创建预览线
-  previewLine = new Konva.Line({
-    points: [pos.x, pos.y, pos.x, pos.y],
-    stroke: '#3b82f6',
-    strokeWidth: 2,
-    dash: [5, 5],
-    listening: false
-  })
-  drawingLayer!.add(previewLine)
-
-  // 创建起点标记
-  const startMarker = new Konva.Circle({
-    x: pos.x,
-    y: pos.y,
-    radius: 8,
-    fill: '#3b82f6',
-    stroke: '#fff',
-    strokeWidth: 2,
-    listening: false
-  })
-  drawingLayer!.add(startMarker)
-  previewSeats.push(startMarker)
-
-  drawingLayer!.batchDraw()
-}
-
-const updateDrawingPreview = (pos: { x: number; y: number }) => {
-  if (!rowStartPoint.value || !previewLine) return
-
-  // 无吸附效果，直接使用鼠标位置
-  rowEndPoint.value = { x: pos.x, y: pos.y }
-
-  // 更新预览线
-  previewLine.points([rowStartPoint.value.x, rowStartPoint.value.y, pos.x, pos.y])
-
-  // 清除旧的预览座位
-  previewSeats.forEach(seat => seat.destroy())
-  previewSeats = []
-
-  // 计算座位数量和位置
-  const dx = pos.x - rowStartPoint.value.x
-  const dy = pos.y - rowStartPoint.value.y
-  const distance = Math.sqrt(dx * dx + dy * dy)
-  
-  // 如果距离太小，不创建预览
-  if (distance < 1) {
-    drawingLayer!.batchDraw()
-    return
-  }
-  
-  const seatCount = Math.max(2, Math.floor(distance / SEAT_SPACING) + 1)
-
-  // 计算单位向量（避免除以0）
-  const unitX = distance > 0 ? dx / distance : 0
-  const unitY = distance > 0 ? dy / distance : 0
-
-  // 创建预览座位
-  for (let i = 0; i < seatCount; i++) {
-    const x = rowStartPoint.value.x + unitX * i * SEAT_SPACING
-    const y = rowStartPoint.value.y + unitY * i * SEAT_SPACING
-
-    // 预览座位 - 半透明蓝色填充
-    const seatGroup = new Konva.Group({
-      x,
-      y,
-      listening: false
-    })
-    const seat = new Konva.Circle({
-      radius: SEAT_RADIUS,
-      fill: 'rgba(59, 130, 246, 0.2)',
-      stroke: '#3b82f6',
-      strokeWidth: 2,
-      listening: false
-    })
-    seatGroup.add(seat)
-    drawingLayer!.add(seatGroup)
-    previewSeats.push(seatGroup)
-
-    // 添加座位编号（相对于 seatGroup）
-    const label = new Konva.Text({
-      text: '?',
-      fontSize: 9,
-      fontFamily: 'Inter',
-      fill: '#fff',
-      listening: false,
-      align: 'center',
-      verticalAlign: 'middle'
-    })
-    label.offsetX(label.width() / 2)
-    label.offsetY(label.height() / 2)
-    seatGroup.add(label)
-  }
-
-  drawingLayer!.batchDraw()
-}
-
-const finishDrawingRow = (pos: { x: number; y: number }) => {
-  if (!rowStartPoint.value) return
-
-  // 使用传入的终点位置（鼠标释放位置）
-  const dx = pos.x - rowStartPoint.value.x
-  const dy = pos.y - rowStartPoint.value.y
-  const distance = Math.sqrt(dx * dx + dy * dy)
-
-  // 如果距离太短，取消绘制
-  if (distance < SEAT_SPACING) {
-    clearDrawingPreview()
-    isDrawingRow.value = false
-    rowStartPoint.value = null
-    rowEndPoint.value = null
-    return
-  }
-
-  // 计算座位数量和位置
-  const seatCount = Math.max(2, Math.floor(distance / SEAT_SPACING) + 1)
-  const unitX = dx / distance
-  const unitY = dy / distance
-
-  // 创建座位数据（水平排列，用 rotation 控制角度）
-  const seats: Seat[] = []
-  for (let i = 0; i < seatCount; i++) {
-    seats.push({
-      id: `seat-${Date.now()}-${i}`,
-      label: String(i + 1),
-      x: i * SEAT_SPACING,
-      y: 0,
-      status: 'available',
-      categoryId: 'custom'
-    })
-  }
-
-  // 创建实际的座位排并渲染
-  const rowId = `row-${Date.now()}`
-  const rowShape = createRowShape(seats, rowStartPoint.value.x, rowStartPoint.value.y, 
-    Math.atan2(dy, dx) * 180 / Math.PI, rowId)
-  
-  if (staticLayer) {
-    staticLayer.add(rowShape)
-    staticLayer.batchDraw()
-  }
-
-  // 清除预览
-  clearDrawingPreview()
-  isDrawingRow.value = false
-  rowStartPoint.value = null
-  rowEndPoint.value = null
-}
-
 const clearDrawingPreview = () => {
   previewSeats.forEach(seat => seat.destroy())
   guideLines.forEach(line => line.destroy())
-  if (previewLine) {
-    previewLine.destroy()
-    previewLine = null
-  }
   previewSeats = []
   guideLines = []
   
@@ -2199,23 +2011,6 @@ const addPreviewDot = (
   })
   drawingLayer!.add(dot)
   return dot as unknown as Konva.Circle
-}
-
-// ---------- 单座位 ----------
-
-const createSingleSeat = (pos: { x: number; y: number }) => {
-  const rowId = `row-${Date.now()}`
-  const seats: Seat[] = [{
-    id: `seat-${Date.now()}-0`,
-    label: '1',
-    x: 0,
-    y: 0,
-    status: 'available',
-    categoryId: 'custom',
-  }]
-  const shape = createRowShape(seats, pos.x, pos.y, 0, rowId)
-  staticLayer?.add(shape)
-  staticLayer?.batchDraw()
 }
 
 // ---------- 直行模式（两点式点击）----------
