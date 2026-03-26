@@ -6,10 +6,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, markRaw, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
 import type { ToolMode, DrawStep } from '../composables/useDrawing'
-import { defaultSeatMapConfig, type SeatStatus, type SeatStatus as SeatStatusType, type SeatType } from '../types'
+import { defaultSeatMapConfig, type SeatStatus } from '../types'
 
 // ==================== 类型定义 ====================
 
@@ -61,21 +61,15 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement>()
 let stage: Konva.Stage | null = null
 
-// 分层策略：StaticLayer 放静态座位，ActiveLayer 放操作中座位
+// 分层策略
 let staticLayer: Konva.Layer | null = null
-let activeLayer: Konva.Layer | null = null
+let layer: Konva.Layer | null = null  // 兼容旧代码的别名
 
-// 兼容旧代码的别名（后续逐步替换）
-let layer: Konva.Layer | null = null
-
-let transformLayer: Konva.Layer | null = null
+// 绘制预览层
 let drawingLayer: Konva.Layer | null = null
 
 // 拖拽时使用的临时 layer（只包含选中节点，优化400+节点性能）
 let dragLayer: Konva.Layer | null = null
-
-// 拖拽预览矩形（轻量级，只显示拖拽位置）
-let dragPreviewRect: Konva.Rect | null = null
 
 const sectionGroups = new Map<string, Konva.Group>()
 const seatGroups = new Map<string, Konva.Group>()
@@ -87,9 +81,6 @@ const offsetY = ref(0)
 const isDraggingStage = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 
-// 拖拽起始位置记录
-const dragStartPositions = new Map<string, { x: number; y: number }>()
-
 // 使用统一配置（来自 defaultSeatMapConfig）
 const SEAT_RADIUS = defaultSeatMapConfig.defaultSeatRadius
 const SEAT_SPACING = defaultSeatMapConfig.defaultSeatSpacing
@@ -98,8 +89,11 @@ const ROW_SPACING = defaultSeatMapConfig.defaultRowSpacing
 // 状态颜色（使用统一配置）
 const statusColors: Record<SeatStatus, string> = defaultSeatMapConfig.statusColors
 
-// 分类颜色（使用统一配置）
-const categoryColors: Record<string, string> = defaultSeatMapConfig.categoryColors
+// ==================== 视口剔除配置 ====================
+// 针对 4 万座位超大规模场景的优化：只渲染视口内的节点
+let viewportCullingEnabled = true
+const VIEWPORT_PADDING = 200 // 视口外扩像素，提前加载边界外内容
+let allRowNodes: Konva.Node[] = [] // 缓存所有排组节点，用于视口剔除
 
 // ==================== 绘制座位状态 ====================
 
@@ -109,8 +103,6 @@ const rowEndPoint = ref<{ x: number; y: number } | null>(null)
 let previewLine: Konva.Line | null = null
 let previewSeats: Konva.Node[] = []
 let guideLines: Konva.Line[] = []
-let cursorPreviewSeat: Konva.Group | null = null  // 鼠标跟随预览座位
-let isFirstPointPlaced = false  // 是否已放置起点
 
 // ==================== 三点式绘制状态（section、section-diagonal）====================
 
@@ -134,7 +126,6 @@ let sectionPreviewSeats: Konva.Shape | null = null
 
 // 行号计数器（自动递增）
 let rowCounter = 0
-const getNextRowLabel = () => String.fromCharCode(65 + (rowCounter++ % 26))
 
 // ==================== 绘制圆形状态 ====================
 
@@ -177,9 +168,8 @@ let sectorCenterMarker: Konva.Circle | null = null
 
 // ==================== 选择系统状态 ====================
 
-// 旧的选择状态（兼容现有代码）
+// 选择状态
 const selectedSeatIds = ref<Set<string>>(new Set())
-const selectedRowIds = ref<Set<string>>(new Set())
 
 type SelectableType = 'seat' | 'row' | 'rect' | 'ellipse' | 'polygon' | 'sector' | 'polyline'
 
@@ -191,20 +181,8 @@ interface SelectedItem {
   originalRotation: number
 }
 
-// 注意：拖拽时使用非响应式的 dragState，避免 Vue 响应式开销
-const selectedItems = ref<SelectedItem[]>([])
-
-// 拖拽状态 - 完全非响应式
-interface DragState {
-  isDragging: boolean
-  nodeId: string | null
-  nodes: Map<string, { node: Konva.Group; startX: number; startY: number }>
-}
-const dragState: DragState = {
-  isDragging: false,
-  nodeId: null,
-  nodes: new Map()
-}
+// 选中项列表 - 使用 shallowRef 避免 Vue 深度代理 Konva 节点
+const selectedItems = shallowRef<SelectedItem[]>([])
 const selectionStartPos = ref<{ x: number; y: number } | null>(null)
 const selectionRectKonva = ref<Konva.Rect | null>(null)
 const isBoxSelecting = ref(false)  // 是否正在框选
@@ -282,17 +260,13 @@ const startDragAll = (screenPos: { x: number; y: number }, isRotation = false) =
   document.body.style.cursor = 'grabbing'
 }
 
-let dragRafId = 0
-let lastDragRenderTime = 0
-let lastTransformerUpdateTime = 0
-const DRAG_RENDER_INTERVAL = 16 // ~60fps
-
 // ==================== 性能监控（非响应式，避免 Vue 重渲染）====================
 let perfFps = 0
-let perfFrameTime = 0
-let perfLastTime = 0
 let perfFrameCount = 0
 let perfFpsTimer = 0
+
+// 拖拽 RAF 节流
+let dragAnimationFrameId: number | null = null
 
 const updateDragAll = (screenPos: { x: number; y: number }) => {
   if (!unifiedDragState.active || !stage) return
@@ -301,52 +275,40 @@ const updateDragAll = (screenPos: { x: number; y: number }) => {
   unifiedDragState.currentX = screenPos.x
   unifiedDragState.currentY = screenPos.y
   
-  const frameStart = performance.now()
+  // RAF 节流：确保与屏幕刷新率同步，避免同一帧内多次重绘
+  if (dragAnimationFrameId) return
   
-  // 1. 坐标计算时间
-  const t1 = performance.now()
-  const scaleVal = stage.scaleX()
-  const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
-  const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
-  const calcTime = Math.round(performance.now() - t1)
-  
-  // 2. 节点更新时间（直接设置 attrs，避免 setter 开销）
-  const t2 = performance.now()
-  const now = performance.now()
-  if (now - lastDragRenderTime > 50) { // 20fps
-    lastDragRenderTime = now
+  dragAnimationFrameId = requestAnimationFrame(() => {
+    dragAnimationFrameId = null
+    if (!unifiedDragState.active || !stage) return
+    
+    const scaleVal = stage.scaleX()
+    const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
+    const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
+    
+    // 批量更新节点属性，使用 setAttrs 减少重绘次数
     unifiedDragState.items.forEach(item => {
-      // 直接设置 attrs，不触发 setter 副作用
-      item.node.setAttr('x', item.startX + dx)
-      item.node.setAttr('y', item.startY + dy)
+      item.node.setAttrs({
+        x: item.startX + dx,
+        y: item.startY + dy
+      })
     })
-  }
-  const updateTime = Math.round(performance.now() - t2)
-  
-  // 3. 渲染时间（只渲染 dragLayer）
-  const t3 = performance.now()
-  dragLayer?.batchDraw()
-  const renderTime = Math.round(performance.now() - t3)
-  
-  // 4. 总帧时
-  const totalTime = Math.round(performance.now() - frameStart)
-  
-  // 每 500ms 打印一次详细数据
-  perfFrameCount++
-  if (frameStart - perfFpsTimer >= 500) {
-    perfFps = Math.round(perfFrameCount * 1000 / (frameStart - perfFpsTimer))
-    perfFrameCount = 0
-    perfFpsTimer = frameStart
-    console.log(`[拖拽性能] FPS:${perfFps} 总:${totalTime}ms | 坐标:${calcTime}ms 更新:${updateTime}ms 渲染:${renderTime}ms | 节点:${unifiedDragState.items.length}排`)
-  }
+    
+    // 批量渲染
+    if (unifiedDragState.useDragLayer) {
+      dragLayer?.batchDraw()
+    } else {
+      staticLayer?.batchDraw()
+    }
+  })
 }
 
 const endDragAll = () => {
   if (!unifiedDragState.active) return
   // 取消未执行的渲染帧
-  if (dragRafId) {
-    cancelAnimationFrame(dragRafId)
-    dragRafId = 0
+  if (dragAnimationFrameId) {
+    cancelAnimationFrame(dragAnimationFrameId)
+    dragAnimationFrameId = null
   }
   
   // 拖拽结束：将 Group 移回 staticLayer，恢复变换设置
@@ -383,7 +345,92 @@ const endDragAll = () => {
 
 // 网格配置
 const GRID_SIZE = 20
-const SNAP_THRESHOLD = 10
+
+// ==================== 视口剔除实现 ====================
+// 针对 4 万座位超大规模场景：只渲染视口内的节点，大幅降低 GPU 压力
+
+interface ViewportBounds {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+}
+
+// 获取当前视口边界（舞台坐标系）
+const getViewportBounds = (): ViewportBounds | null => {
+  if (!stage) return null
+  
+  const width = stage.width()
+  const height = stage.height()
+  const scale = stage.scaleX()
+  const x = stage.x()
+  const y = stage.y()
+  
+  // 计算视口在舞台坐标系中的边界（考虑缩放和平移）
+  const minX = (-x - VIEWPORT_PADDING) / scale
+  const maxX = (-x + width + VIEWPORT_PADDING) / scale
+  const minY = (-y - VIEWPORT_PADDING) / scale
+  const maxY = (-y + height + VIEWPORT_PADDING) / scale
+  
+  return { minX, maxX, minY, maxY }
+}
+
+// 检查节点是否在视口内
+const isNodeInViewport = (node: Konva.Node, viewport: ViewportBounds): boolean => {
+  const rect = node.getClientRect()
+  return (
+    rect.x + rect.width >= viewport.minX &&
+    rect.x <= viewport.maxX &&
+    rect.y + rect.height >= viewport.minY &&
+    rect.y <= viewport.maxY
+  )
+}
+
+// 执行视口剔除更新
+let cullingRafId: number | null = null
+const updateViewportCulling = () => {
+  if (!viewportCullingEnabled || !staticLayer) return
+  
+  // RAF 节流
+  if (cullingRafId) return
+  
+  cullingRafId = requestAnimationFrame(() => {
+    cullingRafId = null
+    
+    const viewport = getViewportBounds()
+    if (!viewport) return
+    
+    // 批量更新可见性
+    let visibleCount = 0
+    let hiddenCount = 0
+    
+    allRowNodes.forEach(node => {
+      const shouldBeVisible = isNodeInViewport(node, viewport)
+      if (node.visible() !== shouldBeVisible) {
+        node.visible(shouldBeVisible)
+        if (shouldBeVisible) visibleCount++
+        else hiddenCount++
+      }
+    })
+    
+    // 只在有变化时重绘
+    if (visibleCount > 0 || hiddenCount > 0) {
+      staticLayer?.batchDraw()
+    }
+  })
+}
+
+// 注册视口变化监听
+const setupViewportCulling = () => {
+  if (!stage) return
+  
+  // 监听舞台平移和缩放
+  stage.on('dragmove', updateViewportCulling)
+  stage.on('wheel', updateViewportCulling)
+  
+  // 初始执行一次
+  updateViewportCulling()
+}
 
 // ==================== 初始化 ====================
 
@@ -408,17 +455,6 @@ const initKonva = () => {
   })
   stage.add(staticLayer)
   layer = staticLayer // 兼容旧代码
-
-  // ActiveLayer 放操作中座位（实时渲染）
-  activeLayer = new Konva.Layer({
-    listening: true,
-    hitGraphEnabled: true
-  })
-  stage.add(activeLayer)
-
-  // 变换层（用于缩放和平移）
-  transformLayer = new Konva.Layer()
-  stage.add(transformLayer)
 
   // 绘制层（用于绘制预览）
   drawingLayer = new Konva.Layer()
@@ -445,6 +481,9 @@ const initKonva = () => {
 
   // 初始化 Transformer
   initTransformer()
+
+  // 初始化视口剔除（针对 4 万座位超大规模场景）
+  setupViewportCulling()
 
   emit('ready', stage)
 
@@ -2045,6 +2084,9 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
   seats.forEach(seat => {
     seatGroups.set(seat.id, shape as any)
   })
+  
+  // 缓存到视口剔除列表
+  allRowNodes.push(shape)
 
   return shape
 }
@@ -2938,14 +2980,14 @@ const selectItem = (node: Konva.Node, type: SelectableType, additive = false, sk
   node.off('mouseenter.select')
   node.off('mouseleave.select')
   
-  // 保存选中项
-  selectedItems.value.push({
+  // 保存选中项 - 使用 markRaw 避免 Vue 深度代理 Konva 节点
+  selectedItems.value = [...selectedItems.value, {
     id: node.id(),
     type,
-    node,
+    node: markRaw(node),
     originalPos: { x: node.x(), y: node.y() },
     originalRotation: node.rotation()
-  })
+  }]
   
   // 添加选中视觉反馈
   node.setAttr('selected', true)
