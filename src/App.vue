@@ -1,9 +1,20 @@
 <template>
-  <KonvaDesigner />
+  <div class="app">
+    <nav class="nav">
+      <button @click="currentView = 'designer'">主应用</button>
+      <button @click="currentView = 'test'">旋转测试</button>
+    </nav>
+    <KonvaDesigner v-if="currentView === 'designer'" />
+    <RotationTest v-else-if="currentView === 'test'" />
+  </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import KonvaDesigner from './components/KonvaDesigner.vue'
+import RotationTest from './components/RotationTest.vue'
+
+const currentView = ref('designer')
 </script>
 
 <style>
@@ -79,5 +90,25 @@ body {
 ::selection {
   background: var(--color-accent-soft);
   color: var(--color-accent);
+}
+
+/* 导航 */
+.nav {
+  padding: 10px 20px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nav button {
+  margin-right: 10px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.nav button:hover {
+  background: var(--color-bg-tertiary);
 }
 </style>

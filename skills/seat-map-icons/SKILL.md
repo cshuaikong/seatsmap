@@ -182,6 +182,102 @@ stage.on('mousemove', (e) => {
 - 手动绘制 和 按钮生成 均调用同一个 `createRowGroup(seats, x, y, rotation, rowId)`
 - `createSection` 内部遍历 rows，每排调用一次 `createRowGroup`
 
+---
+
+## Konva Shape 旋转与包围盒规范
+
+### 问题背景
+使用 Konva.Shape 实现排组旋转时，经常出现以下问题：
+1. **Shape 能旋转但座位不转动** - 原因是未设置 `transformsEnabled: 'all'`
+2. **Transformer 边框与 Shape 内容不重合** - 原因是 `width/height` 计算不正确
+3. **座位超出边框或边框过大** - 原因是坐标原点未对齐
+
+### 正确实现方案
+
+```typescript
+// 1. 座位数据（圆心坐标）
+const seats = []
+for (let i = 0; i < 10; i++) {
+  seats.push({
+    x: i * 15 + 6,  // +6 让座位不超出左边框
+    y: 6,           // +6 让座位垂直居中
+    status: 'available',
+  })
+}
+
+// 2. 计算包围盒（包含半径）
+const SEAT_RADIUS = 6
+const width = 9 * 15 + SEAT_RADIUS * 2   // 147 = 135 + 12
+const height = SEAT_RADIUS * 2            // 12
+
+// 3. 创建 Shape
+const shape = new Konva.Shape({
+  x: startX,
+  y: startY,
+  width: width,           // 必须设置！
+  height: height,         // 必须设置！
+  transformsEnabled: 'all', // 必须设置！
+  draggable: true,
+  seatsData: seats,
+})
+
+// 4. sceneFunc - 从 (0,0) 开始绘制
+shape.sceneFunc((context, shape) => {
+  const seatsData = shape.getAttr('seatsData') as Seat[]
+  
+  // 绘制边框（调试用，可选）
+  context.beginPath()
+  context.strokeStyle = '#ef4444'
+  context.setLineDash([3, 3])
+  context.rect(0, 0, width, height)
+  context.stroke()
+  
+  // 绘制座位
+  context.beginPath()
+  context.fillStyle = '#22c55e'
+  seatsData.forEach((seat) => {
+    context.moveTo(seat.x + SEAT_RADIUS, seat.y)
+    context.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
+  })
+  context.fill()
+})
+
+// 5. hitFunc - 点击检测区域
+shape.hitFunc((context, shape) => {
+  context.beginPath()
+  context.rect(0, 0, width, height)
+  context.fillStrokeShape(shape)
+})
+```
+
+### 关键要点
+
+| 属性 | 必须 | 说明 |
+|------|------|------|
+| `width/height` | ✅ | 必须设置，否则 Transformer 无法计算包围盒 |
+| `transformsEnabled: 'all'` | ✅ | 必须设置，否则旋转不生效 |
+| 坐标原点 | (0,0) | sceneFunc 和 hitFunc 都从 (0,0) 开始绘制 |
+| 座位偏移 | +radius | 座位坐标加半径，避免超出边框 |
+
+### 调试技巧
+```typescript
+// 打印包围盒信息
+const rect = shape.getClientRect()
+console.log('Shape x/y:', shape.x(), shape.y())
+console.log('getClientRect:', rect)
+console.log('偏差:', rect.x - shape.x(), rect.y - shape.y())
+```
+
+### Transformer 配置
+```typescript
+const transformer = new Konva.Transformer({
+  rotateEnabled: true,
+  resizeEnabled: false,
+  padding: 0,  // 移除内边距，确保边框重合
+  rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
+})
+```
+
 ## 工具类型定义
 
 ```typescript
