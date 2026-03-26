@@ -2323,18 +2323,6 @@ const updateMultiPointPreview = (pos: { x: number; y: number }) => {
 
 // ==================== 视图控制 ====================
 
-const resetView = () => {
-  if (!stage) return
-
-  scale.value = 1
-  offsetX.value = 0
-  offsetY.value = 0
-  stage.x(0)
-  stage.y(0)
-
-  staticLayer?.batchDraw()
-}
-
 const zoomTo = (zoomLevel: number, centerX?: number, centerY?: number) => {
   if (!stage) return
 
@@ -2502,23 +2490,6 @@ const generateTestData = (seatCount: number = 400) => {
   console.log(`[性能] 生成 ${seatCount} 个座位数据耗时: ${(endTime - startTime).toFixed(2)}ms`)
 
   return { sections }
-}
-
-// ==================== 清空画布 ====================
-
-const clearCanvas = () => {
-  if (!layer) return
-
-  selectedSeatIds.value.clear()
-  if (transformer) {
-    transformer.nodes([])
-    transformer.visible(false)
-  }
-
-  staticLayer?.destroyChildren()
-  sectionGroups.clear()
-  seatGroups.clear()
-  staticLayer?.batchDraw()
 }
 
 // ==================== 更新座位状态 ====================
@@ -3043,8 +3014,6 @@ const deleteSelected = () => {
 defineExpose({
   renderVenueData,
   generateTestData,
-  clearCanvas,
-  resetView,
   zoomTo,
   updateSeatStatus,
   clearSelection,

@@ -85,14 +85,6 @@
               <Icon icon="lucide:refresh-cw" class="btn-icon" />
               生成50座位
             </button>
-            <button @click="clearCanvas" class="control-btn">
-              <Icon icon="lucide:trash-2" class="btn-icon" />
-              清空
-            </button>
-            <button @click="resetView" class="control-btn">
-              <Icon icon="lucide:maximize" class="btn-icon" />
-              重置视图
-            </button>
           </div>
         </div>
       </div>
@@ -281,16 +273,6 @@ const generateTestSeats = () => {
   if (!canvasRef.value) return
   const testData = canvasRef.value.generateTestData(400)
   venueData.value = testData
-}
-
-const clearCanvas = () => {
-  venueData.value = null
-  canvasRef.value?.clearSelection()
-}
-
-const resetView = () => {
-  canvasRef.value?.resetView()
-  zoomLevel.value = 1
 }
 
 // 编辑操作
