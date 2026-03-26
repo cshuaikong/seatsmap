@@ -278,6 +278,121 @@ const transformer = new Konva.Transformer({
 })
 ```
 
+---
+
+## Konva 拖拽与旋转优化规范
+
+### 问题背景
+拖拽旋转后的物体时，经常出现以下问题：
+1. **拖拽时物体变平** - 角度被强制归零，变成水平
+2. **松开手后跳回角度** - 拖拽结束恢复角度时产生位移偏差
+3. **旋转时触发框选** - Transformer 旋转与舞台框选逻辑冲突
+
+### 根本原因
+1. **`transformsEnabled('position')` 禁用旋转** - 为性能优化而禁用旋转/缩放，导致物体变平
+2. **dragLayer 切换丢失 rotation** - `moveTo(dragLayer)` 时 rotation 属性未被保留
+3. **事件冒泡冲突** - mousedown 未检查 `isTransforming()`，旋转时触发框选
+
+### 正确实现方案
+
+#### 1. mousedown 事件处理（防止旋转时触发框选）
+```typescript
+stage.on('mousedown', (e) => {
+  // 如果正在使用 Transformer 进行变换（旋转/缩放），不干预
+  if (transformer?.isTransforming()) {
+    return
+  }
+  // ... 其他逻辑
+})
+```
+
+#### 2. 拖拽开始时保留旋转角度
+```typescript
+const startDragAll = (screenPos: { x: number; y: number }, isRotation = false) => {
+  // ... 初始化拖拽状态
+  
+  // 官方优化方案：拖拽时将 Group 移到 dragLayer
+  // 注意：旋转操作时不切换 Layer，避免变换中心偏移导致的抖动
+  if (dragLayer && staticLayer && !isRotation) {
+    unifiedDragState.items.forEach(item => {
+      const group = item.node as Konva.Group
+      // 移入 dragLayer 前记录当前旋转角度
+      const currentRotation = group.rotation()
+      group.moveTo(dragLayer)
+      // 关键：确保角度被重新应用，防止被默认值覆盖
+      group.rotation(currentRotation)
+    })
+    dragLayer.visible(true)
+    dragLayer.listening(false)
+    dragLayer.batchDraw()
+  }
+}
+```
+
+#### 3. 拖拽结束时恢复旋转角度
+```typescript
+const endDragAll = () => {
+  // ... 其他逻辑
+  
+  // 拖拽结束：将 Group 移回 staticLayer
+  if (dragLayer && staticLayer && unifiedDragState.useDragLayer) {
+    unifiedDragState.items.forEach(item => {
+      const group = item.node as Konva.Group
+      // 移回前记录当前旋转角度
+      const currentRotation = group.rotation()
+      group.moveTo(staticLayer)
+      // 关键：确保角度被重新应用，防止被默认值覆盖
+      group.rotation(currentRotation)
+    })
+    dragLayer.visible(false)
+  }
+}
+```
+
+#### 4. 检测旋转锚点点击
+```typescript
+// 检查是否在 Transformer 框内 → 进入统一拖拽模式
+if (transformer && transformer.visible() && selectedItems.value.length > 0) {
+  const trRect = transformer.getClientRect()
+  const insideTr = (
+    pos.x >= trRect.x &&
+    pos.x <= trRect.x + trRect.width &&
+    pos.y >= trRect.y &&
+    pos.y <= trRect.y + trRect.height
+  )
+  if (insideTr) {
+    // 检测是否点击了旋转锚点（旋转时不切换 Layer）
+    const targetName = (e.target as any)?.name?.() || ''
+    const isRotater = targetName.includes('rotater')
+    startDragAll(pos, isRotater)
+    return
+  }
+}
+```
+
+### 关键要点
+
+| 要点 | 说明 |
+|------|------|
+| **禁用 `transformsEnabled('position')`** | 这会导致旋转丢失，不要用于需要保持旋转的节点 |
+| **moveTo 前后记录 rotation** | 切换 Layer 前后都要记录并重新应用 rotation |
+| **旋转时不切换 Layer** | 点击 rotater 锚点时，保持在 staticLayer 操作 |
+| **检查 `isTransforming()`** | mousedown 中检查，防止旋转时触发框选 |
+| **使用 `useDragLayer` 标记** | 记录是否使用了 dragLayer，以便正确恢复 |
+
+### 调试技巧
+```typescript
+// 打印旋转角度变化
+console.log('Before moveTo:', group.rotation())
+group.moveTo(dragLayer)
+console.log('After moveTo:', group.rotation())
+
+// 确保角度一致
+if (group.rotation() !== currentRotation) {
+  console.warn('Rotation lost!', currentRotation, '->', group.rotation())
+}
+```
+
 ## 工具类型定义
 
 ```typescript

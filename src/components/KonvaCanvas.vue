@@ -239,6 +239,7 @@ interface UnifiedDragState {
   currentX: number
   currentY: number
   items: DragAllItem[]
+  useDragLayer: boolean // 是否使用了 dragLayer（旋转时不使用）
 }
 const unifiedDragState: UnifiedDragState = {
   active: false,
@@ -246,13 +247,15 @@ const unifiedDragState: UnifiedDragState = {
   startScreenY: 0,
   currentX: 0,
   currentY: 0,
-  items: []
+  items: [],
+  useDragLayer: false
 }
 
-const startDragAll = (screenPos: { x: number; y: number }) => {
+const startDragAll = (screenPos: { x: number; y: number }, isRotation = false) => {
   unifiedDragState.active = true
   unifiedDragState.startScreenX = screenPos.x
   unifiedDragState.startScreenY = screenPos.y
+  unifiedDragState.useDragLayer = !isRotation // 旋转时不使用 dragLayer
   unifiedDragState.items = selectedItems.value.map(item => ({
     node: item.node as Konva.Group,
     startX: item.node.x(),
@@ -260,12 +263,15 @@ const startDragAll = (screenPos: { x: number; y: number }) => {
   }))
   
   // 官方优化方案：拖拽时将 Group 移到 dragLayer，并优化变换计算
-  if (dragLayer && staticLayer) {
+  // 注意：旋转操作时不切换 Layer，避免变换中心偏移导致的抖动
+  if (dragLayer && staticLayer && unifiedDragState.useDragLayer) {
     unifiedDragState.items.forEach(item => {
       const group = item.node as Konva.Group
-      // 只启用位置变换，禁用缩放/旋转（提升性能）
-      group.transformsEnabled('position')
+      // 移入 dragLayer 前记录当前旋转角度
+      const currentRotation = group.rotation()
       group.moveTo(dragLayer)
+      // 关键：确保角度被重新应用，防止被默认值覆盖
+      group.rotation(currentRotation)
     })
     dragLayer.visible(true)
     dragLayer.listening(false)
@@ -344,12 +350,15 @@ const endDragAll = () => {
   }
   
   // 拖拽结束：将 Group 移回 staticLayer，恢复变换设置
-  if (dragLayer && staticLayer) {
+  // 注意：只有使用了 dragLayer 时才需要移回
+  if (dragLayer && staticLayer && unifiedDragState.useDragLayer) {
     unifiedDragState.items.forEach(item => {
       const group = item.node as Konva.Group
-      // 恢复所有变换
-      group.transformsEnabled('all')
+      // 移回前记录当前旋转角度
+      const currentRotation = group.rotation()
       group.moveTo(staticLayer)
+      // 关键：确保角度被重新应用，防止被默认值覆盖
+      group.rotation(currentRotation)
     })
     dragLayer.visible(false)
   }
@@ -361,6 +370,7 @@ const endDragAll = () => {
   )
   justDragged = moved
   unifiedDragState.active = false
+  unifiedDragState.useDragLayer = false
   document.body.style.cursor = ''
   // 更新 originalPos
   selectedItems.value.forEach(item => {
@@ -485,6 +495,11 @@ const setupStageEvents = () => {
     // 只响应左键 (buttons & 1 表示左键按下)
     if (!(e.evt.buttons & 1)) return
 
+    // 如果正在使用 Transformer 进行变换（旋转/缩放），不干预
+    if (transformer?.isTransforming()) {
+      return
+    }
+
     const pos = stage!.getPointerPosition()
     if (!pos) return
 
@@ -566,7 +581,10 @@ const setupStageEvents = () => {
         pos.y <= trRect.y + trRect.height
       )
       if (insideTr) {
-        startDragAll(pos)
+        // 检测是否点击了旋转锚点（旋转时不切换 Layer）
+        const targetName = (e.target as any)?.name?.() || ''
+        const isRotater = targetName.includes('rotater')
+        startDragAll(pos, isRotater)
         return  // 不触发框选或其他逻辑
       }
     }
