@@ -206,6 +206,7 @@ const dragState: DragState = {
   nodes: new Map()
 }
 const selectionStartPos = ref<{ x: number; y: number } | null>(null)
+const selectionRectKonva = ref<Konva.Rect | null>(null)
 const isBoxSelecting = ref(false)  // 是否正在框选
 
 // 拖拽完成标志 - 用于区分拖拽和点击
@@ -708,7 +709,7 @@ const setupStageEvents = () => {
     }
 
     // 处理框选
-    if (selectionStartPos.value && dragSelectRect?.visible()) {
+    if (selectionStartPos.value && selectionRectKonva.value?.visible()) {
       updateBoxSelection(stagePos)
       return
     }
@@ -1774,18 +1775,14 @@ const finishDrawingRow = (pos: { x: number; y: number }) => {
   const unitX = dx / distance
   const unitY = dy / distance
 
-  // 创建座位数据（本地坐标，相对于排起点）
+  // 创建座位数据（水平排列，用 rotation 控制角度）
   const seats: Seat[] = []
   for (let i = 0; i < seatCount; i++) {
-    // 本地坐标：相对于排起点的偏移
-    const localX = unitX * i * SEAT_SPACING
-    const localY = unitY * i * SEAT_SPACING
-
     seats.push({
       id: `seat-${Date.now()}-${i}`,
       label: String(i + 1),
-      x: localX,
-      y: localY,
+      x: i * SEAT_SPACING,
+      y: 0,
       status: 'available',
       categoryId: 'custom'
     })
@@ -1885,48 +1882,49 @@ const clearDrawingPreview = () => {
 // startX/startY 对应第一个座位的绝对坐标（也是旋转原点）
 // seats 中每个座位的 x/y 是相对于 startX/startY 的局部偏移
 const createRowShape = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
-  // 计算排的局部边界
+  // 统一调整座位坐标：加上半径偏移，使座位从 (SEAT_RADIUS, SEAT_RADIUS) 开始
+  // 这样边框可以从 (0, 0) 开始，座位完整包含在边框内
+  const adjustedSeats = seats.map(seat => ({
+    ...seat,
+    x: seat.x + SEAT_RADIUS,
+    y: seat.y + SEAT_RADIUS
+  }))
+  
+  // 计算排的边界（用于 hitFunc 和 width/height）
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  seats.forEach((seat) => {
+  adjustedSeats.forEach((seat) => {
     minX = Math.min(minX, seat.x - SEAT_RADIUS)
     minY = Math.min(minY, seat.y - SEAT_RADIUS)
     maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
     maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
   })
-
+  
+  // 计算 width/height 用于 Transformer 包围盒
   const width = maxX - minX
   const height = maxY - minY
-
-  // 座位坐标减去 minX/minY 偏移，使内容从 (0,0) 开始
-  const adjustedSeats = seats.map(s => ({
-    ...s,
-    x: s.x - minX,
-    y: s.y - minY,
-  }))
   
-  // 旋转原点设在形状中心，旋转时不变形
-  const centerX = width / 2
-  const centerY = height / 2
-  const shapeX = startX + minX + centerX  // x/y 对应中心点
-  const shapeY = startY + minY + centerY
+  // 计算几何中心，用于设置旋转中心
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
 
   const shape = new Konva.Shape({
-    x: shapeX,
-    y: shapeY,
+    x: startX + centerX,
+    y: startY + centerY,
     rotation: rotation,
-    offsetX: centerX,  // 旋转原点在中心
+    width: width,
+    height: height,
+    offsetX: centerX,
     offsetY: centerY,
     id: `row-shape-${rowId}`,
     name: 'row-shape',
-    width: width,
-    height: height,
     perfectDrawEnabled: false,
     transformsEnabled: 'all',
+    // 存储调整后的座位数据和边界信息
     seatsData: adjustedSeats,
-    hitMinX: 0,
-    hitMinY: 0,
-    hitMaxX: width,
-    hitMaxY: height,
+    hitMinX: minX,
+    hitMinY: minY,
+    hitMaxX: maxX,
+    hitMaxY: maxY
   })
 
   // sceneFunc: 批次绘制所有座位
@@ -1991,15 +1989,13 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     })
   })
 
-  // hitFunc: 自定义点击检测区域
+  // hitFunc: 自定义点击检测区域（从 0,0 开始）
   shape.hitFunc((context, shape) => {
-    const minX = shape.getAttr('hitMinX')
-    const minY = shape.getAttr('hitMinY')
-    const maxX = shape.getAttr('hitMaxX')
-    const maxY = shape.getAttr('hitMaxY')
+    const width = shape.width()
+    const height = shape.height()
     
     context.beginPath()
-    context.rect(minX, minY, maxX - minX, maxY - minY)
+    context.rect(0, 0, width, height)
     context.fillStrokeShape(shape)
   })
 
@@ -2021,8 +2017,9 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
 
   shape.on('click', (e) => {
     if (currentTool.value !== 'select') return
-    if (shape.getAttr('selected')) return
     e.cancelBubble = true
+    // 如果已选中且按住 Shift，则取消选中；否则正常处理
+    if (shape.getAttr('selected') && !e.evt.shiftKey) return
     selectRow(rowId, e.evt.shiftKey)
   })
 
@@ -2748,24 +2745,13 @@ const initTransformer = () => {
   if (!selectionDecorationLayer) return
   
   transformer = new Konva.Transformer({
-    resizeEnabled: false,
     rotateEnabled: true,
-    rotateAnchorOffset: 20,
+    resizeEnabled: false,
     rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
+    padding: 0,
     visible: false,
     borderStroke: '#3b82f6',
     borderStrokeWidth: 1,
-    anchorStroke: '#3b82f6',
-    anchorFill: '#fff',
-    anchorSize: 8,
-    padding: 0,
-    ignoreStroke: true,
-    keepRatio: false,
-    centeredScaling: false,
-    boundBoxFunc: (oldBox, newBox) => newBox,
-    // Transformer 不处理拖拽，只显示边框和旋转锚点
-    draggable: false,
-    listening: true,
   })
 
   // 点击 Transformer 框内空白区域 → 取消选中
@@ -2779,15 +2765,17 @@ const initTransformer = () => {
       clearSelection()
     }
   })
-  
-  // 绑定旋转事件
-  transformer.on('transform', (e: any) => {
-    // 更新原始旋转记录
-    selectedItems.value.forEach(item => {
-      item.originalRotation = item.node.rotation()
+
+  // 变换结束后更新选中项的原始位置和旋转角度
+  transformer.on('transformend', () => {
+    const nodes = transformer?.nodes() || []
+    nodes.forEach((node) => {
+      const item = selectedItems.value.find(i => i.id === node.id())
+      if (item) {
+        item.originalPos = { x: node.x(), y: node.y() }
+        item.originalRotation = node.rotation()
+      }
     })
-    // 实时绘制，确保旋转过程中座位跟随旋转
-    staticLayer?.draw()
   })
   
   selectionDecorationLayer.add(transformer)
@@ -2832,19 +2820,17 @@ const updateTransformer = (forceFullUpdate = false) => {
 
 // ==================== 新的选择系统 ====================
 
-// 框选矩形（灰色半透明，绘制在 selectionDecorationLayer 上）
-let dragSelectRect: Konva.Rect | null = null
-
 const initSelection = () => {
-  dragSelectRect = new Konva.Rect({
+  // 初始化选择框（用于框选）
+  selectionRectKonva.value = new Konva.Rect({
     visible: false,
-    fill: 'rgba(180, 180, 180, 0.15)',
-    stroke: '#aaaaaa',
+    fill: 'rgba(59, 130, 246, 0.1)',
+    stroke: '#3b82f6',
     strokeWidth: 1,
-    dash: [4, 3],
-    listening: false,
+    dash: [4, 4],
+    listening: false
   })
-  selectionDecorationLayer?.add(dragSelectRect as unknown as Konva.Shape)
+  selectionDecorationLayer?.add(selectionRectKonva.value as unknown as Konva.Shape)
 }
 
 // 网格对齐辅助函数
@@ -3004,29 +2990,28 @@ const startRotation = (e: MouseEvent) => {
 
 // 开始框选
 const startBoxSelection = (pos: { x: number; y: number }) => {
-  if (!stage || !dragSelectRect) return
+  if (!stage) return
   
+  // 直接使用屏幕坐标（指针位置）
   const pointer = stage.getPointerPosition()
   if (!pointer) return
   
-  // 将屏幕坐标转为 layer 坐标（框选矩形在 selectionDecorationLayer，用屏幕坐标即可）
-  isBoxSelecting.value = true
-  selectionStartPos.value = pointer  // 存屏幕坐标
-
-  dragSelectRect.setAttrs({
+  isBoxSelecting.value = true  // 标记正在框选
+  selectionStartPos.value = pointer
+  selectionRectKonva.value?.setAttrs({
     x: pointer.x,
     y: pointer.y,
     width: 0,
     height: 0,
-    visible: true,
+    visible: true
   })
-  selectionDecorationLayer?.batchDraw()
 }
 
 // 更新框选框
 const updateBoxSelection = (pos: { x: number; y: number }) => {
-  if (!selectionStartPos.value || !dragSelectRect || !stage) return
+  if (!selectionStartPos.value || !selectionRectKonva.value || !stage) return
   
+  // 使用屏幕坐标
   const pointer = stage.getPointerPosition()
   if (!pointer) return
   
@@ -3035,87 +3020,69 @@ const updateBoxSelection = (pos: { x: number; y: number }) => {
   const width = Math.abs(pointer.x - selectionStartPos.value.x)
   const height = Math.abs(pointer.y - selectionStartPos.value.y)
   
-  dragSelectRect.setAttrs({ x, y, width, height })
+  selectionRectKonva.value.setAttrs({ x, y, width, height })
   selectionDecorationLayer?.batchDraw()
 }
 
 // 结束框选
 const endBoxSelection = (additive: boolean) => {
-  if (!dragSelectRect || !selectionStartPos.value || !stage || !layer || !transformer) return
+  if (!selectionRectKonva.value || !selectionStartPos.value || !stage || !layer) return
   
-  // 框选矩形在屏幕坐标，转为 layer 坐标做命中检测
-  const layerTransformInv = layer.getAbsoluteTransform().copy().invert()
-  const p1 = layerTransformInv.point({ x: dragSelectRect.x(), y: dragSelectRect.y() })
-  const p2 = layerTransformInv.point({ x: dragSelectRect.x() + dragSelectRect.width(), y: dragSelectRect.y() + dragSelectRect.height() })
-  const selX = Math.min(p1.x, p2.x)
-  const selY = Math.min(p1.y, p2.y)
-  const selW = Math.abs(p2.x - p1.x)
-  const selH = Math.abs(p2.y - p1.y)
+  // 获取框选框相对于 layer 的边界
+  const selRect = selectionRectKonva.value.getClientRect({ relativeTo: layer })
+  
+  
   
   // 框选区域太小，忽略
-  if (selW < 5 || selH < 5) {
-    dragSelectRect.visible(false)
+  if (selRect.width < 5 || selRect.height < 5) {
+    selectionRectKonva.value.visible(false)
     selectionStartPos.value = null
-    selectionDecorationLayer?.batchDraw()
     return
   }
   
+  // 获取所有可选中对象
   const allNodes = getAllSelectableNodes()
   
+  
+  // 找到与框选区域相交的对象（部分相交或完全包含）
   const intersectingNodes = allNodes.filter(node => {
-    let nodeRect: { x: number; y: number; width: number; height: number }
-    if (node.name() === 'row-shape') {
-      const hitMinX = node.getAttr('hitMinX') as number
-      const hitMinY = node.getAttr('hitMinY') as number
-      const hitMaxX = node.getAttr('hitMaxX') as number
-      const hitMaxY = node.getAttr('hitMaxY') as number
-      const nodeTransform = node.getAbsoluteTransform()
-      const layerInvTransform = layer ? layer.getAbsoluteTransform().copy().invert() : null
-      const toLayerPoint = (p: { x: number; y: number }) => {
-        const abs = nodeTransform.point(p)
-        return layerInvTransform ? layerInvTransform.point(abs) : abs
-      }
-      const corners = [
-        toLayerPoint({ x: hitMinX, y: hitMinY }),
-        toLayerPoint({ x: hitMaxX, y: hitMinY }),
-        toLayerPoint({ x: hitMaxX, y: hitMaxY }),
-        toLayerPoint({ x: hitMinX, y: hitMaxY }),
-      ]
-      const xs = corners.map(p => p.x)
-      const ys = corners.map(p => p.y)
-      nodeRect = { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
-    } else {
-      nodeRect = node.getClientRect({ relativeTo: layer || undefined })
-    }
+    // 获取节点相对于 layer 的边界
+    const nodeRect = node.getClientRect({ relativeTo: layer })
     
-    // AABB 完全包含检测
+    // AABB 相交检测（包含部分重叠和完全包含）
     return (
-      nodeRect.x >= selX &&
-      nodeRect.x + nodeRect.width <= selX + selW &&
-      nodeRect.y >= selY &&
-      nodeRect.y + nodeRect.height <= selY + selH
+      nodeRect.x < selRect.x + selRect.width &&
+      nodeRect.x + nodeRect.width > selRect.x &&
+      nodeRect.y < selRect.y + selRect.height &&
+      nodeRect.y + nodeRect.height > selRect.y
     )
   })
-
-  dragSelectRect.visible(false)
-  selectionStartPos.value = null
+  
+  
   
   if (!additive) {
     clearSelection()
   }
   
+  // 批量选中对象（skipUpdate=true 避免重复更新）
   intersectingNodes.forEach((node, index) => {
     const type = getNodeType(node)
     if (type) {
+      // 只有最后一个对象才更新 transformer
       const isLast = index === intersectingNodes.length - 1
       selectItem(node, type, true, !isLast)
     }
   })
   
+  // 批量绘制
   staticLayer?.batchDraw()
+  
+  // 隐藏选择框
+  selectionRectKonva.value.visible(false)
+  selectionStartPos.value = null
   selectionDecorationLayer?.batchDraw()
   
-  // 框选结束后若有选中对象，判断光标
+  // 框选结束后若有选中对象，判断鼠标是否在 Transformer 框内
   if (intersectingNodes.length > 0 && stage && transformer) {
     const pointerPos = stage.getPointerPosition()
     if (pointerPos) {
@@ -3131,6 +3098,7 @@ const endBoxSelection = (additive: boolean) => {
       }
     }
   }
+  // 标记框选已完成（在 click 事件中使用）
   isBoxSelecting.value = true
 }
 
