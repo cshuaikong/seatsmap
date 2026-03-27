@@ -129,8 +129,8 @@
       <button 
         class="tool-item"
         :class="{ active: modelValue === 'image' }"
-        title="图片"
-        @click="onToolChange('image')"
+        title="底图"
+        @click="onImageClick"
       >
         <i class="iconfont icon-tupian tool-iconfont"></i>
       </button>
@@ -181,11 +181,17 @@ const emit = defineEmits<{
   'copy': []
   'paste': []
   'delete': []
+  'loadBackground': []  // 加载底图事件
 }>()
 
 // 工具切换
 const onToolChange = (tool: ToolMode) => {
   emit('update:modelValue', tool)
+}
+
+// 图片/底图按钮点击
+const onImageClick = () => {
+  emit('loadBackground')
 }
 </script>
 

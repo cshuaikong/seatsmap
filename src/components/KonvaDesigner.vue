@@ -33,6 +33,7 @@
         @copy="onCopy"
         @paste="onPaste"
         @delete="onDelete"
+        @load-background="onLoadBackground"
       />
 
       <!-- 中间画布区域 -->
@@ -294,6 +295,25 @@ const onPaste = () => {
 
 const onDelete = () => {
   console.log('删除')
+}
+
+// 加载底图
+const onLoadBackground = () => {
+  console.log('[底图] 打开文件选择器')
+  // 创建文件选择器
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    console.log('[底图] 选择文件:', file?.name)
+    if (file && canvasRef.value) {
+      console.log('[底图] 调用 loadBackgroundImage')
+      // 调用 KonvaCanvas 的加载底图方法
+      canvasRef.value.loadBackgroundImage?.(file)
+    }
+  }
+  input.click()
 }
 </script>
 

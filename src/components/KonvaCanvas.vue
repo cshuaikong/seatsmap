@@ -71,6 +71,10 @@ let drawingLayer: Konva.Layer | null = null
 // 拖拽时使用的临时 layer（只包含选中节点，优化400+节点性能）
 let dragLayer: Konva.Layer | null = null
 
+// 底图图层
+let backgroundLayer: Konva.Layer | null = null
+let backgroundImage: Konva.Image | null = null
+
 const sectionGroups = new Map<string, Konva.Group>()
 const seatGroups = new Map<string, Konva.Group>()
 
@@ -167,7 +171,7 @@ let sectorCenterMarker: Konva.Circle | null = null
 // 选择状态
 const selectedSeatIds = ref<Set<string>>(new Set())
 
-type SelectableType = 'seat' | 'row' | 'rect' | 'ellipse' | 'polygon' | 'sector' | 'polyline'
+type SelectableType = 'seat' | 'row' | 'rect' | 'ellipse' | 'polygon' | 'sector' | 'polyline' | 'text'
 
 interface SelectedItem {
   id: string
@@ -444,6 +448,12 @@ const initKonva = () => {
     height
   })
 
+  // 底图图层（最底层）
+  backgroundLayer = new Konva.Layer({
+    listening: false  // 底图不响应鼠标事件
+  })
+  stage.add(backgroundLayer)
+
   // 分层策略：StaticLayer 放静态座位（缓存，高性能）
   staticLayer = new Konva.Layer({
     listening: true,
@@ -589,6 +599,18 @@ const setupStageEvents = () => {
     // 画线段（折线）模式 - 点击添加顶点
     if (currentTool.value === 'drawPolyline') {
       handlePolylineClick(stagePos)
+      return
+    }
+
+    // 图片工具 - 点击打开文件选择器
+    if (currentTool.value === 'image') {
+      handleImageToolClick()
+      return
+    }
+
+    // 文本工具 - 点击放置文本
+    if (currentTool.value === 'text') {
+      handleTextClick(stagePos)
       return
     }
 
@@ -2258,6 +2280,236 @@ const handleSectionDiagonalClick = (pos: { x: number; y: number }) => {
 
 // ---------- mousemove 预览更新（直行/三点式/对角）----------
 
+// ==================== 底图功能 ====================
+
+/** 加载底图 */
+const loadBackgroundImage = (file: File) => {
+  if (!stage || !backgroundLayer) return
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const img = new Image()
+    img.onload = () => {
+      // 移除旧底图
+      if (backgroundImage) {
+        backgroundImage.destroy()
+        backgroundImage = null
+      }
+
+      // 获取容器尺寸（视口可见区域）
+      const container = stage!.container()
+      const containerWidth = container.clientWidth
+      const containerHeight = container.clientHeight
+      const imgWidth = img.width
+      const imgHeight = img.height
+
+      // 计算缩放比例（保持比例，适配容器，留边距）
+      const padding = 60
+      const availableWidth = containerWidth - padding * 2
+      const availableHeight = containerHeight - padding * 2
+      const scaleX = availableWidth / imgWidth
+      const scaleY = availableHeight / imgHeight
+      const scale = Math.min(scaleX, scaleY, 1) // 不超过原始尺寸
+
+      // 计算显示尺寸
+      const width = imgWidth * scale
+      const height = imgHeight * scale
+
+      // 计算在容器中的居中位置
+      const containerCenterX = containerWidth / 2
+      const containerCenterY = containerHeight / 2
+
+      // 转换为舞台坐标（考虑当前缩放和平移）
+      const stageTransform = stage!.getAbsoluteTransform().copy()
+      stageTransform.invert()
+      const stageCenter = stageTransform.point({ x: containerCenterX, y: containerCenterY })
+
+      // 图片左上角位置（以图片中心为基准）
+      const x = stageCenter.x - width / 2
+      const y = stageCenter.y - height / 2
+
+      // 创建 Konva.Image
+      backgroundImage = new Konva.Image({
+        x,
+        y,
+        width,
+        height,
+        image: img,
+        listening: false,  // 不响应鼠标事件
+        perfectDrawEnabled: false
+      })
+
+      backgroundLayer!.add(backgroundImage)
+      backgroundLayer!.batchDraw()
+
+      console.log('[底图加载]', {
+        容器尺寸: { width: containerWidth, height: containerHeight },
+        原始尺寸: { width: imgWidth, height: imgHeight },
+        缩放比例: scale,
+        显示尺寸: { width, height },
+        舞台中心: stageCenter,
+        位置: { x, y }
+      })
+    }
+    img.src = e.target?.result as string
+  }
+  reader.readAsDataURL(file)
+}
+
+/** 清除底图 */
+const clearBackgroundImage = () => {
+  if (backgroundImage) {
+    backgroundImage.destroy()
+    backgroundImage = null
+    backgroundLayer?.batchDraw()
+  }
+}
+
+/** 处理图片工具点击 - 打开文件选择器 */
+const handleImageToolClick = () => {
+  // 创建隐藏的文件输入元素
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.onchange = (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (file) {
+      loadBackgroundImage(file)
+    }
+    // 切换回选择工具
+    setTool('select')
+  }
+  input.click()
+}
+
+// ==================== 文本功能 ====================
+
+/** 存储所有文本节点 */
+const textNodes = new Map<string, Konva.Text>()
+
+/** 创建文本节点 */
+const createTextNode = (x: number, y: number, text: string = 'text') => {
+  if (!staticLayer) return
+
+  const textId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+  const textNode = new Konva.Text({
+    id: textId,
+    x,
+    y,
+    text,
+    fontSize: 16,
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fill: '#333333',
+    draggable: true,
+    name: 'text-node selectable'
+    // 不设置 width/height，让 Konva 自动计算文字尺寸
+  })
+
+  // 双击编辑
+  textNode.on('dblclick', (e) => {
+    console.log('[文本] 双击事件触发')
+    e.cancelBubble = true
+    editTextNode(textNode)
+  })
+
+  // 点击选中
+  textNode.on('click', (e) => {
+    if (currentTool.value !== 'select') return
+    e.cancelBubble = true
+    selectItem(textNode, 'text', e.evt.shiftKey)
+  })
+
+  // 拖拽结束更新位置
+  textNode.on('dragend', () => {
+    console.log('[文本] 位置更新:', { x: textNode.x(), y: textNode.y() })
+  })
+
+  staticLayer.add(textNode)
+  staticLayer.batchDraw()
+  textNodes.set(textId, textNode)
+
+  console.log('[文本] 创建:', { id: textId, x, y, text })
+  return textNode
+}
+
+/** 编辑文本节点 - 原地编辑 */
+const editTextNode = (textNode: Konva.Text) => {
+  console.log('[文本] 开始编辑')
+  if (!stage || !staticLayer) {
+    console.log('[文本] 缺少 stage 或 staticLayer')
+    return
+  }
+
+  const currentText = textNode.text()
+  const textPosition = textNode.absolutePosition()
+
+  // 获取舞台容器
+  const container = stage.container()
+  const containerRect = container.getBoundingClientRect()
+
+  // 创建输入框
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.value = currentText
+  input.style.cssText = `
+    position: fixed;
+    left: ${containerRect.left + textPosition.x}px;
+    top: ${containerRect.top + textPosition.y}px;
+    width: ${Math.max(200, textNode.width())}px;
+    height: 30px;
+    font-size: 16px;
+    font-family: system-ui, -apple-system, sans-serif;
+    border: 2px solid #3b82f6;
+    border-radius: 4px;
+    padding: 4px 8px;
+    outline: none;
+    background: white;
+    z-index: 1000;
+    box-sizing: border-box;
+  `
+
+  document.body.appendChild(input)
+  input.focus()
+  input.select()
+
+  // 完成编辑
+  const finishEdit = () => {
+    const newText = input.value
+    document.body.removeChild(input)
+
+    if (newText !== currentText) {
+      textNode.text(newText)
+      // 让 Konva 自动重新计算尺寸
+      staticLayer?.batchDraw()
+      console.log('[文本] 更新内容:', newText)
+    }
+  }
+
+  // 取消编辑
+  const cancelEdit = () => {
+    document.body.removeChild(input)
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      finishEdit()
+    } else if (e.key === 'Escape') {
+      cancelEdit()
+    }
+  })
+
+  input.addEventListener('blur', finishEdit)
+}
+
+/** 处理文本工具点击 */
+const handleTextClick = (pos: { x: number; y: number }) => {
+  console.log('[文本] 放置位置:', pos)
+  createTextNode(pos.x, pos.y)
+  // 放置后切换回选择工具
+  setTool('select')
+}
+
 const updateMultiPointPreview = (pos: { x: number; y: number }) => {
   const tool = currentTool.value
   const step = drawStep.value
@@ -3047,6 +3299,7 @@ const getNodeType = (node: Konva.Node): SelectableType | null => {
   if (name.includes('polygon')) return 'polygon'
   if (name.includes('sector')) return 'sector'
   if (name.includes('polyline')) return 'polyline'
+  if (name.includes('text-node')) return 'text'
   return null
 }
 
@@ -3070,7 +3323,9 @@ defineExpose({
   setTool,
   selectedSeatIds,
   stage,
-  layer
+  layer,
+  loadBackgroundImage,
+  clearBackgroundImage
 })
 
 </script>
