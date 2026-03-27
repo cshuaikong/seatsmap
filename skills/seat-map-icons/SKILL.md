@@ -408,3 +408,175 @@ export type ToolMode =
   // 标注工具
   | 'text' | 'image' | 'restroom'
 ```
+
+---
+
+## 座位绘制与旋转统一规范（Konva.Shape 实现）
+
+### 核心设计原则
+
+**必须同时满足三个需求：**
+1. **预览准确** - 鼠标移动时预览座位位置与实际绘制一致
+2. **绘制准确** - 第一个座位中心在鼠标点击位置
+3. **旋转/移动正常** - Transformer 拖拽、旋转功能正常工作
+
+### 实现方案
+
+#### 1. 预览逻辑（calculatePreviewSeatPositions）
+
+```typescript
+const calculatePreviewSeatPositions = (
+  startX: number,    // 鼠标起点 X
+  startY: number,    // 鼠标起点 Y
+  seatCount: number, // 座位数量
+  ux: number,        // 方向向量 X (cos θ)
+  uy: number         // 方向向量 Y (sin θ)
+): { x: number; y: number }[] => {
+  return Array.from({ length: seatCount }, (_, i) => ({
+    // 第 i 个座位中心 = 起点 + i * 间距 * 方向向量
+    x: startX + ux * i * SEAT_SPACING,
+    y: startY + uy * i * SEAT_SPACING
+  }))
+}
+```
+
+**关键：** 预览直接使用全局坐标，第一个座位中心就在鼠标起点。
+
+#### 2. 实际绘制逻辑（createRowShape）
+
+使用 **逆向计算法** 让 Shape 的第一个座位中心对齐鼠标位置：
+
+```typescript
+const createRowShape = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
+  // 1. 座位局部坐标（第一个座位中心在 SEAT_RADIUS, SEAT_RADIUS）
+  const adjustedSeats = seats.map(seat => ({
+    ...seat,
+    x: seat.x + SEAT_RADIUS,
+    y: seat.y + SEAT_RADIUS
+  }))
+  
+  // 2. 计算边界和几何中心
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  adjustedSeats.forEach((seat) => {
+    minX = Math.min(minX, seat.x - SEAT_RADIUS)
+    minY = Math.min(minY, seat.y - SEAT_RADIUS)
+    maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
+    maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
+  })
+  
+  const width = maxX - minX
+  const height = maxY - minY
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+
+  // 3. 逆向计算 Shape 位置（关键！）
+  const angleRad = (rotation * Math.PI) / 180
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  
+  // 第一个座位相对于几何中心的偏移
+  const firstSeatLocalX = SEAT_RADIUS - centerX
+  const firstSeatLocalY = SEAT_RADIUS - centerY
+  
+  // 旋转后的偏移
+  const rotatedOffsetX = firstSeatLocalX * cos - firstSeatLocalY * sin
+  const rotatedOffsetY = firstSeatLocalX * sin + firstSeatLocalY * cos
+  
+  // Shape 位置 = 第一个座位目标位置 - 旋转后的偏移
+  const shapeX = startX - rotatedOffsetX
+  const shapeY = startY - rotatedOffsetY
+
+  // 4. 创建 Shape
+  const shape = new Konva.Shape({
+    x: shapeX,
+    y: shapeY,
+    rotation: rotation,
+    width: width,
+    height: height,
+    offsetX: centerX,  // 旋转中心为几何中心
+    offsetY: centerY,
+    id: `row-shape-${rowId}`,
+    name: 'row-shape',
+    perfectDrawEnabled: false,
+    transformsEnabled: 'all',
+    seatsData: adjustedSeats,
+    hitMinX: minX,
+    hitMinY: minY,
+    hitMaxX: maxX,
+    hitMaxY: maxY
+  })
+  
+  // 5. sceneFunc - 使用局部坐标绘制
+  shape.sceneFunc((context, shape) => {
+    const seatsData = shape.getAttr('seatsData') as Seat[]
+    const isSelected = shape.getAttr('selected')
+    const radius = SEAT_RADIUS
+    
+    // 按状态分组绘制...
+    seatsData.forEach(seat => {
+      context.moveTo(seat.x + radius, seat.y)
+      context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
+    })
+  })
+  
+  return shape
+}
+```
+
+#### 3. 关键公式推导
+
+**为什么这样计算？**
+
+Konva 的变换顺序是：`translate(x,y) → rotate(rotation) → translate(-offsetX, -offsetY)`
+
+全局坐标 = Shape位置 + 旋转后的(局部坐标 - 偏移)
+
+要让第一个座位在 (startX, startY)：
+```
+startX = shapeX + (SEAT_RADIUS - centerX) * cos - (SEAT_RADIUS - centerY) * sin
+startY = shapeY + (SEAT_RADIUS - centerX) * sin + (SEAT_RADIUS - centerY) * cos
+```
+
+解出：
+```
+shapeX = startX - rotatedOffsetX
+shapeY = startY - rotatedOffsetY
+```
+
+### 关键要点
+
+| 要点 | 说明 |
+|------|------|
+| **预览** | 直接计算全局坐标，第一个座位在鼠标起点 |
+| **绘制** | 使用逆向计算，让 Shape 旋转后第一个座位仍在鼠标起点 |
+| **旋转中心** | 几何中心 (centerX, centerY)，确保旋转平衡 |
+| **局部坐标** | 第一个座位在 (SEAT_RADIUS, SEAT_RADIUS) |
+| **Transformer** | 正常工作，因为使用了标准的 rotation + offset 机制 |
+
+### 调试日志
+
+```typescript
+// 预览时输出
+console.log('[预览计算]', {
+  鼠标起点: { x: startX, y: startY },
+  方向向量: { ux, uy },
+  座位数量: seatCount,
+  预览起点: positions[0],
+  预览终点: positions[positions.length - 1]
+})
+
+// 绘制时输出
+console.log('[实际绘制]', {
+  鼠标起点: from,
+  鼠标终点: to,
+  方向向量: { ux, uy },
+  旋转角度: angle,
+  座位数量: count
+})
+```
+
+### 常见错误
+
+1. **预览偏移** - 预览使用了复杂的几何中心计算，应该直接沿方向向量排列
+2. **旋转后位置偏移** - Shape 位置计算错误，没有考虑旋转后的偏移
+3. **Transformer 边框不对齐** - width/height 或 offsetX/Y 计算错误

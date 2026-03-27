@@ -1751,16 +1751,23 @@ const clearDrawingPreview = () => {
 // 创建座位排 Shape - 高性能批次绘制
 // startX/startY 对应第一个座位的绝对坐标（也是旋转原点）
 // seats 中每个座位的 x/y 是相对于 startX/startY 的局部偏移
+/**
+ * 创建排组 Shape
+ * @param seats 座位数据（相对坐标，x从0开始）
+ * @param startX 第一个座位的全局X坐标（座位圆心）
+ * @param startY 第一个座位的全局Y坐标（座位圆心）
+ * @param rotation 旋转角度（度）
+ * @param rowId 排ID
+ */
 const createRowShape = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
-  // 统一调整座位坐标：加上半径偏移，使座位从 (SEAT_RADIUS, SEAT_RADIUS) 开始
-  // 这样边框可以从 (0, 0) 开始，座位完整包含在边框内
+  // 座位局部坐标：第一个座位中心在 (SEAT_RADIUS, SEAT_RADIUS)
   const adjustedSeats = seats.map(seat => ({
     ...seat,
     x: seat.x + SEAT_RADIUS,
     y: seat.y + SEAT_RADIUS
   }))
   
-  // 计算排的边界（用于 hitFunc 和 width/height）
+  // 计算边界（用于 hitFunc 和 Transformer 包围盒）
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   adjustedSeats.forEach((seat) => {
     minX = Math.min(minX, seat.x - SEAT_RADIUS)
@@ -1769,7 +1776,6 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
   })
   
-  // 计算 width/height 用于 Transformer 包围盒
   const width = maxX - minX
   const height = maxY - minY
   
@@ -1777,9 +1783,23 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
   const centerX = (minX + maxX) / 2
   const centerY = (minY + maxY) / 2
 
+  // 计算第一个座位的全局位置（用于对齐预览）
+  const angleRad = (rotation * Math.PI) / 180
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  // 第一个座位局部坐标 (SEAT_RADIUS, SEAT_RADIUS) 相对于几何中心的偏移
+  const firstSeatLocalX = SEAT_RADIUS - centerX
+  const firstSeatLocalY = SEAT_RADIUS - centerY
+  // 旋转后的偏移
+  const rotatedOffsetX = firstSeatLocalX * cos - firstSeatLocalY * sin
+  const rotatedOffsetY = firstSeatLocalX * sin + firstSeatLocalY * cos
+  // Shape 位置 = 第一个座位目标位置 - 旋转后的偏移
+  const shapeX = startX - rotatedOffsetX
+  const shapeY = startY - rotatedOffsetY
+
   const shape = new Konva.Shape({
-    x: startX + centerX,
-    y: startY + centerY,
+    x: shapeX,
+    y: shapeY,
     rotation: rotation,
     width: width,
     height: height,
@@ -1789,7 +1809,6 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     name: 'row-shape',
     perfectDrawEnabled: false,
     transformsEnabled: 'all',
-    // 存储调整后的座位数据和边界信息
     seatsData: adjustedSeats,
     hitMinX: minX,
     hitMinY: minY,
@@ -1797,7 +1816,7 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     hitMaxY: maxY
   })
 
-  // sceneFunc: 批次绘制所有座位
+  // sceneFunc: 批次绘制所有座位（使用局部坐标）
   shape.sceneFunc((context, shape) => {
     const seatsData = shape.getAttr('seatsData') as Seat[]
     const isSelected = shape.getAttr('selected')
@@ -1823,9 +1842,9 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
       
       context.beginPath()
       const baseColor = statusColors[status as keyof typeof statusColors]
-      // 选中时加粗边框效果
       context.fillStyle = baseColor
       
+      // 使用局部坐标绘制（Shape 的 x/y 和 rotation 已经处理变换）
       groupSeats.forEach(seat => {
         context.moveTo(seat.x + radius, seat.y)
         context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
@@ -1833,29 +1852,16 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
       
       context.fill()
       
-      // 选中时绘制蓝色边框
-      if (isSelected) {
-        context.save()
-        context.strokeStyle = '#3b82f6'
-        context.lineWidth = 3
-        groupSeats.forEach(seat => {
-          context.beginPath()
-          context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
-          context.stroke()
-        })
-        context.restore()
-      } else {
-        // 默认细边框
-        context.save()
-        context.strokeStyle = baseColor
-        context.lineWidth = 1
-        groupSeats.forEach(seat => {
-          context.beginPath()
-          context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
-          context.stroke()
-        })
-        context.restore()
-      }
+      // 绘制边框
+      context.save()
+      context.strokeStyle = isSelected ? '#3b82f6' : baseColor
+      context.lineWidth = isSelected ? 3 : 1
+      groupSeats.forEach(seat => {
+        context.beginPath()
+        context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
+        context.stroke()
+      })
+      context.restore()
     })
   })
 
@@ -1955,6 +1961,41 @@ const cancelMultiPointDraw = () => {
 }
 
 /** 绘制预览座位 Shape（绘制层，不可交互） */
+/**
+ * 计算预览座位的实际渲染位置
+ * 与 createRowShape 逻辑保持一致：
+ * - Shape 位置在几何中心
+ * - 座位局部坐标从 (SEAT_RADIUS, SEAT_RADIUS) 开始
+ * - 预览直接计算全局坐标
+ */
+const calculatePreviewSeatPositions = (
+  startX: number,
+  startY: number,
+  seatCount: number,
+  ux: number,
+  uy: number
+): { x: number; y: number }[] => {
+  // 简化预览逻辑：座位直接沿方向向量排列
+  // 第一个座位中心在鼠标起点 (startX, startY)
+  // 第 i 个座位沿方向向量 (ux, uy) 偏移 i * SEAT_SPACING
+  
+  const positions = Array.from({ length: seatCount }, (_, i) => ({
+    x: startX + ux * i * SEAT_SPACING,
+    y: startY + uy * i * SEAT_SPACING
+  }))
+  
+  // 调试日志：预览座位位置
+  console.log('[预览计算]', {
+    鼠标起点: { x: startX, y: startY },
+    方向向量: { ux, uy },
+    座位数量: seatCount,
+    预览起点: positions[0],
+    预览终点: positions[positions.length - 1]
+  })
+  
+  return positions
+}
+
 const buildPreviewSeatShape = (
   positions: { x: number; y: number }[],
 ): Konva.Shape => {
@@ -2047,8 +2088,26 @@ const handleRowStraightClick = (pos: { x: number; y: number }) => {
         })
       }
       const angle = Math.atan2(uy, ux) * 180 / Math.PI
+      
+      // 调试日志：实际绘制参数
+      console.log('[实际绘制]', {
+        鼠标起点: from,
+        鼠标终点: to,
+        方向向量: { ux, uy },
+        旋转角度: angle,
+        座位数量: count
+      })
+      
       const rowId = `row-${Date.now()}`
       const shape = createRowShape(seats, from.x, from.y, angle, rowId)
+      
+      // 调试日志：实际绘制结果
+      console.log('[实际绘制结果]', {
+        Shape位置: { x: shape.x(), y: shape.y() },
+        Shape旋转: shape.rotation(),
+        Shape偏移: { offsetX: shape.offsetX(), offsetY: shape.offsetY() }
+      })
+      
       staticLayer?.add(shape)
       staticLayer?.batchDraw()
     }
@@ -2081,10 +2140,8 @@ const handleSectionClick = (pos: { x: number; y: number }) => {
     const { ux, uy, dist } = getUnitVec(from, pos)
     if (dist >= SEAT_SPACING) {
       const count = Math.floor(dist / SEAT_SPACING) + 1
-      const positions = Array.from({ length: count }, (_, i) => ({
-        x: from.x + ux * i * SEAT_SPACING,
-        y: from.y + uy * i * SEAT_SPACING,
-      }))
+      // 使用与 createRowShape 一致的坐标计算
+      const positions = calculatePreviewSeatPositions(from.x, from.y, count, ux, uy)
       clearMultiPointPreview()
       // 点1标记
       sectionPreviewLines.push(addPreviewDot(from.x, from.y) as unknown as Konva.Line)
@@ -2214,10 +2271,8 @@ const updateMultiPointPreview = (pos: { x: number; y: number }) => {
     sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
     if (dist >= SEAT_SPACING) {
       const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
-      const positions = Array.from({ length: count }, (_, i) => ({
-        x: from.x + ux * i * SEAT_SPACING,
-        y: from.y + uy * i * SEAT_SPACING,
-      }))
+      // 使用与 createRowShape 一致的坐标计算
+      const positions = calculatePreviewSeatPositions(from.x, from.y, count, ux, uy)
       sectionPreviewSeats = buildPreviewSeatShape(positions)
       drawingLayer!.add(sectionPreviewSeats)
     }
@@ -2232,10 +2287,8 @@ const updateMultiPointPreview = (pos: { x: number; y: number }) => {
     sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
     if (dist >= SEAT_SPACING) {
       const count = Math.floor(dist / SEAT_SPACING) + 1
-      const positions = Array.from({ length: count }, (_, i) => ({
-        x: from.x + ux * i * SEAT_SPACING,
-        y: from.y + uy * i * SEAT_SPACING,
-      }))
+      // 使用与 createRowShape 一致的坐标计算
+      const positions = calculatePreviewSeatPositions(from.x, from.y, count, ux, uy)
       sectionPreviewSeats = buildPreviewSeatShape(positions)
       drawingLayer!.add(sectionPreviewSeats)
     }
@@ -2249,20 +2302,18 @@ const updateMultiPointPreview = (pos: { x: number; y: number }) => {
     const { ux: ux2, uy: uy2, dist: dist2 } = getUnitVec(p2, pos)
 
     const count1 = dist1 >= SEAT_SPACING ? Math.floor(dist1 / SEAT_SPACING) + 1 : 0
+    // 计算第二段起点：第一段最后一个座位位置 + 一个间距
     const lastX = p1.x + ux1 * (count1 - 1) * SEAT_SPACING
     const lastY = p1.y + uy1 * (count1 - 1) * SEAT_SPACING
 
-    const pos1Array = Array.from({ length: count1 }, (_, i) => ({
-      x: p1.x + ux1 * i * SEAT_SPACING,
-      y: p1.y + uy1 * i * SEAT_SPACING,
-    }))
+    // 使用与 createRowShape 一致的坐标计算
+    const pos1Array = calculatePreviewSeatPositions(p1.x, p1.y, count1, ux1, uy1)
     const startX2 = lastX + ux2 * SEAT_SPACING
     const startY2 = lastY + uy2 * SEAT_SPACING
     const count2 = dist2 >= SEAT_SPACING ? Math.floor(dist2 / SEAT_SPACING) : 0
-    const pos2Array = Array.from({ length: count2 }, (_, i) => ({
-      x: startX2 + ux2 * i * SEAT_SPACING,
-      y: startY2 + uy2 * i * SEAT_SPACING,
-    }))
+    const pos2Array = count2 > 0 
+      ? calculatePreviewSeatPositions(startX2, startY2, count2, ux2, uy2)
+      : []
 
     clearMultiPointPreview()
     sectionPreviewLines.push(addPreviewDot(p1.x, p1.y) as unknown as Konva.Line)
@@ -2282,10 +2333,8 @@ const updateMultiPointPreview = (pos: { x: number; y: number }) => {
     sectionPreviewLines.push(addPreviewLine([from.x, from.y, pos.x, pos.y]))
     if (dist >= SEAT_SPACING) {
       const count = Math.floor(dist / SEAT_SPACING) + 1
-      const positions = Array.from({ length: count }, (_, i) => ({
-        x: from.x + ux * i * SEAT_SPACING,
-        y: from.y + uy * i * SEAT_SPACING,
-      }))
+      // 使用与 createRowShape 一致的坐标计算
+      const positions = calculatePreviewSeatPositions(from.x, from.y, count, ux, uy)
       sectionPreviewSeats = buildPreviewSeatShape(positions)
       drawingLayer!.add(sectionPreviewSeats)
     }
@@ -2301,14 +2350,14 @@ const updateMultiPointPreview = (pos: { x: number; y: number }) => {
     const seatsPerRow = Math.max(1, Math.floor(rowDist / SEAT_SPACING) + 1)
     const rowCount = Math.max(1, Math.floor(colDist / ROW_SPACING) + 1)
 
+    // 使用与 createRowShape 一致的坐标计算，每行单独计算
     const allPositions: { x: number; y: number }[] = []
     for (let r = 0; r < rowCount; r++) {
-      for (let s = 0; s < seatsPerRow; s++) {
-        allPositions.push({
-          x: p1.x + colUx * r * ROW_SPACING + rowUx * s * SEAT_SPACING,
-          y: p1.y + colUy * r * ROW_SPACING + rowUy * s * SEAT_SPACING,
-        })
-      }
+      // 每行起点：沿行排列方向偏移 r * ROW_SPACING
+      const rowStartX = p1.x + colUx * r * ROW_SPACING
+      const rowStartY = p1.y + colUy * r * ROW_SPACING
+      const rowPositions = calculatePreviewSeatPositions(rowStartX, rowStartY, seatsPerRow, rowUx, rowUy)
+      allPositions.push(...rowPositions)
     }
 
     clearMultiPointPreview()
