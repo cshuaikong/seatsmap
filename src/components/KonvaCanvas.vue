@@ -470,7 +470,8 @@ const initKonva = () => {
   stage.add(dragLayer)
 
   // 设置初始视图
-  resetView()
+  stage.x(0)
+  stage.y(0)
 
   // 添加事件监听
   setupStageEvents()
