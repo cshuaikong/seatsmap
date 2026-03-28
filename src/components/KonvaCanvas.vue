@@ -47,6 +47,7 @@ const props = defineProps<{
   height?: number
   showGrid?: boolean
   venueData?: VenueData
+  categories?: Array<{ id: string; name: string; color: string }>
 }>()
 
 const emit = defineEmits<{
@@ -54,6 +55,8 @@ const emit = defineEmits<{
   seatClick: [seatId: string]
   seatDrag: [seatId: string, x: number, y: number]
   rowCreated: [seats: Seat[]]
+  selectionChanged: [selection: any]
+  selectionCleared: []
 }>()
 
 // ==================== Refs ====================
@@ -341,6 +344,8 @@ const endDragAll = () => {
   unifiedDragState.items = []
   // 最终重绘
   staticLayer?.batchDraw()
+  // 拖拽结束后 emit 选中变化事件，通知面板刷新
+  emitSelectionChanged()
 }
 
 // 网格配置
@@ -666,22 +671,30 @@ const setupStageEvents = () => {
 
 // 点击事件处理选中
   stage.on('click', (e) => {
-    if (currentTool.value !== 'select') return
+    console.log('[点击事件] currentTool:', currentTool.value, 'target:', e.target.name?.(), 'targetId:', e.target.id?.())
+    
+    if (currentTool.value !== 'select') {
+      console.log('[点击事件] 工具不是 select，跳过')
+      return
+    }
     
     // 如果刚刚完成拖拽，忽略这次点击（避免拖拽结束后误触发取消选中）
     if (justDragged) {
       justDragged = false
+      console.log('[点击事件] 刚完成拖拽，跳过')
       return
     }
     
     // 如果刚刚完成框选，忽略这次点击
     if (isBoxSelecting.value) {
       isBoxSelecting.value = false
+      console.log('[点击事件] 刚完成框选，跳过')
       return
     }
     
     // 点击空白处取消选择
     if (e.target === stage) {
+      console.log('[点击事件] 点击空白处')
       if (!e.evt.shiftKey) {
         clearSelection()
       }
@@ -690,20 +703,31 @@ const setupStageEvents = () => {
     
     // 点击对象 - 处理选中
     const clickedNode = findSelectableParent(e.target)
-    if (!clickedNode) return
+    console.log('[点击事件] findSelectableParent 结果:', clickedNode?.name?.(), clickedNode?.id?.())
+    if (!clickedNode) {
+      console.log('[点击事件] 找不到可选择的父节点')
+      return
+    }
     
     const type = getNodeType(clickedNode)
-    if (!type) return
+    console.log('[点击事件] 节点类型:', type)
+    if (!type) {
+      console.log('[点击事件] 无法识别节点类型')
+      return
+    }
     
     const isSelected = selectedItems.value.some(item => item.node === clickedNode)
+    console.log('[点击事件] 是否已选中:', isSelected)
     
     if (isSelected) {
       // 已选中且没有按住 shift = 取消选中（如果是唯一选中的）
       if (!e.evt.shiftKey && selectedItems.value.length === 1) {
+        console.log('[点击事件] 取消选中:', clickedNode.id())
         deselectItem(clickedNode.id())
       }
     } else {
       // 未选中：选中它
+      console.log('[点击事件] 选中节点:', clickedNode.id(), 'shiftKey:', e.evt.shiftKey)
       selectItem(clickedNode, type, e.evt.shiftKey)
     }
   })
@@ -1781,6 +1805,68 @@ const clearDrawingPreview = () => {
  * @param rotation 旋转角度（度）
  * @param rowId 排ID
  */
+/** 重新生成排的座位数据（用于更新座位数、弧度、间距） */
+const regenerateRowSeats = (
+  node: Konva.Node,
+  newSeatCount: number,
+  newCurve: number,
+  newSeatSpacing: number,
+  categoryId: string
+): Seat[] | null => {
+  const seatsData = (node as any).getAttr('seatsData') as Seat[] | undefined
+  if (!seatsData || seatsData.length === 0) return null
+  
+  // 获取原始数据
+  const firstSeat = seatsData[0]
+  const lastSeat = seatsData[seatsData.length - 1]
+  
+  // 计算排的方向和起点
+  const angleRad = (node.rotation() * Math.PI) / 180
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  
+  // 从 seatsData 反推起点（考虑 offset）
+  const offsetX = (node as any).offsetX?.() || 0
+  const offsetY = (node as any).offsetY?.() || 0
+  
+  // 简单处理：保持第一个座位位置不变，重新生成后续座位
+  const startSeatX = firstSeat.x - SEAT_RADIUS // 还原到全局坐标
+  const startSeatY = firstSeat.y - SEAT_RADIUS
+  
+  const updatedSeats: Seat[] = []
+  
+  for (let i = 0; i < newSeatCount; i++) {
+    // 计算曲线偏移
+    const curveFactor = (i / (newSeatCount - 1) - 0.5) * newCurve * Math.PI / 180
+    
+    // 沿排方向的位置
+    const distanceAlongRow = i * newSeatSpacing
+    
+    // 基础位置（线性排列）
+    let baseX = startSeatX + distanceAlongRow * cos
+    let baseY = startSeatY + distanceAlongRow * sin
+    
+    // 应用曲线（垂直于排方向）
+    if (newCurve !== 0) {
+      const perpX = -sin // 垂直方向
+      const perpY = cos
+      baseX += curveFactor * perpX * 10 // 曲线幅度
+      baseY += curveFactor * perpY * 10
+    }
+    
+    updatedSeats.push({
+      id: i < seatsData.length ? seatsData[i].id : `seat-${Date.now()}-${i}`,
+      label: i < seatsData.length ? seatsData[i].label : String(i + 1),
+      x: baseX,
+      y: baseY,
+      status: firstSeat.status || 'available',
+      categoryId: categoryId
+    })
+  }
+  
+  return updatedSeats
+}
+
 const createRowShape = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
   // 座位局部坐标：第一个座位中心在 (SEAT_RADIUS, SEAT_RADIUS)
   const adjustedSeats = seats.map(seat => ({
@@ -1844,27 +1930,25 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     const isSelected = shape.getAttr('selected')
     const radius = SEAT_RADIUS
     
-    // 按状态分组，减少 fillStyle 切换
-    const statusGroups: Record<string, Seat[]> = {
-      available: [],
-      booked: [],
-      reserved: [],
-      disabled: []
-    }
+    // 按实际显示颜色分组（优先分类颜色，无分类则灰色）
+    const colorGroups: Record<string, Seat[]> = {}
     
     seatsData.forEach(seat => {
-      if (statusGroups[seat.status]) {
-        statusGroups[seat.status].push(seat)
+      let color = '#9E9E9E' // 默认灰色（未分类）
+      if (seat.categoryId && props.categories) {
+        const category = props.categories.find((c: any) => c.id === seat.categoryId)
+        if (category?.color) color = category.color
       }
+      if (!colorGroups[color]) colorGroups[color] = []
+      colorGroups[color].push(seat)
     })
 
-    // 批次绘制每个状态的座位
-    Object.entries(statusGroups).forEach(([status, groupSeats]) => {
+    // 批次绘制每个颜色组的座位
+    Object.entries(colorGroups).forEach(([color, groupSeats]) => {
       if (groupSeats.length === 0) return
       
       context.beginPath()
-      const baseColor = statusColors[status as keyof typeof statusColors]
-      context.fillStyle = baseColor
+      context.fillStyle = color
       
       // 使用局部坐标绘制（Shape 的 x/y 和 rotation 已经处理变换）
       groupSeats.forEach(seat => {
@@ -1876,7 +1960,7 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
       
       // 绘制边框
       context.save()
-      context.strokeStyle = isSelected ? '#3b82f6' : baseColor
+      context.strokeStyle = isSelected ? '#3b82f6' : color
       context.lineWidth = isSelected ? 3 : 1
       groupSeats.forEach(seat => {
         context.beginPath()
@@ -2423,6 +2507,7 @@ const createTextNode = (x: number, y: number, text: string = 'text') => {
   // 拖拽结束更新位置
   textNode.on('dragend', () => {
     console.log('[文本] 位置更新:', { x: textNode.x(), y: textNode.y() })
+    emitSelectionChanged()
   })
 
   staticLayer.add(textNode)
@@ -2649,6 +2734,17 @@ const zoomTo = (zoomLevel: number, centerX?: number, centerY?: number) => {
 
 // ==================== 渲染座位 ====================
 
+/** 获取座位的显示颜色：优先分类颜色，无分类则灰色 */
+const getSeatColor = (seat: Seat): string => {
+  // 有分类 → 用分类颜色
+  if (seat.categoryId) {
+    const category = props.categories?.find((c: any) => c.id === seat.categoryId)
+    if (category?.color) return category.color
+  }
+  // 无分类 → 灰色
+  return '#9E9E9E'
+}
+
 const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
   const group = new Konva.Group({
     x: seat.x,
@@ -2658,10 +2754,11 @@ const createSeat = (seat: Seat, rowLabel: string, rowId: string) => {
     name: `seat row-${rowId}`
   })
 
+  const seatColor = getSeatColor(seat)
   const circle = new Konva.Circle({
     radius: SEAT_RADIUS,
-    fill: statusColors[seat.status],
-    stroke: statusColors[seat.status],
+    fill: seatColor,
+    stroke: seatColor,
     strokeWidth: 1,
     name: 'seatCircle',
     listening: false // 关键：不拦截事件，让事件穿透到 Group
@@ -2904,6 +3001,7 @@ const initTransformer = () => {
         item.originalRotation = node.rotation()
       }
     })
+    emitSelectionChanged()
   })
   
   selectionDecorationLayer.add(transformer)
@@ -3024,6 +3122,114 @@ const updateSelectionDecorationOnDrag = () => {
   })
 }
 
+// 提取节点属性
+const extractNodeProperties = (node: Konva.Node, type: SelectableType): Record<string, any> => {
+  const props: Record<string, any> = {
+    x: node.x(),
+    y: node.y(),
+    rotation: node.rotation(),
+    scaleX: node.scaleX(),
+    scaleY: node.scaleY(),
+    opacity: node.opacity()
+  }
+
+  // 对于 group 类型，需要查找内部的实际形状节点
+  const findShapeInGroup = (group: Konva.Node): Konva.Node => {
+    if (group instanceof Konva.Group) {
+      // 查找第一个形状子节点
+      const children = (group as any).getChildren?.() || []
+      for (const child of children) {
+        if (child instanceof Konva.Rect || child instanceof Konva.Ellipse || 
+            child instanceof Konva.Line || child instanceof Konva.Text ||
+            child instanceof Konva.Circle) {
+          return child
+        }
+      }
+    }
+    return group
+  }
+
+  const shapeNode = findShapeInGroup(node)
+
+  if (type === 'rect') {
+    props.width = shapeNode.width?.() ?? node.width?.() ?? 0
+    props.height = shapeNode.height?.() ?? node.height?.() ?? 0
+    props.fill = (shapeNode as any).fill?.() || ''
+    props.stroke = (shapeNode as any).stroke?.() || ''
+    props.strokeWidth = (shapeNode as any).strokeWidth?.() ?? 0
+    props.cornerRadius = (shapeNode as any).cornerRadius?.() ?? 0
+  }
+
+  if (type === 'ellipse') {
+    props.radiusX = (shapeNode as any).radiusX?.() ?? 0
+    props.radiusY = (shapeNode as any).radiusY?.() ?? 0
+    props.width = props.radiusX * 2
+    props.height = props.radiusY * 2
+    props.fill = (shapeNode as any).fill?.() || ''
+    props.stroke = (shapeNode as any).stroke?.() || ''
+    props.strokeWidth = (shapeNode as any).strokeWidth?.() ?? 0
+  }
+
+  if (type === 'text') {
+    props.text = (shapeNode as any).text?.() || ''
+    props.fontSize = (shapeNode as any).fontSize?.() ?? 16
+    props.fontFamily = (shapeNode as any).fontFamily?.() || 'Arial'
+    props.fill = (shapeNode as any).fill?.() || '#000'
+    const fontStyle = (shapeNode as any).fontStyle?.() || 'normal'
+    props.bold = fontStyle.includes('bold')
+    props.italic = fontStyle.includes('italic')
+  }
+
+  if (type === 'polygon' || type === 'polyline') {
+    props.points = (shapeNode as any).points?.() || []
+    props.fill = (shapeNode as any).fill?.() || ''
+    props.stroke = (shapeNode as any).stroke?.() || ''
+    props.strokeWidth = (shapeNode as any).strokeWidth?.() ?? 0
+    props.closed = (shapeNode as any).closed?.() ?? false
+    props.tension = (shapeNode as any).tension?.() ?? 0
+  }
+
+  if (type === 'sector') {
+    props.fill = (shapeNode as any).fill?.() || ''
+    props.stroke = (shapeNode as any).stroke?.() || ''
+    props.strokeWidth = (shapeNode as any).strokeWidth?.() ?? 0
+  }
+
+  if (type === 'row') {
+    // 排的属性从 group 中提取
+    const children = node instanceof Konva.Group ? (node as any).getChildren?.() || [] : []
+    const seatCount = children.filter((c: any) => c.name?.()?.includes('seat')).length
+    props.seatCount = seatCount
+  }
+
+  if (type === 'seat') {
+    // 座位属性
+    props.fill = (shapeNode as any).fill?.() || ''
+    props.radius = (shapeNode as any).radius?.() ?? 0
+  }
+
+  return props
+}
+
+// Emit 选中变化事件
+const emitSelectionChanged = () => {
+  if (selectedItems.value.length === 0) {
+    emit('selectionCleared')
+    return
+  }
+
+  const types = new Set(selectedItems.value.map(i => i.type))
+  const isMixed = types.size > 1
+  const primaryType = selectedItems.value[0].type
+
+  emit('selectionChanged', {
+    type: primaryType,
+    ids: selectedItems.value.map(i => i.id),
+    nodes: selectedItems.value.map(i => i.node),
+    isMixed
+  })
+}
+
 // 选择对象
 const selectItem = (node: Konva.Node, type: SelectableType, additive = false, skipUpdate = false) => {
   if (!additive) {
@@ -3067,6 +3273,9 @@ const selectItem = (node: Konva.Node, type: SelectableType, additive = false, sk
   if (!skipUpdate) {
     updateSelectionDecoration()
   }
+  
+  // 新增：emit 选中变化事件
+  emitSelectionChanged()
 }
 
 // 取消选择
@@ -3081,6 +3290,8 @@ const deselectItem = (id: string) => {
     selectedItems.value = selectedItems.value.filter(i => i.id !== id)
   }
   updateSelectionDecoration()
+  // 新增：emit 选中变化事件
+  emitSelectionChanged()
 }
 
 // 清空选择
@@ -3096,6 +3307,8 @@ const clearSelection = () => {
   updateSelectionDecoration()
   // 恢复默认光标
   setCursor('default')
+  // 新增：emit 选中清空事件
+  emit('selectionCleared')
 }
 
 // 手动拖拽已由 Transformer 处理，这些函数保留供兼容
@@ -3312,11 +3525,213 @@ const deleteSelected = () => {
   staticLayer?.batchDraw()
 }
 
+// 更新节点属性
+const updateNodeProperty = (nodeId: string, updates: Record<string, any>) => {
+  // 在选中项中查找
+  const item = selectedItems.value.find(i => i.id === nodeId)
+  const node = item?.node
+  if (!node) return
+
+  // 查找内部形状节点
+  let shapeNode: Konva.Node = node
+  if (node instanceof Konva.Group) {
+    const children = (node as any).getChildren?.() || []
+    for (const child of children) {
+      if (child instanceof Konva.Rect || child instanceof Konva.Ellipse || 
+          child instanceof Konva.Line || child instanceof Konva.Text ||
+          child instanceof Konva.Circle) {
+        shapeNode = child
+        break
+      }
+    }
+  }
+
+  // 通用属性
+  if (updates.x !== undefined) node.x(updates.x)
+  if (updates.y !== undefined) node.y(updates.y)
+  if (updates.rotation !== undefined) node.rotation(updates.rotation)
+  if (updates.scaleX !== undefined) node.scaleX(updates.scaleX)
+  if (updates.scaleY !== undefined) node.scaleY(updates.scaleY)
+  if (updates.opacity !== undefined) node.opacity(updates.opacity)
+
+  // 形状特定属性 - 应用到内部形状节点
+  if (updates.width !== undefined) (shapeNode as any).width?.(updates.width)
+  if (updates.height !== undefined) (shapeNode as any).height?.(updates.height)
+  if (updates.fill !== undefined) (shapeNode as any).fill?.(updates.fill)
+  if (updates.stroke !== undefined) (shapeNode as any).stroke?.(updates.stroke)
+  if (updates.strokeWidth !== undefined) (shapeNode as any).strokeWidth?.(updates.strokeWidth)
+  if (updates.cornerRadius !== undefined) (shapeNode as any).cornerRadius?.(updates.cornerRadius)
+
+  // 文本属性
+  if (updates.text !== undefined) (shapeNode as any).text?.(updates.text)
+  if (updates.fontSize !== undefined) (shapeNode as any).fontSize?.(updates.fontSize)
+  if (updates.fontFamily !== undefined) (shapeNode as any).fontFamily?.(updates.fontFamily)
+  if (updates.bold !== undefined || updates.italic !== undefined) {
+    const bold = updates.bold ?? (shapeNode as any).fontStyle?.()?.includes('bold') ?? false
+    const italic = updates.italic ?? (shapeNode as any).fontStyle?.()?.includes('italic') ?? false
+    let style = 'normal'
+    if (bold && italic) style = 'bold italic'
+    else if (bold) style = 'bold'
+    else if (italic) style = 'italic'
+    ;(shapeNode as any).fontStyle?.(style)
+  }
+
+  // 椭圆特有
+  if (updates.radiusX !== undefined) (shapeNode as any).radiusX?.(updates.radiusX)
+  if (updates.radiusY !== undefined) (shapeNode as any).radiusY?.(updates.radiusY)
+
+  // 分类变更处理
+  if (updates.categoryId !== undefined) {
+    // 查找分类颜色
+    const category = props.categories?.find((c: any) => c.id === updates.categoryId)
+    const newColor = category?.color || '#9E9E9E'
+    
+    // 如果是排组（row-shape 类型），需要更新 seatsData 中所有座位的 categoryId
+    if (item?.type === 'row') {
+      const seatsData = (node as any).getAttr('seatsData') as Seat[] | undefined
+      if (seatsData) {
+        seatsData.forEach(seat => {
+          seat.categoryId = updates.categoryId
+        })
+        // 触发排组重绘（sceneFunc 会根据新的 categoryId 重新着色）
+        node.getLayer()?.batchDraw()
+      }
+    }
+    
+    // 如果是单个座位，直接改填充色
+    if (item?.type === 'seat') {
+      // 找到座位内的圆形节点
+      if (shapeNode instanceof Konva.Circle) {
+        shapeNode.fill(newColor)
+        shapeNode.stroke(newColor)
+      }
+    }
+  }
+  
+  // 排属性更新（座位数、弧度、间距）
+  if (item?.type === 'row') {
+    const needsUpdate = updates.seatCount !== undefined || 
+                       updates.curve !== undefined || 
+                       updates.seatSpacing !== undefined
+    
+    if (needsUpdate) {
+      const seatsData = (node as any).getAttr('seatsData') as Seat[] | undefined
+      const currentCurve = (node as any).getAttr('curve') || 0
+      const currentSeatSpacing = (node as any).getAttr('seatSpacing') || 28
+      
+      if (seatsData && seatsData.length > 0) {
+        const newSeatCount = updates.seatCount ?? seatsData.length
+        const newCurve = updates.curve ?? currentCurve
+        const newSeatSpacing = updates.seatSpacing ?? currentSeatSpacing
+        
+        // 保存当前的 categoryId 和位置信息
+        const firstSeat = seatsData[0]
+        const categoryId = firstSeat.categoryId
+        
+        // 重新计算座位位置
+        const updatedSeatsData = regenerateRowSeats(
+          node,
+          newSeatCount,
+          newCurve,
+          newSeatSpacing,
+          categoryId
+        )
+        
+        if (updatedSeatsData) {
+          (node as any).setAttr('seatsData', updatedSeatsData)
+          node.getLayer()?.batchDraw()
+        }
+      }
+    }
+  }
+
+  // 重绘
+  staticLayer?.batchDraw()
+  selectionDecorationLayer?.batchDraw()
+}
+
 // ==================== 暴露方法 ====================
+
+// 从画布中提取座位图数据
+const getVenueData = (): VenueData | null => {
+  if (!staticLayer) return null
+  
+  const sections: Section[] = []
+  const allRowShapes: Konva.Shape[] = []
+  const shapes: any[] = []
+  
+  // 1. 收集所有排 Shape
+  staticLayer.find('Shape').forEach((node: any) => {
+    if (node.name?.() === 'row-shape' && node.id()?.startsWith('row-shape-')) {
+      allRowShapes.push(node as Konva.Shape)
+    }
+  })
+  
+  // 2. 处理所有排，提取座位数据
+  const rows: Row[] = []
+  allRowShapes.forEach((rowShape) => {
+    const rowId = rowShape.id()
+    const rowLabel = rowShape.getAttr('label') || ''
+    const seatsData = rowShape.getAttr('seatsData') as Seat[] || []
+    const rotation = rowShape.rotation() || 0
+    const shapeX = rowShape.x() || 0
+    const shapeY = rowShape.y() || 0
+    const offsetX = rowShape.offsetX?.() || 0
+    const offsetY = rowShape.offsetY?.() || 0
+    
+    // 计算旋转后的变换矩阵
+    const angleRad = (rotation * Math.PI) / 180
+    const cos = Math.cos(angleRad)
+    const sin = Math.sin(angleRad)
+    
+    // 将座位从局部坐标转换为全局坐标
+    const seats: Seat[] = seatsData.map((seat: Seat) => {
+      // 座位局部坐标（相对于 shape 中心）
+      const localX = seat.x - offsetX
+      const localY = seat.y - offsetY
+      
+      // 应用旋转变换
+      const rotatedX = localX * cos - localY * sin
+      const rotatedY = localX * sin + localY * cos
+      
+      // 加上 shape 的全局位置
+      const globalX = shapeX + rotatedX
+      const globalY = shapeY + rotatedY
+      
+      return {
+        ...seat,
+        x: globalX,
+        y: globalY
+      }
+    })
+    
+    rows.push({
+      id: rowId,
+      label: rowLabel,
+      seats
+    })
+  })
+  
+  // 3. 创建一个默认区域包含所有排
+  sections.push({
+    id: 'section-default',
+    name: '默认区域',
+    x: 0,
+    y: 0,
+    rows
+  })
+  
+  // 4. 提取其他形状信息（可选，用于完整备份）
+  // 注意：VenueData 结构主要用于座位，这里暂时不保存装饰形状
+  // 如果需要保存，可以扩展数据结构或添加 shapes 字段
+  
+  return { sections }
+}
 
 defineExpose({
   renderVenueData,
   generateTestData,
+  getVenueData,
   zoomTo,
   updateSeatStatus,
   clearSelection,
@@ -3325,7 +3740,8 @@ defineExpose({
   stage,
   layer,
   loadBackgroundImage,
-  clearBackgroundImage
+  clearBackgroundImage,
+  updateNodeProperty
 })
 
 </script>

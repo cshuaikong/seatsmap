@@ -45,9 +45,12 @@
             :height="canvasHeight"
             :show-grid="showGrid"
             :venue-data="venueData"
+            :categories="categories"
             @ready="onCanvasReady"
             @seat-click="onSeatClick"
             @row-created="onRowCreated"
+            @selection-changed="onSelectionChanged"
+            @selection-cleared="onSelectionCleared"
           />
 
           <!-- 状态栏 -->
@@ -84,7 +87,11 @@
           <div class="control-buttons">
             <button @click="generateTestSeats" class="control-btn">
               <Icon icon="lucide:refresh-cw" class="btn-icon" />
-              生成50座位
+              生成 50 座位
+            </button>
+            <button @click="exportVenueData" class="control-btn" style="background: #4a90d9;">
+              <Icon icon="lucide:download" class="btn-icon" />
+              导出数据
             </button>
           </div>
         </div>
@@ -95,15 +102,28 @@
         :chart-name="chartName"
         :categories="categories"
         :total-seats="totalSeats"
+        :selection="currentSelection"
         :selected-row="selectedRow"
         @update-row="() => {}"
+        @update-property="onPropertyUpdate"
+        @manage-categories="onManageCategories"
+      />
+
+      <!-- Category 管理弹窗 -->
+      <CategoryManager
+        :visible="showCategoryManager"
+        :categories="categories"
+        @close="onCloseCategoryManager"
+        @add="onAddCategory"
+        @update="onUpdateCategory"
+        @delete="onDeleteCategory"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import Konva from 'konva'
 import RightPanel from './RightPanel.vue'
@@ -111,6 +131,8 @@ import LeftToolbar from './LeftToolbar.vue'
 import KonvaCanvas from './KonvaCanvas.vue'
 import type { ToolMode } from '../composables/useDrawing'
 import type { VenueData, Seat, Row } from './KonvaCanvas.vue'
+import type { PanelSelection } from '../types'
+import CategoryManager from './panels/CategoryManager.vue'
 
 // 画布配置
 const canvasWidth = 3000
@@ -134,6 +156,12 @@ const categories = ref<any[]>([
 
 const selectedRow = ref<any>(null)
 const selectedSeatId = ref<string | null>(null)
+
+// 当前选中状态
+const currentSelection = ref<PanelSelection | null>(null)
+
+// Category 管理弹窗控制
+const showCategoryManager = ref(false)
 
 // Canvas ref
 const canvasRef = ref<InstanceType<typeof KonvaCanvas>>()
@@ -314,6 +342,105 @@ const onLoadBackground = () => {
     }
   }
   input.click()
+}
+
+// 选中状态变化处理
+const onSelectionChanged = (selection: any) => {
+  currentSelection.value = { ...selection }  // 用展开运算符创建新对象，触发 Vue 响应
+}
+
+const onSelectionCleared = () => {
+  currentSelection.value = null
+}
+
+// 导出座位图数据到控制台
+const exportVenueData = async () => {
+  // 从画布中获取最新数据
+  const currentData = canvasRef.value?.getVenueData?.()
+  
+  // 即使没有座位也能导出空数据结构
+  const dataToExport = currentData || { sections: [] }
+  
+  // 更新 venueData 以便计算统计数据
+  venueData.value = dataToExport
+  
+  console.log('========== 座位图数据结构 ==========')
+  console.log('📊 总座位数:', totalSeats.value)
+  console.log('📊 可用座位数:', availableSeats.value)
+  console.log('📊 已售座位数:', soldSeats.value)
+  console.log('📊 保留座位数:', reservedSeats.value)
+  console.log('\n📁 完整数据结构:')
+  console.log(JSON.stringify(dataToExport, null, 2))
+  console.log('====================================')
+  
+  if (totalSeats.value === 0) {
+    alert('数据已输出到控制台！\n当前没有座位，快去绘制一些座位吧~ 🎨')
+  } else {
+    alert(`数据已输出到控制台！\n共 ${totalSeats.value} 个座位 ✨`)
+  }
+}
+
+const onPropertyUpdate = (updates: Record<string, any>) => {
+  if (!currentSelection.value?.ids || currentSelection.value.ids.length === 0) return
+  
+  // 如果是分类变更或排属性变更且选中了多个排组，需要遍历所有选中的排组
+  const rowProperties = ['seatCount', 'curve', 'seatSpacing', 'rowSpacing']
+  const isRowPropertyChange = Object.keys(updates).some(key => rowProperties.includes(key))
+  
+  if ((updates.categoryId || isRowPropertyChange) && currentSelection.value.ids.length > 1) {
+    currentSelection.value.ids.forEach(nodeId => {
+      canvasRef.value?.updateNodeProperty?.(nodeId, updates)
+    })
+  } else {
+    // 单个对象或其他属性变更，只更新第一个
+    canvasRef.value?.updateNodeProperty?.(
+      currentSelection.value.ids[0],
+      updates
+    )
+  }
+}
+
+// Category 管理
+const onManageCategories = () => {
+  showCategoryManager.value = true
+}
+
+const onCloseCategoryManager = () => {
+  showCategoryManager.value = false
+}
+
+const onAddCategory = (category: { name: string; color: string }) => {
+  const newCat = {
+    id: String(Date.now()),
+    name: category.name,
+    color: category.color,
+    accessible: false
+  }
+  categories.value.push(newCat)
+}
+
+const onUpdateCategory = (categoryId: string, updates: { name?: string; color?: string }) => {
+  const cat = categories.value.find((c: any) => c.id === categoryId)
+  if (cat) {
+    Object.assign(cat, updates)
+    
+    // 如果颜色发生变化，需要刷新画布上所有使用该分类的座位
+    if (updates.color && canvasRef.value) {
+      // 重新渲染场地数据以应用新颜色
+      if (venueData.value) {
+        const data = { ...venueData.value }
+        venueData.value = null
+        nextTick(() => {
+          venueData.value = data
+        })
+      }
+    }
+  }
+}
+
+const onDeleteCategory = (categoryId: string) => {
+  const idx = categories.value.findIndex((c: any) => c.id === categoryId)
+  if (idx !== -1) categories.value.splice(idx, 1)
 }
 </script>
 

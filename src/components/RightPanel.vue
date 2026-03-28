@@ -1,173 +1,314 @@
 <template>
   <div class="right-panel">
-    <!-- 顶部标题 -->
-    <div class="panel-header">
-      <h2 class="panel-title">{{ chartName }}</h2>
-    </div>
-
-    <!-- Categories 区域 -->
-    <div class="categories-section" :class="{ expanded: showCategories }">
-      <div class="categories-header" @click="showCategories = !showCategories">
-        <div class="toggle-switch" :class="{ on: showCategories }">
-          <div class="toggle-thumb"></div>
-        </div>
-        <span class="categories-count">{{ categories.length }} 个类别</span>
-        <button class="manage-btn">
-          <Icon icon="lucide:settings-2" class="manage-icon" />
-          管理
-        </button>
-      </div>
-      
-      <div v-if="showCategories" class="categories-list">
-        <div v-for="cat in categories" :key="cat.id" class="category-item">
-          <div class="category-color" :style="{ backgroundColor: cat.color }"></div>
-          <span class="category-name">{{ cat.name }}</span>
-          <Icon v-if="cat.accessible" icon="lucide:accessibility" class="accessible-icon" />
+    <!-- 选中对象面板 -->
+    <template v-if="shouldShowSelectionPanel">
+      <!-- 面板标题栏 -->
+      <div class="selection-header">
+        <div class="selection-title">
+          <span class="title-text">{{ selectionTitle }}</span>
+          <span class="title-type">{{ selectionTypeLabel }}</span>
         </div>
       </div>
-    </div>
 
-    <!-- 统计信息 -->
-    <div class="stats-section">
-      <div class="stat-item">
-        <div class="stat-icon-wrapper">
-          <Icon icon="lucide:armchair" class="stat-icon" />
+      <!-- 动态面板内容 -->
+      <div class="selection-content">
+        <!-- 形状面板 -->
+        <ShapePanel
+          v-if="panelType === 'shape'"
+          :key="'shape-' + (selection?.ids?.[0] || '') + '-' + refreshKey"
+          :node="selection?.nodes?.[0]"
+          :type="selection?.type as any"
+          @update-property="(key, val) => emit('update-property', { [key]: val })"
+        />
+
+        <!-- 文本面板 -->
+        <TextPanel
+          v-else-if="panelType === 'text'"
+          :key="'text-' + (selection?.ids?.[0] || '') + '-' + refreshKey"
+          :node="selection?.nodes?.[0]"
+          @update-property="(key, val) => emit('update-property', { [key]: val })"
+        />
+
+        <!-- 座位面板 -->
+        <SeatPanel
+          v-else-if="panelType === 'seat'"
+          :key="'seat-' + (selection?.ids?.join(',') || '') + '-' + refreshKey"
+          :nodes="selection?.nodes || []"
+          :categories="categories"
+          :is-single="(selection?.ids?.length || 0) === 1"
+          @update-property="(key, val) => emit('update-property', { [key]: val })"
+          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          @manage-categories="emit('manage-categories')"
+        />
+
+        <!-- 排面板 -->
+        <RowPanel
+          v-else-if="panelType === 'row'"
+          :key="'row-' + (selection?.ids?.join(',') || '') + '-' + refreshKey"
+          :nodes="selection?.nodes || []"
+          :is-single="(selection?.ids?.length || 0) === 1"
+          :categories="categories"
+          @update-property="(key, val) => emit('update-property', { [key]: val })"
+          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          @manage-categories="emit('manage-categories')"
+        />
+
+        <!-- 区域面板 -->
+        <AreaPanel
+          v-else-if="panelType === 'area'"
+          :key="'area-' + (selection?.ids?.[0] || '') + '-' + refreshKey"
+          :node="selection?.nodes?.[0]"
+          :categories="categories"
+          @update-property="(key, val) => emit('update-property', { [key]: val })"
+          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          @manage-categories="emit('manage-categories')"
+        />
+
+        <!-- 混合选择面板 -->
+        <MixedPanel
+          v-else-if="panelType === 'mixed'"
+          :key="'mixed-' + (selection?.ids?.join(',') || '') + '-' + refreshKey"
+          :nodes="selection?.nodes || []"
+          :categories="categories"
+          :types="[...new Set(selection?.nodes?.map((n: any) => n?.getAttr?.('data-type') || 'object'))]"
+          @update-property="(key, val) => emit('update-property', { [key]: val })"
+          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          @manage-categories="emit('manage-categories')"
+        />
+
+        <!-- 未知类型 -->
+        <div v-else class="panel-placeholder">
+          <div class="placeholder-icon">
+            <Icon icon="lucide:help-circle" class="icon" />
+          </div>
+          <p>未知对象类型</p>
         </div>
-        <span class="stat-value">{{ totalSeats }}</span>
-        <span class="stat-label">个座位</span>
-        <button class="search-btn" title="搜索座位">
-          <Icon icon="lucide:search" class="search-icon" />
-        </button>
       </div>
-    </div>
+    </template>
 
-    <!-- 验证列表 -->
-    <div class="validation-section">
-      <div v-for="(item, index) in validationItems" :key="index" class="validation-item" :class="item.status">
-        <div class="validation-icon-wrapper">
-          <Icon 
-            :icon="item.status === 'success' ? 'lucide:check' : item.status === 'warning' ? 'lucide:alert-triangle' : 'lucide:x'" 
-            class="validation-icon" 
-          />
+    <!-- 兼容旧版：选中排的属性 -->
+    <template v-else-if="selectedRow">
+      <div class="selection-header">
+        <div class="selection-title">
+          <span class="title-text">排设置</span>
+          <span class="title-type">ROW</span>
         </div>
-        <span class="validation-text">{{ item.text }}</span>
       </div>
-    </div>
 
-    <!-- 选中排的属性 -->
-    <div v-if="selectedRow" class="properties-section">
-      <div class="property-group">
-        <h4>排设置</h4>
-        
-        <div class="property-field">
-          <label>排号</label>
-          <input type="text" v-model="selectedRow.label" @change="updateRow" />
+      <div class="selection-content">
+        <div class="property-group">
+          <div class="property-field">
+            <label>排号</label>
+            <input type="text" v-model="selectedRow.label" @change="updateRow" />
+          </div>
+
+          <div class="property-field">
+            <label>座位数量</label>
+            <div class="number-input">
+              <button class="step-btn" @click="decreaseSeats">
+                <Icon icon="lucide:minus" class="step-icon" />
+              </button>
+              <span class="number-value">{{ selectedRow.seats.length }}</span>
+              <button class="step-btn" @click="increaseSeats">
+                <Icon icon="lucide:plus" class="step-icon" />
+              </button>
+            </div>
+          </div>
+
+          <div class="property-field">
+            <label>旋转角度</label>
+            <div class="number-input">
+              <button class="step-btn" @click="decreaseRotation">
+                <Icon icon="lucide:minus" class="step-icon" />
+              </button>
+              <span class="number-value">{{ Math.round(selectedRow.rotation) }}°</span>
+              <button class="step-btn" @click="increaseRotation">
+                <Icon icon="lucide:plus" class="step-icon" />
+              </button>
+            </div>
+          </div>
+
+          <div class="property-field">
+            <label>位置</label>
+            <div class="position-display">
+              <span>X: {{ Math.round(selectedRow.x) }}</span>
+              <span>Y: {{ Math.round(selectedRow.y) }}</span>
+            </div>
+          </div>
         </div>
-        
-        <div class="property-field">
-          <label>座位数量</label>
-          <div class="number-input">
-            <button class="step-btn" @click="decreaseSeats">
-              <Icon icon="lucide:minus" class="step-icon" />
-            </button>
-            <span class="number-value">{{ selectedRow.seats.length }}</span>
-            <button class="step-btn" @click="increaseSeats">
-              <Icon icon="lucide:plus" class="step-icon" />
+
+        <div class="property-group">
+          <h4>类别</h4>
+          <div class="category-select">
+            <div class="category-badge" :style="{ backgroundColor: selectedCategory?.color || '#9ca3af' }"></div>
+            <span class="category-name">{{ selectedCategory?.name || '选择类别' }}</span>
+            <button class="dropdown-btn">
+              <Icon icon="lucide:chevron-down" class="dropdown-icon" />
             </button>
           </div>
         </div>
-        
-        <div class="property-field">
-          <label>旋转角度</label>
-          <div class="number-input">
-            <button class="step-btn" @click="decreaseRotation">
-              <Icon icon="lucide:minus" class="step-icon" />
-            </button>
-            <span class="number-value">{{ Math.round(selectedRow.rotation) }}°</span>
-            <button class="step-btn" @click="increaseRotation">
-              <Icon icon="lucide:plus" class="step-icon" />
-            </button>
-          </div>
-        </div>
-        
-        <div class="property-field">
-          <label>位置</label>
-          <div class="position-display">
-            <span>X: {{ Math.round(selectedRow.x) }}</span>
-            <span>Y: {{ Math.round(selectedRow.y) }}</span>
+
+        <div class="property-group">
+          <h4>座位间距</h4>
+          <div class="property-field">
+            <label>座位间距</label>
+            <div class="number-input">
+              <button class="step-btn" @click="seatSpacing = Math.max(20, seatSpacing - 2)">
+                <Icon icon="lucide:minus" class="step-icon" />
+              </button>
+              <span class="number-value">{{ seatSpacing }}</span>
+              <button class="step-btn" @click="seatSpacing = Math.min(60, seatSpacing + 2)">
+                <Icon icon="lucide:plus" class="step-icon" />
+              </button>
+            </div>
+            <span class="unit">pt</span>
           </div>
         </div>
       </div>
+    </template>
 
-      <!-- 类别 -->
-      <div class="property-group">
-        <h4>类别</h4>
-        <div class="category-select">
-          <div class="category-badge" :style="{ backgroundColor: selectedCategory?.color || '#9ca3af' }"></div>
-          <span class="category-name">{{ selectedCategory?.name || '选择类别' }}</span>
-          <button class="dropdown-btn">
-            <Icon icon="lucide:chevron-down" class="dropdown-icon" />
-          </button>
-        </div>
-      </div>
-
-      <!-- 座位间距 -->
-      <div class="property-group">
-        <h4>座位间距</h4>
-        <div class="property-field">
-          <label>座位间距</label>
-          <div class="number-input">
-            <button class="step-btn" @click="seatSpacing = Math.max(20, seatSpacing - 2)">
-              <Icon icon="lucide:minus" class="step-icon" />
-            </button>
-            <span class="number-value">{{ seatSpacing }}</span>
-            <button class="step-btn" @click="seatSpacing = Math.min(60, seatSpacing + 2)">
-              <Icon icon="lucide:plus" class="step-icon" />
-            </button>
-          </div>
-          <span class="unit">pt</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- 空状态 -->
-    <div v-else class="empty-state">
-      <Icon icon="lucide:mouse-pointer-2" class="empty-icon" />
-      <p>选择一个排进行编辑</p>
-    </div>
+    <!-- 图表概览（无选中时） -->
+    <template v-else>
+      <ChartOverviewPanel
+        :chart-name="chartName"
+        :categories="categories"
+        :total-seats="totalSeats"
+        @manage-categories="emit('manage-categories')"
+      />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import type { Row, Category } from '../types'
+import type { Row, Category, PanelSelection, SelectedObjectType } from '../types'
+import ChartOverviewPanel from './panels/ChartOverviewPanel.vue'
+import ShapePanel from './panels/ShapePanel.vue'
+import TextPanel from './panels/TextPanel.vue'
+import SeatPanel from './panels/SeatPanel.vue'
+import RowPanel from './panels/RowPanel.vue'
+import AreaPanel from './panels/AreaPanel.vue'
+import MixedPanel from './panels/MixedPanel.vue'
 
 const props = defineProps<{
   chartName: string
   categories: Category[]
   totalSeats: number
-  selectedRow: Row | null
+  selection?: PanelSelection | null
+  selectedRow?: Row | null
 }>()
 
 const emit = defineEmits<{
   'update-row': [row: Row]
+  'update-property': [updates: Record<string, any>]
+  'manage-categories': []
 }>()
 
-const showCategories = ref(true)
 const seatSpacing = ref(28)
 
+// 刷新 key，用于强制重新挂载子面板
+const refreshKey = ref(0)
+
+// 监听 selection 变化，递增 refreshKey
+watch(() => props.selection, () => {
+  refreshKey.value++
+}, { deep: true })
+
+// 判断是否显示选中对象面板
+const shouldShowSelectionPanel = computed(() => {
+  if (!props.selection) return false
+  return props.selection.type !== 'none'
+})
+
+// 面板类型映射
+const panelType = computed(() => {
+  if (!props.selection) return null
+
+  const type = props.selection.type
+
+  // 混合选择
+  if (props.selection.isMixed) return 'mixed'
+
+  // 形状类型映射
+  const shapeTypes: SelectedObjectType[] = ['rect', 'ellipse', 'polygon', 'sector', 'polyline']
+  if (shapeTypes.includes(type)) return 'shape'
+
+  // 直接映射
+  if (type === 'text') return 'text'
+  if (type === 'seat') return 'seat'
+  if (type === 'row') return 'row'
+  if (type === 'area') return 'area'
+
+  return 'unknown'
+})
+
+// 选中对象标题
+const selectionTitle = computed(() => {
+  if (!props.selection) return ''
+
+  if (props.selection.isMixed) {
+    // 混合选择时显示类型组合
+    const types = new Set(props.selection.nodes?.map((n: any) => n?.getAttr?.('data-type') || 'object'))
+    const typeNames: Record<string, string> = {
+      'rect': '形状',
+      'ellipse': '形状',
+      'polygon': '形状',
+      'sector': '形状',
+      'polyline': '形状',
+      'text': '文本',
+      'seat': '座位',
+      'row': '排',
+      'area': '区域',
+      'object': '对象'
+    }
+    const uniqueNames = Array.from(types).map(t => typeNames[t as string] || '对象')
+    return [...new Set(uniqueNames)].join(', ')
+  }
+
+  const titles: Record<SelectedObjectType, string> = {
+    'none': '',
+    'rect': '形状',
+    'ellipse': '形状',
+    'polygon': '形状',
+    'sector': '形状',
+    'polyline': '形状',
+    'text': '文本',
+    'seat': '座位',
+    'row': '排',
+    'area': '区域'
+  }
+
+  return titles[props.selection.type] || '对象'
+})
+
+// 选中对象类型标签（右上角大写）
+const selectionTypeLabel = computed(() => {
+  if (!props.selection) return ''
+
+  if (props.selection.isMixed) return 'MULTIPLE'
+
+  const labels: Record<SelectedObjectType, string> = {
+    'none': '',
+    'rect': 'SHAPE',
+    'ellipse': 'SHAPE',
+    'polygon': 'SHAPE',
+    'sector': 'SHAPE',
+    'polyline': 'SHAPE',
+    'text': 'TEXT',
+    'seat': 'SEAT',
+    'row': 'ROW',
+    'area': 'AREA'
+  }
+
+  return labels[props.selection.type] || 'OBJECT'
+})
+
+// 兼容旧版：选中类别
 const selectedCategory = computed(() => {
   if (!props.selectedRow || props.selectedRow.seats.length === 0) return null
   return props.categories.find(c => c.id === props.selectedRow!.seats[0].categoryId)
 })
-
-const validationItems = [
-  { status: 'success', text: '无重复对象' },
-  { status: 'success', text: '所有对象已标记' },
-  { status: 'success', text: '所有对象已分类' },
-  { status: 'success', text: '焦点已设置' }
-]
 
 function updateRow() {
   if (props.selectedRow) {
@@ -208,9 +349,85 @@ function decreaseRotation() {
   flex-direction: column;
 }
 
+/* 选中对象面板标题栏 */
+.selection-header {
+  padding: 16px;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.selection-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.title-type {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.5px;
+}
+
+/* 选中对象内容区 */
+.selection-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 占位面板样式 */
+.panel-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.placeholder-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: var(--color-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.placeholder-icon .icon {
+  width: 32px;
+  height: 32px;
+  color: var(--color-text-muted);
+}
+
+.panel-placeholder p {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0 0 8px 0;
+}
+
+.placeholder-hint {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* 图表概览头部 */
 .panel-header {
   padding: 16px;
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .panel-title {
@@ -224,6 +441,7 @@ function decreaseRotation() {
 .categories-section {
   background: var(--color-bg-tertiary);
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .categories-section.expanded {
@@ -248,7 +466,7 @@ function decreaseRotation() {
 }
 
 .toggle-switch.on {
-  background: rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .toggle-thumb {
@@ -283,7 +501,7 @@ function decreaseRotation() {
   gap: 4px;
   padding: 4px 10px;
   border: none;
-  background: rgba(0,0,0,0.08);
+  background: rgba(0, 0, 0, 0.08);
   border-radius: 6px;
   font-size: 12px;
   color: var(--color-text);
@@ -292,7 +510,7 @@ function decreaseRotation() {
 
 .categories-section.expanded .manage-btn {
   color: white;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .manage-icon {
@@ -335,6 +553,7 @@ function decreaseRotation() {
   padding: 16px;
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .stat-item {
@@ -394,6 +613,7 @@ function decreaseRotation() {
   padding: 8px 16px;
   background: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .validation-item {
@@ -432,10 +652,6 @@ function decreaseRotation() {
 }
 
 /* Properties */
-.properties-section {
-  flex: 1;
-}
-
 .property-group {
   padding: 16px;
   border-bottom: 1px solid var(--color-border);
@@ -548,12 +764,6 @@ function decreaseRotation() {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-}
-
-.category-name {
-  flex: 1;
-  font-size: 13px;
-  color: var(--color-text);
 }
 
 .dropdown-btn {
