@@ -1706,7 +1706,7 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   // 清除旧预览
   clearDrawingPreview()
   
-  // 绘制辅助）
+  // 绘制辅助线
   const line = new Konva.Line({
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
     stroke: '#3b82f6',
@@ -1728,20 +1728,51 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   })
   addPreviewElement(startDot)
   
-  // 绘制座位预览
+  // 【修复】计算座位位置（与 renderRow 保持一致的几何中心方式）
+  // 生成座位数据（局部坐标，相对于排起点）
+  const seats: { x: number; y: number }[] = []
+  for (let i = 0; i < count; i++) {
+    seats.push({
+      x: i * drawing.SEAT_SPACING,
+      y: 0
+    })
+  }
+  
+  // 计算边界（包含座位半径）
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  seats.forEach((seat) => {
+    minX = Math.min(minX, seat.x - SEAT_RADIUS)
+    minY = Math.min(minY, seat.y - SEAT_RADIUS)
+    maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
+    maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
+  })
+  
+  const width = maxX - minX
+  const height = maxY - minY
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  
+  // 计算旋转角度（与 submitSeatRow 一致）
+  const angle = Math.atan2(uy, ux) * 180 / Math.PI
+  
+  // 绘制座位预览（使用与 renderRow 相同的坐标系统）
   const shape = new Konva.Shape({
+    x: startPos.x + centerX,  // Shape 位置 = 起点 + 几何中心
+    y: startPos.y + centerY,
+    width: width,
+    height: height,
+    rotation: angle,  // 添加旋转角度
     listening: false,
     perfectDrawEnabled: false
   })
   
   shape.sceneFunc((ctx) => {
     ctx.beginPath()
-    for (let i = 0; i < count; i++) {
-      const x = startPos.x + ux * i * drawing.SEAT_SPACING
-      const y = startPos.y + uy * i * drawing.SEAT_SPACING
-      ctx.moveTo(x + SEAT_RADIUS, y)
-      ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
-    }
+    // 使用局部坐标绘制（与 renderRow 一致）
+    seats.forEach(seat => {
+      ctx.moveTo(seat.x + SEAT_RADIUS, seat.y)
+      ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
+    })
     ctx.fillStyle = 'rgba(59, 130, 246, 0.25)'
     ctx.fill()
     ctx.strokeStyle = '#3b82f6'
@@ -1756,7 +1787,6 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
 /** 提交座位排到 store */
 const submitSeatRow = (startPos: Position, endPos: Position) => {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-  
   if (dist < drawing.SEAT_SPACING) {
     clearDrawingPreview()
     return
