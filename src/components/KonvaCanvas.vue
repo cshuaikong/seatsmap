@@ -5,6 +5,16 @@
   </div>
 </template>
 
+<!-- 
+  @deprecated KonvaCanvas 已被弃用，请使用 KonvaRenderer 替代。
+  保留此文件仅供参考，将在未来版本中移除。
+  
+  迁移指南：
+  1. 使用 KonvaRenderer 替代 KonvaCanvas
+  2. KonvaRenderer 直接读取 venueStore，无需传递 venue-data
+  3. 选中状态通过 venueStore 管理，无需通过事件传递
+-->
+
 <script setup lang="ts">
 import { ref, shallowRef, markRaw, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
@@ -330,8 +340,8 @@ const endDragAll = () => {
   
   // 只有真正移动了才设 justDragged，防止误取消选中
   const moved = unifiedDragState.items.some(item =>
-    Math.abs(item.node.x() + item.node.offsetX() - item.startX) > 2 ||
-    Math.abs(item.node.y() + item.node.offsetY() - item.startY) > 2
+    Math.abs(item.node.x() - item.startX) > 2 ||
+    Math.abs(item.node.y() - item.startY) > 2
   )
   justDragged = moved
   unifiedDragState.active = false
@@ -1868,60 +1878,47 @@ const regenerateRowSeats = (
 }
 
 const createRowShape = (seats: Seat[], startX: number, startY: number, rotation: number, rowId: string) => {
-  // 座位局部坐标：第一个座位中心在 (SEAT_RADIUS, SEAT_RADIUS)
-  const adjustedSeats = seats.map(seat => ({
-    ...seat,
-    x: seat.x + SEAT_RADIUS,
-    y: seat.y + SEAT_RADIUS
-  }))
+  // 【参考 RotationTest.vue 实现】：保持座位原始坐标，计算边界框
+  // 座位坐标：第一个座位在 (0,0)，向右递增
   
-  // 计算边界（用于 hitFunc 和 Transformer 包围盒）
+  // 计算边界（包含座位半径）
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  adjustedSeats.forEach((seat) => {
+  seats.forEach((seat) => {
     minX = Math.min(minX, seat.x - SEAT_RADIUS)
     minY = Math.min(minY, seat.y - SEAT_RADIUS)
     maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
     maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
   })
   
+  // width/height 是内容实际大小，从 (0,0) 开始计算
+  // 例如：10个座位，间距15，半径6 → width = 9*15 + 12 = 147
   const width = maxX - minX
   const height = maxY - minY
   
-  // 计算几何中心，用于设置旋转中心
+  // 计算几何中心（用于旋转中心）
   const centerX = (minX + maxX) / 2
   const centerY = (minY + maxY) / 2
 
-  // 计算第一个座位的全局位置（用于对齐预览）
-  const angleRad = (rotation * Math.PI) / 180
-  const cos = Math.cos(angleRad)
-  const sin = Math.sin(angleRad)
-  // 第一个座位局部坐标 (SEAT_RADIUS, SEAT_RADIUS) 相对于几何中心的偏移
-  const firstSeatLocalX = SEAT_RADIUS - centerX
-  const firstSeatLocalY = SEAT_RADIUS - centerY
-  // 旋转后的偏移
-  const rotatedOffsetX = firstSeatLocalX * cos - firstSeatLocalY * sin
-  const rotatedOffsetY = firstSeatLocalX * sin + firstSeatLocalY * cos
-  // Shape 位置 = 第一个座位目标位置 - 旋转后的偏移
-  const shapeX = startX - rotatedOffsetX
-  const shapeY = startY - rotatedOffsetY
-
   const shape = new Konva.Shape({
-    x: shapeX,
-    y: shapeY,
+    x: startX + centerX,  // Shape 位置 = 几何中心
+    y: startY + centerY,
     rotation: rotation,
     width: width,
     height: height,
-    offsetX: centerX,
-    offsetY: centerY,
+    // 【关键】：不设置 offsetX/offsetY，保持为 0
+    // 这样 Transformer 的包围盒从 (x, y) 开始，大小为 width/height
+    draggable: false,  // 【关键】：禁止单独拖拽，由统一拖拽系统接管
     id: `row-shape-${rowId}`,
     name: 'row-shape',
     perfectDrawEnabled: false,
     transformsEnabled: 'all',
-    seatsData: adjustedSeats,
+    seatsData: seats,  // 保持原始座位坐标
     hitMinX: minX,
     hitMinY: minY,
     hitMaxX: maxX,
-    hitMaxY: maxY
+    hitMaxY: maxY,
+    centerX: centerX,  // 存储几何中心，用于后续计算
+    centerY: centerY
   })
 
   // sceneFunc: 批次绘制所有座位（使用局部坐标）
@@ -1971,11 +1968,11 @@ const createRowShape = (seats: Seat[], startX: number, startY: number, rotation:
     })
   })
 
-  // hitFunc: 自定义点击检测区域（从 0,0 开始）
+  // hitFunc: 自定义点击检测区域（参考 RotationTest.vue）
+  // 从 (0,0) 开始，大小为 width/height
   shape.hitFunc((context, shape) => {
     const width = shape.width()
     const height = shape.height()
-    
     context.beginPath()
     context.rect(0, 0, width, height)
     context.fillStrokeShape(shape)
@@ -3020,6 +3017,10 @@ const updateTransformer = (forceFullUpdate = false) => {
     
     if (!transformer) return
     
+    // 【关键】：重置所有节点的 draggable 状态为 false
+    // 先获取当前所有选中的节点
+    const currentSelectedNodes = selectedItems.value.map(item => item.node) as Konva.Node[]
+    
     if (selectedItems.value.length === 0) {
       transformer.nodes([])
       transformer.visible(false)
@@ -3032,10 +3033,22 @@ const updateTransformer = (forceFullUpdate = false) => {
           !currentNodes.every((node, i) => node === newNodes[i])) {
         transformer.nodes(newNodes)
         transformer.visible(true)
+        // 【关键修改】：设置节点后强制更新 Transformer 包围盒
+        transformer.forceUpdate()
       } else {
         // 拖拽时只更新位置和边框
         transformer.forceUpdate()
       }
+      
+      // 【关键】：只有选中的节点才开启拖拽
+      currentSelectedNodes.forEach(node => {
+        node.draggable(true)
+      })
+    }
+    
+    // 【关键修改】：选中时强制将 selectionDecorationLayer 提到最上层，防止遮挡 Transformer 手柄
+    if (selectedItems.value.length > 0) {
+      selectionDecorationLayer?.moveToTop()
     }
     
     selectionDecorationLayer?.batchDraw()
@@ -3287,6 +3300,8 @@ const deselectItem = (id: string) => {
     item.node.off('mouseleave.select')
     // 移除选中高亮效果
     applySelectionHighlight(item.node, false)
+    // 【关键】：取消选中时禁用拖拽
+    item.node.draggable(false)
     selectedItems.value = selectedItems.value.filter(i => i.id !== id)
   }
   updateSelectionDecoration()
@@ -3302,6 +3317,8 @@ const clearSelection = () => {
     item.node.off('mouseleave.select')
     // 移除选中高亮效果
     applySelectionHighlight(item.node, false)
+    // 【关键】：取消选中时禁用拖拽
+    item.node.draggable(false)
   })
   selectedItems.value = []
   updateSelectionDecoration()

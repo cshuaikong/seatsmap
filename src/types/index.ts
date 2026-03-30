@@ -12,7 +12,8 @@ export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
 // 绘制模式
 export type SeatDrawMode = 'single-seat' | 'row-straight' | 'row-curved' | 'row-segments' | 'section' | 'section-diagonal'
 
-export interface Seat {
+// 旧类型定义（保持兼容性）
+export interface SeatLegacy {
   id: string
   label: string
   x: number
@@ -30,25 +31,25 @@ export interface Seat {
   isCompanion: boolean
 }
 
-export interface Row {
+export interface RowLegacy {
   id: string
   label: string
   x: number
   y: number
   rotation: number
-  seats: Seat[]
+  seats: SeatLegacy[]
 }
 
-export interface Section {
+export interface SectionLegacy {
   id: string
   name: string
   x: number
   y: number
   rotation: number
-  rows: Row[]
+  rows: RowLegacy[]
 }
 
-export interface Category {
+export interface CategoryLegacy {
   id: string
   name: string
   color: string
@@ -61,6 +62,79 @@ export interface ChartData {
   height: number
   sections: Section[]
   categories: Category[]
+}
+
+// 数据驱动架构的核心类型
+export interface VenueData {
+  id: string
+  name: string
+  venueType: 'SIMPLE' | 'WITH_SECTIONS' | 'WITH_SECTIONS_AND_FLOORS'
+  categories: Category[]
+  sections: Section[]
+  focalPoint?: Position
+}
+
+// 扩展 Category 支持 key 字段
+export interface Category {
+  key: string | number
+  label: string
+  color: string
+  accessible?: boolean
+}
+
+// 扩展 Row 支持更多属性
+export interface SeatRow {
+  id: string
+  label: string
+  seats: Seat[]
+  curve?: number
+  seatSpacing?: number
+  rowSpacing?: number
+  rotation?: number
+  x?: number
+  y?: number
+}
+
+// 扩展 Seat 支持 Seats.io 风格
+export interface Seat {
+  id: string
+  label: string
+  x: number
+  y: number
+  categoryKey: string | number
+  status: SeatStatus
+  objectType: 'seat' | 'wheelchair' | 'companion' | 'generalAdmission'
+  
+  // 可选属性
+  radius?: number
+  rowId?: string
+  sectionId?: string
+  
+  // 无障碍设施
+  isAccessible?: boolean
+  isCompanionSeat?: boolean
+  hasRestrictedView?: boolean
+  
+  // 邻居关系
+  leftNeighbour?: string
+  rightNeighbour?: string
+  
+  // 距离舞台中心
+  distanceToFocalPoint?: number
+}
+
+// 扩展 Section
+export interface Section {
+  id: string
+  name: string
+  rows: SeatRow[]
+  x?: number
+  y?: number
+  rotation?: number
+  // 扩展对象类型
+  shapes?: ShapeObject[]
+  texts?: TextObject[]
+  areas?: AreaObject[]
 }
 
 // 座位图配置接口
@@ -81,9 +155,9 @@ export interface SeatMapConfig {
 
 // 默认座位图配置
 export const defaultSeatMapConfig: SeatMapConfig = {
-  defaultSeatRadius: 6,
-  defaultSeatSpacing: 18,
-  defaultRowSpacing: 22,
+  defaultSeatRadius: 12,
+  defaultSeatSpacing: 28,
+  defaultRowSpacing: 32,
   showRowLabels: true,
   showSeatLabels: true,
   
@@ -136,23 +210,32 @@ export interface SeatLabelConfig {
 export interface ShapeObject {
   id: string
   type: 'rect' | 'ellipse' | 'polygon' | 'sector' | 'polyline'
+  x: number
+  y: number
   width?: number
   height?: number
   rotation: number
   cornerRadius?: number
-  fillColor: string
-  autoStroke: boolean
+  fill: string
+  stroke: string
   strokeWidth: number
-  strokeColor: string
-  order: number
-  scale: number
+  opacity?: number
+  // polygon/polyline 专用
+  points?: number[]
+  // sector 专用
+  innerRadius?: number
+  outerRadius?: number
+  angle?: number
+  locked?: boolean
+  order?: number
+  scale?: number
   smoothing?: number
-  label: {
-    type: string
-    caption: string
-    fontSize: number
-    positionX: number
-    positionY: number
+  label?: {
+    type?: string
+    caption?: string
+    fontSize?: number
+    positionX?: number
+    positionY?: number
   }
 }
 
@@ -160,34 +243,52 @@ export interface ShapeObject {
 export interface TextObject {
   id: string
   type: 'text'
-  caption: string
+  x: number
+  y: number
+  text: string
   fontSize: number
-  textColor: string
-  bold: boolean
-  italic: boolean
-  scale: number
+  fontFamily?: string
+  fontStyle?: string
+  fill: string
+  rotation?: number
+  width?: number
+  height?: number
+  align?: 'left' | 'center' | 'right'
+  locked?: boolean
+  scale?: number
+  // 兼容旧字段
+  caption?: string
+  textColor?: string
+  bold?: boolean
+  italic?: boolean
 }
 
 // 区域对象
 export interface AreaObject {
   id: string
   type: 'area'
-  width: number
-  height: number
-  rotation: number
-  cornerRadius: number
-  translucent: boolean
-  scale: number
-  categoryId: string
-  areaLabeling: LabelConfig & {
-    visible: boolean
-    fontSize: number
-    positionX: number
-    positionY: number
+  label: string
+  // 多边形顶点 (相对于区域位置的坐标)
+  points: number[]
+  fill?: string
+  opacity?: number
+  width?: number
+  height?: number
+  rotation?: number
+  cornerRadius?: number
+  translucent?: boolean
+  scale?: number
+  categoryId?: string
+  areaLabeling?: LabelConfig & {
+    visible?: boolean
+    fontSize?: number
+    positionX?: number
+    positionY?: number
   }
-  capacityType: 'general_admission'
-  capacity: number
-  entrance: string
+  capacityType?: 'general_admission'
+  capacity?: number
+  entrance?: string
+  locked?: boolean
 }
 
 // 选中对象类型
@@ -214,7 +315,7 @@ export interface SeatExtended extends Seat {
 }
 
 // 扩展 Row 接口
-export interface RowExtended extends Row {
+export interface RowExtended extends SeatRow {
   curve?: number
   seatSpacing?: number
   rowLabeling?: RowLabelConfig

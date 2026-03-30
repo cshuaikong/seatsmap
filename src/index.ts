@@ -1,13 +1,12 @@
 // 组件
-export { default as SeatChartEditor } from './components/SeatChartEditor.vue'
-export { default as ChartCanvas } from './components/ChartCanvas.vue'
-export { default as SeatItem } from './components/SeatItem.vue'
-export { default as SeatRow } from './components/SeatRow.vue'
-export { default as SeatSection } from './components/SeatSection.vue'
-export { default as Toolbar } from './components/Toolbar.vue'
-export { default as PropertyPanel } from './components/PropertyPanel.vue'
+export { default as KonvaDesigner } from './components/KonvaDesigner.vue'
+export { default as KonvaRenderer } from './components/KonvaRenderer.vue'
+export { default as LeftToolbar } from './components/LeftToolbar.vue'
+export { default as RightPanel } from './components/RightPanel.vue'
+export { default as TopToolbar } from './components/TopToolbar.vue'
 
 // Store
+export { useVenueStore } from './stores/venueStore'
 export { useChartStore } from './stores/chartStore'
 
 // 类型
@@ -16,3 +15,6 @@ export * from './types'
 // 工具函数
 export * from './utils/geometry'
 export * from './utils/id'
+
+// Composables
+export { useDrawing } from './composables/useDrawing'

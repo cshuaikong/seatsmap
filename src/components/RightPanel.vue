@@ -15,64 +15,64 @@
         <!-- 形状面板 -->
         <ShapePanel
           v-if="panelType === 'shape'"
-          :key="'shape-' + (selection?.ids?.[0] || '') + '-' + refreshKey"
-          :node="selection?.nodes?.[0]"
-          :type="selection?.type as any"
-          @update-property="(key, val) => emit('update-property', { [key]: val })"
+          :key="'shape-' + (selectedIds.shapes?.[0] || '') + '-' + refreshKey"
+          :node="selectedObjects.shapes?.[0]"
+          :type="currentSelectionType as any"
+          @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
         />
 
         <!-- 文本面板 -->
         <TextPanel
           v-else-if="panelType === 'text'"
-          :key="'text-' + (selection?.ids?.[0] || '') + '-' + refreshKey"
-          :node="selection?.nodes?.[0]"
-          @update-property="(key, val) => emit('update-property', { [key]: val })"
+          :key="'text-' + (selectedIds.texts?.[0] || '') + '-' + refreshKey"
+          :node="selectedObjects.texts?.[0]"
+          @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
         />
 
         <!-- 座位面板 -->
         <SeatPanel
           v-else-if="panelType === 'seat'"
-          :key="'seat-' + (selection?.ids?.join(',') || '') + '-' + refreshKey"
-          :nodes="selection?.nodes || []"
-          :categories="categories"
-          :is-single="(selection?.ids?.length || 0) === 1"
-          @update-property="(key, val) => emit('update-property', { [key]: val })"
-          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          :key="'seat-' + (selectedIds.seats?.join(',') || '') + '-' + refreshKey"
+          :nodes="selectedObjects.seats || []"
+          :categories="categories as any"
+          :is-single="selectedIds.seats?.length === 1"
+          @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
+          @update-category="(catId) => handleCategoryChange(catId)"
           @manage-categories="emit('manage-categories')"
         />
 
         <!-- 排面板 -->
         <RowPanel
           v-else-if="panelType === 'row'"
-          :key="'row-' + (selection?.ids?.join(',') || '') + '-' + refreshKey"
-          :nodes="selection?.nodes || []"
-          :is-single="(selection?.ids?.length || 0) === 1"
-          :categories="categories"
-          @update-property="(key, val) => emit('update-property', { [key]: val })"
-          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          :key="'row-' + (selectedIds.rows?.join(',') || '') + '-' + refreshKey"
+          :nodes="selectedObjects.rows || []"
+          :is-single="selectedIds.rows?.length === 1"
+          :categories="categories as any"
+          @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
+          @update-category="(catId) => handleCategoryChange(catId)"
           @manage-categories="emit('manage-categories')"
         />
 
         <!-- 区域面板 -->
         <AreaPanel
           v-else-if="panelType === 'area'"
-          :key="'area-' + (selection?.ids?.[0] || '') + '-' + refreshKey"
-          :node="selection?.nodes?.[0]"
-          :categories="categories"
-          @update-property="(key, val) => emit('update-property', { [key]: val })"
-          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          :key="'area-' + (selectedIds.areas?.[0] || '') + '-' + refreshKey"
+          :node="selectedObjects.areas?.[0]"
+          :categories="categories as any"
+          @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
+          @update-category="(catId) => handleCategoryChange(catId)"
           @manage-categories="emit('manage-categories')"
         />
 
         <!-- 混合选择面板 -->
         <MixedPanel
           v-else-if="panelType === 'mixed'"
-          :key="'mixed-' + (selection?.ids?.join(',') || '') + '-' + refreshKey"
-          :nodes="selection?.nodes || []"
-          :categories="categories"
-          :types="[...new Set(selection?.nodes?.map((n: any) => n?.getAttr?.('data-type') || 'object'))]"
-          @update-property="(key, val) => emit('update-property', { [key]: val })"
-          @update-category="(catId) => emit('update-property', { categoryId: catId })"
+          :key="'mixed-' + mixedSelectionKey + '-' + refreshKey"
+          :nodes="mixedSelectionNodes"
+          :categories="categories as any"
+          :types="mixedSelectionTypes"
+          @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
+          @update-category="(catId) => handleCategoryChange(catId)"
           @manage-categories="emit('manage-categories')"
         />
 
@@ -121,7 +121,7 @@
               <button class="step-btn" @click="decreaseRotation">
                 <Icon icon="lucide:minus" class="step-icon" />
               </button>
-              <span class="number-value">{{ Math.round(selectedRow.rotation) }}°</span>
+              <span class="number-value">{{ Math.round(selectedRow.rotation || 0) }}°</span>
               <button class="step-btn" @click="increaseRotation">
                 <Icon icon="lucide:plus" class="step-icon" />
               </button>
@@ -131,8 +131,8 @@
           <div class="property-field">
             <label>位置</label>
             <div class="position-display">
-              <span>X: {{ Math.round(selectedRow.x) }}</span>
-              <span>Y: {{ Math.round(selectedRow.y) }}</span>
+              <span>X: {{ Math.round(selectedRow.x || 0) }}</span>
+              <span>Y: {{ Math.round(selectedRow.y || 0) }}</span>
             </div>
           </div>
         </div>
@@ -141,7 +141,7 @@
           <h4>类别</h4>
           <div class="category-select">
             <div class="category-badge" :style="{ backgroundColor: selectedCategory?.color || '#9ca3af' }"></div>
-            <span class="category-name">{{ selectedCategory?.name || '选择类别' }}</span>
+            <span class="category-name">{{ (selectedCategory as any)?.name || (selectedCategory as any)?.label || '选择类别' }}</span>
             <button class="dropdown-btn">
               <Icon icon="lucide:chevron-down" class="dropdown-icon" />
             </button>
@@ -171,7 +171,7 @@
     <template v-else>
       <ChartOverviewPanel
         :chart-name="chartName"
-        :categories="categories"
+        :categories="categories as any"
         :total-seats="totalSeats"
         @manage-categories="emit('manage-categories')"
       />
@@ -182,7 +182,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Icon } from '@iconify/vue'
-import type { Row, Category, PanelSelection, SelectedObjectType } from '../types'
+import { useVenueStore } from '../stores/venueStore'
+import type { SeatRow as Row, PanelSelection, SelectedObjectType } from '../types'
 import ChartOverviewPanel from './panels/ChartOverviewPanel.vue'
 import ShapePanel from './panels/ShapePanel.vue'
 import TextPanel from './panels/TextPanel.vue'
@@ -191,64 +192,212 @@ import RowPanel from './panels/RowPanel.vue'
 import AreaPanel from './panels/AreaPanel.vue'
 import MixedPanel from './panels/MixedPanel.vue'
 
+// 面板内部使用的 Category 类型（兼容旧版 id/name 和新版 key/label）
+interface PanelCategory {
+  id?: string
+  name?: string
+  key?: string | number
+  label?: string
+  color: string
+  accessible?: boolean
+}
+
 const props = defineProps<{
   chartName: string
-  categories: Category[]
+  categories: PanelCategory[]
   totalSeats: number
+  // 兼容旧版：selection 现在可选，优先从 venueStore 读取
   selection?: PanelSelection | null
   selectedRow?: Row | null
 }>()
 
 const emit = defineEmits<{
   'update-row': [row: Row]
+  // 兼容旧版：update-property 现在可选，面板直接写入 store
   'update-property': [updates: Record<string, any>]
   'manage-categories': []
 }>()
+
+// 使用 venueStore 作为唯一数据源
+const venueStore = useVenueStore()
 
 const seatSpacing = ref(28)
 
 // 刷新 key，用于强制重新挂载子面板
 const refreshKey = ref(0)
 
-// 监听 selection 变化，递增 refreshKey
+// 计算当前选中类型（从 venueStore 读取）
+const currentSelectionType = computed<SelectedObjectType | null>(() => {
+  if (venueStore.selectedSeatIds.length > 0) return 'seat'
+  if (venueStore.selectedRowIds.length > 0) return 'row'
+  if (venueStore.selectedShapeIds.length > 0) {
+    // 返回第一个选中形状的类型
+    const shape = venueStore.selectedShapes[0]
+    if (shape) {
+      const shapeType = shape.type
+      if (['rect', 'ellipse', 'polygon', 'sector', 'polyline'].includes(shapeType)) {
+        return shapeType as SelectedObjectType
+      }
+    }
+    return 'rect'
+  }
+  if (venueStore.selectedTextIds.length > 0) return 'text'
+  if (venueStore.selectedAreaIds.length > 0) return 'area'
+  if (venueStore.selectedSectionIds.length > 0) return 'none'
+  return null
+})
+
+// 混合选择检测
+const isMixedSelection = computed(() => {
+  const types = [
+    venueStore.selectedSeatIds.length > 0,
+    venueStore.selectedRowIds.length > 0,
+    venueStore.selectedShapeIds.length > 0,
+    venueStore.selectedTextIds.length > 0,
+    venueStore.selectedAreaIds.length > 0,
+  ].filter(Boolean).length
+  return types > 1
+})
+
+// 获取选中对象数据
+const selectedObjects = computed(() => {
+  return {
+    seats: venueStore.selectedSeats,
+    rows: venueStore.selectedRows,
+    shapes: venueStore.selectedShapes,
+    texts: venueStore.selectedTexts,
+    areas: venueStore.selectedAreas,
+  }
+})
+
+// 获取选中 ID 列表
+const selectedIds = computed(() => {
+  return {
+    seats: venueStore.selectedSeatIds,
+    rows: venueStore.selectedRowIds,
+    shapes: venueStore.selectedShapeIds,
+    texts: venueStore.selectedTextIds,
+    areas: venueStore.selectedAreaIds,
+  }
+})
+
+// 混合选择的节点数据（合并所有选中类型）
+const mixedSelectionNodes = computed(() => {
+  return [
+    ...selectedObjects.value.seats,
+    ...selectedObjects.value.rows,
+    ...selectedObjects.value.shapes,
+    ...selectedObjects.value.texts,
+    ...selectedObjects.value.areas,
+  ]
+})
+
+// 混合选择的 key（用于强制刷新）
+const mixedSelectionKey = computed(() => {
+  return [
+    ...selectedIds.value.seats,
+    ...selectedIds.value.rows,
+    ...selectedIds.value.shapes,
+    ...selectedIds.value.texts,
+    ...selectedIds.value.areas,
+  ].join(',')
+})
+
+// 混合选择的类型列表
+const mixedSelectionTypes = computed(() => {
+  const types: string[] = []
+  if (selectedIds.value.seats.length > 0) types.push('seat')
+  if (selectedIds.value.rows.length > 0) types.push('row')
+  if (selectedIds.value.shapes.length > 0) types.push('shape')
+  if (selectedIds.value.texts.length > 0) types.push('text')
+  if (selectedIds.value.areas.length > 0) types.push('area')
+  return types
+})
+
+// 监听 venueStore 选择变化，递增 refreshKey
+watch(() => [
+  venueStore.selectedSeatIds,
+  venueStore.selectedRowIds,
+  venueStore.selectedShapeIds,
+  venueStore.selectedTextIds,
+  venueStore.selectedAreaIds
+], () => {
+  refreshKey.value++
+}, { deep: true })
+
+// 兼容旧版：如果 props.selection 存在，也监听它
 watch(() => props.selection, () => {
   refreshKey.value++
 }, { deep: true })
 
 // 判断是否显示选中对象面板
 const shouldShowSelectionPanel = computed(() => {
+  // 优先使用 venueStore
+  if (venueStore.hasSelection) return true
+  // 兼容旧版
   if (!props.selection) return false
   return props.selection.type !== 'none'
 })
 
 // 面板类型映射
 const panelType = computed(() => {
+  // 优先使用 venueStore
+  if (isMixedSelection.value) return 'mixed'
+  
+  const type = currentSelectionType.value
+  if (type) {
+    // 形状类型映射
+    const shapeTypes: SelectedObjectType[] = ['rect', 'ellipse', 'polygon', 'sector', 'polyline']
+    if (shapeTypes.includes(type)) return 'shape'
+    // 直接映射
+    if (type === 'text') return 'text'
+    if (type === 'seat') return 'seat'
+    if (type === 'row') return 'row'
+    if (type === 'area') return 'area'
+  }
+
+  // 兼容旧版
   if (!props.selection) return null
-
-  const type = props.selection.type
-
-  // 混合选择
+  const oldType = props.selection.type
   if (props.selection.isMixed) return 'mixed'
-
-  // 形状类型映射
   const shapeTypes: SelectedObjectType[] = ['rect', 'ellipse', 'polygon', 'sector', 'polyline']
-  if (shapeTypes.includes(type)) return 'shape'
-
-  // 直接映射
-  if (type === 'text') return 'text'
-  if (type === 'seat') return 'seat'
-  if (type === 'row') return 'row'
-  if (type === 'area') return 'area'
+  if (shapeTypes.includes(oldType)) return 'shape'
+  if (oldType === 'text') return 'text'
+  if (oldType === 'seat') return 'seat'
+  if (oldType === 'row') return 'row'
+  if (oldType === 'area') return 'area'
 
   return 'unknown'
 })
 
 // 选中对象标题
 const selectionTitle = computed(() => {
+  // 优先使用 venueStore
+  if (isMixedSelection.value) {
+    return '混合选择'
+  }
+
+  const type = currentSelectionType.value
+  if (type) {
+    const titles: Record<SelectedObjectType, string> = {
+      'none': '',
+      'rect': '形状',
+      'ellipse': '形状',
+      'polygon': '形状',
+      'sector': '形状',
+      'polyline': '形状',
+      'text': '文本',
+      'seat': '座位',
+      'row': '排',
+      'area': '区域'
+    }
+    return titles[type] || '对象'
+  }
+
+  // 兼容旧版
   if (!props.selection) return ''
 
   if (props.selection.isMixed) {
-    // 混合选择时显示类型组合
     const types = new Set(props.selection.nodes?.map((n: any) => n?.getAttr?.('data-type') || 'object'))
     const typeNames: Record<string, string> = {
       'rect': '形状',
@@ -284,6 +433,27 @@ const selectionTitle = computed(() => {
 
 // 选中对象类型标签（右上角大写）
 const selectionTypeLabel = computed(() => {
+  // 优先使用 venueStore
+  if (isMixedSelection.value) return 'MULTIPLE'
+
+  const type = currentSelectionType.value
+  if (type) {
+    const labels: Record<SelectedObjectType, string> = {
+      'none': '',
+      'rect': 'SHAPE',
+      'ellipse': 'SHAPE',
+      'polygon': 'SHAPE',
+      'sector': 'SHAPE',
+      'polyline': 'SHAPE',
+      'text': 'TEXT',
+      'seat': 'SEAT',
+      'row': 'ROW',
+      'area': 'AREA'
+    }
+    return labels[type] || 'OBJECT'
+  }
+
+  // 兼容旧版
   if (!props.selection) return ''
 
   if (props.selection.isMixed) return 'MULTIPLE'
@@ -304,10 +474,85 @@ const selectionTypeLabel = computed(() => {
   return labels[props.selection.type] || 'OBJECT'
 })
 
+// 通用属性更新处理器 - 直接写入 venueStore
+const handlePropertyUpdate = (updates: Record<string, any>) => {
+  const type = currentSelectionType.value
+  if (!type) {
+    // 兼容旧版：通过 emit 更新
+    emit('update-property', updates)
+    return
+  }
+
+  // 获取当前选中的 ID 列表
+  let ids: string[] = []
+  switch (type) {
+    case 'seat':
+      ids = venueStore.selectedSeatIds
+      break
+    case 'row':
+      ids = venueStore.selectedRowIds
+      break
+    case 'rect':
+    case 'ellipse':
+    case 'polygon':
+    case 'sector':
+    case 'polyline':
+      ids = venueStore.selectedShapeIds
+      break
+    case 'text':
+      ids = venueStore.selectedTextIds
+      break
+    case 'area':
+      ids = venueStore.selectedAreaIds
+      break
+  }
+
+  // 批量更新所有选中对象
+  for (const id of ids) {
+    venueStore.updateObjectProperty(type, id, updates)
+  }
+}
+
+// 处理分类变更
+const handleCategoryChange = (categoryId: string) => {
+  const type = currentSelectionType.value
+  if (!type) {
+    // 兼容旧版
+    emit('update-property', { categoryId })
+    return
+  }
+
+  let ids: string[] = []
+  switch (type) {
+    case 'seat':
+      ids = venueStore.selectedSeatIds
+      // 批量更新座位分类
+      venueStore.updateSeatsCategory(ids, categoryId)
+      return
+    case 'row':
+      ids = venueStore.selectedRowIds
+      break
+    case 'area':
+      ids = venueStore.selectedAreaIds
+      break
+    default:
+      // 其他类型不处理分类
+      return
+  }
+
+  // 批量更新分类
+  for (const id of ids) {
+    venueStore.updateObjectProperty(type, id, { categoryId })
+  }
+}
+
 // 兼容旧版：选中类别
 const selectedCategory = computed(() => {
   if (!props.selectedRow || props.selectedRow.seats.length === 0) return null
-  return props.categories.find(c => c.id === props.selectedRow!.seats[0].categoryId)
+  // Seat 使用 categoryKey 而非 categoryId
+  const seat = props.selectedRow.seats[0] as any
+  const categoryKey = seat.categoryKey || seat.categoryId
+  return props.categories.find(c => (c as any).id === categoryKey || c.key === categoryKey)
 })
 
 function updateRow() {
@@ -326,14 +571,14 @@ function decreaseSeats() {
 
 function increaseRotation() {
   if (props.selectedRow) {
-    props.selectedRow.rotation = (props.selectedRow.rotation + 5) % 360
+    props.selectedRow.rotation = ((props.selectedRow.rotation || 0) + 5) % 360
     updateRow()
   }
 }
 
 function decreaseRotation() {
   if (props.selectedRow) {
-    props.selectedRow.rotation = (props.selectedRow.rotation - 5) % 360
+    props.selectedRow.rotation = ((props.selectedRow.rotation || 0) - 5) % 360
     updateRow()
   }
 }
