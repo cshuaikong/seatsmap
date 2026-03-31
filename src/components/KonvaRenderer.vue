@@ -306,8 +306,8 @@ const renderRow = (row: SeatRow, section: Section) => {
   // - 不设置 offsetX/offsetY，保持为 0
   // - 座位局部坐标保持原始值
   const rowShape = new Konva.Shape({
-    x: (row.x ?? 0) + centerX,  // Shape 位置 = 起点 + 几何中心
-    y: (row.y ?? 0) + centerY,
+    x: (row.x ?? 0),  // Shape 位置 = 起点
+    y: (row.y ?? 0),
     rotation: row.rotation || 0,
     width: width,
     height: height,
@@ -1715,7 +1715,7 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
     listening: false
   })
   addPreviewElement(line)
-  
+  console.log('startPos',startPos,'endPos',endPos)
   // 绘制起点标记
   const startDot = new Konva.Circle({
     x: startPos.x,
@@ -1757,8 +1757,8 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   
   // 绘制座位预览（使用与 renderRow 相同的坐标系统）
   const shape = new Konva.Shape({
-    x: startPos.x + centerX,  // Shape 位置 = 起点 + 几何中心
-    y: startPos.y + centerY,
+    x: startPos.x,  // Shape 位置 = 起点 + 几何中心
+    y: startPos.y,
     width: width,
     height: height,
     rotation: angle,  // 添加旋转角度

@@ -155,17 +155,17 @@ export interface SeatMapConfig {
 
 // 默认座位图配置
 export const defaultSeatMapConfig: SeatMapConfig = {
-  defaultSeatRadius: 12,
-  defaultSeatSpacing: 28,
-  defaultRowSpacing: 32,
+  defaultSeatRadius: 6,
+  defaultSeatSpacing: 18,
+  defaultRowSpacing: 6,
   showRowLabels: true,
   showSeatLabels: true,
   
   statusColors: {
-    available: '#4CAF50',
+    available: '#9E9E9E',
     booked: '#F44336',
     reserved: '#FF9800',
-    disabled: '#9E9E9E',
+    disabled: '#616161',
   },
   
   categoryColors: {
