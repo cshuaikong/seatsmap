@@ -301,10 +301,9 @@ const renderRow = (row: SeatRow, section: Section) => {
   const centerY = (minY + maxY) / 2
 
   // 创建 Shape 用于绘制座位
-  // 【参考KonvaCanvas.vue 实现】：
-  // - Shape.x/y = row.x/y + centerX/Y（几何中心）
+  // - Shape.x/y = row.x/y（直接对应起点位置）
   // - 不设置 offsetX/offsetY，保持为 0
-  // - 座位局部坐标保持原始值
+  // - 座位使用原始局部坐标绘制
   const rowShape = new Konva.Shape({
     x: (row.x ?? 0),  // Shape 位置 = 起点
     y: (row.y ?? 0),
@@ -398,17 +397,13 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   // 拖拽结束同步 - 同步 Shape 的坐标到 row 数据
-  // 【关键】：Shape.x/y = row.x/y + centerX/Y，所以需要减去 centerX/Y 得到 row.x/y
+  // Shape.x/y 直接等于 row.x/y，无需偏移换算
   rowShape.on('dragend', () => {
-    // 如果正在使用 Transformer 进行变换，跳过（由 transformend 统一处理）
     if (transformer?.isTransforming()) return
 
-    const centerX = rowShape.getAttr('centerX') || 0
-    const centerY = rowShape.getAttr('centerY') || 0
-
     venueStore.updateRow(row.id, {
-      x: rowShape.x() - centerX,  // 减去几何中心得到 row 起点
-      y: rowShape.y() - centerY,
+      x: rowShape.x(),
+      y: rowShape.y(),
       rotation: rowShape.rotation()
     })
   })
@@ -860,7 +855,9 @@ const setupStageEvents = () => {
     }
     
     // H. 点击舞台空白））启动框）
-    if (e.evt.button === 0 && e.target === stage && !isDrawingMode()) {
+    const target = e.target as any
+    const isEmptyArea = target === stage || target === mainLayer || target === overlayLayer
+    if (e.evt.button === 0 && isEmptyArea && !isDrawingMode()) {
       startBoxSelection(pointer)  // 使用屏幕坐标
     }
   })
@@ -1224,12 +1221,10 @@ const initTransformer = () => {
 
       if (rowData) {
         // 排：同步位置和旋转，重置缩放（排不支持缩放）
-        // 【关键】：Shape.x/y = row.x/y + centerX/Y，需要减去 centerX/Y
-        const centerX = node.getAttr('centerX') || 0
-        const centerY = node.getAttr('centerY') || 0
+        // Shape.x/y 直接等于 row.x/y，无需偏移换算
         venueStore.updateRow(rowData.id, {
-          x: node.x() - centerX,
-          y: node.y() - centerY,
+          x: node.x(),
+          y: node.y(),
           rotation: node.rotation()
         })
         // 重置缩放
@@ -1495,12 +1490,10 @@ const endDragAll = () => {
       const areaData = item.node.getAttr('areaData')
       
       if (rowData) {
-        // 【关键】：Shape.x/y = row.x/y + centerX/Y，需要减去 centerX/Y
-        const centerX = item.node.getAttr('centerX') || 0
-        const centerY = item.node.getAttr('centerY') || 0
+        // Shape.x/y 直接等于 row.x/y，无需偏移换算
         venueStore.updateRow(rowData.id, {
-          x: item.node.x() - centerX,
-          y: item.node.y() - centerY,
+          x: item.node.x(),
+          y: item.node.y(),
           rotation: item.node.rotation()
         })
       } else if (shapeData) {
