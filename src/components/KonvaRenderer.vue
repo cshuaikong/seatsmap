@@ -51,6 +51,7 @@ const viewportState = {
 // 框选状态
 const selectionState = {
   isSelecting: false,
+  hasDragged: false,  // 标记是否有拖动（区分框选和单击）
   startX: 0,
   startY: 0,
   rect: null as Konva.Rect | null
@@ -216,7 +217,7 @@ watch(() => [
   venueStore.selectedTextIds,
   venueStore.selectedAreaIds
 ], (newVal, oldVal) => {
-  console.log('watch 触发:', '新值:', newVal.map(a => a.length), '旧值:', oldVal?.map(a => a.length))
+  console.log('watch 触发:', '新值:', newVal, '旧值:', oldVal,'selectedRowIds',venueStore.selectedRowIds)
   updateSelectionVisuals()
   updateTransformer()
 }, { deep: true })
@@ -301,17 +302,17 @@ const renderRow = (row: SeatRow, section: Section) => {
   const centerY = (minY + maxY) / 2
 
   // 创建 Shape 用于绘制座位
-  // - Shape.x/y = row.x/y（直接对应起点位置）
-  // - 不设置 offsetX/offsetY，保持为 0
+  // - Shape.x/y 设为几何中心
+  // - offsetX/Y 也设为几何中心，使旋转中心在排中心
   // - 座位使用原始局部坐标绘制
   const rowShape = new Konva.Shape({
-    x: (row.x ?? 0),  // Shape 位置 = 起点
-    y: (row.y ?? 0),
+    x: row.x,
+    y: row.y,
     rotation: row.rotation || 0,
     width: width,
     height: height,
-    // 【关键】：不设置 offsetX/offsetY，保持为 0
-    // 这样 Transformer 的包围盒从 (x, y) 开始，大小为 width/height
+    offsetX: SEAT_RADIUS,  // 旋转中心在第一个座位中心
+    offsetY: SEAT_RADIUS,
     draggable: false,  // 【关键】：未选中时禁止拖拽
     id: `row-${row.id}`,
     name: 'row-shape',
@@ -351,7 +352,7 @@ const renderRow = (row: SeatRow, section: Section) => {
 
       // 使用局部坐标绘制（Shape 的 x/y 和 rotation 已经处理变换
       groupSeats.forEach(seat => {
-        context.moveTo(seat.x + radius, seat.y)
+        context.moveTo(seat.x, seat.y)
         context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
       })
 
@@ -360,7 +361,7 @@ const renderRow = (row: SeatRow, section: Section) => {
       // 绘制边框
       context.save()
       context.strokeStyle = isSelected ? '#3b82f6' : color
-      context.lineWidth = isSelected ? 3 : 1
+      context.lineWidth = 1
       groupSeats.forEach(seat => {
         context.beginPath()
         context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
@@ -370,23 +371,28 @@ const renderRow = (row: SeatRow, section: Section) => {
     })
   })
 
-  // hitFunc: 自定义点击检测区域
-  // 【参考 RotationTest.vue】：从 (0,0) 开始，大小为 width/height
+  // hitFunc: 自定义点击检测区域（与实际绘制区域对齐）
   rowShape.hitFunc((context, shape) => {
-    const width = shape.width()
-    const height = shape.height()
+    const hitMinX = shape.getAttr('hitMinX') as number
+    const hitMinY = shape.getAttr('hitMinY') as number
+    const hitMaxX = shape.getAttr('hitMaxX') as number
+    const hitMaxY = shape.getAttr('hitMaxY') as number
     context.beginPath()
-    context.rect(0, 0, width, height)
+    context.rect(hitMinX, hitMinY, hitMaxX - hitMinX, hitMaxY - hitMinY)
     context.fillStrokeShape(shape)
   })
 
   // 事件处理
-  // 【注意】：选中和框选统一在 stage 的 mousedown/click 事件中处理
-  // 这里只保留基本的鼠标样式和拖拽结束同步
   rowShape.on('click', (e) => {
-    // 阻止冒泡，避免触发舞台点击
+    // 绘制模式下不处理选中
+    if (isDrawingMode()) return
+    // 如果刚完成框选，忽略
+    if (selectionState.hasDragged) return
+    // 阻止冒泡，避免触发舞台 click
     e.cancelBubble = true
-    // 选中的具体逻辑在 stage 的 click 事件中统一处理
+    const additive = e.evt.shiftKey
+    venueStore.selectRow(row.id, additive)
+    updateTransformer(true)
   })
 
   rowShape.on('mouseenter', () => {
@@ -397,10 +403,10 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   // 拖拽结束同步 - 同步 Shape 的坐标到 row 数据
-  // Shape.x/y 直接等于 row.x/y，无需偏移换算
   rowShape.on('dragend', () => {
     if (transformer?.isTransforming()) return
-
+    console.log('dragend',rowShape.x(),rowShape.y(),rowShape.rotation())
+    // rowShape.x/y 是左上角
     venueStore.updateRow(row.id, {
       x: rowShape.x(),
       y: rowShape.y(),
@@ -511,24 +517,20 @@ const renderShape = (shape: ShapeObject, section: Section) => {
     konvaShape.setAttr('shapeData', shape)
     konvaShape.setAttr('sectionId', section.id)
 
-    // 【关键修复】：mousedown 立即选中，确保 Transformer 能接管拖拽
+    // 【关键修复】：mousedown 立即选中，统一拖拽系统接管移动
     konvaShape.on('mousedown', (e) => {
       if (e.evt.button !== 0) return
       e.cancelBubble = true
       
       const isAlreadySelected = venueStore.selectedShapeIds.includes(shape.id)
-      if (isAlreadySelected) return
-      
-      const additive = e.evt.shiftKey
-      venueStore.selectShape(shape.id, additive)
-      updateTransformer(true)
-      
-      // 手动启动拖拽
-      requestAnimationFrame(() => {
-        if (transformer && transformer.nodes().includes(konvaShape)) {
-          konvaShape.startDrag(e.evt)
-        }
-      })
+      if (!isAlreadySelected) {
+        const additive = e.evt.shiftKey
+        venueStore.selectShape(shape.id, additive)
+        // 同步更新 Transformer，确保节点注册后再启动拖拽
+        updateTransformer(true)
+      }
+      // 启动统一拖拽（与 rowShape 保持一致）
+      startDragAll({ x: e.evt.clientX, y: e.evt.clientY })
     })
 
     // 点击事件
@@ -545,24 +547,9 @@ const renderShape = (shape: ShapeObject, section: Section) => {
     konvaShape.on('mouseleave', () => {
       if (stage) stage.container().style.cursor = 'default'
     })
-    
-    // 拖拽结束同步位置
-    konvaShape.on('dragend', () => {
-      // 如果正在使用 Transformer 进行变换，跳过（由 transformend 统一处理）
-      if (transformer?.isTransforming()) return
-      
-      const newX = konvaShape.x()
-      const newY = konvaShape.y()
-      const newRotation = konvaShape.rotation()
-      venueStore.updateShape(shape.id, { 
-        x: newX, 
-        y: newY, 
-        rotation: newRotation 
-      })
-    })
-    
-    // 启用拖拽
-    konvaShape.draggable(true)
+
+    // 禁用原生拖拽，由统一拖拽系统接管
+    konvaShape.draggable(false)
 
     mainLayer.add(konvaShape)
     nodeMap.set(shape.id, konvaShape)
@@ -977,14 +964,14 @@ const setupStageEvents = () => {
     // 绘制模式下不处理选中
     if (isDrawingMode()) return
     
-    // 如果正在框选，不处理点）
-    if (selectionState.isSelecting) return
+    // 如果刚完成框选（有拖动），不清空选择
+    if (selectionState.hasDragged) {
+      selectionState.hasDragged = false
+      return
+    }
     
-    // 如果点击的是舞台空白处，取消选择
+    // 单击空白处不做任何操作（Seats.io 风格：用 Esc 键清空选择）
     if (e.target === stage) {
-      if (!e.evt.shiftKey) {
-        venueStore.clearSelection()
-      }
       return
     }
     
@@ -1050,11 +1037,14 @@ const setupStageEvents = () => {
 
 // 键盘事件处理
 const handleKeyDown = (e: KeyboardEvent) => {
-  // ESC 取消绘制
+  // ESC 取消绘制 / 清空选择
   if (e.key === 'Escape') {
     if (isDrawingMode()) {
       clearDrawingPreview()
       drawing.resetDrawingState()
+    } else {
+      // 非绘制模式：清空选择（Seats.io 风格）
+      venueStore.clearSelection()
     }
     return
   }
@@ -1221,7 +1211,6 @@ const initTransformer = () => {
 
       if (rowData) {
         // 排：同步位置和旋转，重置缩放（排不支持缩放）
-        // Shape.x/y 直接等于 row.x/y，无需偏移换算
         venueStore.updateRow(rowData.id, {
           x: node.x(),
           y: node.y(),
@@ -1481,8 +1470,10 @@ const endDragAll = () => {
   
   if (stage) stage.container().style.cursor = 'default'
   
-  // 同步位置）store
+  // 同步位置到 store（设置标志位，防止 watch 触发 renderAll 销毁节点）
   if (moved) {
+    isSyncingFromTransformer = true
+    
     unifiedDragState.items.forEach(item => {
       const rowData = item.node.getAttr('rowData')
       const shapeData = item.node.getAttr('shapeData')
@@ -1490,7 +1481,6 @@ const endDragAll = () => {
       const areaData = item.node.getAttr('areaData')
       
       if (rowData) {
-        // Shape.x/y 直接等于 row.x/y，无需偏移换算
         venueStore.updateRow(rowData.id, {
           x: item.node.x(),
           y: item.node.y(),
@@ -1509,7 +1499,6 @@ const endDragAll = () => {
           rotation: item.node.rotation()
         })
       } else if (areaData) {
-        // 区域的位置通过 points 定义
         const dx = item.node.x()
         const dy = item.node.y()
         if (dx !== 0 || dy !== 0) {
@@ -1521,6 +1510,14 @@ const endDragAll = () => {
         }
       }
     })
+    
+    // 刷新 Transformer
+    updateTransformer(true)
+    
+    // 延迟重置标志位，确保 watch 已执行完毕
+    setTimeout(() => {
+      isSyncingFromTransformer = false
+    }, 0)
   }
   
   unifiedDragState.items = []
@@ -1568,6 +1565,13 @@ const startBoxSelection = (screenPos: { x: number, y: number }) => {
 
 const updateBoxSelection = (screenPos: { x: number, y: number }) => {
   if (!selectionState.rect || !stage) return
+
+  // 检查是否有拖动（移动超过 3px 认为是框选）
+  const dx = Math.abs(screenPos.x - selectionState.startX)
+  const dy = Math.abs(screenPos.y - selectionState.startY)
+  if (dx > 3 || dy > 3) {
+    selectionState.hasDragged = true
+  }
 
   // 使用屏幕坐标
   const x = Math.min(selectionState.startX, screenPos.x)
@@ -1660,7 +1664,7 @@ const endBoxSelection = (additive: boolean) => {
       case 'area': areaIds.push(id); break
     }
   })
-
+  console.log('selectedIds',selectedIds)
   // 【关键优化】：批量更新所有选中状态，只触发一次 watch
   // 不单独调用 clearSelection，而是直接赋值新数组
   if (additive) {
@@ -1708,7 +1712,6 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
     listening: false
   })
   addPreviewElement(line)
-  console.log('startPos',startPos,'endPos',endPos)
   // 绘制起点标记
   const startDot = new Konva.Circle({
     x: startPos.x,
@@ -1721,12 +1724,11 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   })
   addPreviewElement(startDot)
   
-  // 【修复】计算座位位置（与 renderRow 保持一致的几何中心方式）
-  // 生成座位数据（局部坐标，相对于排起点）
+  // 生成座位数据（局部坐标）
   const seats: { x: number; y: number }[] = []
   for (let i = 0; i < count; i++) {
     seats.push({
-      x: i * drawing.SEAT_SPACING,
+      x: i * drawing.SEAT_SPACING,  
       y: 0
     })
   }
@@ -1742,37 +1744,35 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   
   const width = maxX - minX
   const height = maxY - minY
-  const centerX = (minX + maxX) / 2
-  const centerY = (minY + maxY) / 2
   
-  // 计算旋转角度（与 submitSeatRow 一致）
+  // 计算旋转角度
   const angle = Math.atan2(uy, ux) * 180 / Math.PI
-  
-  // 绘制座位预览（使用与 renderRow 相同的坐标系统）
+
+  // 绘制座位预览
   const shape = new Konva.Shape({
-    x: startPos.x,  // Shape 位置 = 起点 + 几何中心
+    x: startPos.x,  
     y: startPos.y,
     width: width,
     height: height,
-    rotation: angle,  // 添加旋转角度
+    rotation: angle,
     listening: false,
     perfectDrawEnabled: false
   })
   
   shape.sceneFunc((ctx) => {
+   
+    // 座位圆圈
     ctx.beginPath()
-    // 使用局部坐标绘制（与 renderRow 一致）
     seats.forEach(seat => {
-      ctx.moveTo(seat.x + SEAT_RADIUS, seat.y)
+      ctx.moveTo(seat.x , seat.y)
       ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
     })
     ctx.fillStyle = 'rgba(59, 130, 246, 0.25)'
     ctx.fill()
     ctx.strokeStyle = '#3b82f6'
-    ctx.lineWidth = 1.5
+    ctx.lineWidth = 1
     ctx.stroke()
   })
-  
   addPreviewElement(shape)
   overlayLayer?.batchDraw()
 }
@@ -1788,14 +1788,14 @@ const submitSeatRow = (startPos: Position, endPos: Position) => {
   const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
   const angle = Math.atan2(uy, ux) * 180 / Math.PI
   
-  // 生成座位（使用局部坐标，）KonvaCanvas.vue ）handleRowStraightClick 一致）
+  // 生成座位（使用局部坐标，偏移半径使 minX=0）
   const seats: Seat[] = []
   for (let i = 0; i < count; i++) {
     seats.push({
       id: generateId(),
       label: String(i + 1),
-      x: i * drawing.SEAT_SPACING,
-      y: 0,
+      x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
+      y: SEAT_RADIUS,
       categoryKey: venueStore.venue.categories[0]?.key || 1,
       status: 'available',
       objectType: 'seat'

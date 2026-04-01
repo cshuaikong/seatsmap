@@ -254,38 +254,58 @@ const localPositionY = ref(50)
 const readFromNode = () => {
   if (!props.node) return
   const node = props.node
-  
-  // 查找 group 内的实际形状节点
-  let shapeNode = node
-  if (node.getClassName?.() === 'Group') {
-    const children = node.getChildren?.() || []
-    for (const child of children) {
-      const cls = child.getClassName?.()
-      if (['Rect', 'Ellipse', 'Line', 'Circle'].includes(cls)) {
-        shapeNode = child
-        break
+
+  // 判断是 Konva 节点还是纯数据对象（ShapeObject）
+  const isKonvaNode = typeof node.getAttr === 'function'
+
+  if (isKonvaNode) {
+    // Konva 节点模式
+    let shapeNode = node
+    if (node.getClassName?.() === 'Group') {
+      const children = node.getChildren?.() || []
+      for (const child of children) {
+        const cls = child.getClassName?.()
+        if (['Rect', 'Ellipse', 'Line', 'Circle'].includes(cls)) {
+          shapeNode = child
+          break
+        }
       }
     }
+
+    localWidth.value = typeof shapeNode.width === 'function' ? shapeNode.width() : (node.width?.() ?? 0)
+    localHeight.value = typeof shapeNode.height === 'function' ? shapeNode.height() : (node.height?.() ?? 0)
+    localRotation.value = node.rotation?.() ?? 0
+    localCornerRadius.value = typeof shapeNode.cornerRadius === 'function' ? shapeNode.cornerRadius() : 0
+    localFillColor.value = shapeNode.fill?.() ?? ''
+    localAutoStroke.value = node.getAttr?.('autoStroke') ?? true
+    localStrokeWidth.value = shapeNode.strokeWidth?.() ?? 1
+    localStrokeColor.value = shapeNode.stroke?.() ?? '#000000'
+    const scaleX = node.scaleX?.() || 1
+    localScale.value = Math.round(scaleX * 100)
+    localSmoothing.value = node.getAttr?.('smoothing') || 0
+    localLabelType.value = node.getAttr?.('labelType') || ''
+    localCaption.value = node.getAttr?.('caption') || ''
+    localFontSize.value = node.getAttr?.('fontSize') || 14
+    localPositionX.value = node.getAttr?.('positionX') ?? 50
+    localPositionY.value = node.getAttr?.('positionY') ?? 50
+  } else {
+    // 纯数据对象模式（ShapeObject）
+    localWidth.value = node.width ?? 0
+    localHeight.value = node.height ?? 0
+    localRotation.value = node.rotation ?? 0
+    localCornerRadius.value = node.cornerRadius ?? 0
+    localFillColor.value = node.fill ?? ''
+    localAutoStroke.value = node.autoStroke ?? true
+    localStrokeWidth.value = node.strokeWidth ?? 1
+    localStrokeColor.value = node.stroke ?? '#000000'
+    localScale.value = 100
+    localSmoothing.value = node.smoothing || 0
+    localLabelType.value = node.labelType || ''
+    localCaption.value = node.caption || ''
+    localFontSize.value = node.fontSize || 14
+    localPositionX.value = node.positionX ?? 50
+    localPositionY.value = node.positionY ?? 50
   }
-  
-  localWidth.value = shapeNode.width?.() ?? node.width?.() ?? 0
-  localHeight.value = shapeNode.height?.() ?? node.height?.() ?? 0
-  localRotation.value = node.rotation?.() ?? 0
-  localCornerRadius.value = shapeNode.cornerRadius?.() ?? 0
-  localFillColor.value = shapeNode.fill?.() ?? ''
-  localAutoStroke.value = node.getAttr?.('autoStroke') ?? true
-  localStrokeWidth.value = shapeNode.strokeWidth?.() ?? 1
-  localStrokeColor.value = shapeNode.stroke?.() ?? '#000000'
-  const scaleX = node.scaleX?.() || 1
-  localScale.value = Math.round(scaleX * 100)
-  localSmoothing.value = node.getAttr?.('smoothing') || 0
-  
-  // Label 属性
-  localLabelType.value = node.getAttr?.('labelType') || ''
-  localCaption.value = node.getAttr?.('caption') || ''
-  localFontSize.value = node.getAttr?.('fontSize') || 14
-  localPositionX.value = node.getAttr?.('positionX') ?? 50
-  localPositionY.value = node.getAttr?.('positionY') ?? 50
 }
 
 // 挂载时和 node 变化时读取

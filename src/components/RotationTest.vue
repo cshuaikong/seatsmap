@@ -132,6 +132,7 @@ const addRow = () => {
     draggable: true,
     width: width,
     height: height,
+    rotation: 30, 
     transformsEnabled: 'all',
     seatsData: seats,
   })
