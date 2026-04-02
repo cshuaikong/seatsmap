@@ -8,7 +8,11 @@ import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
 import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints } from '../composables/useDrawing'
-import { setPreviewLayer, clearDrawingPreview as newClearDrawingPreview, addPreviewElement as newAddPreviewElement } from '../composables/useKonvaDrawing'
+import {
+  setPreviewLayer,
+  clearDrawingPreview,
+  addPreviewElement
+} from '../composables/useKonvaDrawing'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 
@@ -131,15 +135,7 @@ const initDrawingPreview = () => {
   // 预览层已在 onMounted 中创建
 }
 
-// 清除绘制预览（使用新 composable 的实现）
-const clearDrawingPreview = () => {
-  newClearDrawingPreview()
-}
-
-// 添加预览元素（使用新 composable 的实现）
-const addPreviewElement = (el: Konva.Group | Konva.Shape) => {
-  newAddPreviewElement(el)
-}
+// 清除绘制预览和添加预览元素现在直接从 useKonvaDrawing 导入使用
 
 // 获取或创建默认 section
 const getOrCreateDefaultSection = (): string => {
@@ -1983,26 +1979,30 @@ const endBoxSelection = (additive: boolean) => {
   overlayLayer?.batchDraw()
 }
 
-// ==================== 绘制功能 ====================
+// ==================== 绘制功能（已迁移到 useKonvaDrawing）====================
+
+// 注意：以下函数现在作为代理，实际实现已在 useKonvaDrawing.ts 中
+
+import {
+  createSeatCursorPreview as _createSeatCursorPreview,
+  createSeatRowPreview as _createSeatRowPreview,
+  submitSeatRow as _submitSeatRow,
+  createRectPreview as _createRectPreview,
+  submitRect as _submitRect,
+  createEllipsePreview as _createEllipsePreview,
+  submitEllipse as _submitEllipse,
+  createPolygonPreview as _createPolygonPreview,
+  submitPolygon as _submitPolygon,
+  submitArea as _submitArea,
+  createTextPreview as _createTextPreview,
+  submitText as _submitText
+} from '../composables/useKonvaDrawing'
 
 // ---------- 座位排绘制 ----------
 
 /** 创建鼠标跟随的预览圆（idle 状态） */
 const createSeatCursorPreview = (pos: Position) => {
-  clearDrawingPreview()
-
-  const circle = new Konva.Circle({
-    x: pos.x,
-    y: pos.y,
-    radius: SEAT_RADIUS,
-    fill: '#ffffff',
-    stroke: '#3b82f6',
-    strokeWidth: 1.5,
-    opacity: 0.8,
-    listening: false
-  })
-  addPreviewElement(circle)
-  overlayLayer?.batchDraw()
+  _createSeatCursorPreview(pos)
 }
 
 /** 创建座位排预览 */
