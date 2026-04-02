@@ -8,6 +8,7 @@ import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
 import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints } from '../composables/useDrawing'
+import { setPreviewLayer, clearDrawingPreview as newClearDrawingPreview, addPreviewElement as newAddPreviewElement } from '../composables/useKonvaDrawing'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 
@@ -95,9 +96,6 @@ let dragAnimationFrameId: number | null = null
 
 // ==================== 绘制预览状态====================
 
-// 预览元素引用
-let previewElements: Konva.Node[] = []
-
 // 当前绘制模式
 const currentDrawingTool = ref<DrawingToolMode>('select')
 
@@ -133,17 +131,14 @@ const initDrawingPreview = () => {
   // 预览层已在 onMounted 中创建
 }
 
-// 清除绘制预览
+// 清除绘制预览（使用新 composable 的实现）
 const clearDrawingPreview = () => {
-  previewElements.forEach(el => el.destroy())
-  previewElements = []
-  overlayLayer?.batchDraw()
+  newClearDrawingPreview()
 }
 
-// 添加预览元素
+// 添加预览元素（使用新 composable 的实现）
 const addPreviewElement = (el: Konva.Group | Konva.Shape) => {
-  overlayLayer?.add(el)
-  previewElements.push(el)
+  newAddPreviewElement(el)
 }
 
 // 获取或创建默认 section
@@ -182,6 +177,9 @@ onMounted(() => {
   // 合并为一层简化管理，始终在最上层
   overlayLayer = new Konva.Layer()
   stage.add(overlayLayer)
+
+  // 设置预览层（供 useKonvaDrawing 使用）
+  setPreviewLayer(overlayLayer)
 
   // 拖拽临时层（只包含选中节点，优化400+节点性能）
   dragLayer = new Konva.Layer({
