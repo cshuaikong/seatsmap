@@ -10,6 +10,7 @@ import type {
   ShapeObject,
   TextObject,
   AreaObject,
+  CanvasImage,
   SelectedObjectType,
   // 旧格式类型
   SeatLegacy,
@@ -41,6 +42,10 @@ export const useVenueStore = defineStore('venue', () => {
   const selectedShapeIds = ref<string[]>([])
   const selectedTextIds = ref<string[]>([])
   const selectedAreaIds = ref<string[]>([])
+
+  // 图片列表（支持多张）
+  const canvasImages = ref<CanvasImage[]>([])
+  const selectedImageId = ref<string | null>(null)
 
   // ==================== Getters ====================
   
@@ -344,6 +349,37 @@ export const useVenueStore = defineStore('venue', () => {
     selectedAreaIds.value = selectedAreaIds.value.filter(id => id !== areaId)
   }
 
+  // ==================== 图片相关 ====================
+
+  function addCanvasImage(image: CanvasImage) {
+    canvasImages.value.push(image)
+  }
+
+  function updateCanvasImage(id: string, updates: Partial<CanvasImage>) {
+    const index = canvasImages.value.findIndex(img => img.id === id)
+    if (index !== -1) {
+      canvasImages.value[index] = { ...canvasImages.value[index], ...updates }
+    }
+  }
+
+  function removeCanvasImage(id: string) {
+    canvasImages.value = canvasImages.value.filter(img => img.id !== id)
+    if (selectedImageId.value === id) {
+      selectedImageId.value = null
+    }
+  }
+
+  function selectCanvasImage(id: string, additive = false) {
+    if (!additive) {
+      clearSelection()
+    }
+    selectedImageId.value = id
+  }
+
+  function clearCanvasImageSelection() {
+    selectedImageId.value = null
+  }
+
   // ==================== 选择相关 ====================
 
   function selectSeat(seatId: string, additive = false) {
@@ -425,6 +461,7 @@ export const useVenueStore = defineStore('venue', () => {
     selectedShapeIds.value = []
     selectedTextIds.value = []
     selectedAreaIds.value = []
+    selectedImageId.value = null
   }
 
   // ==================== 通用对象更新 ====================
@@ -726,6 +763,14 @@ export const useVenueStore = defineStore('venue', () => {
     addArea,
     updateArea,
     deleteArea,
+    // Images
+    canvasImages,
+    selectedImageId,
+    addCanvasImage,
+    updateCanvasImage,
+    removeCanvasImage,
+    selectCanvasImage,
+    clearCanvasImageSelection,
     // Selection
     selectSeat,
     selectRow,

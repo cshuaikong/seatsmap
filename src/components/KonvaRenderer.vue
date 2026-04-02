@@ -6,7 +6,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
-import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, Position } from '../types'
+import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
 import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints } from '../composables/useDrawing'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
@@ -101,8 +101,28 @@ let previewElements: Konva.Node[] = []
 // 当前绘制模式
 const currentDrawingTool = ref<DrawingToolMode>('select')
 
+// ==================== 座位绘制状态机（分段式单击绘制）====================
+
+type SeatDrawStep = 'idle' | 'first' | 'second'
+
+const seatDrawStep = ref<SeatDrawStep>('idle')
+const seatDrawPoints = ref<{
+  first: Position | null
+  second: Position | null
+}>({ first: null, second: null })
+
+// 重置座位绘制状态
+const resetSeatDrawingState = () => {
+  seatDrawStep.value = 'idle'
+  seatDrawPoints.value = { first: null, second: null }
+}
+
 // 设置当前绘制工具
 const setDrawingTool = (tool: DrawingToolMode) => {
+  // 如果切换工具，重置座位绘制状态
+  if (currentDrawingTool.value !== tool) {
+    resetSeatDrawingState()
+  }
   currentDrawingTool.value = tool
   drawing.setTool(tool as any)
   clearDrawingPreview()
@@ -209,13 +229,64 @@ watch(() => venueStore.venue, () => {
   })
 }, { deep: true })
 
+// 监听图片列表变化，自动重绘
+watch(() => venueStore.canvasImages, (newImages) => {
+  if (isSyncingFromTransformer) return
+  nextTick(() => {
+    if (isSyncingFromTransformer) return
+    if (!mainLayer) return
+
+    const currentIds = new Set(newImages.map(img => img.id))
+
+    // 删除不再存在的图片节点
+    nodeMap.forEach((node, id) => {
+      if (node.name() === 'canvas-image' && !currentIds.has(id)) {
+        node.destroy()
+        nodeMap.delete(id)
+      }
+    })
+
+    // 更新已存在的图片节点属性，新增不存在的
+    newImages.forEach(img => {
+      const existingNode = nodeMap.get(img.id) as Konva.Image | undefined
+      if (existingNode) {
+        // 增量更新节点属性（避免销毁重建）
+        existingNode.x(img.x)
+        existingNode.y(img.y)
+        existingNode.width(img.width)
+        existingNode.height(img.height)
+        existingNode.rotation(img.rotation || 0)
+        existingNode.opacity(img.opacity ?? 1)
+        existingNode.listening(!img.locked)
+        existingNode.setAttr('canvasImageData', img)
+      } else {
+        // 新图片：加载并创建节点
+        const cachedImage = imageCache.get(img.src)
+        if (cachedImage && cachedImage.complete) {
+          createImageNode(img, cachedImage)
+        } else {
+          const imageObj = new Image()
+          imageObj.onload = () => {
+            imageCache.set(img.src, imageObj)
+            createImageNode(img, imageObj)
+          }
+          imageObj.src = img.src
+        }
+      }
+    })
+
+    mainLayer.batchDraw()
+  })
+}, { deep: true })
+
 // 监听选中状态变化，更新选中效果和 Transformer
 watch(() => [
   venueStore.selectedRowIds,
   venueStore.selectedSeatIds,
   venueStore.selectedShapeIds,
   venueStore.selectedTextIds,
-  venueStore.selectedAreaIds
+  venueStore.selectedAreaIds,
+  venueStore.selectedImageId
 ], (newVal, oldVal) => {
   console.log('watch 触发:', '新值:', newVal, '旧值:', oldVal,'selectedRowIds',venueStore.selectedRowIds)
   updateSelectionVisuals()
@@ -230,6 +301,9 @@ const renderAll = () => {
   // 清空画布和节点映射
   mainLayer.destroyChildren()
   nodeMap.clear()
+
+  // 渲染图片（在最底层）
+  renderImages()
 
   // 渲染所有区域
   venueStore.venue.sections.forEach(section => {
@@ -273,6 +347,103 @@ const renderSection = (section: Section) => {
       renderArea(area, section)
     })
   }
+}
+
+// ==================== 渲染底图 ====================
+
+// 缓存已加载的图片
+const imageCache = new Map<string, HTMLImageElement>()
+
+// 渲染所有图片
+const renderImages = () => {
+  if (!mainLayer) return
+
+  const images = venueStore.canvasImages
+  if (!images || images.length === 0) return
+
+  images.forEach(canvasImage => {
+    // 检查缓存
+    const cachedImage = imageCache.get(canvasImage.src)
+    if (cachedImage && cachedImage.complete) {
+      createImageNode(canvasImage, cachedImage)
+      return
+    }
+
+    // 异步加载图片
+    const imageObj = new Image()
+    imageObj.onload = () => {
+      imageCache.set(canvasImage.src, imageObj)
+      createImageNode(canvasImage, imageObj)
+    }
+    imageObj.onerror = () => {
+      console.error('[图片] 加载失败:', canvasImage.fileName)
+    }
+    imageObj.src = canvasImage.src
+  })
+}
+
+// 创建图片节点的辅助函数
+const createImageNode = (canvasImage: CanvasImage, imageObj: HTMLImageElement) => {
+  if (!mainLayer) return
+
+  // 防止重复创建：如果已存在则直接更新属性
+  const existing = nodeMap.get(canvasImage.id) as Konva.Image | undefined
+  if (existing) {
+    existing.x(canvasImage.x)
+    existing.y(canvasImage.y)
+    existing.width(canvasImage.width)
+    existing.height(canvasImage.height)
+    existing.rotation(canvasImage.rotation || 0)
+    existing.opacity(canvasImage.opacity ?? 1)
+    // 锁定时禁止事件穿透，解锁时恢复
+    existing.listening(!canvasImage.locked)
+    existing.setAttr('canvasImageData', canvasImage)
+    mainLayer.batchDraw()
+    return
+  }
+
+  const konvaImage = new Konva.Image({
+    x: canvasImage.x,
+    y: canvasImage.y,
+    width: canvasImage.width,
+    height: canvasImage.height,
+    rotation: canvasImage.rotation || 0,
+    opacity: canvasImage.opacity ?? 1,
+    image: imageObj,
+    id: `image-${canvasImage.id}`,
+    name: 'canvas-image',
+    // 锁定时不响应事件
+    listening: !canvasImage.locked
+  })
+
+  konvaImage.setAttr('canvasImageData', canvasImage)
+
+  // 图片点击选中（始终从节点属性读取最新数据）
+  konvaImage.on('mousedown', (e) => {
+    if (e.evt.button !== 0) return
+
+    // 实时读取最新锁定状态
+    const latestData = konvaImage.getAttr('canvasImageData') as CanvasImage
+    if (latestData?.locked) return
+
+    e.cancelBubble = true
+
+    const isAlreadySelected = venueStore.selectedImageId === latestData.id
+    if (!isAlreadySelected) {
+      const additive = e.evt.shiftKey
+      venueStore.selectCanvasImage(latestData.id, additive)
+      updateTransformer(true)
+    }
+
+    // 启动统一拖拽
+    const pointer = stage!.getPointerPosition()!
+    startDragAll(pointer)
+  })
+
+  // 先注册到 nodeMap，防止异步回调时重复创建
+  nodeMap.set(canvasImage.id, konvaImage)
+  mainLayer.add(konvaImage)
+  mainLayer.batchDraw()
 }
 
 // ==================== 渲染排====================
@@ -530,7 +701,8 @@ const renderShape = (shape: ShapeObject, section: Section) => {
         updateTransformer(true)
       }
       // 启动统一拖拽（与 rowShape 保持一致）
-      startDragAll({ x: e.evt.clientX, y: e.evt.clientY })
+      const pointer = stage!.getPointerPosition()!
+      startDragAll(pointer)
     })
 
     // 点击事件
@@ -580,24 +752,21 @@ const renderText = (text: TextObject, section: Section) => {
   konvaText.setAttr('textData', text)
   konvaText.setAttr('sectionId', section.id)
 
-  // 【关键修复】：mousedown 立即选中，确保 Transformer 能接管拖拽
+  // 【关键修复】：mousedown 立即选中，统一拖拽系统接管移动
   konvaText.on('mousedown', (e) => {
     if (e.evt.button !== 0) return
     e.cancelBubble = true
-    
+
     const isAlreadySelected = venueStore.selectedTextIds.includes(text.id)
-    if (isAlreadySelected) return
-    
-    const additive = e.evt.shiftKey
-    venueStore.selectText(text.id, additive)
-    updateTransformer(true)
-    
-    // 手动启动拖拽
-    requestAnimationFrame(() => {
-      if (transformer && transformer.nodes().includes(konvaText)) {
-        konvaText.startDrag(e.evt)
-      }
-    })
+    if (!isAlreadySelected) {
+      const additive = e.evt.shiftKey
+      venueStore.selectText(text.id, additive)
+      // 同步更新 Transformer，确保节点注册后再启动拖拽
+      updateTransformer(true)
+    }
+    // 启动统一拖拽（与 shape 保持一致）
+    const pointer = stage!.getPointerPosition()!
+    startDragAll(pointer)
   })
 
   // 点击事件
@@ -614,19 +783,9 @@ const renderText = (text: TextObject, section: Section) => {
   konvaText.on('mouseleave', () => {
     if (stage) stage.container().style.cursor = 'default'
   })
-  
-  // 拖拽结束同步位置
-  konvaText.on('dragend', () => {
-    // 如果正在使用 Transformer 进行变换，跳过（由 transformend 统一处理）
-    if (transformer?.isTransforming()) return
-    
-    const newX = konvaText.x()
-    const newY = konvaText.y()
-    venueStore.updateText(text.id, { x: newX, y: newY })
-  })
-  
-  // 启用拖拽
-  konvaText.draggable(true)
+
+  // 禁用原生拖拽，由统一拖拽系统接管
+  konvaText.draggable(false)
 
   mainLayer.add(konvaText)
   nodeMap.set(text.id, konvaText)
@@ -796,9 +955,15 @@ const setupStageEvents = () => {
         return
       }
       
-      // 座位）矩形/椭圆：开始拖拽绘）
-      if (tool === 'draw_seat' || tool === 'draw_rect' || tool === 'draw_ellipse') {
+      // 矩形/椭圆：开始拖拽绘制
+      if (tool === 'draw_rect' || tool === 'draw_ellipse') {
         drawing.startDrawing(pos)
+        return
+      }
+      
+      // 座位绘制：分段式单击处理（在 click 事件中处理）
+      if (tool === 'draw_seat') {
+        // 分段式绘制在 click 事件中处理，这里不处理 mousedown
         return
       }
     }
@@ -873,16 +1038,26 @@ const setupStageEvents = () => {
     const pointer = stage!.getPointerPosition()
     if (!pointer) return
     
-    // 绘制模式预览
+    // 座位绘制：分段式预览（idle 状态显示鼠标跟随圆，first 状态显示排预览）
+    if (currentDrawingTool.value === 'draw_seat') {
+      if (seatDrawStep.value === 'idle') {
+        // idle 状态：显示鼠标跟随的预览圆
+        createSeatCursorPreview(pos)
+        return
+      } else if (seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
+        // first 状态：显示从起点到鼠标的排预览
+        createSeatRowPreview(seatDrawPoints.value.first, pos)
+        return
+      }
+    }
+
+    // 绘制模式预览（矩形、椭圆等拖拽式绘制）
     if (isDrawingMode() && drawing.previewState.value.isActive) {
       drawing.updateDrawing(pos)
       const startPos = drawing.previewState.value.startPos
       if (!startPos) return
       
       switch (currentDrawingTool.value) {
-        case 'draw_seat':
-          createSeatRowPreview(startPos, pos)
-          break
         case 'draw_rect':
           createRectPreview(startPos, pos)
           break
@@ -926,17 +1101,14 @@ const setupStageEvents = () => {
       return
     }
     
-    // 绘制模式：完成绘）
+    // 绘制模式：完成绘制（矩形、椭圆等拖拽式绘制）
     if (isDrawingMode() && drawing.previewState.value.isActive) {
       const startPos = drawing.previewState.value.startPos
-      // 使用不带参数）getStagePosition，自动处）scale ）offset
+      // 使用不带参数的 getStagePosition，自动处理 scale 和 offset
       const endPos = getStagePosition()
-      
+
       if (startPos && endPos) {
         switch (currentDrawingTool.value) {
-          case 'draw_seat':
-            submitSeatRow(startPos, endPos)
-            break
           case 'draw_rect':
             submitRect(startPos, endPos)
             break
@@ -945,7 +1117,7 @@ const setupStageEvents = () => {
             break
         }
       }
-      
+
       drawing.finishDrawing()
       return
     }
@@ -961,7 +1133,27 @@ const setupStageEvents = () => {
 
   // 点击事件（用于选中对象）
   stage.on('click', (e) => {
-    // 绘制模式下不处理选中
+    // 座位绘制模式：分段式单击处理
+    if (currentDrawingTool.value === 'draw_seat') {
+      const pos = getStagePosition()
+      if (!pos) return
+
+      if (seatDrawStep.value === 'idle') {
+        // 第一次单击：记录起点，进入 first 状态
+        seatDrawPoints.value.first = pos
+        seatDrawStep.value = 'first'
+        clearDrawingPreview()
+        return
+      } else if (seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
+        // 第二次单击：确定终点，提交座位排
+        submitSeatRow(seatDrawPoints.value.first, pos)
+        // 重置状态，允许继续绘制下一排
+        resetSeatDrawingState()
+        return
+      }
+    }
+
+    // 其他绘制模式下不处理选中
     if (isDrawingMode()) return
     
     // 如果刚完成框选（有拖动），不清空选择
@@ -1039,9 +1231,16 @@ const setupStageEvents = () => {
 const handleKeyDown = (e: KeyboardEvent) => {
   // ESC 取消绘制 / 清空选择
   if (e.key === 'Escape') {
+    // 优先处理座位绘制状态
+    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value !== 'idle') {
+      resetSeatDrawingState()
+      clearDrawingPreview()
+      return
+    }
     if (isDrawingMode()) {
       clearDrawingPreview()
       drawing.resetDrawingState()
+      resetSeatDrawingState()
     } else {
       // 非绘制模式：清空选择（Seats.io 风格）
       venueStore.clearSelection()
@@ -1176,7 +1375,7 @@ const initTransformer = () => {
 
   transformer = new Konva.Transformer({
     rotateEnabled: true,
-    resizeEnabled: false,  // 【参考KonvaCanvas】：禁用缩放
+    resizeEnabled: true,  // 启用缩放，支持调节大小
     rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
     rotationSnapTolerance: 5,
     padding: 0,  // 【参考KonvaCanvas】：无内边距
@@ -1208,8 +1407,34 @@ const initTransformer = () => {
       const shapeData = node.getAttr('shapeData') as ShapeObject
       const textData = node.getAttr('textData') as TextObject
       const areaData = node.getAttr('areaData') as AreaObject
+      const imageData = node.getAttr('canvasImageData') as CanvasImage
 
-      if (rowData) {
+      if (imageData) {
+        // 图片：将缩放转换为尺寸变化，直接更新节点，避免触发 renderAll 销毁节点
+        const scaleX = node.scaleX()
+        const scaleY = node.scaleY()
+        const newWidth = imageData.width * scaleX
+        const newHeight = imageData.height * scaleY
+
+        // 1. 先重置 scale，改为直接改 width/height
+        node.scaleX(1)
+        node.scaleY(1)
+        ;(node as Konva.Image).width(newWidth)
+        ;(node as Konva.Image).height(newHeight)
+
+        // 2. 更新节点上缓存的数据
+        const updatedImage = { ...imageData, x: node.x(), y: node.y(), width: newWidth, height: newHeight, rotation: node.rotation() }
+        node.setAttr('canvasImageData', updatedImage)
+
+        // 3. 同步到 store（isSyncingFromTransformer=true 会阻止 watch 触发 renderAll）
+        venueStore.updateCanvasImage(imageData.id, {
+          x: node.x(),
+          y: node.y(),
+          width: newWidth,
+          height: newHeight,
+          rotation: node.rotation()
+        })
+      } else if (rowData) {
         // 排：同步位置和旋转，重置缩放（排不支持缩放）
         venueStore.updateRow(rowData.id, {
           x: node.x(),
@@ -1329,6 +1554,12 @@ const updateTransformer = (forceUpdate = false) => {
     if (node) selectedNodes.push(node)
   })
 
+  // 收集选中的图片
+  if (venueStore.selectedImageId) {
+    const node = nodeMap.get(venueStore.selectedImageId)
+    if (node) selectedNodes.push(node)
+  }
+
   // 【关键】：未选中的排禁用拖拽
   nodeMap.forEach((node, id) => {
     const name = node.name() || ''
@@ -1340,14 +1571,41 @@ const updateTransformer = (forceUpdate = false) => {
 
   if (selectedNodes.length > 0) {
     const currentNodes = transformer.nodes()
-    // 只有在节点列表变化时才重新设）nodes
+
+    // 判断是否纯图片选中
+    const isImageOnly = venueStore.selectedImageId !== null &&
+      venueStore.selectedRowIds.length === 0 &&
+      venueStore.selectedShapeIds.length === 0 &&
+      venueStore.selectedTextIds.length === 0 &&
+      venueStore.selectedAreaIds.length === 0
+
+    if (isImageOnly) {
+      // 图片：允许等比缩放（四角 + 四边手柄），锁定比例
+      transformer.setAttrs({
+        resizeEnabled: true,
+        keepRatio: true,
+        enabledAnchors: [
+          'top-left', 'top-right',
+          'bottom-left', 'bottom-right'
+        ]
+      })
+    } else {
+      // 其他对象：仅旋转，禁用所有缩放手柄
+      transformer.setAttrs({
+        resizeEnabled: false,
+        keepRatio: false,
+        enabledAnchors: []
+      })
+    }
+
+    // 只有在节点列表变化时才重新设置 nodes
     if (forceUpdate || 
         currentNodes.length !== selectedNodes.length || 
         !currentNodes.every((node, i) => node === selectedNodes[i])) {
       transformer.nodes(selectedNodes)
       transformer.visible(true)
     }
-    // 始终强制更新包围盒，确保位置变化后正确显）
+    // 始终强制更新包围盒，确保位置变化后正确显示
     transformer.forceUpdate()
   } else {
     transformer.nodes([])
@@ -1479,25 +1737,64 @@ const endDragAll = () => {
       const shapeData = item.node.getAttr('shapeData')
       const textData = item.node.getAttr('textData')
       const areaData = item.node.getAttr('areaData')
-      
-      if (rowData) {
+      const imageData = item.node.getAttr('canvasImageData')
+
+      if (imageData) {
+        // 图片：同步位置，同时更新节点缓存数据
+        const updatedImgData = { ...imageData, x: item.node.x(), y: item.node.y(), rotation: item.node.rotation() }
+        item.node.setAttr('canvasImageData', updatedImgData)
+        venueStore.updateCanvasImage(imageData.id, {
+          x: item.node.x(),
+          y: item.node.y(),
+          rotation: item.node.rotation()
+        })
+      } else if (rowData) {
         venueStore.updateRow(rowData.id, {
           x: item.node.x(),
           y: item.node.y(),
           rotation: item.node.rotation()
         })
       } else if (shapeData) {
-        venueStore.updateShape(shapeData.id, {
+        // 形状：同步位置，并将缩放转换为尺寸变化（与 transformend 保持一致）
+        const scaleX = item.node.scaleX()
+        const scaleY = item.node.scaleY()
+        
+        const updates: any = {
           x: item.node.x(),
           y: item.node.y(),
           rotation: item.node.rotation()
-        })
+        }
+        
+        // 根据形状类型处理缩放
+        if (shapeData.type === 'rect' || shapeData.type === 'ellipse') {
+          updates.width = (shapeData.width || 100) * scaleX
+          updates.height = (shapeData.height || 100) * scaleY
+        }
+        
+        venueStore.updateShape(shapeData.id, updates)
+        // 重置缩放
+        item.node.scaleX(1)
+        item.node.scaleY(1)
       } else if (textData) {
-        venueStore.updateText(textData.id, {
+        // 文本：同步位置，并将缩放转换为字体大小变化（与 transformend 保持一致）
+        const scaleX = item.node.scaleX()
+        const scaleY = item.node.scaleY()
+        const avgScale = (scaleX + scaleY) / 2
+
+        const updates: any = {
           x: item.node.x(),
           y: item.node.y(),
           rotation: item.node.rotation()
-        })
+        }
+
+        if (avgScale !== 1) {
+          updates.fontSize = Math.round((textData.fontSize || 16) * avgScale)
+        }
+
+        venueStore.updateText(textData.id, updates)
+        // 重置缩放
+        item.node.scaleX(1)
+        item.node.scaleY(1)
       } else if (areaData) {
         const dx = item.node.x()
         const dy = item.node.y()
@@ -1690,9 +1987,27 @@ const endBoxSelection = (additive: boolean) => {
 
 // ==================== 绘制功能 ====================
 
-// ---------- 座位排绘）----------
+// ---------- 座位排绘制 ----------
 
-/** 创建座位排预览*/
+/** 创建鼠标跟随的预览圆（idle 状态） */
+const createSeatCursorPreview = (pos: Position) => {
+  clearDrawingPreview()
+
+  const circle = new Konva.Circle({
+    x: pos.x,
+    y: pos.y,
+    radius: SEAT_RADIUS,
+    fill: '#ffffff',
+    stroke: '#3b82f6',
+    strokeWidth: 1.5,
+    opacity: 0.8,
+    listening: false
+  })
+  addPreviewElement(circle)
+  overlayLayer?.batchDraw()
+}
+
+/** 创建座位排预览 */
 const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
   
@@ -1708,7 +2023,7 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
     stroke: '#3b82f6',
     strokeWidth: 1.5,
-    dash: [5, 4],
+    dash: [6, 6],
     listening: false
   })
   addPreviewElement(line)
@@ -1760,18 +2075,16 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   })
   
   shape.sceneFunc((ctx) => {
-   
-    // 座位圆圈
-    ctx.beginPath()
+    // 座位圆圈 - 白色填充 + 蓝色边框
     seats.forEach(seat => {
-      ctx.moveTo(seat.x , seat.y)
+      ctx.beginPath()
       ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = '#3b82f6'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
     })
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.25)'
-    ctx.fill()
-    ctx.strokeStyle = '#3b82f6'
-    ctx.lineWidth = 1
-    ctx.stroke()
   })
   addPreviewElement(shape)
   overlayLayer?.batchDraw()

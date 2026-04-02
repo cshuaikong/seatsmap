@@ -181,7 +181,6 @@ const emit = defineEmits<{
   'copy': []
   'paste': []
   'delete': []
-  'loadBackground': []  // 加载底图事件
 }>()
 
 // 工具切换
@@ -189,9 +188,9 @@ const onToolChange = (tool: ToolMode) => {
   emit('update:modelValue', tool)
 }
 
-// 图片/底图按钮点击
+// 图片按钮点击：切换到 image 工具模式
 const onImageClick = () => {
-  emit('loadBackground')
+  emit('update:modelValue', 'image')
 }
 </script>
 

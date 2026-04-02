@@ -1,7 +1,12 @@
 <template>
   <div class="right-panel">
+    <!-- 图片工具激活时：始终显示图片面板（优先级最高） -->
+    <template v-if="props.currentTool === 'image'">
+      <ImagePanel />
+    </template>
+
     <!-- 选中对象面板 -->
-    <template v-if="shouldShowSelectionPanel">
+    <template v-else-if="shouldShowSelectionPanel">
       <!-- 面板标题栏 -->
       <div class="selection-header">
         <div class="selection-title">
@@ -191,6 +196,7 @@ import SeatPanel from './panels/SeatPanel.vue'
 import RowPanel from './panels/RowPanel.vue'
 import AreaPanel from './panels/AreaPanel.vue'
 import MixedPanel from './panels/MixedPanel.vue'
+import ImagePanel from './panels/ImagePanel.vue'
 
 // 面板内部使用的 Category 类型（兼容旧版 id/name 和新版 key/label）
 interface PanelCategory {
@@ -206,6 +212,7 @@ const props = defineProps<{
   chartName: string
   categories: PanelCategory[]
   totalSeats: number
+  currentTool?: string
   // 兼容旧版：selection 现在可选，优先从 venueStore 读取
   selection?: PanelSelection | null
   selectedRow?: Row | null

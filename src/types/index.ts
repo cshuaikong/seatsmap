@@ -291,6 +291,26 @@ export interface AreaObject {
   locked?: boolean
 }
 
+// 图片对象（可拖拽到画布）
+export interface CanvasImage {
+  id: string
+  type: 'image'
+  // 图片数据源 (base64 或 URL)
+  src: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation?: number
+  opacity?: number
+  // 是否锁定位置
+  locked?: boolean
+  // 原始文件名
+  fileName?: string
+  // 是否可见
+  visible?: boolean
+}
+
 // 选中对象类型
 export type SelectedObjectType = 'seat' | 'row' | 'rect' | 'ellipse' | 'polygon'
   | 'sector' | 'polyline' | 'text' | 'area' | 'none'

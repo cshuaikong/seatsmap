@@ -33,7 +33,6 @@
         @copy="onCopy"
         @paste="onPaste"
         @delete="onDelete"
-        @load-background="onLoadBackground"
       />
 
       <!-- 中间画布区域 -->
@@ -94,6 +93,7 @@
         :chart-name="chartName"
         :categories="displayCategories"
         :total-seats="totalSeats"
+        :current-tool="currentTool"
         @manage-categories="onManageCategories"
       />
 
@@ -120,6 +120,7 @@ import KonvaRenderer from './KonvaRenderer.vue'
 import type { ToolMode } from '../composables/useDrawing'
 import type { Seat } from '../types'
 import { useVenueStore } from '../stores/venueStore'
+import { generateId } from '../utils/id'
 
 import CategoryManager from './panels/CategoryManager.vue'
 
@@ -303,20 +304,50 @@ const onPaste = () => {
 
 // onDelete 已在下方定义
 
-// 加载底图
+// 加载底图（已迁移到 RightPanel > ImagePanel，此处保留兼容）
 const onLoadBackground = () => {
-  console.log('[底图] 打开文件选择器')
-  // 创建文件选择器
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*'
+  input.multiple = true
   input.onchange = (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    console.log('[底图] 选择文件:', file?.name)
-    if (file && rendererRef.value) {
-      console.log('[底图] 加载底图功能待实现')
-      // TODO: 实现底图加载
-    }
+    const files = (e.target as HTMLInputElement).files
+    if (!files) return
+
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith('image/')) return
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`${file.name} 超过 10MB 限制`)
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const src = event.target?.result as string
+        if (!src) return
+
+        const img = new Image()
+        img.onload = () => {
+          const canvasImage = {
+            id: generateId(),
+            type: 'image' as const,
+            src,
+            x: 100 + Math.random() * 200,
+            y: 100 + Math.random() * 200,
+            width: img.width,
+            height: img.height,
+            rotation: 0,
+            opacity: 1,
+            locked: false,
+            visible: true,
+            fileName: file.name
+          }
+          venueStore.addCanvasImage(canvasImage)
+        }
+        img.src = src
+      }
+      reader.readAsDataURL(file)
+    })
   }
   input.click()
 }
