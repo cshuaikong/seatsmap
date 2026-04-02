@@ -13,6 +13,7 @@ import {
   clearDrawingPreview,
   addPreviewElement
 } from '../composables/useKonvaDrawing'
+import { useKonvaSelection } from '../composables/useKonvaSelection'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 
@@ -53,14 +54,8 @@ const viewportState = {
   lastPointerY: 0
 }
 
-// 框选状态
-const selectionState = {
-  isSelecting: false,
-  hasDragged: false,  // 标记是否有拖动（区分框选和单击）
-  startX: 0,
-  startY: 0,
-  rect: null as Konva.Rect | null
-}
+// 框选（通过 useKonvaSelection 管理）
+let selection: ReturnType<typeof useKonvaSelection> | null = null
 
 // 标志位：是否正在从 Transformer 同步数据（防止触发重绘）
 let isSyncingFromTransformer = false
@@ -187,8 +182,29 @@ onMounted(() => {
   // 初始化 Transformer
   initTransformer()
 
-  // 初始化框选矩形
-  initSelectionRect()
+  // 初始化框选
+  selection = useKonvaSelection({
+    stage,
+    overlayLayer,
+    nodeMap,
+    onSelectionEnd: (result, additive) => {
+      const { rowIds, seatIds, shapeIds, textIds, areaIds } = result
+      if (additive) {
+        if (rowIds.length) venueStore.selectedRowIds = [...new Set([...venueStore.selectedRowIds, ...rowIds])]
+        if (seatIds.length) venueStore.selectedSeatIds = [...new Set([...venueStore.selectedSeatIds, ...seatIds])]
+        if (shapeIds.length) venueStore.selectedShapeIds = [...new Set([...venueStore.selectedShapeIds, ...shapeIds])]
+        if (textIds.length) venueStore.selectedTextIds = [...new Set([...venueStore.selectedTextIds, ...textIds])]
+        if (areaIds.length) venueStore.selectedAreaIds = [...new Set([...venueStore.selectedAreaIds, ...areaIds])]
+      } else {
+        venueStore.selectedRowIds = rowIds
+        venueStore.selectedSeatIds = seatIds
+        venueStore.selectedShapeIds = shapeIds
+        venueStore.selectedTextIds = textIds
+        venueStore.selectedAreaIds = areaIds
+      }
+    }
+  })
+  selection.initSelectionRect()
   
   // 初始化绘制预览
   initDrawingPreview()
@@ -552,7 +568,7 @@ const renderRow = (row: SeatRow, section: Section) => {
     // 绘制模式下不处理选中
     if (isDrawingMode()) return
     // 如果刚完成框选，忽略
-    if (selectionState.hasDragged) return
+    if (selection?.hasDragged) return
     // 阻止冒泡，避免触发舞台 click
     e.cancelBubble = true
     const additive = e.evt.shiftKey
@@ -1004,7 +1020,7 @@ const setupStageEvents = () => {
     const target = e.target as any
     const isEmptyArea = target === stage || target === mainLayer || target === overlayLayer
     if (e.evt.button === 0 && isEmptyArea && !isDrawingMode()) {
-      startBoxSelection(pointer)  // 使用屏幕坐标
+      selection?.startBoxSelection(pointer)  // 使用屏幕坐标
     }
   })
 
@@ -1081,9 +1097,9 @@ const setupStageEvents = () => {
       viewportState.lastPointerY = e.evt.clientY
       updateViewportCulling()
       mainLayer?.batchDraw()
-    } else if (selectionState.isSelecting) {
-      // 更新框）- 使用屏幕坐标
-      updateBoxSelection(pointer)
+    } else if (selection?.isSelecting) {
+      // 更新框选 - 使用屏幕坐标
+      selection.updateBoxSelection(pointer)
     }
   })
 
@@ -1120,8 +1136,8 @@ const setupStageEvents = () => {
     if (viewportState.isDragging) {
       viewportState.isDragging = false
       if (stage) stage.container().style.cursor = 'default'
-    } else if (selectionState.isSelecting) {
-      endBoxSelection(e.evt.shiftKey)
+    } else if (selection?.isSelecting) {
+      selection.endBoxSelection(e.evt.shiftKey)
     }
   })
 
@@ -1151,8 +1167,8 @@ const setupStageEvents = () => {
     if (isDrawingMode()) return
     
     // 如果刚完成框选（有拖动），不清空选择
-    if (selectionState.hasDragged) {
-      selectionState.hasDragged = false
+    if (selection?.hasDragged) {
+      selection.resetSelectionState()
       return
     }
     
@@ -1818,166 +1834,9 @@ const endDragAll = () => {
   overlayLayer?.batchDraw()
 }
 
-// ==================== 框选功）====================
+// ==================== 框选功能（已迁移到 useKonvaSelection）====================
+// 见 onMounted 中的 selection 初始化
 
-const initSelectionRect = () => {
-  if (!overlayLayer) return
-
-  selectionState.rect = new Konva.Rect({
-    fill: 'rgba(59, 130, 246, 0.1)',
-    stroke: '#3b82f6',
-    strokeWidth: 1,
-    dash: [4, 4],
-    visible: false,
-    listening: false
-  })
-
-  overlayLayer.add(selectionState.rect)
-}
-
-const startBoxSelection = (screenPos: { x: number, y: number }) => {
-  if (!selectionState.rect || !stage) return
-
-  selectionState.isSelecting = true
-  selectionState.startX = screenPos.x
-  selectionState.startY = screenPos.y
-
-  // 使用屏幕坐标（指针位置）
-  selectionState.rect.setAttrs({
-    x: screenPos.x,
-    y: screenPos.y,
-    width: 0,
-    height: 0,
-    visible: true
-  })
-
-  overlayLayer?.batchDraw()
-}
-
-const updateBoxSelection = (screenPos: { x: number, y: number }) => {
-  if (!selectionState.rect || !stage) return
-
-  // 检查是否有拖动（移动超过 3px 认为是框选）
-  const dx = Math.abs(screenPos.x - selectionState.startX)
-  const dy = Math.abs(screenPos.y - selectionState.startY)
-  if (dx > 3 || dy > 3) {
-    selectionState.hasDragged = true
-  }
-
-  // 使用屏幕坐标
-  const x = Math.min(selectionState.startX, screenPos.x)
-  const y = Math.min(selectionState.startY, screenPos.y)
-  const width = Math.abs(screenPos.x - selectionState.startX)
-  const height = Math.abs(screenPos.y - selectionState.startY)
-
-  selectionState.rect.setAttrs({ x, y, width, height })
-  overlayLayer?.batchDraw()
-}
-
-const endBoxSelection = (additive: boolean) => {
-  if (!selectionState.rect || !stage) return
-
-  selectionState.isSelecting = false
-
-  // 【关键修复】：框选框使用屏幕坐标，需要转换为相对于舞台的坐标
-  // 获取框选框在屏幕坐标系中的位置和大小
-  const rectX = selectionState.rect.x()
-  const rectY = selectionState.rect.y()
-  const rectWidth = selectionState.rect.width()
-  const rectHeight = selectionState.rect.height()
-  
-  // 转换为舞台坐标系（考虑舞台的缩放和平移）
-  const scale = stage.scaleX()
-  const stageX = stage.x()
-  const stageY = stage.y()
-  
-  // 屏幕坐标 → 舞台坐标
-  const selRect = {
-    x: (rectX - stageX) / scale,
-    y: (rectY - stageY) / scale,
-    width: rectWidth / scale,
-    height: rectHeight / scale
-  }
-
-  // 框选区域太小，忽略
-  if (selRect.width < 5 || selRect.height < 5) {
-    selectionState.rect.visible(false)
-    overlayLayer?.batchDraw()
-    return
-  }
-
-  // 找到与框选区域相交的对象
-  const selectedIds: { type: 'row' | 'seat' | 'shape' | 'text' | 'area', id: string }[] = []
-
-  nodeMap.forEach((node, id) => {
-    // 获取节点在舞台坐标系中的位置
-    // 【关键】：必须使用 relativeTo: 'stage' 获取舞台坐标，与 selRect 保持一致
-    const nodeRect = node.getClientRect({ relativeTo: stage! })
-    
-    // AABB 相交检测
-    const isIntersecting = (
-      nodeRect.x < selRect.x + selRect.width &&
-      nodeRect.x + nodeRect.width > selRect.x &&
-      nodeRect.y < selRect.y + selRect.height &&
-      nodeRect.y + nodeRect.height > selRect.y
-    )
-
-    if (isIntersecting) {
-      console.log('isIntersecting', node.name(),node)
-      const name = node.name() || ''
-      let type: 'row' | 'seat' | 'shape' | 'text' | 'area' | null = null
-
-      if (name.includes('row-shape')) type = 'row'
-      else if (name.includes('seat-hit-area')) type = 'seat'
-      else if (name.includes('shape-object')) type = 'shape'
-      else if (name.includes('text-object')) type = 'text'
-      else if (name.includes('area-object')) type = 'area'
-
-      if (type) {
-        selectedIds.push({ type, id })
-      }
-    }
-  })
-
-  // 按类型分组收集 ID
-  const rowIds: string[] = []
-  const seatIds: string[] = []
-  const shapeIds: string[] = []
-  const textIds: string[] = []
-  const areaIds: string[] = []
-
-  selectedIds.forEach(({ type, id }) => {
-    switch (type) {
-      case 'row': rowIds.push(id); break
-      case 'seat': seatIds.push(id); break
-      case 'shape': shapeIds.push(id); break
-      case 'text': textIds.push(id); break
-      case 'area': areaIds.push(id); break
-    }
-  })
-  console.log('selectedIds',selectedIds)
-  // 【关键优化】：批量更新所有选中状态，只触发一次 watch
-  // 不单独调用 clearSelection，而是直接赋值新数组
-  if (additive) {
-    // Shift+框选：追加模式
-    if (rowIds.length) venueStore.selectedRowIds = [...new Set([...venueStore.selectedRowIds, ...rowIds])]
-    if (seatIds.length) venueStore.selectedSeatIds = [...new Set([...venueStore.selectedSeatIds, ...seatIds])]
-    if (shapeIds.length) venueStore.selectedShapeIds = [...new Set([...venueStore.selectedShapeIds, ...shapeIds])]
-    if (textIds.length) venueStore.selectedTextIds = [...new Set([...venueStore.selectedTextIds, ...textIds])]
-    if (areaIds.length) venueStore.selectedAreaIds = [...new Set([...venueStore.selectedAreaIds, ...areaIds])]
-  } else {
-    // 普通框选：替换模式（一次性赋值所有类型）
-    venueStore.selectedRowIds = rowIds
-    venueStore.selectedSeatIds = seatIds
-    venueStore.selectedShapeIds = shapeIds
-    venueStore.selectedTextIds = textIds
-    venueStore.selectedAreaIds = areaIds
-  }
-
-  // 隐藏选择框
-  selectionState.rect.visible(false)
-  overlayLayer?.batchDraw()
-}
 
 // ==================== 绘制功能（已迁移到 useKonvaDrawing）====================
 
