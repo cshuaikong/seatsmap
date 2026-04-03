@@ -93,7 +93,7 @@
         :chart-name="chartName"
         :categories="displayCategories"
         :total-seats="totalSeats"
-        :current-tool="currentTool"
+        :current-tool="currentTool as any"
         @manage-categories="onManageCategories"
       />
 
@@ -117,7 +117,7 @@ import Konva from 'konva'
 import RightPanel from './RightPanel.vue'
 import LeftToolbar from './LeftToolbar.vue'
 import KonvaRenderer from './KonvaRenderer.vue'
-import type { ToolMode } from '../composables/useDrawing'
+import type { ToolMode } from '../composables/useKonvaDrawing'
 import type { Seat } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { generateId } from '../utils/id'

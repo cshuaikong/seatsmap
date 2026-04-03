@@ -10,7 +10,7 @@
  */
 
 import { useVenueStore } from '../stores/venueStore'
-import type { DrawingToolMode } from './useDrawing'
+import type { DrawingToolMode } from './useKonvaDrawing'
 
 export interface UseKonvaKeyboardOptions {
   /** 当前绘制工具 */

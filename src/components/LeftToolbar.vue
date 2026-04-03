@@ -166,7 +166,7 @@
 
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { ToolMode } from '../composables/useDrawing'
+import type { DrawingToolMode as ToolMode } from '../composables/useKonvaDrawing'
 
 // Props
 const props = defineProps<{

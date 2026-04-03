@@ -7,7 +7,7 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
-import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints } from '../composables/useDrawing'
+import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints } from '../composables/useKonvaDrawing'
 import {
   setPreviewLayer,
   clearDrawingPreview,
@@ -1410,7 +1410,7 @@ const submitPolygon = (points: Position[]) => {
   }
   
   const center = calculatePolygonCenter(points)
-  const relativePoints = toRelativePoints(points, center.x, center.y)
+  const relativePoints = toRelativePoints(points, center)
   
   const sectionId = getOrCreateDefaultSection()
   venueStore.addShape(sectionId, {

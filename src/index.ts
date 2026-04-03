@@ -17,4 +17,4 @@ export * from './utils/geometry'
 export * from './utils/id'
 
 // Composables
-export { useDrawing } from './composables/useDrawing'
+export { useDrawing } from './composables/useKonvaDrawing'

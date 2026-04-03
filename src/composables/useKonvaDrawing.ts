@@ -11,7 +11,116 @@ import type { Position, Seat, SeatRow } from '../types'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 import { useVenueStore } from '../stores/venueStore'
-import type { DrawingToolMode } from './useDrawing'
+
+// ==================== 类型定义（从 useDrawing 合并）====================
+
+// 绘制工具模式
+export type DrawingToolMode =
+  | 'select'
+  | 'pan'
+  | 'draw_seat'
+  | 'draw_rect'
+  | 'draw_ellipse'
+  | 'draw_polygon'
+  | 'draw_polyline'
+  | 'draw_sector'
+  | 'draw_text'
+  | 'draw_area'
+
+// 兼容旧代码的 ToolMode（保留所有旧值）
+export type ToolMode =
+  | 'select' | 'pan'
+  | 'single-seat'
+  | 'row-straight'
+  | 'section'
+  | 'section-diagonal'
+  | 'drawCircle' | 'drawRect' | 'drawPolygon' | 'drawPolyline' | 'drawSector'
+  | 'text' | 'image'
+  | 'drawRow' | 'drawSegmentRow' | 'drawMultiRow' | 'selectseat'
+  | 'drawLine' | 'restroom' | 'drawRoundTable'
+  | 'seat' | 'row' | 'section-old' | 'booth' | 'table' | 'shape' | 'stage'
+  | 'drawSeat' | 'drawFreehand' | 'drawLineRow' | 'drawArcRow' | 'drawText' | 'drawStage'
+  | DrawingToolMode
+
+// 绘制步骤
+export type DrawStep = 'idle' | 'first' | 'second' | 'third'
+
+// 绘制状态
+export type DrawingState = 'idle' | 'placingSeat' | 'dragging' | 'drawing'
+
+// 预览状态
+export interface DrawingPreviewState {
+  isActive: boolean
+  startPos: Position | null
+  currentPos: Position | null
+  points: Position[]
+}
+
+// ==================== 几何工具函数（从 useDrawing 合并）====================
+
+/** 计算两点间的单位向量和距离 */
+export function getUnitVector(from: Position, to: Position): { ux: number; uy: number; dist: number } {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  if (dist < 0.001) return { ux: 1, uy: 0, dist: 0 }
+  return { ux: dx / dist, uy: dy / dist, dist }
+}
+
+/** 计算两点间角度（度） */
+export function getAngle(from: Position, to: Position): number {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  return Math.atan2(dy, dx) * 180 / Math.PI
+}
+
+/** 沿方向生成座位坐标列表 */
+export function generateSeatsAlongLine(
+  count: number,
+  startX: number,
+  startY: number,
+  spacing: number,
+  angleDeg: number
+): Position[] {
+  const angleRad = (angleDeg * Math.PI) / 180
+  const seats: Position[] = []
+  for (let i = 0; i < count; i++) {
+    seats.push({
+      x: startX + Math.cos(angleRad) * spacing * i,
+      y: startY + Math.sin(angleRad) * spacing * i
+    })
+  }
+  return seats
+}
+
+/** 计算边界框 */
+export function calculateBoundingBox(positions: Position[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (positions.length === 0) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  positions.forEach(pos => {
+    minX = Math.min(minX, pos.x)
+    minY = Math.min(minY, pos.y)
+    maxX = Math.max(maxX, pos.x)
+    maxY = Math.max(maxY, pos.y)
+  })
+  return { minX, minY, maxX, maxY }
+}
+
+/** 计算多边形中心 */
+export function calculatePolygonCenter(points: Position[]): Position {
+  if (points.length === 0) return { x: 0, y: 0 }
+  let sumX = 0, sumY = 0
+  points.forEach(p => {
+    sumX += p.x
+    sumY += p.y
+  })
+  return { x: sumX / points.length, y: sumY / points.length }
+}
+
+/** 将绝对坐标转换为相对坐标 */
+export function toRelativePoints(points: Position[], center: Position): number[] {
+  return points.flatMap(p => [p.x - center.x, p.y - center.y])
+}
 
 // ==================== 模块级共享状态 ====================
 
@@ -64,13 +173,16 @@ export function isDrawingMode(): boolean {
 }
 
 /** 重置所有绘制状态 */
-export function resetDrawingState() {
+export function resetAllDrawingState() {
   _seatDrawStep = 'idle'
   _seatDrawStartPos = null
   _polygonPoints = []
   _dragStartPos = null
   clearDrawingPreview()
 }
+
+/** 兼容旧代码的别名 */
+export const resetDrawingState = resetAllDrawingState
 
 /** 清除绘制预览 */
 export function clearDrawingPreview() {
@@ -91,27 +203,6 @@ export function batchDrawOverlay() {
 }
 
 // ==================== 辅助函数 ====================
-
-/** 计算两点间的单位向量和距离 */
-const getUnitVector = (from: Position, to: Position): { ux: number; uy: number; dist: number } => {
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const dist = Math.sqrt(dx * dx + dy * dy)
-  if (dist < 0.001) return { ux: 1, uy: 0, dist: 0 }
-  return { ux: dx / dist, uy: dy / dist, dist }
-}
-
-/** 计算多边形中心点 */
-const calculatePolygonCenter = (points: Position[]): Position => {
-  let sumX = 0, sumY = 0
-  points.forEach(p => { sumX += p.x; sumY += p.y })
-  return { x: sumX / points.length, y: sumY / points.length }
-}
-
-/** 将点数组转换为相对坐标 */
-const toRelativePoints = (points: Position[], centerX: number, centerY: number): number[] => {
-  return points.flatMap(p => [p.x - centerX, p.y - centerY])
-}
 
 /** 获取或创建默认 section */
 const getOrCreateDefaultSection = (): string => {
@@ -467,7 +558,7 @@ export function submitPolygon(points: Position[]) {
   }
   
   const center = calculatePolygonCenter(points)
-  const relativePoints = toRelativePoints(points, center.x, center.y)
+  const relativePoints = toRelativePoints(points, center)
   
   const sectionId = getOrCreateDefaultSection()
   useVenueStore().addShape(sectionId, {
@@ -680,4 +771,117 @@ export function getSeatDrawStartPos(): Position | null {
 /** 获取拖拽起点（供外部检查） */
 export function getDragStartPos(): Position | null {
   return _dragStartPos
+}
+
+// ==================== Vue Composable（兼容旧代码）====================
+
+import { ref, computed, shallowRef } from 'vue'
+
+/**
+ * 绘制状态管理 Composable（兼容 useDrawing）
+ * 实际状态使用模块级变量，这里只提供 Vue 响应式包装
+ */
+export function useDrawing() {
+  // 当前工具（响应式包装）
+  const currentTool = ref<DrawingToolMode>(_currentTool)
+  
+  // 绘制状态
+  const drawingState = ref<DrawingState>('idle')
+  const mousePos = ref<Position>({ x: 0, y: 0 })
+  const showPreview = ref(false)
+  
+  // 预览状态（响应式包装）
+  const previewState = ref({
+    isActive: _dragStartPos !== null || _polygonPoints.length > 0,
+    startPos: _dragStartPos,
+    currentPos: mousePos.value,
+    points: _polygonPoints
+  })
+  
+  // 多边形点（响应式包装）
+  const polygonPoints = computed(() => _polygonPoints)
+  
+  // 座位绘制状态（响应式包装）
+  const seatDrawStep = computed(() => _seatDrawStep)
+  const seatDrawPoints = ref({
+    first: _seatDrawStartPos,
+    second: null as Position | null,
+    third: null as Position | null
+  })
+  
+  // 绘制步骤
+  const drawStep = ref<DrawStep>('idle')
+  const drawPoints = ref({
+    first: null as Position | null,
+    second: null as Position | null,
+    third: null as Position | null
+  })
+  
+  // 方法
+  const setTool = (tool: DrawingToolMode) => {
+    setDrawingTool(tool)
+    currentTool.value = tool
+  }
+  
+  const startDrawing = (pos: Position) => {
+    _dragStartPos = pos
+    previewState.value.isActive = true
+    previewState.value.startPos = pos
+  }
+  
+  const updateDrawing = (pos: Position) => {
+    mousePos.value = pos
+    previewState.value.currentPos = pos
+  }
+  
+  const finishDrawing = () => {
+    _dragStartPos = null
+    previewState.value.isActive = false
+    previewState.value.startPos = null
+  }
+  
+  const addPolygonPoint = (pos: Position) => {
+    _polygonPoints.push(pos)
+    previewState.value.points = _polygonPoints
+  }
+  
+  const clearPolygonPoints = () => {
+    _polygonPoints.length = 0
+    previewState.value.points = []
+  }
+  
+  const isNearStartPoint = (pos: Position): boolean => {
+    return checkNearStartPoint(pos, _polygonPoints)
+  }
+  
+  const resetDrawingState = () => {
+    resetAllDrawingState()
+    drawingState.value = 'idle'
+    drawStep.value = 'idle'
+    drawPoints.value = { first: null, second: null, third: null }
+    seatDrawPoints.value = { first: null, second: null, third: null }
+  }
+  
+  return {
+    // 状态
+    currentTool,
+    drawingState,
+    mousePos,
+    showPreview,
+    previewState,
+    polygonPoints,
+    seatDrawStep,
+    seatDrawPoints,
+    drawStep,
+    drawPoints,
+    // 方法
+    setTool,
+    startDrawing,
+    updateDrawing,
+    finishDrawing,
+    addPolygonPoint,
+    clearPolygonPoints,
+    isNearStartPoint,
+    resetDrawingState
+  }
 }
