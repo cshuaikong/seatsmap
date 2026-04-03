@@ -29,6 +29,15 @@ import { useKonvaSelection } from '../composables/useKonvaSelection'
 import { useKonvaTransformer } from '../composables/useKonvaTransformer'
 import { useKonvaKeyboard } from '../composables/useKonvaKeyboard'
 import { useKonvaViewport } from '../composables/useKonvaViewport'
+import {
+  calculateRowBounds,
+  createRowShape,
+  createRowSceneFunc,
+  createRowHitFunc,
+  createShapeNode,
+  createTextNode,
+  createAreaNode
+} from '../composables/useKonvaRenderPrimitives'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 
@@ -484,115 +493,31 @@ const createImageNode = (canvasImage: CanvasImage, imageObj: HTMLImageElement) =
 const renderRow = (row: SeatRow, section: Section) => {
   if (!mainLayer || row.seats.length === 0) return
 
-  // 计算座位间距和尺寸
-  const seatSpacing = row.seatSpacing || SEAT_SPACING
+  // 计算边界
+  const bounds = calculateRowBounds(row, SEAT_RADIUS)
 
-  // 【参考KonvaCanvas.vue 实现】：直接使用 Shape 方案，放弃 rowGroup
-  // 计算边界（包含座位半径）
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  row.seats.forEach((seat) => {
-    minX = Math.min(minX, seat.x - SEAT_RADIUS)
-    minY = Math.min(minY, seat.y - SEAT_RADIUS)
-    maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
-    maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
+  // 获取座位颜色函数
+  const getSeatColor = (seat: Seat): string => {
+    const category = venueStore.venue.categories.find(c => String(c.key) === String(seat.categoryKey))
+    return category?.color || '#9E9E9E'
+  }
+
+  // 创建 Shape
+  const rowShape = createRowShape(row, bounds, {
+    seatRadius: SEAT_RADIUS,
+    getSeatColor,
+    isSelected: venueStore.selectedRowIds.includes(row.id),
+    sectionId: section.id
   })
 
-  // width/height 是内容实际大小
-  const width = maxX - minX
-  const height = maxY - minY
-
-  // 计算几何中心（用于旋转中心）
-  const centerX = (minX + maxX) / 2
-  const centerY = (minY + maxY) / 2
-
-  // 创建 Shape 用于绘制座位
-  // - Shape.x/y 设为几何中心
-  // - offsetX/Y 也设为几何中心，使旋转中心在排中心
-  // - 座位使用原始局部坐标绘制
-  const rowShape = new Konva.Shape({
-    x: row.x,
-    y: row.y,
-    rotation: row.rotation || 0,
-    width: width,
-    height: height,
-    offsetX: SEAT_RADIUS,  // 旋转中心在第一个座位中心
-    offsetY: SEAT_RADIUS,
-    draggable: false,  // 【关键】：未选中时禁止拖拽
-    id: `row-${row.id}`,
-    name: 'row-shape',
-    perfectDrawEnabled: false,
-    transformsEnabled: 'all',
-    rowData: row,  // 存储排数据引用
-    sectionId: section.id,
-    hitMinX: minX,
-    hitMinY: minY,
-    hitMaxX: maxX,
-    hitMaxY: maxY,
-    centerX: centerX,  // 存储几何中心，用于后续计算
-    centerY: centerY
-  })
-
-  // sceneFunc: 批次绘制所有座位（使用局部坐标）
-  rowShape.sceneFunc((context, shape) => {
-    const rowData = shape.getAttr('rowData') as SeatRow
-    const isSelected = venueStore.selectedRowIds.includes(rowData.id)
-    const radius = SEAT_RADIUS
-
-    // 按分类颜色分组绘制
-    const colorGroups: Record<string, Seat[]> = {}
-    rowData.seats.forEach((seat) => {
-      const category = venueStore.venue.categories.find(c => String(c.key) === String(seat.categoryKey))
-      const color = category?.color || '#9E9E9E'
-      if (!colorGroups[color]) colorGroups[color] = []
-      colorGroups[color].push(seat)
-    })
-
-    // 批次绘制每个颜色组的座位
-    Object.entries(colorGroups).forEach(([color, groupSeats]) => {
-      if (groupSeats.length === 0) return
-
-      context.beginPath()
-      context.fillStyle = color
-
-      // 使用局部坐标绘制（Shape 的 x/y 和 rotation 已经处理变换
-      groupSeats.forEach(seat => {
-        context.moveTo(seat.x, seat.y)
-        context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
-      })
-
-      context.fill()
-
-      // 绘制边框
-      context.save()
-      context.strokeStyle = isSelected ? '#3b82f6' : color
-      context.lineWidth = 1
-      groupSeats.forEach(seat => {
-        context.beginPath()
-        context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
-        context.stroke()
-      })
-      context.restore()
-    })
-  })
-
-  // hitFunc: 自定义点击检测区域（与实际绘制区域对齐）
-  rowShape.hitFunc((context, shape) => {
-    const hitMinX = shape.getAttr('hitMinX') as number
-    const hitMinY = shape.getAttr('hitMinY') as number
-    const hitMaxX = shape.getAttr('hitMaxX') as number
-    const hitMaxY = shape.getAttr('hitMaxY') as number
-    context.beginPath()
-    context.rect(hitMinX, hitMinY, hitMaxX - hitMinX, hitMaxY - hitMinY)
-    context.fillStrokeShape(shape)
-  })
+  // 设置绘制函数
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS))
+  rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
   rowShape.on('click', (e) => {
-    // 绘制模式下不处理选中
     if (isDrawingMode()) return
-    // 如果刚完成框选，忽略
     if (selection?.hasDragged) return
-    // 阻止冒泡，避免触发舞台 click
     e.cancelBubble = true
     const additive = e.evt.shiftKey
     venueStore.selectRow(row.id, additive)
@@ -606,11 +531,8 @@ const renderRow = (row: SeatRow, section: Section) => {
     if (stage) stage.container().style.cursor = 'default'
   })
 
-  // 拖拽结束同步 - 同步 Shape 的坐标到 row 数据
   rowShape.on('dragend', () => {
     if (tfm?.transformer?.isTransforming()) return
-    console.log('dragend',rowShape.x(),rowShape.y(),rowShape.rotation())
-    // rowShape.x/y 是左上角
     venueStore.updateRow(row.id, {
       x: rowShape.x(),
       y: rowShape.y(),
@@ -627,98 +549,11 @@ const renderRow = (row: SeatRow, section: Section) => {
 const renderShape = (shape: ShapeObject, section: Section) => {
   if (!mainLayer) return
 
-  let konvaShape: Konva.Shape | null = null
+  // 使用原子函数创建形状节点
+  const konvaShape = createShapeNode(shape)
+  if (!konvaShape) return
 
-  switch (shape.type) {
-    case 'rect':
-      konvaShape = new Konva.Rect({
-        x: shape.x,
-        y: shape.y,
-        width: shape.width || 100,
-        height: shape.height || 100,
-        rotation: shape.rotation || 0,
-        fill: shape.fill,
-        stroke: shape.stroke,
-        strokeWidth: shape.strokeWidth,
-        opacity: shape.opacity ?? 1,
-        cornerRadius: shape.cornerRadius || 0,
-        id: `shape-${shape.id}`,
-        name: `shape-object rect-shape`
-      })
-      break
-
-    case 'ellipse':
-      konvaShape = new Konva.Ellipse({
-        x: shape.x,
-        y: shape.y,
-        radiusX: (shape.width || 100) / 2,
-        radiusY: (shape.height || 100) / 2,
-        rotation: shape.rotation || 0,
-        fill: shape.fill,
-        stroke: shape.stroke,
-        strokeWidth: shape.strokeWidth,
-        opacity: shape.opacity ?? 1,
-        id: `shape-${shape.id}`,
-        name: `shape-object ellipse-shape`
-      })
-      break
-
-    case 'polygon':
-      if (shape.points && shape.points.length >= 6) {
-        konvaShape = new Konva.Line({
-          x: shape.x,
-          y: shape.y,
-          points: shape.points,
-          rotation: shape.rotation || 0,
-          fill: shape.fill,
-          stroke: shape.stroke,
-          strokeWidth: shape.strokeWidth,
-          opacity: shape.opacity ?? 1,
-          closed: true,
-          id: `shape-${shape.id}`,
-          name: `shape-object polygon-shape`
-        })
-      }
-      break
-
-    case 'sector':
-      // 使用 Arc 绘制扇形
-      konvaShape = new Konva.Arc({
-        x: shape.x,
-        y: shape.y,
-        innerRadius: shape.innerRadius || 0,
-        outerRadius: shape.outerRadius || 100,
-        angle: shape.angle || 90,
-        rotation: shape.rotation || 0,
-        fill: shape.fill,
-        stroke: shape.stroke,
-        strokeWidth: shape.strokeWidth,
-        opacity: shape.opacity ?? 1,
-        id: `shape-${shape.id}`,
-        name: `shape-object sector-shape`
-      })
-      break
-
-    case 'polyline':
-      if (shape.points && shape.points.length >= 4) {
-        konvaShape = new Konva.Line({
-          x: shape.x,
-          y: shape.y,
-          points: shape.points,
-          rotation: shape.rotation || 0,
-          stroke: shape.stroke,
-          strokeWidth: shape.strokeWidth,
-          opacity: shape.opacity ?? 1,
-          closed: false,
-          id: `shape-${shape.id}`,
-          name: `shape-object polyline-shape`
-        })
-      }
-      break
-  }
-
-  if (konvaShape) {
-    konvaShape.setAttr('shapeData', shape)
+  konvaShape.setAttr('shapeData', shape)
     konvaShape.setAttr('sectionId', section.id)
 
     // 【关键修复】：mousedown 立即选中，统一拖拽系统接管移动
@@ -758,7 +593,6 @@ const renderShape = (shape: ShapeObject, section: Section) => {
 
     mainLayer.add(konvaShape)
     nodeMap.set(shape.id, konvaShape)
-  }
 }
 
 // ==================== 渲染文本 ====================
@@ -766,21 +600,7 @@ const renderShape = (shape: ShapeObject, section: Section) => {
 const renderText = (text: TextObject, section: Section) => {
   if (!mainLayer) return
 
-  const konvaText = new Konva.Text({
-    x: text.x,
-    y: text.y,
-    text: text.text || text.caption || '',
-    fontSize: text.fontSize || 16,
-    fontFamily: text.fontFamily || 'system-ui, -apple-system, sans-serif',
-    fontStyle: text.fontStyle || (text.bold ? 'bold' : text.italic ? 'italic' : 'normal'),
-    fill: text.fill || text.textColor || '#333333',
-    rotation: text.rotation || 0,
-    width: text.width,
-    height: text.height,
-    align: text.align || 'left',
-    id: `text-${text.id}`,
-    name: 'text-object'
-  })
+  const konvaText = createTextNode(text)
 
   konvaText.setAttr('textData', text)
   konvaText.setAttr('sectionId', section.id)
@@ -829,16 +649,7 @@ const renderText = (text: TextObject, section: Section) => {
 const renderArea = (area: AreaObject, section: Section) => {
   if (!mainLayer || !area.points || area.points.length < 6) return
 
-  const areaShape = new Konva.Line({
-    x: 0,
-    y: 0,
-    points: area.points,
-    fill: area.fill || 'rgba(100, 100, 100, 0.3)',
-    opacity: area.opacity ?? (area.translucent ? 0.3 : 0.6),
-    closed: true,
-    id: `area-${area.id}`,
-    name: 'area-object'
-  })
+  const areaShape = createAreaNode(area)
 
   areaShape.setAttr('areaData', area)
   areaShape.setAttr('sectionId', section.id)
