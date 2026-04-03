@@ -1831,7 +1831,7 @@ defineExpose({
   setDrawingTool,
   currentDrawingTool,
   // É¾³ý
-  deleteSelected: deleteSelectedObjects,
+  deleteSelected: () => keyboard?.deleteSelectedObjects(),
   // Çå³ý»æÖÆ×´Ì¬
   clearDrawing: () => {
     clearDrawingPreview()
