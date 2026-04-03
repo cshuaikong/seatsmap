@@ -1233,11 +1233,7 @@ const setupStageEvents = () => {
       }
     }
   })
-  
-  // ¼üÅÌÊÂ¼ş
-  window.addEventListener('keydown', handleKeyDown)
 }
-
 
 const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
   if (!stage) return
