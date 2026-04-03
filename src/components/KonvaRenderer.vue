@@ -28,6 +28,7 @@ import {
 import { useKonvaSelection } from '../composables/useKonvaSelection'
 import { useKonvaTransformer } from '../composables/useKonvaTransformer'
 import { useKonvaKeyboard } from '../composables/useKonvaKeyboard'
+import { renderImages, syncImageNodes } from '../composables/useKonvaImages'
 import { useKonvaViewport } from '../composables/useKonvaViewport'
 import {
   calculateRowBounds,
@@ -125,8 +126,6 @@ const initDrawingPreview = () => {
   // 预览层已在 onMounted 中创建
 }
 
-// 清除绘制预览和添加预览元素现在直接从 useKonvaDrawing 导入使用
-
 // 键盘事件处理（通过 useKonvaKeyboard 管理）
 let keyboard: ReturnType<typeof useKonvaKeyboard> | null = null
 
@@ -165,8 +164,7 @@ onMounted(() => {
   mainLayer = new Konva.Layer()
   stage.add(mainLayer)
 
-  // 覆盖层：包含绘制预览、框选框、Transformer
-  // 合并为一层简化管理，始终在最上层
+  // 覆盖层：包含绘制预览、框选框、Transformer始终在最上层
   overlayLayer = new Konva.Layer()
   stage.add(overlayLayer)
 
@@ -276,48 +274,7 @@ watch(() => venueStore.canvasImages, (newImages) => {
   if (isSyncingFromTransformer) return
   nextTick(() => {
     if (isSyncingFromTransformer) return
-    if (!mainLayer) return
-
-    const currentIds = new Set(newImages.map(img => img.id))
-
-    // 删除不再存在的图片节点
-    nodeMap.forEach((node, id) => {
-      if (node.name() === 'canvas-image' && !currentIds.has(id)) {
-        node.destroy()
-        nodeMap.delete(id)
-      }
-    })
-
-    // 更新已存在的图片节点属性，新增不存在的
-    newImages.forEach(img => {
-      const existingNode = nodeMap.get(img.id) as Konva.Image | undefined
-      if (existingNode) {
-        // 增量更新节点属性（避免销毁重建）
-        existingNode.x(img.x)
-        existingNode.y(img.y)
-        existingNode.width(img.width)
-        existingNode.height(img.height)
-        existingNode.rotation(img.rotation || 0)
-        existingNode.opacity(img.opacity ?? 1)
-        existingNode.listening(!img.locked)
-        existingNode.setAttr('canvasImageData', img)
-      } else {
-        // 新图片：加载并创建节点
-        const cachedImage = imageCache.get(img.src)
-        if (cachedImage && cachedImage.complete) {
-          createImageNode(img, cachedImage)
-        } else {
-          const imageObj = new Image()
-          imageObj.onload = () => {
-            imageCache.set(img.src, imageObj)
-            createImageNode(img, imageObj)
-          }
-          imageObj.src = img.src
-        }
-      }
-    })
-
-    mainLayer.batchDraw()
+    syncImageNodes(newImages, getImageRenderOptions())
   })
 }, { deep: true })
 
@@ -329,8 +286,7 @@ watch(() => [
   venueStore.selectedTextIds,
   venueStore.selectedAreaIds,
   venueStore.selectedImageId
-], (newVal, oldVal) => {
-  console.log('watch 触发:', '新值:', newVal, '旧值:', oldVal,'selectedRowIds',venueStore.selectedRowIds)
+], () => {
   tfm?.updateSelectionVisuals()
   tfm?.updateTransformer()
 }, { deep: true })
@@ -345,7 +301,7 @@ const renderAll = () => {
   nodeMap.clear()
 
   // 渲染图片（在最底层）
-  renderImages()
+  renderImages(getImageRenderOptions())
 
   // 渲染所有区域
   venueStore.venue.sections.forEach(section => {
@@ -391,102 +347,15 @@ const renderSection = (section: Section) => {
   }
 }
 
-// ==================== 渲染底图 ====================
+// ==================== 图片渲染选项 ====================
 
-// 缓存已加载的图片
-const imageCache = new Map<string, HTMLImageElement>()
-
-// 渲染所有图片
-const renderImages = () => {
-  if (!mainLayer) return
-
-  const images = venueStore.canvasImages
-  if (!images || images.length === 0) return
-
-  images.forEach(canvasImage => {
-    // 检查缓存
-    const cachedImage = imageCache.get(canvasImage.src)
-    if (cachedImage && cachedImage.complete) {
-      createImageNode(canvasImage, cachedImage)
-      return
-    }
-
-    // 异步加载图片
-    const imageObj = new Image()
-    imageObj.onload = () => {
-      imageCache.set(canvasImage.src, imageObj)
-      createImageNode(canvasImage, imageObj)
-    }
-    imageObj.onerror = () => {
-      console.error('[图片] 加载失败:', canvasImage.fileName)
-    }
-    imageObj.src = canvasImage.src
-  })
-}
-
-// 创建图片节点的辅助函数
-const createImageNode = (canvasImage: CanvasImage, imageObj: HTMLImageElement) => {
-  if (!mainLayer) return
-
-  // 防止重复创建：如果已存在则直接更新属性
-  const existing = nodeMap.get(canvasImage.id) as Konva.Image | undefined
-  if (existing) {
-    existing.x(canvasImage.x)
-    existing.y(canvasImage.y)
-    existing.width(canvasImage.width)
-    existing.height(canvasImage.height)
-    existing.rotation(canvasImage.rotation || 0)
-    existing.opacity(canvasImage.opacity ?? 1)
-    // 锁定时禁止事件穿透，解锁时恢复
-    existing.listening(!canvasImage.locked)
-    existing.setAttr('canvasImageData', canvasImage)
-    mainLayer.batchDraw()
-    return
-  }
-
-  const konvaImage = new Konva.Image({
-    x: canvasImage.x,
-    y: canvasImage.y,
-    width: canvasImage.width,
-    height: canvasImage.height,
-    rotation: canvasImage.rotation || 0,
-    opacity: canvasImage.opacity ?? 1,
-    image: imageObj,
-    id: `image-${canvasImage.id}`,
-    name: 'canvas-image',
-    // 锁定时不响应事件
-    listening: !canvasImage.locked
-  })
-
-  konvaImage.setAttr('canvasImageData', canvasImage)
-
-  // 图片点击选中（始终从节点属性读取最新数据）
-  konvaImage.on('mousedown', (e) => {
-    if (e.evt.button !== 0) return
-
-    // 实时读取最新锁定状态
-    const latestData = konvaImage.getAttr('canvasImageData') as CanvasImage
-    if (latestData?.locked) return
-
-    e.cancelBubble = true
-
-    const isAlreadySelected = venueStore.selectedImageId === latestData.id
-    if (!isAlreadySelected) {
-      const additive = e.evt.shiftKey
-      venueStore.selectCanvasImage(latestData.id, additive)
-      tfm?.updateTransformer(true)
-    }
-
-    // 启动统一拖拽
-    const pointer = stage!.getPointerPosition()!
-    tfm?.startDragAll(pointer)
-  })
-
-  // 先注册到 nodeMap，防止异步回调时重复创建
-  nodeMap.set(canvasImage.id, konvaImage)
-  mainLayer.add(konvaImage)
-  mainLayer.batchDraw()
-}
+const getImageRenderOptions = () => ({
+  mainLayer,
+  stage,
+  nodeMap,
+  tfm,
+  isDrawingMode
+})
 
 // ==================== 渲染排====================
 
@@ -1360,7 +1229,7 @@ const createPolygonPreview = (points: Position[], currentPos: Position) => {
   
   // 绘制预览线段（最后一个点到鼠标位置）
   const lastPoint = points[points.length - 1]
-  const isNearStart = drawing.isNearStartPoint(currentPos, drawing.SNAP_TO_START_DISTANCE)
+  const isNearStart = drawing.isNearStartPoint(currentPos)
   const targetPoint = isNearStart ? points[0] : currentPos
   
   const previewLine = new Konva.Line({
