@@ -798,6 +798,11 @@ export function useDrawing() {
     points: _polygonPoints
   })
   
+  // 是否是数据驱动的绘制工具
+  const isDataDrivenTool = computed(() => {
+    return ['draw_seat', 'draw_rect', 'draw_ellipse', 'draw_polygon', 'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'].includes(_currentTool)
+  })
+  
   // 多边形点（响应式包装）
   const polygonPoints = computed(() => _polygonPoints)
   
@@ -874,6 +879,7 @@ export function useDrawing() {
     seatDrawPoints,
     drawStep,
     drawPoints,
+    isDataDrivenTool,
     // 方法
     setTool,
     startDrawing,
