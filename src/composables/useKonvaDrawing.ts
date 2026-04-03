@@ -19,6 +19,9 @@ export type DrawingToolMode =
   | 'select'
   | 'pan'
   | 'draw_seat'
+  | 'row-straight'
+  | 'section'
+  | 'section-diagonal'
   | 'draw_rect'
   | 'draw_ellipse'
   | 'draw_polygon'
@@ -142,6 +145,7 @@ let _dragStartPos: Position | null = null
 
 const SEAT_RADIUS = defaultSeatMapConfig.defaultSeatRadius
 const SEAT_SPACING = defaultSeatMapConfig.defaultSeatSpacing
+const ROW_SPACING = defaultSeatMapConfig.defaultRowSpacing
 const MIN_SHAPE_SIZE = 10
 const SNAP_TO_START_DISTANCE = 15
 
@@ -166,7 +170,8 @@ export function getCurrentTool(): DrawingToolMode {
 /** 判断是否处于绘制模式 */
 export function isDrawingMode(): boolean {
   const drawingTools: DrawingToolMode[] = [
-    'draw_seat', 'draw_rect', 'draw_ellipse', 'draw_polygon',
+    'draw_seat', 'row-straight', 'section', 'section-diagonal',
+    'draw_rect', 'draw_ellipse', 'draw_polygon',
     'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'
   ]
   return drawingTools.includes(_currentTool)
@@ -251,13 +256,13 @@ export function createSeatCursorPreview(pos: Position) {
 /** 创建座位排预览 */
 export function createSeatRowPreview(startPos: Position, endPos: Position) {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-  
+
   if (dist < SEAT_SPACING) return
-  
+
   const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
-  
+
   clearDrawingPreview()
-  
+
   // 绘制辅助线
   const line = new Konva.Line({
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
@@ -267,7 +272,9 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
     listening: false
   })
   addPreviewElement(line)
-  
+
+  // 起点标记已移除（避免绘制完成后留下标记）
+
   // 绘制起点标记
   const startDot = new Konva.Circle({
     x: startPos.x,
@@ -645,6 +652,9 @@ export function submitText(pos: Position) {
 export function handleDrawingClick(pos: Position): boolean {
   switch (_currentTool) {
     case 'draw_seat':
+    case 'row-straight':
+    case 'section':
+    case 'section-diagonal':
       return handleSeatClick(pos)
     case 'draw_rect':
     case 'draw_ellipse':
@@ -664,6 +674,9 @@ export function handleDrawingClick(pos: Position): boolean {
 export function handleDrawingMove(pos: Position): boolean {
   switch (_currentTool) {
     case 'draw_seat':
+    case 'row-straight':
+    case 'section':
+    case 'section-diagonal':
       return handleSeatMove(pos)
     case 'draw_rect':
       if (_dragStartPos) {
@@ -800,7 +813,7 @@ export function useDrawing() {
   
   // 是否是数据驱动的绘制工具
   const isDataDrivenTool = computed(() => {
-    return ['draw_seat', 'draw_rect', 'draw_ellipse', 'draw_polygon', 'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'].includes(_currentTool)
+    return ['draw_seat', 'row-straight', 'section', 'section-diagonal', 'draw_rect', 'draw_ellipse', 'draw_polygon', 'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'].includes(_currentTool)
   })
   
   // 多边形点（响应式包装）
@@ -871,6 +884,7 @@ export function useDrawing() {
     // 常量
     SEAT_RADIUS,
     SEAT_SPACING,
+    ROW_SPACING,
     MIN_SHAPE_SIZE,
     // 状态
     currentTool,
@@ -895,3 +909,6 @@ export function useDrawing() {
     resetDrawingState
   }
 }
+
+// 模块级别导出常量
+export { SEAT_RADIUS, SEAT_SPACING, ROW_SPACING, MIN_SHAPE_SIZE }

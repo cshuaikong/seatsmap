@@ -93,6 +93,9 @@ export interface SeatRow {
   rotation?: number
   x?: number
   y?: number
+  // 多段转折座位排的关键节点索引数组
+  // 记录每段转折处的座位索引，用于渲染多段转折排
+  segmentIndices?: number[]
 }
 
 // 扩展 Seat 支持 Seats.io 风格
@@ -157,7 +160,7 @@ export interface SeatMapConfig {
 export const defaultSeatMapConfig: SeatMapConfig = {
   defaultSeatRadius: 6,
   defaultSeatSpacing: 18,
-  defaultRowSpacing: 6,
+  defaultRowSpacing: 18,  // 行间距与座位间距相同
   showRowLabels: true,
   showSeatLabels: true,
   

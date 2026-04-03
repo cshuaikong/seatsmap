@@ -17,6 +17,8 @@ export interface UseKonvaKeyboardOptions {
   currentTool: DrawingToolMode
   /** 是否处于绘制模式 */
   isDrawingMode: () => boolean
+  /** 是否处于座位绘制模式（单排/转折/多行） */
+  isSeatDrawingMode: () => boolean
   /** 座位绘制步骤（用于 ESC 判断） */
   seatDrawStep: { value: 'idle' | 'first' | 'dragging' | 'segment_done' }
   /** 重置座位绘制状态 */
@@ -38,6 +40,7 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
   const {
     currentTool,
     isDrawingMode,
+    isSeatDrawingMode,
     seatDrawStep,
     resetSeatDrawingState,
     clearDrawingPreview,
@@ -50,8 +53,8 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
   const handleKeyDown = (e: KeyboardEvent) => {
     // ESC 取消绘制 / 清空选择
     if (e.key === 'Escape') {
-      // 优先处理座位绘制状态
-      if (currentTool === 'draw_seat' && seatDrawStep.value !== 'idle') {
+      // 优先处理座位绘制状态（单排/转折/多行）
+      if (isSeatDrawingMode() && seatDrawStep.value !== 'idle') {
         resetSeatDrawingState()
         clearDrawingPreview()
         return

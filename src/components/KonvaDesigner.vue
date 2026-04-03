@@ -233,9 +233,9 @@ watch(currentTool, (newTool) => {
   const toolMapping: Record<string, string> = {
     'select': 'select',
     'selectseat': 'select',
-    'row-straight': 'draw_seat',
-    'section': 'draw_seat',
-    'section-diagonal': 'draw_seat',
+    'row-straight': 'row-straight',
+    'section': 'section',
+    'section-diagonal': 'section-diagonal',
     'drawCircle': 'draw_ellipse',
     'drawRect': 'draw_rect',
     'drawPolygon': 'draw_polygon',

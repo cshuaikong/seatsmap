@@ -108,6 +108,7 @@ export function createRowShape(
 
 /**
  * 创建排的 sceneFunc（批次绘制座位）
+ * 支持多段转折排渲染
  */
 export function createRowSceneFunc(
   row: SeatRow,
@@ -117,6 +118,9 @@ export function createRowSceneFunc(
 ): (context: Konva.Context, shape: Konva.Shape) => void {
   return (context, shape) => {
     const radius = seatRadius
+
+    // 获取关键节点索引集合
+    const segmentIndices = new Set(row.segmentIndices || [])
 
     // 按分类颜色分组绘制
     const colorGroups = groupSeatsByColor(row.seats, getSeatColor)
@@ -147,6 +151,8 @@ export function createRowSceneFunc(
       })
       context.restore()
     })
+
+    // 关键节点高亮已移除（不需要显示黄色/橙色圈）
   }
 }
 

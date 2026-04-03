@@ -7,7 +7,7 @@ import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
-import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints } from '../composables/useKonvaDrawing'
+import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints, ROW_SPACING } from '../composables/useKonvaDrawing'
 import {
   setPreviewLayer,
   clearDrawingPreview,
@@ -94,7 +94,7 @@ let justDragged = false
 // 当前绘制模式
 const currentDrawingTool = ref<DrawingToolMode>('select')
 
-// ==================== 座位绘制状态机（支持拖拽/点击混合模式 + 多段转折）====================
+// ==================== 座位绘制状态机（支持三种模式：单排/转折/多行）====================
 
 type SeatDrawStep = 'idle' | 'first' | 'dragging' | 'segment_done'
 
@@ -102,7 +102,18 @@ type SeatDrawStep = 'idle' | 'first' | 'dragging' | 'segment_done'
 interface SeatSegment {
   start: Position
   end: Position
-  seats: { x: number; y: number }[]
+  angle: number  // 段的角度（弧度）
+  seatCount: number  // 座位数量
+  // 推算的最后一个座位中心位置（用于精确定位转折点）
+  lastSeatPos?: Position
+}
+
+// 多行绘制数据
+interface MultiRowPreview {
+  baseRow: SeatSegment  // 第一排数据
+  rowCount: number      // 行数
+  rowSpacing: number    // 行间距
+  angle: number         // 整体角度
 }
 
 const seatDrawStep = ref<SeatDrawStep>('idle')
@@ -113,6 +124,9 @@ const seatDrawPoints = ref<{
 
 // 已完成的段（用于多段转折绘制）
 const completedSegments = ref<SeatSegment[]>([])
+
+// 多行绘制预览数据
+const multiRowPreview = ref<MultiRowPreview | null>(null)
 
 // 是否正在拖拽中（用于区分拖拽模式vs点击模式）
 const isDraggingSeat = ref(false)
@@ -125,7 +139,23 @@ const resetSeatDrawingState = () => {
   seatDrawStep.value = 'idle'
   seatDrawPoints.value = { first: null, current: null }
   completedSegments.value = []
+  multiRowPreview.value = null
   isDraggingSeat.value = false
+}
+
+// 判断当前是否为多段转折绘制模式
+const isSegmentDrawingMode = (): boolean => {
+  return currentDrawingTool.value === 'section'
+}
+
+// 判断当前是否为单排绘制模式
+const isSingleRowDrawingMode = (): boolean => {
+  return currentDrawingTool.value === 'row-straight'
+}
+
+// 判断当前是否为多行绘制模式
+const isMultiRowDrawingMode = (): boolean => {
+  return currentDrawingTool.value === 'section-diagonal'
 }
 
 // 设置当前绘制工具
@@ -235,6 +265,7 @@ onMounted(() => {
   keyboard = useKonvaKeyboard({
     currentTool: currentDrawingTool.value,
     isDrawingMode: () => drawing.isDataDrivenTool.value,
+    isSeatDrawingMode: () => isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode(),
     seatDrawStep: { get value() { return seatDrawStep.value } },
     resetSeatDrawingState,
     clearDrawingPreview,
@@ -689,9 +720,9 @@ const setupStageEvents = () => {
         drawing.startDrawing(pos)
         return
       }
-      
+
       // 座位绘制：分段式单击处理（在 click 事件中处理）
-      if (tool === 'draw_seat') {
+      if (tool === 'row-straight' || tool === 'section' || tool === 'section-diagonal') {
         // 分段式绘制在 click 事件中处理，这里不处理 mousedown
         return
       }
@@ -767,8 +798,8 @@ const setupStageEvents = () => {
     const pointer = stage!.getPointerPosition()
     if (!pointer) return
     
-    // 座位绘制：支持拖拽/点击混合模式 + 多段转折
-    if (currentDrawingTool.value === 'draw_seat') {
+    // 座位绘制：支持三种模式（单排/转折/多行）
+    if (isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode()) {
       if (seatDrawStep.value === 'idle') {
         // idle 状态：显示鼠标跟随的预览圆
         createSeatCursorPreview(pos)
@@ -776,13 +807,30 @@ const setupStageEvents = () => {
       } else if ((seatDrawStep.value === 'first' || seatDrawStep.value === 'dragging') && seatDrawPoints.value.first) {
         // first/dragging 状态：显示从起点到鼠标的排预览
         seatDrawPoints.value.current = pos
-        createMultiSegmentPreview(seatDrawPoints.value.first, pos, completedSegments.value)
+        if (isSegmentDrawingMode()) {
+          // 多段转折模式：使用多段预览
+          createMultiSegmentPreview(seatDrawPoints.value.first, pos, completedSegments.value)
+        } else if (isMultiRowDrawingMode()) {
+          // 多行模式：使用多行预览
+          createMultiRowPreview(seatDrawPoints.value.first, pos)
+        } else {
+          // 单排模式：使用简单排预览
+          createSeatRowPreview(seatDrawPoints.value.first, pos)
+        }
         return
-      } else if (seatDrawStep.value === 'segment_done' && completedSegments.value.length > 0) {
-        // segment_done 状态：以上一段终点为起点，预览新段
-        const lastSegment = completedSegments.value[completedSegments.value.length - 1]
-        seatDrawPoints.value.current = pos
-        createMultiSegmentPreview(lastSegment.end, pos, completedSegments.value)
+      } else if (seatDrawStep.value === 'segment_done') {
+        // segment_done 状态：处理多段/多行预览
+        if (isSegmentDrawingMode() && completedSegments.value.length > 0) {
+          // 多段转折模式：以上一段终点为起点，预览新段
+          const lastSegment = completedSegments.value[completedSegments.value.length - 1]
+          const segmentStart = lastSegment.lastSeatPos || lastSegment.end
+          seatDrawPoints.value.current = pos
+          createMultiSegmentPreview(segmentStart, pos, completedSegments.value)
+        } else if (isMultiRowDrawingMode() && multiRowPreview.value) {
+          // 多行模式：更新多行预览（调整行数）
+          seatDrawPoints.value.current = pos
+          createMultiRowPreview(seatDrawPoints.value.first!, pos)
+        }
         return
       }
     }
@@ -832,19 +880,30 @@ const setupStageEvents = () => {
   // 鼠标释放
   stage.on('mouseup', (e) => {
     // 座位绘制模式：检测是否为拖拽
-    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
+    if ((isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode()) && seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
       const endPos = getStagePosition()
       if (endPos) {
         // 计算移动距离
         const dx = endPos.x - seatDrawPoints.value.first.x
         const dy = endPos.y - seatDrawPoints.value.first.y
         const dist = Math.sqrt(dx * dx + dy * dy)
-        
+
         if (dist > DRAG_THRESHOLD) {
-          // 拖拽模式：保存第一段，进入 segment_done 状态
+          // 拖拽模式
           isDraggingSeat.value = true
-          saveSegment(seatDrawPoints.value.first, endPos)
-          seatDrawStep.value = 'segment_done'
+
+          if (isSegmentDrawingMode()) {
+            // 多段转折模式：保存第一段，进入 segment_done 状态
+            saveSegment(seatDrawPoints.value.first, endPos)
+            seatDrawStep.value = 'segment_done'
+          } else if (isSingleRowDrawingMode()) {
+            // 单排模式：直接提交
+            submitSeatRow(seatDrawPoints.value.first, endPos)
+            resetSeatDrawingState()
+          } else if (isMultiRowDrawingMode()) {
+            // 多行模式：进入多行预览状态，等待确认
+            seatDrawStep.value = 'segment_done'
+          }
           return
         }
         // 点击模式：移动距离小，保持 first 状态，等待第二次点击
@@ -852,9 +911,9 @@ const setupStageEvents = () => {
       }
       return
     }
-    
-    // segment_done 状态：mouseup 不处理，等待 click 提交
-    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value === 'segment_done') {
+
+    // segment_done 状态：mouseup 不处理，等待 click 提交（多段/多行模式）
+    if ((isSegmentDrawingMode() || isMultiRowDrawingMode()) && seatDrawStep.value === 'segment_done') {
       // 不处理，让 click 事件处理提交
       return
     }
@@ -898,7 +957,7 @@ const setupStageEvents = () => {
   // 鼠标按下事件
   stage.on('mousedown', (e) => {
     // 座位绘制模式：处理第一次按下
-    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value === 'idle') {
+    if ((isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode()) && seatDrawStep.value === 'idle') {
       const pos = getStagePosition()
       if (!pos) return
 
@@ -907,6 +966,8 @@ const setupStageEvents = () => {
       seatDrawStep.value = 'first'
       isDraggingSeat.value = false
       clearDrawingPreview()
+      // 重置多排预览数据
+      multiRowPreview.value = null
       // 立即绘制起点小圆
       createSeatCursorPreview(pos)
       return
@@ -916,43 +977,75 @@ const setupStageEvents = () => {
   // 点击事件（用于选中对象和座位绘制确认）
   stage.on('click', (e) => {
     // 座位绘制模式：第二次点击确认
-    if (currentDrawingTool.value === 'draw_seat') {
+    if (isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode()) {
       // 如果是拖拽模式（有移动过），不处理 click
       if (isDraggingSeat.value) {
         isDraggingSeat.value = false
         return
       }
-      
-      // 忽略第一次点击（刚从 idle 进入 first 状态）
-      // 通过检查是否有 current 点来判断是否是第二次点击
-      if (seatDrawStep.value === 'first' && seatDrawPoints.value.first && seatDrawPoints.value.current) {
+
+      // 单排模式：第二次点击提交
+      if (isSingleRowDrawingMode() && seatDrawStep.value === 'first' && seatDrawPoints.value.first && seatDrawPoints.value.current) {
         const pos = getStagePosition()
         if (!pos) return
-        
+
         // 第二次单击：确定终点，提交座位排
         submitSeatRow(seatDrawPoints.value.first, pos)
         // 重置状态，允许继续绘制下一排
         resetSeatDrawingState()
         return
       }
-      
-      // segment_done 状态：在终点座位单击提交
-      if (seatDrawStep.value === 'segment_done' && completedSegments.value.length > 0) {
+
+      // 多行模式：segment_done 状态单击提交
+      if (isMultiRowDrawingMode() && seatDrawStep.value === 'segment_done' && multiRowPreview.value) {
         const clickPos = getStagePosition()
         if (!clickPos) return
-        
-        const lastSegment = completedSegments.value[completedSegments.value.length - 1]
-        // 检查点击位置是否接近最后一段的终点（关键节点）
-        const dx = clickPos.x - lastSegment.end.x
-        const dy = clickPos.y - lastSegment.end.y
+
+        // 计算最后一排最后一个座位位置
+        const preview = multiRowPreview.value
+        const perpX = -Math.sin(preview.angle)
+        const perpY = Math.cos(preview.angle)
+        const lastRowOffsetX = (preview.rowCount - 1) * preview.rowSpacing * perpX
+        const lastRowOffsetY = (preview.rowCount - 1) * preview.rowSpacing * perpY
+        const lastRowStartX = preview.baseRow.start.x + lastRowOffsetX
+        const lastRowStartY = preview.baseRow.start.y + lastRowOffsetY
+        const lastSeatLocalX = (preview.baseRow.seatCount - 1) * drawing.SEAT_SPACING
+        const lastSeatPos = {
+          x: lastRowStartX + lastSeatLocalX * Math.cos(preview.angle),
+          y: lastRowStartY + lastSeatLocalX * Math.sin(preview.angle)
+        }
+
+        // 检查点击位置是否接近最后一个座位
+        const dx = clickPos.x - lastSeatPos.x
+        const dy = clickPos.y - lastSeatPos.y
         const dist = Math.sqrt(dx * dx + dy * dy)
-        
+
+        if (dist < SEAT_RADIUS * 3) {
+          // 在最后一个座位附近单击：提交多行
+          submitMultiRows()
+        }
+        return
+      }
+
+      // 多段转折模式：segment_done 状态在终点座位单击提交
+      if (isSegmentDrawingMode() && seatDrawStep.value === 'segment_done' && completedSegments.value.length > 0) {
+        const clickPos = getStagePosition()
+        if (!clickPos) return
+
+        const lastSegment = completedSegments.value[completedSegments.value.length - 1]
+        const lastSeatPos = lastSegment.lastSeatPos || lastSegment.end
+
+        // 检查点击位置是否接近最后一段的最后一个座位（关键节点）
+        const dx = clickPos.x - lastSeatPos.x
+        const dy = clickPos.y - lastSeatPos.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+
         if (dist < SEAT_RADIUS * 3) {
           // 在关键节点附近单击：提交所有段
           submitAllSegments()
         } else {
           // 在其他位置单击：保存新段并继续
-          saveSegment(lastSegment.end, clickPos)
+          saveSegment(lastSeatPos, clickPos)
         }
         return
       }
@@ -1050,14 +1143,14 @@ const createSeatCursorPreview = (pos: Position) => {
 /** 创建座位排预览 */
 const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-  
+
   if (dist < drawing.SEAT_SPACING) return
-  
+
   const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
-  
+
   // 清除旧预览
   clearDrawingPreview()
-  
+
   // 绘制辅助线
   const line = new Konva.Line({
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
@@ -1067,18 +1160,8 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
     listening: false
   })
   addPreviewElement(line)
-  // 绘制起点标记
-  const startDot = new Konva.Circle({
-    x: startPos.x,
-    y: startPos.y,
-    radius: 5,
-    fill: '#3b82f6',
-    stroke: '#fff',
-    strokeWidth: 1.5,
-    listening: false
-  })
-  addPreviewElement(startDot)
-  
+  // 起点标记已移除（绘制完成后不应留下标记）
+
   // 生成座位数据（局部坐标）
   const seats: { x: number; y: number }[] = []
   for (let i = 0; i < count; i++) {
@@ -1141,85 +1224,98 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 创建多段座位排预览（支持转折） */
+/** 创建多段座位排预览（支持转折）- 优化版本 */
 const createMultiSegmentPreview = (
   currentStart: Position,
   currentEnd: Position,
   segments: SeatSegment[]
 ) => {
   clearDrawingPreview()
-  
-  // 1. 绘制已完成的段
-  segments.forEach((segment, segIndex) => {
-    const isLastSegment = segIndex === segments.length - 1
-    
-    // 绘制该段的座位
-    const shape = new Konva.Shape({
-      x: segment.start.x,
-      y: segment.start.y,
+
+  // 1. 批量绘制已完成的段（合并为一个 Shape 减少渲染开销）
+  if (segments.length > 0) {
+    const completedShape = new Konva.Shape({
       listening: false,
       perfectDrawEnabled: false
     })
-    
-    shape.sceneFunc((ctx) => {
-      segment.seats.forEach((seat, index) => {
-        ctx.beginPath()
-        ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
-        
-        // 最后一个段的最后一个座位：关键节点样式（橙色）
-        if (isLastSegment && index === segment.seats.length - 1) {
-          ctx.fillStyle = '#fed7aa' // 浅橙色填充
-          ctx.fill()
-          ctx.strokeStyle = '#f97316' // 橙色边框
-          ctx.lineWidth = 2.5 // 更粗
-          ctx.stroke()
-        } else {
-          // 其他座位：标准样式
-          ctx.fillStyle = '#dbeafe'
-          ctx.fill()
-          ctx.strokeStyle = '#3b82f6'
-          ctx.lineWidth = 1
-          ctx.stroke()
+
+    completedShape.sceneFunc((ctx) => {
+      segments.forEach((segment, segIndex) => {
+        const isLastSegment = segIndex === segments.length - 1
+
+        ctx.save()
+        ctx.translate(segment.start.x, segment.start.y)
+        ctx.rotate(segment.angle)
+
+        for (let i = 0; i < segment.seatCount; i++) {
+          const x = i * drawing.SEAT_SPACING
+          const y = 0
+
+          ctx.beginPath()
+          ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
+
+          // 关键节点判断：最后一段的最后一个座位，或非第一段的第一个座位
+          const isKeyNode = (isLastSegment && i === segment.seatCount - 1) || (i === 0 && segIndex > 0)
+
+          if (isKeyNode) {
+            // 关键节点：白色填充 + 蓝色边框（与单排起点一致）
+            ctx.fillStyle = '#ffffff'
+            ctx.fill()
+            ctx.strokeStyle = '#3b82f6'
+            ctx.lineWidth = 2
+            ctx.stroke()
+          } else {
+            // 普通座位：浅蓝色填充 + 蓝色边框
+            ctx.fillStyle = '#dbeafe'
+            ctx.fill()
+            ctx.strokeStyle = '#3b82f6'
+            ctx.lineWidth = 1
+            ctx.stroke()
+          }
         }
+
+        ctx.restore()
       })
     })
-    addPreviewElement(shape)
-  })
-  
+    addPreviewElement(completedShape)
+  }
+
   // 2. 绘制当前预览段
   const { ux, uy, dist } = getUnitVector(currentStart, currentEnd)
   if (dist >= drawing.SEAT_SPACING) {
     const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
-    const angle = Math.atan2(uy, ux) * 180 / Math.PI
-    
-    // 生成座位数据（局部坐标）
-    const seats: { x: number; y: number }[] = []
-    for (let i = 0; i < count; i++) {
-      seats.push({
-        x: i * drawing.SEAT_SPACING,
-        y: 0
-      })
-    }
-    
-    const shape = new Konva.Shape({
-      x: currentStart.x,
-      y: currentStart.y,
-      rotation: angle,
+    const angle = Math.atan2(uy, ux)
+
+    const previewShape = new Konva.Shape({
       listening: false,
       perfectDrawEnabled: false
     })
-    
-    shape.sceneFunc((ctx) => {
-      seats.forEach((seat, index) => {
+
+    previewShape.sceneFunc((ctx) => {
+      ctx.save()
+      ctx.translate(currentStart.x, currentStart.y)
+      ctx.rotate(angle)
+
+      for (let i = 0; i < count; i++) {
+        const x = i * drawing.SEAT_SPACING
+        const y = 0
+
         ctx.beginPath()
-        ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
-        
-        // 第一个座位：粗边框（连接点）
-        if (index === 0) {
-          ctx.fillStyle = '#fed7aa'
+        ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
+
+        // 第一个座位：关键节点样式（白色填充+蓝色边框）
+        if (i === 0) {
+          ctx.fillStyle = '#ffffff'
           ctx.fill()
-          ctx.strokeStyle = '#f97316'
-          ctx.lineWidth = 2.5
+          ctx.strokeStyle = '#3b82f6'
+          ctx.lineWidth = 2
+          ctx.stroke()
+        } else if (i === count - 1) {
+          // 最后一个座位：可点击提交的关键节点（绿色边框提示）
+          ctx.fillStyle = '#dbeafe'
+          ctx.fill()
+          ctx.strokeStyle = '#22c55e'  // 绿色边框表示可点击
+          ctx.lineWidth = 2
           ctx.stroke()
         } else {
           // 其他座位：标准样式
@@ -1229,11 +1325,118 @@ const createMultiSegmentPreview = (
           ctx.lineWidth = 1
           ctx.stroke()
         }
-      })
+      }
+
+      ctx.restore()
     })
-    addPreviewElement(shape)
+    addPreviewElement(previewShape)
   }
-  
+
+  overlayLayer?.batchDraw()
+}
+
+/** 创建多行座位预览（一个Shape绘制所有行）- seats.io风格 */
+const createMultiRowPreview = (startPos: Position, endPos: Position) => {
+  clearDrawingPreview()
+
+  // 计算第一排数据（实时计算，不缓存）
+  const { ux, uy, dist } = getUnitVector(startPos, endPos)
+  if (dist < drawing.SEAT_SPACING) return
+
+  const seatCount = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
+  const angle = Math.atan2(uy, ux)
+
+  // 在 segment_done 状态下，使用已保存的第一排数据，只更新行数
+  let rowCount = 1
+  let rowSpacing = ROW_SPACING
+  let baseRow = { start: startPos, end: endPos, angle, seatCount }
+
+  if (seatDrawStep.value === 'segment_done' && multiRowPreview.value) {
+    // 使用已保存的第一排数据
+    baseRow = multiRowPreview.value.baseRow
+    rowSpacing = multiRowPreview.value.rowSpacing
+
+    // 计算第一排最后一个座位位置
+    const lastSeatLocalX = (baseRow.seatCount - 1) * drawing.SEAT_SPACING
+    const firstRowEndX = baseRow.start.x + lastSeatLocalX * Math.cos(baseRow.angle)
+    const firstRowEndY = baseRow.start.y + lastSeatLocalX * Math.sin(baseRow.angle)
+
+    // 计算鼠标到第一排终点的距离（垂直方向）
+    const dx = endPos.x - firstRowEndX
+    const dy = endPos.y - firstRowEndY
+    const perpDist = Math.sqrt(dx * dx + dy * dy)
+
+    // 根据距离计算行数
+    rowCount = Math.max(1, Math.floor(perpDist / rowSpacing) + 1)
+  }
+
+  // 保存预览数据
+  multiRowPreview.value = {
+    baseRow,
+    rowCount,
+    rowSpacing,
+    angle: baseRow.angle
+  }
+
+  const preview = multiRowPreview.value
+
+  // 计算垂直方向角度
+  const perpAngle = preview.angle + Math.PI / 2
+
+  // 使用一个 Shape 绘制所有行
+  const shape = new Konva.Shape({
+    listening: false,
+    perfectDrawEnabled: false
+  })
+
+  shape.sceneFunc((ctx) => {
+    for (let row = 0; row < preview.rowCount; row++) {
+      // 计算该行的起点（从第一排起点沿垂直方向偏移）
+      const rowOffsetX = row * preview.rowSpacing * Math.cos(perpAngle)
+      const rowOffsetY = row * preview.rowSpacing * Math.sin(perpAngle)
+      const rowStartX = preview.baseRow.start.x + rowOffsetX
+      const rowStartY = preview.baseRow.start.y + rowOffsetY
+
+      ctx.save()
+      ctx.translate(rowStartX, rowStartY)
+      ctx.rotate(preview.angle)
+
+      for (let i = 0; i < preview.baseRow.seatCount; i++) {
+        const x = i * drawing.SEAT_SPACING
+        const y = 0
+
+        ctx.beginPath()
+        ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
+
+        // 第一排第一个座位：白色填充（起点标记）
+        if (row === 0 && i === 0) {
+          ctx.fillStyle = '#ffffff'
+          ctx.fill()
+          ctx.strokeStyle = '#3b82f6'
+          ctx.lineWidth = 2
+          ctx.stroke()
+        } else if (row === preview.rowCount - 1 && i === preview.baseRow.seatCount - 1) {
+          // 最后一排最后一个座位：绿色边框（可点击提交）
+          ctx.fillStyle = '#dbeafe'
+          ctx.fill()
+          ctx.strokeStyle = '#22c55e'
+          ctx.lineWidth = 2
+          ctx.stroke()
+        } else {
+          // 其他座位：标准样式
+          ctx.fillStyle = '#dbeafe'
+          ctx.fill()
+          ctx.strokeStyle = '#3b82f6'
+          ctx.lineWidth = 1
+          ctx.stroke()
+        }
+      }
+
+      ctx.restore()
+    }
+  })
+
+  addPreviewElement(shape)
   overlayLayer?.batchDraw()
 }
 
@@ -1241,37 +1444,168 @@ const createMultiSegmentPreview = (
 const saveSegment = (startPos: Position, endPos: Position) => {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
   if (dist < drawing.SEAT_SPACING) return
-  
+
   const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
-  
-  // 生成座位数据（局部坐标）
-  const seats: { x: number; y: number }[] = []
-  for (let i = 0; i < count; i++) {
-    seats.push({
-      x: i * drawing.SEAT_SPACING,
-      y: 0
-    })
+  const angle = Math.atan2(uy, ux)
+
+  // 推算最后一个座位的精确中心位置（不是鼠标位置）
+  const lastSeatLocalX = (count - 1) * drawing.SEAT_SPACING
+  const lastSeatPos = {
+    x: startPos.x + lastSeatLocalX * Math.cos(angle),
+    y: startPos.y + lastSeatLocalX * Math.sin(angle)
   }
-  
+
+  // 保存段数据
   completedSegments.value.push({
     start: startPos,
     end: endPos,
-    seats
+    angle,
+    seatCount: count,
+    lastSeatPos  // 记录精确的最后一个座位位置
   })
+}
+
+/** 计算多段座位排的所有座位坐标（相对row起点的局部坐标） */
+const calculateMultiSegmentSeats = (
+  segments: SeatSegment[],
+  seatSpacing: number,
+  seatRadius: number
+): { seats: { x: number; y: number }[]; segmentIndices: number[] } => {
+  if (segments.length === 0) return { seats: [], segmentIndices: [] }
+
+  const seats: { x: number; y: number }[] = []
+  const segmentIndices: number[] = [0]  // 第一个座位索引为0，总是关键节点
+
+  // 以第一段的起点作为row的参考原点
+  const rowOrigin = segments[0].start
+
+  let currentGlobalPos = { ...rowOrigin }
+
+  segments.forEach((segment, segIndex) => {
+    // 计算段起点相对于row原点的偏移
+    const segmentOffsetX = segment.start.x - rowOrigin.x
+    const segmentOffsetY = segment.start.y - rowOrigin.y
+
+    // 生成该段的座位
+    for (let i = 0; i < segment.seatCount; i++) {
+      // 座位在段内的局部位置
+      const localX = i * seatSpacing
+
+      // 转换为全局坐标
+      const globalX = segment.start.x + localX * Math.cos(segment.angle)
+      const globalY = segment.start.y + localX * Math.sin(segment.angle)
+
+      // 转换为相对row原点的局部坐标
+      seats.push({
+        x: globalX - rowOrigin.x + seatRadius,
+        y: globalY - rowOrigin.y + seatRadius
+      })
+    }
+
+    // 记录下一段的起点索引（如果不是最后一段）
+    if (segIndex < segments.length - 1) {
+      // 下一段的起点是当前段的最后一个座位
+      segmentIndices.push(seats.length)
+    }
+
+    // 更新当前全局位置到下一段的起点（当前段最后一个座位）
+    const lastSeatLocalX = (segment.seatCount - 1) * seatSpacing
+    currentGlobalPos = {
+      x: segment.start.x + lastSeatLocalX * Math.cos(segment.angle),
+      y: segment.start.y + lastSeatLocalX * Math.sin(segment.angle)
+    }
+  })
+
+  return { seats, segmentIndices }
 }
 
 /** 提交所有段到 store */
 const submitAllSegments = () => {
   if (completedSegments.value.length === 0) return
-  
-  // 将所有段合并为一个 row 提交
-  // 简化处理：目前只提交第一段，后续需要合并逻辑
+
+  // 计算所有座位和关键节点
+  const { seats: seatPositions, segmentIndices } = calculateMultiSegmentSeats(
+    completedSegments.value,
+    drawing.SEAT_SPACING,
+    SEAT_RADIUS
+  )
+
+  if (seatPositions.length === 0) return
+
+  // 生成座位对象
+  const seats: Seat[] = seatPositions.map((pos, index) => ({
+    id: generateId(),
+    label: String(index + 1),
+    x: pos.x,
+    y: pos.y,
+    categoryKey: venueStore.venue.categories[0]?.key || 1,
+    status: 'available',
+    objectType: 'seat'
+  }))
+
+  // 提交到store
+  const sectionId = getOrCreateDefaultSection()
   const firstSegment = completedSegments.value[0]
-  submitSeatRow(firstSegment.start, firstSegment.end)
-  
-  // TODO: 支持真正的多段转折排
-  // 需要将多个段的座位合并到一个 row 中，处理坐标转换
-  
+
+  venueStore.addRow(sectionId, {
+    label: '',
+    seats,
+    x: firstSegment.start.x,
+    y: firstSegment.start.y,
+    rotation: 0,  // 多段排不使用整体旋转
+    curve: 0,
+    seatSpacing: drawing.SEAT_SPACING,
+    segmentIndices  // 记录关键节点
+  })
+
+  resetSeatDrawingState()
+}
+
+/** 提交多行座位到 store（拆分为多排） */
+const submitMultiRows = () => {
+  if (!multiRowPreview.value) return
+
+  const preview = multiRowPreview.value
+  const sectionId = getOrCreateDefaultSection()
+
+  // 计算垂直方向向量
+  const perpX = -Math.sin(preview.angle)
+  const perpY = Math.cos(preview.angle)
+
+  // 逐行提交
+  for (let row = 0; row < preview.rowCount; row++) {
+    // 计算该行的起点
+    const rowOffsetX = row * preview.rowSpacing * perpX
+    const rowOffsetY = row * preview.rowSpacing * perpY
+    const rowStartX = preview.baseRow.start.x + rowOffsetX
+    const rowStartY = preview.baseRow.start.y + rowOffsetY
+
+    // 生成该行的座位
+    const seats: Seat[] = []
+    for (let i = 0; i < preview.baseRow.seatCount; i++) {
+      seats.push({
+        id: generateId(),
+        label: String(i + 1),
+        x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
+        y: SEAT_RADIUS,
+        categoryKey: venueStore.venue.categories[0]?.key || 1,
+        status: 'available',
+        objectType: 'seat'
+      })
+    }
+
+    // 提交每一排
+    venueStore.addRow(sectionId, {
+      label: '',
+      seats,
+      x: rowStartX,
+      y: rowStartY,
+      rotation: preview.angle * 180 / Math.PI,
+      curve: 0,
+      seatSpacing: drawing.SEAT_SPACING
+    })
+  }
+
   resetSeatDrawingState()
 }
 
