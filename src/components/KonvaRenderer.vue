@@ -1071,29 +1071,24 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   })
   
   shape.sceneFunc((ctx) => {
-    // 座位圆圈 - 白色填充 + 蓝色边框
+    // 座位圆圈 - 浅蓝色填充 + 蓝色边框
     seats.forEach((seat, index) => {
       ctx.beginPath()
       ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
       
+      // 统一填充：浅蓝色
+      ctx.fillStyle = '#dbeafe'
+      ctx.fill()
+      
       if (index === 0) {
-        // 第一个座位：特殊样式（绿色填充，表示起点）
-        ctx.fillStyle = '#10b981'
-        ctx.fill()
-        ctx.strokeStyle = '#059669'
+        // 第一个座位：粗边框（2px），表示起点
+        ctx.strokeStyle = '#3b82f6'
         ctx.lineWidth = 2
         ctx.stroke()
-        // 添加白色内圈装饰
-        ctx.beginPath()
-        ctx.arc(seat.x, seat.y, SEAT_RADIUS * 0.5, 0, Math.PI * 2)
-        ctx.fillStyle = '#ffffff'
-        ctx.fill()
       } else {
-        // 其他座位：标准样式
-        ctx.fillStyle = '#ffffff'
-        ctx.fill()
+        // 其他座位：标准边框（1px）
         ctx.strokeStyle = '#3b82f6'
-        ctx.lineWidth = 1.5
+        ctx.lineWidth = 1
         ctx.stroke()
       }
     })
