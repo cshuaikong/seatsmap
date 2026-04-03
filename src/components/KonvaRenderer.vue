@@ -900,10 +900,12 @@ const setupStageEvents = () => {
         return
       }
       
-      const pos = getStagePosition()
-      if (!pos) return
-
-      if (seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
+      // 忽略第一次点击（刚从 idle 进入 first 状态）
+      // 通过检查是否有 current 点来判断是否是第二次点击
+      if (seatDrawStep.value === 'first' && seatDrawPoints.value.first && seatDrawPoints.value.current) {
+        const pos = getStagePosition()
+        if (!pos) return
+        
         // 第二次单击：确定终点，提交座位排
         submitSeatRow(seatDrawPoints.value.first, pos)
         // 重置状态，允许继续绘制下一排
