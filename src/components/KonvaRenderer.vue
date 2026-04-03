@@ -300,7 +300,7 @@ watch(() => [
   venueStore.selectedImageId
 ], (newVal, oldVal) => {
   console.log('watch 触发:', '新值:', newVal, '旧值:', oldVal,'selectedRowIds',venueStore.selectedRowIds)
-  updateSelectionVisuals()
+  tfm?.updateSelectionVisuals()
   tfm?.updateTransformer()
 }, { deep: true })
 
@@ -325,7 +325,7 @@ const renderAll = () => {
   updateViewportCulling()
 
   // 更新选中装饰
-  updateSelectionVisuals()
+  tfm?.updateSelectionVisuals()
 
   mainLayer.batchDraw()
 }
@@ -1760,51 +1760,6 @@ const submitArea = (points: Position[]) => {
 }
 
 // ==================== 选中效果 ====================
-
-const updateSelectionVisuals = () => {
-  if (!mainLayer) return
-  console.log('updateSelectionVisuals',venueStore.selectedRowIds)
-  // 为所有节点移除选中效果
-  nodeMap.forEach((node, id) => {
-    const name = node.name() || ''
-
-    if (name.includes('row-shape')) {
-      // 排的选择效果）sceneFunc 中处）
-      node.setAttr('selected', venueStore.selectedRowIds.includes(id))
-    } else if (name.includes('shape-object') || name.includes('area-object')) {
-      const isSelected = venueStore.selectedShapeIds.includes(id) || venueStore.selectedAreaIds.includes(id)
-      const shapeNode = node as Konva.Shape
-      if (isSelected) {
-        // 保存原始 stroke（如果还没保存的话）
-        if (shapeNode.getAttr('_originalStroke') === undefined) {
-          shapeNode.setAttr('_originalStroke', shapeNode.stroke())
-          shapeNode.setAttr('_originalStrokeWidth', shapeNode.strokeWidth())
-        }
-        shapeNode.stroke('#3b82f6')
-        shapeNode.strokeWidth(2)
-      } else {
-        // 恢复原始 stroke
-        const origStroke = shapeNode.getAttr('_originalStroke')
-        const origWidth = shapeNode.getAttr('_originalStrokeWidth')
-        shapeNode.stroke(origStroke !== undefined ? origStroke : undefined)
-        shapeNode.strokeWidth(origWidth !== undefined ? origWidth : 0)
-        shapeNode.setAttr('_originalStroke', undefined)
-        shapeNode.setAttr('_originalStrokeWidth', undefined)
-      }
-    } else if (name.includes('text-object')) {
-      const isSelected = venueStore.selectedTextIds.includes(id)
-      if (isSelected) {
-        node.setAttr('selected', true)
-      } else {
-        node.setAttr('selected', false)
-      }
-    }
-  })
-
-  // 重绘以更新选中效果
-  mainLayer.batchDraw()
-}
-
 // ==================== 暴露方法 ====================
 
 defineExpose({

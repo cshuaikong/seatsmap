@@ -56,6 +56,8 @@ export interface UseKonvaTransformerReturn {
   updateDragAll: (screenPos: { x: number; y: number }) => void
   /** 结束拖拽并同步到 store */
   endDragAll: () => boolean
+  /** 更新选中视觉效果 */
+  updateSelectionVisuals: () => void
 }
 
 // ==================== Main Composable ====================
@@ -447,6 +449,48 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     }
   }
 
+  // ==================== 选中视觉效果 ====================
+
+  const updateSelectionVisuals = () => {
+    if (!mainLayer) return
+
+    // 为所有节点移除选中效果
+    nodeMap.forEach((node, id) => {
+      const name = node.name() || ''
+
+      if (name.includes('row-shape')) {
+        // 排的选择效果在 sceneFunc 中处理
+        node.setAttr('selected', venueStore.selectedRowIds.includes(id))
+      } else if (name.includes('shape-object') || name.includes('area-object')) {
+        const isSelected = venueStore.selectedShapeIds.includes(id) || venueStore.selectedAreaIds.includes(id)
+        const shapeNode = node as Konva.Shape
+        if (isSelected) {
+          // 保存原始 stroke（如果还没保存的话）
+          if (shapeNode.getAttr('_originalStroke') === undefined) {
+            shapeNode.setAttr('_originalStroke', shapeNode.stroke())
+            shapeNode.setAttr('_originalStrokeWidth', shapeNode.strokeWidth())
+          }
+          shapeNode.stroke('#3b82f6')
+          shapeNode.strokeWidth(2)
+        } else {
+          // 恢复原始 stroke
+          const origStroke = shapeNode.getAttr('_originalStroke')
+          const origWidth = shapeNode.getAttr('_originalStrokeWidth')
+          shapeNode.stroke(origStroke !== undefined ? origStroke : undefined)
+          shapeNode.strokeWidth(origWidth !== undefined ? origWidth : 0)
+          shapeNode.setAttr('_originalStroke', undefined)
+          shapeNode.setAttr('_originalStrokeWidth', undefined)
+        }
+      } else if (name.includes('text-object')) {
+        const isSelected = venueStore.selectedTextIds.includes(id)
+        node.setAttr('selected', isSelected)
+      }
+    })
+
+    // 重绘以更新选中效果
+    mainLayer.batchDraw()
+  }
+
   // ==================== Return ====================
 
   return {
@@ -456,6 +500,7 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     updateTransformer,
     startDragAll,
     updateDragAll,
-    endDragAll
+    endDragAll,
+    updateSelectionVisuals
   }
 }
