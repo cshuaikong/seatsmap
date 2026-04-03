@@ -94,20 +94,27 @@ let justDragged = false
 // 当前绘制模式
 const currentDrawingTool = ref<DrawingToolMode>('select')
 
-// ==================== 座位绘制状态机（分段式单击绘制）====================
+// ==================== 座位绘制状态机（支持拖拽/点击混合模式）====================
 
-type SeatDrawStep = 'idle' | 'first' | 'second'
+type SeatDrawStep = 'idle' | 'first' | 'dragging'
 
 const seatDrawStep = ref<SeatDrawStep>('idle')
 const seatDrawPoints = ref<{
   first: Position | null
-  second: Position | null
-}>({ first: null, second: null })
+  current: Position | null
+}>({ first: null, current: null })
+
+// 是否正在拖拽中（用于区分拖拽模式vs点击模式）
+const isDraggingSeat = ref(false)
+
+// 拖拽检测阈值（像素）
+const DRAG_THRESHOLD = 5
 
 // 重置座位绘制状态
 const resetSeatDrawingState = () => {
   seatDrawStep.value = 'idle'
-  seatDrawPoints.value = { first: null, second: null }
+  seatDrawPoints.value = { first: null, current: null }
+  isDraggingSeat.value = false
 }
 
 // 设置当前绘制工具
@@ -589,13 +596,11 @@ const renderArea = (area: AreaObject, section: Section) => {
   nodeMap.set(area.id, areaShape)
 }
 
-// ==================== 视口管理 ====================
-
 // ==================== 事件处理 ====================
 
 /**
- * 获取相对于舞）Stage)内部逻辑空间的坐）
- * 无论当前缩放(Scale)或平）Position)如何，返回的坐标始终与原始数据对）
+ * 获取相对于Stage内部逻辑空间的坐）
+ * 无论当前缩放Scale或Position如何，返回的坐标始终与原始数据对
  */
 const getStagePosition = (): Position | null => {
   if (!stage) return null
@@ -751,14 +756,15 @@ const setupStageEvents = () => {
     const pointer = stage!.getPointerPosition()
     if (!pointer) return
     
-    // 座位绘制：分段式预览（idle 状态显示鼠标跟随圆，first 状态显示排预览）
+    // 座位绘制：支持拖拽/点击混合模式
     if (currentDrawingTool.value === 'draw_seat') {
       if (seatDrawStep.value === 'idle') {
         // idle 状态：显示鼠标跟随的预览圆
         createSeatCursorPreview(pos)
         return
-      } else if (seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
-        // first 状态：显示从起点到鼠标的排预览
+      } else if ((seatDrawStep.value === 'first' || seatDrawStep.value === 'dragging') && seatDrawPoints.value.first) {
+        // first/dragging 状态：显示从起点到鼠标的排预览
+        seatDrawPoints.value.current = pos
         createSeatRowPreview(seatDrawPoints.value.first, pos)
         return
       }
@@ -781,7 +787,7 @@ const setupStageEvents = () => {
       return
     }
     
-    // 多边）区域预览
+    // 多边区域预览
     if (isDrawingMode() && (currentDrawingTool.value === 'draw_polygon' || currentDrawingTool.value === 'draw_area')) {
       if (drawing.polygonPoints.value.length > 0) {
         createPolygonPreview(drawing.polygonPoints.value, pos)
@@ -808,6 +814,28 @@ const setupStageEvents = () => {
 
   // 鼠标释放
   stage.on('mouseup', (e) => {
+    // 座位绘制模式：检测是否为拖拽
+    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
+      const endPos = getStagePosition()
+      if (endPos) {
+        // 计算移动距离
+        const dx = endPos.x - seatDrawPoints.value.first.x
+        const dy = endPos.y - seatDrawPoints.value.first.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        
+        if (dist > DRAG_THRESHOLD) {
+          // 拖拽模式：移动距离超过阈值，提交座位排
+          isDraggingSeat.value = true
+          submitSeatRow(seatDrawPoints.value.first, endPos)
+          resetSeatDrawingState()
+          return
+        }
+        // 点击模式：移动距离小，保持 first 状态，等待第二次点击
+        // 不重置状态，保留起点小圆
+      }
+      return
+    }
+    
     // 统一拖拽结束优先处理
     if (tfm?.unifiedDragState.active) {
       justDragged = tfm.endDragAll() ?? false
@@ -844,20 +872,38 @@ const setupStageEvents = () => {
     }
   })
 
-  // 点击事件（用于选中对象）
-  stage.on('click', (e) => {
-    // 座位绘制模式：分段式单击处理
-    if (currentDrawingTool.value === 'draw_seat') {
+  // 鼠标按下事件
+  stage.on('mousedown', (e) => {
+    // 座位绘制模式：处理第一次按下
+    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value === 'idle') {
       const pos = getStagePosition()
       if (!pos) return
 
-      if (seatDrawStep.value === 'idle') {
-        // 第一次单击：记录起点，进入 first 状态
-        seatDrawPoints.value.first = pos
-        seatDrawStep.value = 'first'
-        clearDrawingPreview()
+      // 记录起点，进入 first 状态
+      seatDrawPoints.value.first = pos
+      seatDrawStep.value = 'first'
+      isDraggingSeat.value = false
+      clearDrawingPreview()
+      // 立即绘制起点小圆
+      createSeatCursorPreview(pos)
+      return
+    }
+  })
+
+  // 点击事件（用于选中对象和座位绘制确认）
+  stage.on('click', (e) => {
+    // 座位绘制模式：第二次点击确认
+    if (currentDrawingTool.value === 'draw_seat') {
+      // 如果是拖拽模式（有移动过），不处理 click
+      if (isDraggingSeat.value) {
+        isDraggingSeat.value = false
         return
-      } else if (seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
+      }
+      
+      const pos = getStagePosition()
+      if (!pos) return
+
+      if (seatDrawStep.value === 'first' && seatDrawPoints.value.first) {
         // 第二次单击：确定终点，提交座位排
         submitSeatRow(seatDrawPoints.value.first, pos)
         // 重置状态，允许继续绘制下一排

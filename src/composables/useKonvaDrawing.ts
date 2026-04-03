@@ -871,6 +871,7 @@ export function useDrawing() {
     // 常量
     SEAT_RADIUS,
     SEAT_SPACING,
+    MIN_SHAPE_SIZE,
     // 状态
     currentTool,
     drawingState,
