@@ -15,6 +15,7 @@ import {
 } from '../composables/useKonvaDrawing'
 import { useKonvaSelection } from '../composables/useKonvaSelection'
 import { useKonvaTransformer } from '../composables/useKonvaTransformer'
+import { useKonvaKeyboard } from '../composables/useKonvaKeyboard'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 
@@ -106,6 +107,9 @@ const initDrawingPreview = () => {
 
 // 清除绘制预览和添加预览元素现在直接从 useKonvaDrawing 导入使用
 
+// 键盘事件处理（通过 useKonvaKeyboard 管理）
+let keyboard: ReturnType<typeof useKonvaKeyboard> | null = null
+
 // 获取或创建默认 section
 const getOrCreateDefaultSection = (): string => {
   if (venueStore.venue.sections.length === 0) {
@@ -188,11 +192,24 @@ onMounted(() => {
   })
   selection.initSelectionRect()
   
+  // 初始化键盘事件处理
+  keyboard = useKonvaKeyboard({
+    currentTool: currentDrawingTool.value,
+    isDrawingMode: () => drawing.isDataDrivenTool.value,
+    seatDrawStep: { get value() { return seatDrawStep.value } },
+    resetSeatDrawingState,
+    clearDrawingPreview,
+    resetDrawingState: () => drawing.resetDrawingState()
+  })
+  
   // 初始化绘制预览
   initDrawingPreview()
 
   // 设置事件监听
   setupStageEvents()
+  
+  // 注册键盘事件
+  window.addEventListener('keydown', keyboard.handleKeyDown)
 
   // 初始渲染
   renderAll()
@@ -200,7 +217,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   // 移除键盘事件监听
-  window.removeEventListener('keydown', handleKeyDown)
+  if (keyboard) {
+    window.removeEventListener('keydown', keyboard.handleKeyDown)
+  }
   
   if (stage) {
     stage.destroy()
@@ -1219,61 +1238,6 @@ const setupStageEvents = () => {
   window.addEventListener('keydown', handleKeyDown)
 }
 
-// 键盘事件处理
-const handleKeyDown = (e: KeyboardEvent) => {
-  // ESC 取消绘制 / 清空选择
-  if (e.key === 'Escape') {
-    // 优先处理座位绘制状态
-    if (currentDrawingTool.value === 'draw_seat' && seatDrawStep.value !== 'idle') {
-      resetSeatDrawingState()
-      clearDrawingPreview()
-      return
-    }
-    if (isDrawingMode()) {
-      clearDrawingPreview()
-      drawing.resetDrawingState()
-      resetSeatDrawingState()
-    } else {
-      // 非绘制模式：清空选择（Seats.io 风格）
-      venueStore.clearSelection()
-    }
-    return
-  }
-  
-  // Delete/Backspace 删除选中
-  if (e.key === 'Delete' || e.key === 'Backspace') {
-    // 绘制模式下不处理删除
-    if (isDrawingMode()) return
-    
-    deleteSelectedObjects()
-  }
-}
-
-// 删除选中的对）
-const deleteSelectedObjects = () => {
-  // 删除选中的排
-  venueStore.selectedRowIds.forEach(id => {
-    venueStore.deleteRow(id)
-  })
-  
-  // 删除选中的形）
-  venueStore.selectedShapeIds.forEach(id => {
-    venueStore.deleteShape(id)
-  })
-  
-  // 删除选中的文）
-  venueStore.selectedTextIds.forEach(id => {
-    venueStore.deleteText(id)
-  })
-  
-  // 删除选中的区）
-  venueStore.selectedAreaIds.forEach(id => {
-    venueStore.deleteArea(id)
-  })
-  
-  // 清除选择状态
-  venueStore.clearSelection()
-}
 
 const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
   if (!stage) return
