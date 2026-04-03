@@ -18,7 +18,7 @@ export interface UseKonvaKeyboardOptions {
   /** 是否处于绘制模式 */
   isDrawingMode: () => boolean
   /** 座位绘制步骤（用于 ESC 判断） */
-  seatDrawStep: { value: 'idle' | 'first' | 'dragging' }
+  seatDrawStep: { value: 'idle' | 'first' | 'dragging' | 'segment_done' }
   /** 重置座位绘制状态 */
   resetSeatDrawingState: () => void
   /** 清除绘制预览 */
