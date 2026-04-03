@@ -11,11 +11,24 @@ import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine
 import {
   setPreviewLayer,
   clearDrawingPreview,
-  addPreviewElement
+  addPreviewElement,
+  createSeatCursorPreview as _createSeatCursorPreview,
+  createSeatRowPreview as _createSeatRowPreview,
+  submitSeatRow as _submitSeatRow,
+  createRectPreview as _createRectPreview,
+  submitRect as _submitRect,
+  createEllipsePreview as _createEllipsePreview,
+  submitEllipse as _submitEllipse,
+  createPolygonPreview as _createPolygonPreview,
+  submitPolygon as _submitPolygon,
+  submitArea as _submitArea,
+  createTextPreview as _createTextPreview,
+  submitText as _submitText
 } from '../composables/useKonvaDrawing'
 import { useKonvaSelection } from '../composables/useKonvaSelection'
 import { useKonvaTransformer } from '../composables/useKonvaTransformer'
 import { useKonvaKeyboard } from '../composables/useKonvaKeyboard'
+import { useKonvaViewport } from '../composables/useKonvaViewport'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 
@@ -35,9 +48,7 @@ let dragLayer: Konva.Layer | null = null  // ÍÏ×§²ã£ºÍÏ×§Ê±ÁÙÊ±´æ·ÅÑ¡ÖĞ½Úµã£¨ĞÔÄ
 
 const SEAT_RADIUS = defaultSeatMapConfig.defaultSeatRadius
 const SEAT_SPACING = defaultSeatMapConfig.defaultSeatSpacing
-const VIEWPORT_PADDING = 200 // ÊÓ¿ÚÍâÀ©ÏñËØ
-const MIN_SCALE = 0.1
-const MAX_SCALE = 5
+
 
 // ==================== ×´Ì¬====================
 
@@ -109,6 +120,9 @@ const initDrawingPreview = () => {
 
 // ¼üÅÌÊÂ¼ş´¦Àí£¨Í¨¹ı useKonvaKeyboard ¹ÜÀí£©
 let keyboard: ReturnType<typeof useKonvaKeyboard> | null = null
+
+// ÊÓ¿Ú¹ÜÀí£¨Í¨¹ı useKonvaViewport ¹ÜÀí£©
+let viewport: ReturnType<typeof useKonvaViewport> | null = null
 
 // »ñÈ¡»ò´´½¨Ä¬ÈÏ section
 const getOrCreateDefaultSection = (): string => {
@@ -210,6 +224,14 @@ onMounted(() => {
   
   // ×¢²á¼üÅÌÊÂ¼ş
   window.addEventListener('keydown', keyboard.handleKeyDown)
+
+  // ³õÊ¼»¯ÊÓ¿Ú¹ÜÀí
+  viewport = useKonvaViewport({
+    stage,
+    mainLayer,
+    nodeMap,
+    onScaleChange: (scale) => { viewportState.scale = scale }
+  })
 
   // ³õÊ¼äÖÈ¾
   renderAll()
@@ -322,7 +344,7 @@ const renderAll = () => {
   })
 
   // Ó¦ÓÃÊÓ¿ÚÌŞ³ı
-  updateViewportCulling()
+  viewport?.updateViewportCulling()
 
   // ¸üĞÂÑ¡ÖĞ×°ÊÎ
   tfm?.updateSelectionVisuals()
@@ -1096,7 +1118,7 @@ const setupStageEvents = () => {
       stage!.y(stage!.y() + dy)
       viewportState.lastPointerX = e.evt.clientX
       viewportState.lastPointerY = e.evt.clientY
-      updateViewportCulling()
+      viewport?.updateViewportCulling()
       mainLayer?.batchDraw()
     } else if (selection?.isSelecting) {
       // ¸üĞÂ¿òÑ¡ - Ê¹ÓÃÆÁÄ»×ø±ê
@@ -1235,91 +1257,6 @@ const setupStageEvents = () => {
   })
 }
 
-const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
-  if (!stage) return
-
-  const oldScale = stage.scaleX()
-  const pointer = stage.getPointerPosition()
-  if (!pointer) return
-
-  // ¼ÆËãĞÂµÄËõ·Å±ÈÀı
-  const scaleBy = 1.1
-  const direction = e.evt.deltaY > 0 ? -1 : 1
-  const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy
-
-  // ÏŞÖÆËõ·Å·¶Î§
-  if (newScale < MIN_SCALE || newScale > MAX_SCALE) return
-
-  // ¼ÆËãÊó±êÎ»ÖÃ¶ÔÓ¦µÄÎèÌ¨×ø£©
-  const mousePointTo = {
-    x: (pointer.x - stage.x()) / oldScale,
-    y: (pointer.y - stage.y()) / oldScale
-  }
-
-  // Ó¦ÓÃĞÂµÄËõ·Å
-  stage.scale({ x: newScale, y: newScale })
-
-  // ¼ÆËãĞÂµÄÎ»ÖÃ£¬Ê¹Êó±êÖ¸ÏòµÄµã±£³Ö²»±ä
-  const newPos = {
-    x: pointer.x - mousePointTo.x * newScale,
-    y: pointer.y - mousePointTo.y * newScale
-  }
-
-  stage.position(newPos)
-  viewportState.scale = newScale
-
-  // ¸üĞÂÊÓ¿ÚÌŞ³ı
-  updateViewportCulling()
-  mainLayer?.batchDraw()
-}
-
-// ==================== ÊÓ¿ÚÌŞ³ı ====================
-
-const updateViewportCulling = () => {
-  if (!stage || !mainLayer) return
-
-  const viewport = getViewportBounds()
-  if (!viewport) return
-
-  // ÅúÁ¿¸üĞÂ¿É¼û£©
-  nodeMap.forEach((node) => {
-    const shouldBeVisible = isNodeInViewport(node, viewport)
-    if (node.visible() !== shouldBeVisible) {
-      node.visible(shouldBeVisible)
-    }
-  })
-
-  mainLayer.batchDraw()
-}
-
-const getViewportBounds = () => {
-  if (!stage) return null
-
-  const width = stage.width()
-  const height = stage.height()
-  const scale = stage.scaleX()
-  const x = stage.x()
-  const y = stage.y()
-
-  // ¼ÆËãÊÓ¿ÚÔÚÎèÌ¨×ø±êÏµÖĞµÄ±ß½ç
-  const minX = (-x - VIEWPORT_PADDING) / scale
-  const maxX = (-x + width + VIEWPORT_PADDING) / scale
-  const minY = (-y - VIEWPORT_PADDING) / scale
-  const maxY = (-y + height + VIEWPORT_PADDING) / scale
-
-  return { minX, maxX, minY, maxY }
-}
-
-const isNodeInViewport = (node: Konva.Node, viewport: { minX: number, maxX: number, minY: number, maxY: number }): boolean => {
-  const rect = node.getClientRect()
-  return (
-    rect.x + rect.width >= viewport.minX &&
-    rect.x <= viewport.maxX &&
-    rect.y + rect.height >= viewport.minY &&
-    rect.y <= viewport.maxY
-  )
-}
-
 // ==================== Transformer + ÍÏ×§£¨ÒÑÇ¨ÒÆµ½ useKonvaTransformer£©====================
 // ¼û onMounted ÖĞµÄ tfm ³õÊ¼»¯
 
@@ -1330,21 +1267,6 @@ const isNodeInViewport = (node: Konva.Node, viewport: { minX: number, maxX: numb
 // ==================== »æÖÆ¹¦ÄÜ£¨ÒÑÇ¨ÒÆµ½ useKonvaDrawing£©====================
 
 // ×¢Òâ£ºÒÔÏÂº¯ÊıÏÖÔÚ×÷Îª´úÀí£¬Êµ¼ÊÊµÏÖÒÑÔÚ useKonvaDrawing.ts ÖĞ
-
-import {
-  createSeatCursorPreview as _createSeatCursorPreview,
-  createSeatRowPreview as _createSeatRowPreview,
-  submitSeatRow as _submitSeatRow,
-  createRectPreview as _createRectPreview,
-  submitRect as _submitRect,
-  createEllipsePreview as _createEllipsePreview,
-  submitEllipse as _submitEllipse,
-  createPolygonPreview as _createPolygonPreview,
-  submitPolygon as _submitPolygon,
-  submitArea as _submitArea,
-  createTextPreview as _createTextPreview,
-  submitText as _submitText
-} from '../composables/useKonvaDrawing'
 
 // ---------- ×ùÎ»ÅÅ»æÖÆ ----------
 
@@ -1773,11 +1695,11 @@ defineExpose({
       stage.position({ x, y })
     }
     viewportState.scale = scale
-    updateViewportCulling()
+    viewport?.updateViewportCulling()
     mainLayer?.batchDraw()
   },
-  getViewport: () => getViewportBounds(),
-  updateViewportCulling,
+  getViewport: () => viewport?.getViewportBounds(),
+  updateViewportCulling: () => viewport?.updateViewportCulling(),
   // »æÖÆ¹¤¾ß
   setDrawingTool,
   currentDrawingTool,
