@@ -1186,11 +1186,10 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
     stroke: '#3b82f6',
     strokeWidth: 1.5,
-    dash: [6, 6],
+    dash: [12, 6],
     listening: false
   })
   addPreviewElement(line)
-  // 起点标记已移除（绘制完成后不应留下标记）
 
   // 生成座位数据（局部坐标）
   const seats: { x: number; y: number }[] = []
