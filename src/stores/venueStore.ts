@@ -27,9 +27,9 @@ export const useVenueStore = defineStore('venue', () => {
     name: '未命名座位图',
     venueType: 'SIMPLE',
     categories: [
-      { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
-      { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
-      { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
+      { key: 1, label: '普通区', color: '#A5D6A7', accessible: false },  // 中绿
+      { key: 2, label: 'VIP区', color: '#FF8A80', accessible: false },   // 中红
+      { key: 3, label: '轮椅区', color: '#90CAF9', accessible: true }   // 中蓝
     ],
     sections: [],
     focalPoint: undefined
@@ -179,6 +179,15 @@ export const useVenueStore = defineStore('venue', () => {
       const row = section.rows.find(r => r.id === rowId)
       if (row) {
         Object.assign(row, updates)
+        
+        // 如果更新了分类，同步更新该排下所有座位的分类
+        const categoryId = (updates as any).categoryId
+        if (categoryId !== undefined) {
+          const normalizedKey = String(categoryId)
+          row.seats.forEach(seat => {
+            seat.categoryKey = normalizedKey
+          })
+        }
       }
     })
   }
@@ -189,6 +198,15 @@ export const useVenueStore = defineStore('venue', () => {
       section.rows.forEach(row => {
         if (rowIds.includes(row.id)) {
           Object.assign(row, updates)
+          
+          // 如果更新了分类，同步更新该排下所有座位的分类
+          const categoryId = (updates as any).categoryId
+          if (categoryId !== undefined) {
+            const normalizedKey = String(categoryId)
+            row.seats.forEach(seat => {
+              seat.categoryKey = normalizedKey
+            })
+          }
         }
       })
     })

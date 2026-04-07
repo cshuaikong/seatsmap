@@ -9,6 +9,39 @@
 import Konva from 'konva'
 import type { SeatRow, Seat, ShapeObject, TextObject, AreaObject, CanvasImage } from '../types'
 
+// ==================== 颜色工具函数 ====================
+
+/**
+ * 将颜色加深指定百分比
+ * @param color - 十六进制颜色字符串 (#RGB 或 #RRGGBB)
+ * @param percent - 加深百分比 (0-100)
+ * @returns 加深后的十六进制颜色
+ */
+export function darkenColor(color: string, percent: number = 20): string {
+  // 移除 # 号
+  let hex = color.replace('#', '')
+  
+  // 处理简写形式 #RGB
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('')
+  }
+  
+  // 解析 RGB
+  const r = parseInt(hex.substring(0, 2), 16)
+  const g = parseInt(hex.substring(2, 4), 16)
+  const b = parseInt(hex.substring(4, 6), 16)
+  
+  // 加深计算
+  const factor = 1 - percent / 100
+  const newR = Math.floor(r * factor)
+  const newG = Math.floor(g * factor)
+  const newB = Math.floor(b * factor)
+  
+  // 转换回十六进制
+  const toHex = (n: number) => n.toString(16).padStart(2, '0')
+  return `#${toHex(newR)}${toHex(newG)}${toHex(newB)}`
+}
+
 // ==================== 类型定义 ====================
 
 export interface CreateRowShapeOptions {
@@ -140,10 +173,11 @@ export function createRowSceneFunc(
 
       context.fill()
 
-      // 绘制边框
+      // 绘制边框 - 使用加深后的颜色（seats.io 风格）
       context.save()
-      context.strokeStyle = isSelected ? '#3b82f6' : color
-      context.lineWidth = 1
+      const borderColor = darkenColor(color, 25)
+      context.strokeStyle = borderColor
+      context.lineWidth = 2
       groupSeats.forEach(seat => {
         context.beginPath()
         context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)

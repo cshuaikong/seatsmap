@@ -338,7 +338,35 @@ watch(() => [
 ], () => {
   tfm?.updateSelectionVisuals()
   tfm?.updateTransformer()
+  // 更新排座位的选中视觉效果（边框颜色）
+  updateRowSelectionVisuals()
 }, { deep: true })
+
+// 获取座位颜色的辅助函数
+const getSeatColorForRow = (row: SeatRow) => (seat: Seat): string => {
+  // categoryKey 为 0 表示未分类，返回中灰色
+  if (seat.categoryKey === 0) return '#BDBDBD'
+  const category = venueStore.venue.categories.find(c => String(c.key) === String(seat.categoryKey))
+  return category?.color || '#9E9E9E'
+}
+
+// 更新排座位的选中视觉效果
+const updateRowSelectionVisuals = () => {
+  if (!mainLayer) return
+  
+  venueStore.venue.sections.forEach(section => {
+    section.rows.forEach(row => {
+      const rowShape = nodeMap.get(row.id) as Konva.Shape
+      if (rowShape && rowShape.getAttr('objectType') === 'row') {
+        const isSelected = venueStore.selectedRowIds.includes(row.id)
+        // 重新设置 sceneFunc 以更新边框颜色
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, SEAT_RADIUS))
+      }
+    })
+  })
+  
+  mainLayer.batchDraw()
+}
 
 // ==================== 渲染主函数====================
 
@@ -416,6 +444,8 @@ const renderRow = (row: SeatRow, section: Section) => {
 
   // 获取座位颜色函数
   const getSeatColor = (seat: Seat): string => {
+    // categoryKey 为 0 表示未分类，返回中灰色
+    if (seat.categoryKey === 0) return '#BDBDBD'
     const category = venueStore.venue.categories.find(c => String(c.key) === String(seat.categoryKey))
     return category?.color || '#9E9E9E'
   }
@@ -1538,7 +1568,7 @@ const submitAllSegments = () => {
     label: String(index + 1),
     x: pos.x,
     y: pos.y,
-    categoryKey: venueStore.venue.categories[0]?.key || 1,
+    categoryKey: 0,  // 默认未分类（灰色）
     status: 'available',
     objectType: 'seat'
   }))
@@ -1588,7 +1618,7 @@ const submitMultiRows = () => {
         label: String(i + 1),
         x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
         y: SEAT_RADIUS,
-        categoryKey: venueStore.venue.categories[0]?.key || 1,
+        categoryKey: 0,  // 默认未分类（灰色）
         status: 'available',
         objectType: 'seat'
       })
@@ -1628,7 +1658,7 @@ const submitSeatRow = (startPos: Position, endPos: Position) => {
       label: String(i + 1),
       x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
       y: SEAT_RADIUS,
-      categoryKey: venueStore.venue.categories[0]?.key || 1,
+      categoryKey: 0,  // 默认未分类（灰色）
       status: 'available',
       objectType: 'seat'
     })
