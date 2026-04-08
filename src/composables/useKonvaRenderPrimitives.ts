@@ -126,6 +126,7 @@ export function createRowShape(
     name: 'row-shape',
     perfectDrawEnabled: false,
     transformsEnabled: 'all',
+    objectType: 'row',
     rowData: row,
     sectionId: sectionId,
     hitMinX: minX,
@@ -140,8 +141,65 @@ export function createRowShape(
 }
 
 /**
+ * 根据弧度计算座位在弧形上的位置
+ * @param seats - 座位数组
+ * @param curve - 弧度值 (-100 到 100)
+ * @returns 计算后的座位位置数组
+ */
+function calculateCurvedPositions(seats: Seat[], curve: number): Array<{ x: number; y: number }> {
+  if (!curve || curve === 0 || seats.length < 2) {
+    // 无弧度，直接返回原始位置
+    return seats.map(seat => ({ x: seat.x, y: seat.y }))
+  }
+
+  const count = seats.length
+  const firstSeat = seats[0]
+  const lastSeat = seats[count - 1]
+  
+  // 计算排的长度和角度
+  const dx = lastSeat.x - firstSeat.x
+  const dy = lastSeat.y - firstSeat.y
+  const length = Math.sqrt(dx * dx + dy * dy)
+  const baseAngle = Math.atan2(dy, dx)
+  
+  // 直接使用度数作为弯曲角度（curve值即为度数）
+  const maxCurveAngle = curve * (Math.PI / 180)
+  
+  // 计算弧形半径
+  const chordLength = length
+  const curveAngle = Math.abs(maxCurveAngle)
+  const radius = curveAngle > 0.001 ? chordLength / (2 * Math.sin(curveAngle / 2)) : Infinity
+  
+  // 计算弧形中心点
+  const midX = (firstSeat.x + lastSeat.x) / 2
+  const midY = (firstSeat.y + lastSeat.y) / 2
+  
+  // 垂直于排方向的方向
+  const perpX = -Math.sin(baseAngle) * (curve > 0 ? 1 : -1)
+  const perpY = Math.cos(baseAngle) * (curve > 0 ? 1 : -1)
+  
+  // 圆心位置
+  const centerX = midX + perpX * Math.sqrt(Math.max(0, radius * radius - (chordLength / 2) * (chordLength / 2)))
+  const centerY = midY + perpY * Math.sqrt(Math.max(0, radius * radius - (chordLength / 2) * (chordLength / 2)))
+  
+  // 计算每个座位在弧形上的角度
+  const startAngle = Math.atan2(firstSeat.y - centerY, firstSeat.x - centerX)
+  const endAngle = Math.atan2(lastSeat.y - centerY, lastSeat.x - centerX)
+  const angleStep = (endAngle - startAngle) / (count - 1)
+  
+  // 生成弧形位置
+  return seats.map((_, i) => {
+    const angle = startAngle + angleStep * i
+    return {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle)
+    }
+  })
+}
+
+/**
  * 创建排的 sceneFunc（批次绘制座位）
- * 支持多段转折排渲染
+ * 支持多段转折排渲染和弧度渲染
  */
 export function createRowSceneFunc(
   row: SeatRow,
@@ -154,6 +212,9 @@ export function createRowSceneFunc(
 
     // 获取关键节点索引集合
     const segmentIndices = new Set(row.segmentIndices || [])
+    
+    // 根据弧度计算座位位置
+    const curvedPositions = calculateCurvedPositions(row.seats, row.curve || 0)
 
     // 按分类颜色分组绘制
     const colorGroups = groupSeatsByColor(row.seats, getSeatColor)
@@ -165,10 +226,11 @@ export function createRowSceneFunc(
       context.beginPath()
       context.fillStyle = color
 
-      // 使用局部坐标绘制
-      groupSeats.forEach(seat => {
-        context.moveTo(seat.x, seat.y)
-        context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
+      // 使用计算后的弧形位置绘制
+      groupSeats.forEach((seat, index) => {
+        const pos = curvedPositions[row.seats.indexOf(seat)]
+        context.moveTo(pos.x, pos.y)
+        context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
       })
 
       context.fill()
@@ -178,9 +240,10 @@ export function createRowSceneFunc(
       const borderColor = darkenColor(color, 25)
       context.strokeStyle = borderColor
       context.lineWidth = 2
-      groupSeats.forEach(seat => {
+      groupSeats.forEach((seat) => {
+        const pos = curvedPositions[row.seats.indexOf(seat)]
         context.beginPath()
-        context.arc(seat.x, seat.y, radius, 0, Math.PI * 2)
+        context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
         context.stroke()
       })
       context.restore()

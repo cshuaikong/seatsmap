@@ -185,7 +185,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatRow as Row, PanelSelection, SelectedObjectType } from '../types'
@@ -487,6 +487,46 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   if (!type) {
     // 兼容旧版：通过 emit 更新
     emit('update-property', updates)
+    return
+  }
+
+  // 特殊处理座位数更新
+  if (type === 'row' && 'seatCount' in updates) {
+    const newCounts = updates.seatCount as number[]
+    const rowIds = venueStore.selectedRowIds
+    // 为每个选中的排更新座位数
+    rowIds.forEach((rowId, index) => {
+      const newCount = newCounts[index] || newCounts[0] || 1
+      venueStore.updateRowSeatCount(rowId, newCount)
+    })
+    return
+  }
+
+  // 特殊处理弧度更新
+  if (type === 'row' && 'curve' in updates) {
+    const newCurves = updates.curve as number[]
+    const rowIds = venueStore.selectedRowIds
+    // 为每个选中的排更新弧度
+    rowIds.forEach((rowId, index) => {
+      const newCurve = newCurves[index] || newCurves[0] || 0
+      venueStore.updateRowCurve(rowId, newCurve)
+    })
+    return
+  }
+
+  // 特殊处理座位间距更新
+  if (type === 'row' && 'seatSpacing' in updates) {
+    const spacingData = updates.seatSpacing as { spacings: number[], resetCurve: boolean }
+    const rowIds = venueStore.selectedRowIds
+    // 为每个选中的排更新座位间距
+    rowIds.forEach((rowId, index) => {
+      const newSpacing = spacingData.spacings[index] || spacingData.spacings[0] || 18
+      venueStore.updateRowSeatSpacing(rowId, newSpacing, spacingData.resetCurve)
+    })
+    // 使用 nextTick 确保 Vue 响应式更新完成后再触发事件
+    nextTick(() => {
+      window.dispatchEvent(new CustomEvent('seatSpacingUpdated', { detail: { rowIds } }))
+    })
     return
   }
 

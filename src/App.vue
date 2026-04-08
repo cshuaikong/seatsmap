@@ -3,9 +3,11 @@
     <nav class="nav">
       <button @click="currentView = 'designer'">主应用</button>
       <button @click="currentView = 'test'">旋转测试</button>
+      <button @click="currentView = 'transformer-test'">Transformer测试</button>
     </nav>
     <KonvaDesigner v-if="currentView === 'designer'" />
     <RotationTest v-else-if="currentView === 'test'" />
+    <TransformerTest v-else-if="currentView === 'transformer-test'" />
   </div>
 </template>
 
@@ -13,6 +15,7 @@
 import { ref } from 'vue'
 import KonvaDesigner from './components/KonvaDesigner.vue'
 import RotationTest from './components/RotationTest.vue'
+import TransformerTest from './components/TransformerTest.vue'
 
 const currentView = ref('designer')
 </script>

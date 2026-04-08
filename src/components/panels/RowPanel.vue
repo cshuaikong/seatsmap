@@ -18,35 +18,45 @@
         <!-- EN: Number of seats -->
         <label class="property-label">座位数</label>
         <div class="property-control">
-          <NumberInput
-            :modelValue="localSeatCount"
-            :min="1"
-            @update:modelValue="onUpdateProperty('seatCount', $event)"
-          />
+          <div class="seat-count-display">
+            <button class="step-btn" @click="onDecreaseSeatCount" :disabled="!canDecrease">
+              <Icon icon="lucide:minus" class="step-icon" />
+            </button>
+            <span class="count-text">{{ seatCountDisplay }}</span>
+            <button class="step-btn" @click="onIncreaseSeatCount" :disabled="!canIncrease">
+              <Icon icon="lucide:plus" class="step-icon" />
+            </button>
+          </div>
         </div>
       </div>
       <div class="property-row">
         <!-- EN: Curve -->
         <label class="property-label">弧度</label>
         <div class="property-control">
-          <NumberInput
-            :modelValue="localCurve"
-            :min="-100"
-            :max="100"
-            @update:modelValue="onUpdateProperty('curve', $event)"
-          />
+          <div class="seat-count-display">
+            <button class="step-btn" @click="onDecreaseCurve" :disabled="!canDecreaseCurve">
+              <Icon icon="lucide:minus" class="step-icon" />
+            </button>
+            <span class="count-text">{{ curveDisplay }}</span>
+            <button class="step-btn" @click="onIncreaseCurve" :disabled="!canIncreaseCurve">
+              <Icon icon="lucide:plus" class="step-icon" />
+            </button>
+          </div>
         </div>
       </div>
       <div class="property-row">
         <!-- EN: Seat spacing -->
         <label class="property-label">座位间距</label>
         <div class="property-control">
-          <NumberInput
-            :modelValue="localSeatSpacing"
-            :min="0"
-            unit="pt"
-            @update:modelValue="onUpdateProperty('seatSpacing', $event)"
-          />
+          <div class="seat-count-display">
+            <button class="step-btn" @click="onDecreaseSpacing" :disabled="!canDecreaseSpacing">
+              <Icon icon="lucide:minus" class="step-icon" />
+            </button>
+            <span class="count-text">{{ seatSpacingDisplay }}</span>
+            <button class="step-btn" @click="onIncreaseSpacing" :disabled="!canIncreaseSpacing">
+              <Icon icon="lucide:plus" class="step-icon" />
+            </button>
+          </div>
         </div>
       </div>
     </PanelSection>
@@ -189,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import PanelSection from './controls/PanelSection.vue'
 import CategorySelector from './controls/CategorySelector.vue'
@@ -215,9 +225,9 @@ const emit = defineEmits<{
 
 // 本地 ref 管理属性值
 const localCategoryId = ref('')
-const localSeatCount = ref(0)
-const localCurve = ref(0)
-const localSeatSpacing = ref(28)
+const localSeatCounts = ref<number[]>([])  // 多选时存储每个排的座位数
+const localCurves = ref<number[]>([])  // 多选时存储每个排的弧度
+const localSeatSpacings = ref<number[]>([])  // 多选时存储每个排的座位间距
 const localEntrance = ref('')
 
 // 排标签配置
@@ -238,16 +248,86 @@ const positions = [
   { value: 'right', label: 'Right' }
 ]
 
-// 从节点读取属性的函数（只读取第一个节点作为代表）
+// 计算座位数显示文本（多选用逗号分隔）
+const seatCountDisplay = computed(() => {
+  if (localSeatCounts.value.length === 0) return '0'
+  if (localSeatCounts.value.length === 1) return String(localSeatCounts.value[0])
+  // 多选时显示所有座位数，用逗号分隔
+  return localSeatCounts.value.join(',')
+})
+
+// 是否可以减少座位
+const canDecrease = computed(() => {
+  return localSeatCounts.value.some(count => count > 1)
+})
+
+// 是否可以增加座位
+const canIncrease = computed(() => {
+  return localSeatCounts.value.length > 0
+})
+
+// 计算弧度显示文本（多选用逗号分隔）
+const curveDisplay = computed(() => {
+  if (localCurves.value.length === 0) return '0'
+  if (localCurves.value.length === 1) return String(localCurves.value[0])
+  // 多选时显示所有弧度，用逗号分隔
+  return localCurves.value.join(',')
+})
+
+// 是否可以减少弧度
+const canDecreaseCurve = computed(() => {
+  return localCurves.value.some(curve => curve > -200)
+})
+
+// 是否可以增加弧度
+const canIncreaseCurve = computed(() => {
+  return localCurves.value.some(curve => curve < 200)
+})
+
+// 计算座位间距显示文本（多选用逗号分隔）
+const seatSpacingDisplay = computed(() => {
+  if (localSeatSpacings.value.length === 0) return '18'
+  if (localSeatSpacings.value.length === 1) return String(localSeatSpacings.value[0])
+  // 多选时显示所有座位间距，用逗号分隔
+  return localSeatSpacings.value.join(',')
+})
+
+// 是否可以减少座位间距
+const canDecreaseSpacing = computed(() => {
+  return localSeatSpacings.value.some(spacing => spacing > 1)
+})
+
+// 是否可以增加座位间距
+const canIncreaseSpacing = computed(() => {
+  return localSeatSpacings.value.length > 0
+})
+
+// 从节点读取属性的函数（读取所有节点）
 const readFromNodes = () => {
-  if (!props.nodes || props.nodes.length === 0) return
-  const node = props.nodes[0]
+  if (!props.nodes || props.nodes.length === 0) {
+    localSeatCounts.value = []
+    return
+  }
   
-  const seats = node.getAttr?.('seats') || node.seats || []
+  // 读取所有选中排的座位数
+  localSeatCounts.value = props.nodes.map(node => {
+    const seats = node.getAttr?.('seats') || node.seats || []
+    return seats.length || 0
+  })
+  
+  // 读取所有选中排的弧度
+  localCurves.value = props.nodes.map(node => {
+    return node.getAttr?.('curve') || node.curve || 0
+  })
+  
+  // 读取所有选中排的座位间距
+  localSeatSpacings.value = props.nodes.map(node => {
+    return node.getAttr?.('seatSpacing') || node.seatSpacing || 18
+  })
+  
+  // 其他属性只读取第一个节点
+  const node = props.nodes[0]
   localCategoryId.value = node.getAttr?.('categoryId') || node.categoryId || ''
-  localSeatCount.value = seats.length || 0
-  localCurve.value = node.getAttr?.('curve') || node.curve || 0
-  localSeatSpacing.value = node.getAttr?.('seatSpacing') || node.seatSpacing || 28
   localEntrance.value = node.getAttr?.('entrance') || node.entrance || ''
   
   // 排标签配置
@@ -272,12 +352,78 @@ function onCategoryChange(categoryId: string) {
   emit('update-category', categoryId)
 }
 
+// 减少座位数
+function onDecreaseSeatCount() {
+  if (!canDecrease.value) return
+  // 每个选中的排都减少1个座位，但不能少于1
+  const newCounts = localSeatCounts.value.map(count => Math.max(1, count - 1))
+  localSeatCounts.value = newCounts
+  // 发送更新事件，包含所有排的座位数
+  emit('update-property', 'seatCount', newCounts)
+}
+
+// 增加座位数
+function onIncreaseSeatCount() {
+  if (!canIncrease.value) return
+  // 每个选中的排都增加1个座位
+  const newCounts = localSeatCounts.value.map(count => count + 1)
+  localSeatCounts.value = newCounts
+  // 发送更新事件，包含所有排的座位数
+  emit('update-property', 'seatCount', newCounts)
+}
+
+// 减少弧度
+function onDecreaseCurve() {
+  if (!canDecreaseCurve.value) return
+  // 每个选中的排都减少5个单位的弧度，但不能少于-200
+  const newCurves = localCurves.value.map(curve => Math.max(-200, curve - 5))
+  localCurves.value = newCurves
+  // 发送更新事件，包含所有排的弧度
+  emit('update-property', 'curve', newCurves)
+}
+
+// 增加弧度
+function onIncreaseCurve() {
+  if (!canIncreaseCurve.value) return
+  // 每个选中的排都增加5个单位的弧度，但不能超过200
+  const newCurves = localCurves.value.map(curve => Math.min(200, curve + 5))
+  localCurves.value = newCurves
+  // 发送更新事件，包含所有排的弧度
+  emit('update-property', 'curve', newCurves)
+}
+
+// 减少座位间距
+function onDecreaseSpacing() {
+  if (!canDecreaseSpacing.value) return
+  // 每个选中的排都减少1个单位的座位间距，但不能少于1
+  const newSpacings = localSeatSpacings.value.map(spacing => Math.max(1, spacing - 1))
+  localSeatSpacings.value = newSpacings
+  // 发送更新事件，包含所有排的座位间距，同时重置弧度为0
+  emit('update-property', 'seatSpacing', { spacings: newSpacings, resetCurve: true })
+}
+
+// 增加座位间距
+function onIncreaseSpacing() {
+  if (!canIncreaseSpacing.value) return
+  // 每个选中的排都增加1个单位的座位间距
+  const newSpacings = localSeatSpacings.value.map(spacing => spacing + 1)
+  localSeatSpacings.value = newSpacings
+  // 发送更新事件，包含所有排的座位间距，同时重置弧度为0
+  emit('update-property', 'seatSpacing', { spacings: newSpacings, resetCurve: true })
+}
+
 function onUpdateProperty(key: string, value: any) {
   // 更新本地 ref
   switch(key) {
-    case 'seatCount': localSeatCount.value = value; break
-    case 'curve': localCurve.value = value; break
-    case 'seatSpacing': localSeatSpacing.value = value; break
+    case 'seatCount': 
+      // 座位数通过 onDecreaseSeatCount/onIncreaseSeatCount 处理
+      break
+    case 'curve': 
+      // 弧度通过 onDecreaseCurve/onIncreaseCurve 处理
+      break
+    case 'seatSpacing': 
+      // 座位间距通过 onDecreaseSpacing/onIncreaseSpacing 处理
+      break
     case 'entrance': localEntrance.value = value; break
     case 'rowLabeling.enabled': localRowLabelingEnabled.value = value; break
     case 'rowLabeling.label': localRowLabelingLabel.value = value; break
@@ -287,7 +433,9 @@ function onUpdateProperty(key: string, value: any) {
     case 'seatLabeling.labels': localSeatLabelingLabels.value = value; break
     case 'seatLabeling.locked': localSeatLabelingLocked.value = value; break
   }
-  emit('update-property', key, value)
+  if (key !== 'seatCount' && key !== 'curve') {
+    emit('update-property', key, value)
+  }
 }
 
 function toggleRowLabelLock() {
@@ -554,5 +702,65 @@ defineExpose({ refresh })
 .position-dot.active {
   background: #4a90d9;
   border-color: #4a90d9;
+}
+
+/* 座位数显示控件 */
+.seat-count-display {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+  flex: 1;
+}
+
+.seat-count-display .step-btn {
+  width: 24px;
+  height: 100%;
+  border: none;
+  background: #f5f5f5;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.seat-count-display .step-btn:hover:not(:disabled) {
+  background: #e8e8e8;
+  color: #333;
+}
+
+.seat-count-display .step-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.seat-count-display .step-btn:first-child {
+  border-right: 1px solid #d0d0d0;
+}
+
+.seat-count-display .step-btn:last-child {
+  border-left: 1px solid #d0d0d0;
+}
+
+.seat-count-display .step-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.seat-count-display .count-text {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  font-family: 'SF Mono', Monaco, monospace;
+  padding: 0 8px;
+  min-width: 50px;
 }
 </style>

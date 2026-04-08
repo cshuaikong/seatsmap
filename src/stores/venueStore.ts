@@ -212,6 +212,97 @@ export const useVenueStore = defineStore('venue', () => {
     })
   }
 
+  // 更新排的座位数（保持排的位置和角度不变，重新计算座位间距和位置）
+  function updateRowSeatCount(rowId: string, newSeatCount: number) {
+    venue.value.sections.forEach(section => {
+      const row = section.rows.find(r => r.id === rowId)
+      if (!row || row.seats.length === newSeatCount) return
+      
+      const currentCount = row.seats.length
+      const currentSpacing = row.seatSpacing || 18
+      
+      // 计算排的总长度（保持不变）
+      const totalLength = (currentCount - 1) * currentSpacing
+      
+      // 计算新的座位间距
+      const newSpacing = newSeatCount > 1 ? totalLength / (newSeatCount - 1) : currentSpacing
+      
+      // 保存第一个座位的位置和分类信息
+      const firstSeat = row.seats[0]
+      const baseX = firstSeat.x
+      const baseY = firstSeat.y
+      const baseCategoryKey = firstSeat.categoryKey
+      
+      // 获取排的角度（从第一个座位到最后一个座位的方向）
+      const lastSeat = row.seats[currentCount - 1]
+      const angle = Math.atan2(lastSeat.y - firstSeat.y, lastSeat.x - firstSeat.x)
+      
+      // 重新生成座位
+      row.seats = Array.from({ length: newSeatCount }, (_, i) => ({
+        id: i < currentCount ? row.seats[i].id : generateId(),  // 保留原有ID
+        label: String(i + 1),
+        x: baseX + Math.cos(angle) * (newSpacing * i),
+        y: baseY + Math.sin(angle) * (newSpacing * i),
+        categoryKey: i < currentCount ? row.seats[i].categoryKey : baseCategoryKey,
+        status: i < currentCount ? row.seats[i].status : 'available',
+        objectType: 'seat' as const
+      }))
+      
+      // 更新排的座位间距
+      row.seatSpacing = newSpacing
+    })
+  }
+
+  // 更新排的弧度
+  function updateRowCurve(rowId: string, newCurve: number) {
+    venue.value.sections.forEach(section => {
+      const row = section.rows.find(r => r.id === rowId)
+      if (!row || row.curve === newCurve) return
+      
+      // 更新弧度值
+      row.curve = newCurve
+    })
+  }
+
+  // 更新排的座位间距
+  function updateRowSeatSpacing(rowId: string, newSpacing: number, resetCurve: boolean = false) {
+    venue.value.sections.forEach(section => {
+      const row = section.rows.find(r => r.id === rowId)
+      if (!row) return
+      
+      const oldSpacing = row.seatSpacing || 18
+      if (oldSpacing === newSpacing && !resetCurve) return
+      
+      // 如果需要重置弧度，先重置为0
+      if (resetCurve) {
+        row.curve = 0
+      }
+      
+      // 更新座位间距
+      row.seatSpacing = newSpacing
+      
+      // 重新计算座位位置（保持起点不动，尾部扩张）
+      const seatCount = row.seats.length
+      if (seatCount < 2) return
+      
+      // 获取第一个座位的位置作为起点
+      const firstSeat = row.seats[0]
+      const baseX = firstSeat.x
+      const baseY = firstSeat.y
+      
+      // 获取排的方向（从第一个座位到最后一个座位的角度）
+      const lastSeat = row.seats[seatCount - 1]
+      const angle = Math.atan2(lastSeat.y - firstSeat.y, lastSeat.x - firstSeat.x)
+      
+      // 更新每个座位的位置（从起点开始重新分布）
+      row.seats = row.seats.map((seat, i) => ({
+        ...seat,
+        x: baseX + Math.cos(angle) * (newSpacing * i),
+        y: baseY + Math.sin(angle) * (newSpacing * i)
+      }))
+    })
+  }
+
   // 更新座位
   function updateSeat(seatId: string, updates: Partial<Seat>) {
     venue.value.sections.forEach(section => {
@@ -765,6 +856,9 @@ export const useVenueStore = defineStore('venue', () => {
     addRow,
     updateRow,
     updateMultipleRows,
+    updateRowSeatCount,
+    updateRowCurve,
+    updateRowSeatSpacing,
     updateSeat,
     updateSeatsCategory,
     deleteRow,

@@ -299,6 +299,9 @@ onUnmounted(() => {
     window.removeEventListener('keydown', keyboard.handleKeyDown)
   }
   
+  // 移除座位间距更新事件监听
+  window.removeEventListener('seatSpacingUpdated', handleSeatSpacingUpdated)
+  
   if (stage) {
     stage.destroy()
     stage = null
@@ -342,6 +345,15 @@ watch(() => [
   updateRowSelectionVisuals()
 }, { deep: true })
 
+// 座位间距更新事件处理函数
+const handleSeatSpacingUpdated = () => {
+  // 更新排座位的几何属性和选择框
+  updateRowSelectionVisuals()
+}
+
+// 监听座位间距更新事件
+window.addEventListener('seatSpacingUpdated', handleSeatSpacingUpdated)
+
 // 获取座位颜色的辅助函数
 const getSeatColorForRow = (row: SeatRow) => (seat: Seat): string => {
   // categoryKey 为 0 表示未分类，返回中灰色
@@ -350,7 +362,7 @@ const getSeatColorForRow = (row: SeatRow) => (seat: Seat): string => {
   return category?.color || '#9E9E9E'
 }
 
-// 更新排座位的选中视觉效果
+// 更新排座位的选中视觉效果和几何属性
 const updateRowSelectionVisuals = () => {
   if (!mainLayer) return
   
@@ -359,6 +371,26 @@ const updateRowSelectionVisuals = () => {
       const rowShape = nodeMap.get(row.id) as Konva.Shape
       if (rowShape && rowShape.getAttr('objectType') === 'row') {
         const isSelected = venueStore.selectedRowIds.includes(row.id)
+        
+        // 重新计算 bounds（座位位置可能已变化）
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        row.seats.forEach((seat) => {
+          minX = Math.min(minX, seat.x - SEAT_RADIUS)
+          minY = Math.min(minY, seat.y - SEAT_RADIUS)
+          maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
+          maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
+        })
+        const width = maxX - minX
+        const height = maxY - minY
+        
+        // 更新 shape 的几何属性
+        rowShape.width(width)
+        rowShape.height(height)
+        rowShape.setAttr('hitMinX', minX)
+        rowShape.setAttr('hitMinY', minY)
+        rowShape.setAttr('hitMaxX', maxX)
+        rowShape.setAttr('hitMaxY', maxY)
+        
         // 重新设置 sceneFunc 以更新边框颜色
         rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, SEAT_RADIUS))
       }
@@ -366,6 +398,10 @@ const updateRowSelectionVisuals = () => {
   })
   
   mainLayer.batchDraw()
+  
+  // 直接调用 updateTransformer(true)，它会调用 forceUpdate() 并刷新 overlayLayer
+  // 这和点击选中时的路径完全一致
+  tfm?.updateTransformer(true)
 }
 
 // ==================== 渲染主函数====================
