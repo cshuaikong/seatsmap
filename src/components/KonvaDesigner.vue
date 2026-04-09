@@ -20,7 +20,7 @@
           <Icon icon="lucide:upload" class="btn-icon" />
           导入
         </button>
-        <button class="action-btn secondary">
+        <button class="action-btn secondary" @click="onPreview">
           <Icon icon="lucide:eye" class="btn-icon" />
           预览
         </button>
@@ -114,6 +114,13 @@
         @update="onUpdateCategory"
         @delete="onDeleteCategory"
       />
+
+      <!-- 预览弹窗 -->
+      <PreviewModal
+        :visible="showPreview"
+        :venue="venueStore.venue"
+        @close="showPreview = false"
+      />
     </div>
   </div>
 </template>
@@ -132,6 +139,7 @@ import { generateId } from '../utils/id'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 
 import CategoryManager from './panels/CategoryManager.vue'
+import PreviewModal from './PreviewModal.vue'
 
 // 画布配置
 const canvasWidth = 3000
@@ -159,6 +167,9 @@ const displayCategories = computed(() => {
 
 // Category 管理弹窗控制
 const showCategoryManager = ref(false)
+
+// 预览弹窗控制
+const showPreview = ref(false)
 
 // Renderer ref
 const rendererRef = ref<InstanceType<typeof KonvaRenderer>>()
@@ -417,6 +428,11 @@ const onImportData = async () => {
   } else {
     alert('导入失败，请检查文件格式')
   }
+}
+
+// 打开预览
+const onPreview = () => {
+  showPreview.value = true
 }
 
 const onCloseCategoryManager = () => {
