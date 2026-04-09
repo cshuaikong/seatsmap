@@ -530,6 +530,37 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     return
   }
 
+  // 特殊处理排标签更新
+  if (type === 'row' && 'rowLabeling.label' in updates) {
+    const rowIds = venueStore.selectedRowIds
+    const newLabel = updates['rowLabeling.label']
+    // 更新 row.label（排标签直接存在 row 上，不是嵌套对象）
+    rowIds.forEach(rowId => {
+      venueStore.updateRow(rowId, { label: newLabel })
+    })
+    return
+  }
+
+  // 特殊处理批量标签更新
+  if (type === 'row' && 'batchLabels' in updates) {
+    const labels = updates.batchLabels as string[]
+    // 获取所有选中的排并按位置排序（从上到下，从左到右）
+    const rows = [...venueStore.selectedRows]
+    rows.sort((a, b) => {
+      // 先按 Y 坐标排序，Y 相近时按 X 排序
+      const yDiff = (a.y || 0) - (b.y || 0)
+      if (Math.abs(yDiff) > 20) return yDiff
+      return (a.x || 0) - (b.x || 0)
+    })
+    // 按排序后的顺序设置标签
+    rows.forEach((row, index) => {
+      if (labels[index] !== undefined) {
+        venueStore.updateRow(row.id, { label: labels[index] })
+      }
+    })
+    return
+  }
+
   // 获取当前选中的 ID 列表
   let ids: string[] = []
   switch (type) {

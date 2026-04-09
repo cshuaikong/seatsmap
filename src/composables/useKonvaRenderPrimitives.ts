@@ -219,6 +219,13 @@ export function createRowSceneFunc(
     // 按分类颜色分组绘制
     const colorGroups = groupSeatsByColor(row.seats, getSeatColor)
 
+    if (row.label) {
+      context.fillStyle = '#72716'
+      context.font = '12px Inter, -apple-system, sans-serif'
+      context.textAlign = 'right'
+      context.textBaseline = 'middle'
+      context.fillText(row.label, -seatRadius, seatRadius) 
+    }
     // 批次绘制每个颜色组的座位
     Object.entries(colorGroups).forEach(([color, groupSeats]) => {
       if (groupSeats.length === 0) return

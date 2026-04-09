@@ -69,23 +69,9 @@
           <Icon :icon="localRowLabelingLocked ? 'lucide:lock' : 'lucide:unlock'" class="lock-icon" />
         </button>
       </template>
-      <div class="property-row">
-        <!-- EN: Enabled -->
-        <label class="property-label">启用</label>
-        <div class="property-control">
-          <label class="checkbox-wrapper">
-            <input
-              type="checkbox"
-              :checked="localRowLabelingEnabled"
-              @change="onUpdateProperty('rowLabeling.enabled', ($event.target as HTMLInputElement).checked)"
-              class="checkbox-input"
-            />
-            <span class="checkmark"></span>
-          </label>
-        </div>
-      </div>
-      <div class="property-row">
-        <!-- EN: Label -->
+      
+      <!-- 单选：显示单个标签输入 -->
+      <div v-if="isSingle" class="property-row">
         <label class="property-label">标签</label>
         <div class="property-control">
           <input
@@ -97,44 +83,31 @@
           />
         </div>
       </div>
-      <div class="property-row">
-        <!-- EN: Displayed label -->
-        <label class="property-label">显示标签</label>
-        <div class="property-control">
-          <input
-            type="text"
-            :value="localRowLabelingDisplayedLabel"
-            @input="onUpdateProperty('rowLabeling.displayedLabel', ($event.target as HTMLInputElement).value)"
-            class="text-input"
-          />
-          <!-- EN: Set -->
-          <button class="set-btn" @click="onSetDisplayedLabel">设置</button>
-        </div>
-      </div>
-      <div class="property-row">
-        <!-- EN: Position -->
-        <label class="property-label">位置</label>
-        <div class="property-control">
-          <div class="position-selector">
-            <button
-              v-for="pos in positions"
-              :key="pos.value"
-              class="position-dot"
-              :class="{ active: localRowLabelingPosition === pos.value }"
-              @click="onUpdateProperty('rowLabeling.position', pos.value)"
-              :title="pos.label"
-            ></button>
+      
+      <!-- 多选：显示批量标签设置 -->
+      <template v-else>
+        <div class="property-row">
+          <label class="property-label">标签模式</label>
+          <div class="property-control">
+            <select v-model="batchLabelMode" class="select-input">
+              <option value="A-B-C">A-B-C</option>
+              <option value="a-b-c">a-b-c</option>
+              <option value="1-2-3">1-2-3</option>
+            </select>
           </div>
         </div>
-      </div>
-      <div class="property-row">
-        <!-- EN: Displayed type -->
-        <label class="property-label">显示类型</label>
-        <div class="property-control">
-          <!-- EN: Row -->
-          <span class="readonly-text">排</span>
+        <div class="property-row">
+          <label class="property-label">起始值</label>
+          <div class="property-control">
+            <input 
+              type="text" 
+              v-model="batchLabelStart" 
+              class="text-input"
+              :placeholder="batchLabelStartPlaceholder"
+            />
+          </div>
         </div>
-      </div>
+      </template>
     </PanelSection>
 
     <!-- Seat labeling 分组 -->
@@ -231,22 +204,66 @@ const localSeatSpacings = ref<number[]>([])  // 多选时存储每个排的座�
 const localEntrance = ref('')
 
 // 排标签配置
-const localRowLabelingEnabled = ref(true)
 const localRowLabelingLabel = ref('')
-const localRowLabelingDisplayedLabel = ref('')
-const localRowLabelingPosition = ref('left')
 const localRowLabelingLocked = ref(false)
 
 // 座位标签配置
 const localSeatLabelingLabels = ref('1-2-3')
 const localSeatLabelingLocked = ref(false)
 
-// 位置选项
-const positions = [
-  { value: 'left', label: 'Left' },
-  { value: 'center', label: 'Center' },
-  { value: 'right', label: 'Right' }
-]
+// 批量标签设置
+const batchLabelMode = ref<'A-B-C' | 'a-b-c' | '1-2-3'>('A-B-C')
+const batchLabelStart = ref('')
+
+// 起始值占位符
+const batchLabelStartPlaceholder = computed(() => {
+  switch (batchLabelMode.value) {
+    case 'A-B-C': return '例如: A 或 C'
+    case 'a-b-c': return '例如: a 或 c'
+    case '1-2-3': return '例如: 1 或 5'
+    default: return ''
+  }
+})
+
+// 生成标签序列
+const generateLabels = (mode: string, start: string, count: number): string[] => {
+  const labels: string[] = []
+  
+  if (mode === '1-2-3') {
+    // 数字模式
+    let startNum = parseInt(start) || 1
+    for (let i = 0; i < count; i++) {
+      labels.push(String(startNum + i))
+    }
+  } else if (mode === 'A-B-C') {
+    // 大写字母模式
+    let startCode = start ? start.toUpperCase().charCodeAt(0) : 65 // A = 65
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(startCode + i))
+    }
+  } else if (mode === 'a-b-c') {
+    // 小写字母模式
+    let startCode = start ? start.toLowerCase().charCodeAt(0) : 97 // a = 97
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(startCode + i))
+    }
+  }
+  
+  return labels
+}
+
+// 应用批量标签
+const applyBatchLabels = () => {
+  const labels = generateLabels(batchLabelMode.value, batchLabelStart.value, props.nodes.length)
+  emit('update-property', 'batchLabels', labels)
+}
+
+// 监听批量标签设置变化，自动应用
+watch([batchLabelMode, batchLabelStart], () => {
+  if (!props.isSingle && props.nodes.length > 0) {
+    applyBatchLabels()
+  }
+})
 
 // 计算座位数显示文本（多选用逗号分隔）
 const seatCountDisplay = computed(() => {
@@ -332,10 +349,7 @@ const readFromNodes = () => {
   
   // 排标签配置
   const rowLabeling = node.getAttr?.('rowLabeling') || node.rowLabeling || {}
-  localRowLabelingEnabled.value = rowLabeling.enabled !== false
   localRowLabelingLabel.value = rowLabeling.label || node.getAttr?.('label') || node.label || ''
-  localRowLabelingDisplayedLabel.value = rowLabeling.displayedLabel || ''
-  localRowLabelingPosition.value = rowLabeling.position || 'left'
   localRowLabelingLocked.value = rowLabeling.locked || false
   
   // 座位标签配置
@@ -425,10 +439,7 @@ function onUpdateProperty(key: string, value: any) {
       // 座位间距通过 onDecreaseSpacing/onIncreaseSpacing 处理
       break
     case 'entrance': localEntrance.value = value; break
-    case 'rowLabeling.enabled': localRowLabelingEnabled.value = value; break
     case 'rowLabeling.label': localRowLabelingLabel.value = value; break
-    case 'rowLabeling.displayedLabel': localRowLabelingDisplayedLabel.value = value; break
-    case 'rowLabeling.position': localRowLabelingPosition.value = value; break
     case 'rowLabeling.locked': localRowLabelingLocked.value = value; break
     case 'seatLabeling.labels': localSeatLabelingLabels.value = value; break
     case 'seatLabeling.locked': localSeatLabelingLocked.value = value; break
@@ -448,11 +459,6 @@ function toggleSeatLabelLock() {
   const newValue = !localSeatLabelingLocked.value
   localSeatLabelingLocked.value = newValue
   emit('update-property', 'seatLabeling.locked', newValue)
-}
-
-function onSetDisplayedLabel() {
-  localRowLabelingDisplayedLabel.value = localRowLabelingLabel.value
-  emit('update-property', 'rowLabeling.displayedLabel', localRowLabelingLabel.value)
 }
 
 function onClearSeatLabeling() {
@@ -674,36 +680,6 @@ defineExpose({ refresh })
   display: block;
 }
 
-/* Position 可视化选择器 */
-.position-selector {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: #f0f0f0;
-  border-radius: 4px;
-}
-
-.position-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 2px solid #ccc;
-  background: #fff;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  padding: 0;
-}
-
-.position-dot:hover {
-  border-color: #4a90d9;
-}
-
-.position-dot.active {
-  background: #4a90d9;
-  border-color: #4a90d9;
-}
-
 /* 座位数显示控件 */
 .seat-count-display {
   display: flex;
@@ -762,5 +738,30 @@ defineExpose({ refresh })
   font-family: 'SF Mono', Monaco, monospace;
   padding: 0 8px;
   min-width: 50px;
+}
+
+/* 批量设置按钮 */
+.batch-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  color: #666;
+  transition: all 0.15s ease;
+}
+
+.batch-btn:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.batch-icon {
+  width: 12px;
+  height: 12px;
 }
 </style>

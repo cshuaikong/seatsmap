@@ -526,6 +526,7 @@ const renderRow = (row: SeatRow, section: Section) => {
 
   mainLayer.add(rowShape)
   nodeMap.set(row.id, rowShape)
+  
 }
 
 // ==================== 渲染形状 ====================
