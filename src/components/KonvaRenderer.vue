@@ -1601,7 +1601,7 @@ const submitAllSegments = () => {
   // 生成座位对象
   const seats: Seat[] = seatPositions.map((pos, index) => ({
     id: generateId(),
-    label: String(index + 1),
+    label: '',  // 默认空标签
     x: pos.x,
     y: pos.y,
     categoryKey: 0,  // 默认未分类（灰色）
@@ -1651,7 +1651,7 @@ const submitMultiRows = () => {
     for (let i = 0; i < preview.baseRow.seatCount; i++) {
       seats.push({
         id: generateId(),
-        label: String(i + 1),
+        label: '',  // 默认空标签
         x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
         y: SEAT_RADIUS,
         categoryKey: 0,  // 默认未分类（灰色）
@@ -1691,7 +1691,7 @@ const submitSeatRow = (startPos: Position, endPos: Position) => {
   for (let i = 0; i < count; i++) {
     seats.push({
       id: generateId(),
-      label: String(i + 1),
+      label: '',  // 默认空标签
       x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
       y: SEAT_RADIUS,
       categoryKey: 0,  // 默认未分类（灰色）

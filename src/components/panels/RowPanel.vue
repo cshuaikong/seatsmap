@@ -90,6 +90,7 @@
           <label class="property-label">标签模式</label>
           <div class="property-control">
             <select v-model="batchLabelMode" class="select-input">
+              <option value="">无</option>
               <option value="A-B-C">A-B-C</option>
               <option value="a-b-c">a-b-c</option>
               <option value="1-2-3">1-2-3</option>
@@ -134,37 +135,12 @@
             @change="onUpdateProperty('seatLabeling.labels', ($event.target as HTMLSelectElement).value)"
             class="select-input"
           >
+            <option value="">无</option>
             <option value="1-2-3">1-2-3</option>
             <option value="1-3-5">1-3-5</option>
             <option value="a-b-c">a-b-c</option>
             <option value="A-B-C">A-B-C</option>
           </select>
-        </div>
-      </div>
-      <div class="property-row">
-        <!-- EN: Displayed type -->
-        <label class="property-label">显示类型</label>
-        <div class="property-control">
-          <!-- EN: Seat -->
-          <span class="readonly-text">座位</span>
-        </div>
-      </div>
-    </PanelSection>
-
-    <!-- Miscellaneous 分组 -->
-    <!-- EN: Miscellaneous -->
-    <PanelSection title="其他" :collapsible="true" :defaultExpanded="true">
-      <div class="property-row">
-        <!-- EN: Entrance -->
-        <label class="property-label">入口</label>
-        <div class="property-control">
-          <input
-            type="text"
-            :value="localEntrance"
-            @input="onUpdateProperty('entrance', ($event.target as HTMLInputElement).value)"
-            class="text-input"
-            placeholder="例如：A入口"
-          />
         </div>
       </div>
     </PanelSection>
@@ -201,18 +177,17 @@ const localCategoryId = ref('')
 const localSeatCounts = ref<number[]>([])  // 多选时存储每个排的座位数
 const localCurves = ref<number[]>([])  // 多选时存储每个排的弧度
 const localSeatSpacings = ref<number[]>([])  // 多选时存储每个排的座位间距
-const localEntrance = ref('')
 
 // 排标签配置
 const localRowLabelingLabel = ref('')
 const localRowLabelingLocked = ref(false)
 
 // 座位标签配置
-const localSeatLabelingLabels = ref('1-2-3')
+const localSeatLabelingLabels = ref('')
 const localSeatLabelingLocked = ref(false)
 
 // 批量标签设置
-const batchLabelMode = ref<'A-B-C' | 'a-b-c' | '1-2-3'>('A-B-C')
+const batchLabelMode = ref<string>('')
 const batchLabelStart = ref('')
 
 // 起始值占位符
@@ -226,7 +201,12 @@ const batchLabelStartPlaceholder = computed(() => {
 })
 
 // 生成标签序列
-const generateLabels = (mode: string, start: string, count: number): string[] => {
+const generateLabels = (mode: string, start: string, count: number): (string | null)[] => {
+  if (!mode) {
+    // 空模式：返回 null 数组表示清除标签
+    return Array(count).fill(null)
+  }
+  
   const labels: string[] = []
   
   if (mode === '1-2-3') {
@@ -345,7 +325,6 @@ const readFromNodes = () => {
   // 其他属性只读取第一个节点
   const node = props.nodes[0]
   localCategoryId.value = node.getAttr?.('categoryId') || node.categoryId || ''
-  localEntrance.value = node.getAttr?.('entrance') || node.entrance || ''
   
   // 排标签配置
   const rowLabeling = node.getAttr?.('rowLabeling') || node.rowLabeling || {}
@@ -354,7 +333,7 @@ const readFromNodes = () => {
   
   // 座位标签配置
   const seatLabeling = node.getAttr?.('seatLabeling') || node.seatLabeling || {}
-  localSeatLabelingLabels.value = seatLabeling.labels || '1-2-3'
+  localSeatLabelingLabels.value = seatLabeling.labels || ''
   localSeatLabelingLocked.value = seatLabeling.locked || false
 }
 
@@ -438,7 +417,6 @@ function onUpdateProperty(key: string, value: any) {
     case 'seatSpacing': 
       // 座位间距通过 onDecreaseSpacing/onIncreaseSpacing 处理
       break
-    case 'entrance': localEntrance.value = value; break
     case 'rowLabeling.label': localRowLabelingLabel.value = value; break
     case 'rowLabeling.locked': localRowLabelingLocked.value = value; break
     case 'seatLabeling.labels': localSeatLabelingLabels.value = value; break

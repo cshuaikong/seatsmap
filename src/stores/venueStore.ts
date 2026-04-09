@@ -240,7 +240,7 @@ export const useVenueStore = defineStore('venue', () => {
       // 重新生成座位
       row.seats = Array.from({ length: newSeatCount }, (_, i) => ({
         id: i < currentCount ? row.seats[i].id : generateId(),  // 保留原有ID
-        label: String(i + 1),
+        label: i < currentCount ? row.seats[i].label : '',  // 保留原有标签，新增座位为空
         x: baseX + Math.cos(angle) * (newSpacing * i),
         y: baseY + Math.sin(angle) * (newSpacing * i),
         categoryKey: i < currentCount ? row.seats[i].categoryKey : baseCategoryKey,

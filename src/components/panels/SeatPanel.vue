@@ -53,11 +53,26 @@
     <!-- EN: Seat labeling -->
     <PanelSection v-else title="座位编号" :collapsible="true" :defaultExpanded="true">
       <div class="property-row">
-        <!-- EN: Displayed type -->
-        <label class="property-label">显示类型</label>
+        <label class="property-label">标签模式</label>
         <div class="property-control">
-          <!-- EN: Seat -->
-          <span class="readonly-text">座位</span>
+          <select v-model="batchLabelMode" class="select-input">
+            <option value="">无</option>
+            <option value="1-2-3">1-2-3</option>
+            <option value="1-3-5">1-3-5</option>
+            <option value="a-b-c">a-b-c</option>
+            <option value="A-B-C">A-B-C</option>
+          </select>
+        </div>
+      </div>
+      <div class="property-row">
+        <label class="property-label">起始值</label>
+        <div class="property-control">
+          <input 
+            type="text" 
+            v-model="batchLabelStart" 
+            class="text-input"
+            :placeholder="batchLabelStartPlaceholder"
+          />
         </div>
       </div>
     </PanelSection>
@@ -155,6 +170,73 @@ const localCategoryId = ref('')
 const localAccessibility = ref<'none' | 'wheelchair'>('none')
 const localRestrictedView = ref(false)
 const localEntrance = ref('')
+
+// 批量标签设置
+const batchLabelMode = ref<string>('')
+const batchLabelStart = ref('')
+
+// 起始值占位符
+const batchLabelStartPlaceholder = computed(() => {
+  switch (batchLabelMode.value) {
+    case '1-2-3':
+    case '1-3-5': return '例如: 1 或 5'
+    case 'a-b-c': return '例如: a 或 c'
+    case 'A-B-C': return '例如: A 或 C'
+    default: return ''
+  }
+})
+
+// 生成标签序列
+const generateLabels = (mode: string, start: string, count: number): (string | null)[] => {
+  if (!mode) {
+    // 空模式：返回 null 数组表示清除标签
+    return Array(count).fill(null)
+  }
+  
+  const labels: string[] = []
+  
+  if (mode === '1-2-3') {
+    // 数字递增
+    let startNum = parseInt(start) || 1
+    for (let i = 0; i < count; i++) {
+      labels.push(String(startNum + i))
+    }
+  } else if (mode === '1-3-5') {
+    // 奇数递增
+    let startNum = parseInt(start) || 1
+    if (startNum % 2 === 0) startNum++ // 确保奇数
+    for (let i = 0; i < count; i++) {
+      labels.push(String(startNum + i * 2))
+    }
+  } else if (mode === 'A-B-C') {
+    // 大写字母
+    let startCode = start ? start.toUpperCase().charCodeAt(0) : 65
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(startCode + i))
+    }
+  } else if (mode === 'a-b-c') {
+    // 小写字母
+    let startCode = start ? start.toLowerCase().charCodeAt(0) : 97
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(startCode + i))
+    }
+  }
+  
+  return labels
+}
+
+// 应用批量标签
+const applyBatchLabels = () => {
+  const labels = generateLabels(batchLabelMode.value, batchLabelStart.value, props.nodes.length)
+  emit('update-property', 'batchLabels', labels)
+}
+
+// 监听批量标签设置变化，自动应用
+watch([batchLabelMode, batchLabelStart], () => {
+  if (!props.isSingle && props.nodes.length > 0) {
+    applyBatchLabels()
+  }
+})
 
 // 从节点读取属性的函数
 const readFromNodes = () => {

@@ -188,6 +188,37 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useVenueStore } from '../stores/venueStore'
+
+// 生成座位标签序列
+const generateSeatLabels = (scheme: string, count: number): string[] => {
+  const labels: string[] = []
+  
+  if (!scheme) {
+    // 空方案：返回空字符串数组
+    return Array(count).fill('')
+  }
+  
+  if (scheme === '1-2-3') {
+    for (let i = 0; i < count; i++) {
+      labels.push(String(i + 1))
+    }
+  } else if (scheme === '1-3-5') {
+    for (let i = 0; i < count; i++) {
+      labels.push(String(i * 2 + 1))
+    }
+  } else if (scheme === 'a-b-c') {
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(97 + i)) // a = 97
+    }
+  } else if (scheme === 'A-B-C') {
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(65 + i)) // A = 65
+    }
+  }
+  
+  return labels
+}
+
 import type { SeatRow as Row, PanelSelection, SelectedObjectType } from '../types'
 import ChartOverviewPanel from './panels/ChartOverviewPanel.vue'
 import ShapePanel from './panels/ShapePanel.vue'
@@ -543,7 +574,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
 
   // 特殊处理批量标签更新
   if (type === 'row' && 'batchLabels' in updates) {
-    const labels = updates.batchLabels as string[]
+    const labels = updates.batchLabels as (string | null)[]
     // 获取所有选中的排并按位置排序（从上到下，从左到右）
     const rows = [...venueStore.selectedRows]
     rows.sort((a, b) => {
@@ -552,11 +583,69 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
       if (Math.abs(yDiff) > 20) return yDiff
       return (a.x || 0) - (b.x || 0)
     })
-    // 按排序后的顺序设置标签
+    // 按排序后的顺序设置标签（null 表示清除标签）
     rows.forEach((row, index) => {
       if (labels[index] !== undefined) {
-        venueStore.updateRow(row.id, { label: labels[index] })
+        venueStore.updateRow(row.id, { label: labels[index] ?? undefined })
       }
+    })
+    return
+  }
+
+  // 特殊处理座位批量标签更新
+  if (type === 'seat' && 'batchLabels' in updates) {
+    const labels = updates.batchLabels as (string | null)[]
+    const seatIds = venueStore.selectedSeatIds
+    // 获取所有选中的座位信息（需要包含位置信息用于排序）
+    const seatsWithPos: { id: string, x: number, y: number }[] = []
+    venueStore.venue.sections.forEach(section => {
+      section.rows.forEach(row => {
+        row.seats.forEach(seat => {
+          if (seatIds.includes(seat.id)) {
+            // 座位位置 = 排位置 + 座位相对位置
+            seatsWithPos.push({
+              id: seat.id,
+              x: (row.x || 0) + seat.x,
+              y: (row.y || 0) + seat.y
+            })
+          }
+        })
+      })
+    })
+    // 按位置排序（从上到下，从左到右）
+    seatsWithPos.sort((a, b) => {
+      const yDiff = a.y - b.y
+      if (Math.abs(yDiff) > 20) return yDiff
+      return a.x - b.x
+    })
+    // 按排序后的顺序设置标签（null 表示清除标签）
+    seatsWithPos.forEach((seat, index) => {
+      if (labels[index] !== undefined) {
+        venueStore.updateSeat(seat.id, { label: labels[index] ?? undefined })
+      }
+    })
+    return
+  }
+
+  // 特殊处理排座位标签方案更新
+  if (type === 'row' && 'seatLabeling.labels' in updates) {
+    const labelScheme = updates['seatLabeling.labels'] as string
+    const rowIds = venueStore.selectedRowIds
+    
+    rowIds.forEach(rowId => {
+      const row = venueStore.selectedRows.find(r => r.id === rowId)
+      if (!row) return
+      
+      // 根据方案生成座位标签
+      const seats = row.seats
+      const labels = generateSeatLabels(labelScheme, seats.length)
+      
+      // 更新每个座位的标签
+      seats.forEach((seat, index) => {
+        if (labels[index] !== undefined) {
+          venueStore.updateSeat(seat.id, { label: labels[index] || undefined })
+        }
+      })
     })
     return
   }

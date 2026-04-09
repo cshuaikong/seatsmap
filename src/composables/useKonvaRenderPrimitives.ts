@@ -256,6 +256,19 @@ export function createRowSceneFunc(
       context.restore()
     })
 
+    // 绘制座位标签（如果有）
+    context.fillStyle = '#ffffff'
+    context.font = `bold ${Math.max(8, radius - 2)}px Inter, -apple-system, sans-serif`
+    context.textAlign = 'center'
+    context.textBaseline = 'middle'
+    
+    row.seats.forEach((seat, index) => {
+      if (seat.label) {
+        const pos = curvedPositions[index]
+        context.fillText(seat.label, pos.x, pos.y)
+      }
+    })
+
     // 关键节点高亮已移除（不需要显示黄色/橙色圈）
   }
 }

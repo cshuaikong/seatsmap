@@ -349,7 +349,7 @@ export function submitSeatRow(startPos: Position, endPos: Position) {
   for (let i = 0; i < count; i++) {
     seats.push({
       id: generateId(),
-      label: String(i + 1),
+      label: '',  // 默认空标签
       x: i * SEAT_SPACING + SEAT_RADIUS,
       y: SEAT_RADIUS,
       categoryKey: useVenueStore().venue.categories[0]?.key || 1,
