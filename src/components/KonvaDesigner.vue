@@ -82,17 +82,7 @@
             </span>
           </div>
 
-          <!-- 控制按钮 -->
-          <div class="control-buttons">
-            <button @click="generateTestSeats" class="control-btn">
-              <Icon icon="lucide:refresh-cw" class="btn-icon" />
-              生成 50 座位
-            </button>
-            <button @click="exportVenueData" class="control-btn" style="background: #4a90d9;">
-              <Icon icon="lucide:download" class="btn-icon" />
-              导出数据
-            </button>
-          </div>
+
         </div>
       </div>
 
@@ -272,42 +262,6 @@ watch(currentTool, (newTool) => {
   rendererRef.value?.setDrawingTool?.(mappedTool as any)
 })
 
-const generateTestSeats = () => {
-  // 使用 venueStore 生成测试数据
-  const sectionId = venueStore.addSection({
-    name: '测试区域',
-    rows: [],
-    x: 100,
-    y: 100
-  })
-  
-  // 生成 50 个座位（5排 x 10座）
-  for (let rowIdx = 0; rowIdx < 5; rowIdx++) {
-    const seats: Seat[] = []
-    for (let seatIdx = 0; seatIdx < 10; seatIdx++) {
-      seats.push({
-        id: `seat-${Date.now()}-${rowIdx}-${seatIdx}`,
-        label: String(seatIdx + 1),
-        x: seatIdx * 28,
-        y: 0,
-        categoryKey: venueStore.venue.categories[0]?.key || 1,
-        status: 'available',
-        objectType: 'seat'
-      })
-    }
-    
-    venueStore.addRow(sectionId, {
-      label: String.fromCharCode(65 + rowIdx),
-      seats,
-      x: 100,
-      y: 100 + rowIdx * 32,
-      rotation: 0,
-      curve: 0,
-      seatSpacing: 28
-    })
-  }
-}
-
 // 编辑操作
 const onUndo = () => {
   console.log('撤销')
@@ -374,29 +328,6 @@ const onLoadBackground = () => {
   }
   input.click()
 }
-
-// 导出座位图数据到控制台
-const exportVenueData = async () => {
-  // 从 store 中获取数据
-  const dataToExport = venueStore.exportVenueData()
-  
-  console.log('========== 座位图数据结构 ==========')
-  console.log('📊 总座位数:', totalSeats.value)
-  console.log('📊 可用座位数:', availableSeats.value)
-  console.log('📊 已售座位数:', soldSeats.value)
-  console.log('📊 保留座位数:', reservedSeats.value)
-  console.log('\n📁 完整数据结构:')
-  console.log(JSON.stringify(dataToExport, null, 2))
-  console.log('====================================')
-  
-  if (totalSeats.value === 0) {
-    alert('数据已输出到控制台！\n当前没有座位，快去绘制一些座位吧~ 🎨')
-  } else {
-    alert(`数据已输出到控制台！\n共 ${totalSeats.value} 个座位 ✨`)
-  }
-}
-
-
 
 // Category 管理
 const onManageCategories = () => {
@@ -638,43 +569,6 @@ const onDelete = () => {
   background: #f59e0b;
 }
 
-/* 控制按钮 */
-.control-buttons {
-  position: absolute;
-  top: 60px;
-  left: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.control-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  color: var(--color-text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  white-space: nowrap;
-}
-
-.control-btn:hover {
-  background: var(--color-bg-tertiary);
-  border-color: var(--color-border-hover);
-}
-
-.control-btn:active {
-  transform: scale(0.98);
-}
-
 /* 响应式处理 */
 @media (max-width: 1024px) {
   .designer-main {
@@ -697,10 +591,6 @@ const onDelete = () => {
   .designer-main {
     grid-template-columns: 56px 1fr;
     grid-template-rows: none;
-  }
-  
-  .control-buttons {
-    display: none;
   }
 }
 </style>
