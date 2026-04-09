@@ -559,7 +559,7 @@ const onDelete = () => {
 /* 主内容区 - 三栏布局 */
 .designer-main {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   gap: 12px;
   padding: 12px;
   flex: 1;
@@ -678,9 +678,13 @@ const onDelete = () => {
 /* 响应式处理 */
 @media (max-width: 1024px) {
   .designer-main {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 56px 1fr;
     gap: 8px;
     padding: 8px;
+  }
+  
+  .designer-main :deep(.right-panel) {
+    display: none;
   }
   
   .status-bar {
@@ -691,8 +695,8 @@ const onDelete = () => {
 
 @media (max-width: 768px) {
   .designer-main {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-columns: 56px 1fr;
+    grid-template-rows: none;
   }
   
   .control-buttons {

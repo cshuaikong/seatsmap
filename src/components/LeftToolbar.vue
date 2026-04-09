@@ -205,7 +205,8 @@ const onImageClick = () => {
   border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow-y: auto;
-  min-width: 52px;
+  width: 56px;
+  flex-shrink: 0;
   max-height: 100%;
 }
 
