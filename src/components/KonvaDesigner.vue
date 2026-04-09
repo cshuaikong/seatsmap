@@ -12,6 +12,14 @@
 
       <!-- 右侧：操作按钮 -->
       <div class="toolbar-right">
+        <button class="action-btn secondary" @click="onExportData">
+          <Icon icon="lucide:download" class="btn-icon" />
+          导出
+        </button>
+        <button class="action-btn secondary" @click="onImportData">
+          <Icon icon="lucide:upload" class="btn-icon" />
+          导入
+        </button>
         <button class="action-btn secondary">
           <Icon icon="lucide:eye" class="btn-icon" />
           预览
@@ -121,6 +129,7 @@ import type { ToolMode } from '../composables/useKonvaDrawing'
 import type { Seat } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { generateId } from '../utils/id'
+import { useSeatMapIO } from '../composables/useSeatMapIO'
 
 import CategoryManager from './panels/CategoryManager.vue'
 
@@ -156,6 +165,9 @@ const rendererRef = ref<InstanceType<typeof KonvaRenderer>>()
 
 // Venue store
 const venueStore = useVenueStore()
+
+// 导出导入
+const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
 // 计算统计数据
 const totalSeats = computed(() => {
@@ -378,6 +390,33 @@ const exportVenueData = async () => {
 // Category 管理
 const onManageCategories = () => {
   showCategoryManager.value = true
+}
+
+// 导出数据到文件
+const onExportData = () => {
+  const success = exportSeatMap(venueStore.venue, `${venueStore.venue.name || 'seatmap'}.json`)
+  if (success) {
+    alert(`导出成功！共 ${totalSeats.value} 个座位`)
+  } else {
+    alert('导出失败，请查看控制台')
+  }
+}
+
+// 从文件导入数据
+const onImportData = async () => {
+  const file = await triggerImport()
+  if (!file) return
+  
+  const venue = await importSeatMap(file)
+  if (venue) {
+    // 替换当前数据
+    venueStore.venue = venue
+    // 清空选中状态
+    venueStore.clearSelection()
+    alert(`导入成功！共 ${venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)} 个座位`)
+  } else {
+    alert('导入失败，请检查文件格式')
+  }
 }
 
 const onCloseCategoryManager = () => {

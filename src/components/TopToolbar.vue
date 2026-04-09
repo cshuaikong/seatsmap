@@ -62,6 +62,14 @@
 
     <!-- 右侧：操作 -->
     <div class="toolbar-right">
+      <button class="action-btn secondary" @click="emit('export-data')">
+        <Icon icon="lucide:download" class="btn-icon" />
+        导出
+      </button>
+      <button class="action-btn secondary" @click="emit('import-data')">
+        <Icon icon="lucide:upload" class="btn-icon" />
+        导入
+      </button>
       <button class="action-btn secondary">
         <Icon icon="lucide:eye" class="btn-icon" />
         预览
@@ -82,6 +90,11 @@ import { Icon } from '@iconify/vue'
 
 defineProps<{
   chartName: string
+}>()
+
+const emit = defineEmits<{
+  'export-data': []
+  'import-data': []
 }>()
 </script>
 
