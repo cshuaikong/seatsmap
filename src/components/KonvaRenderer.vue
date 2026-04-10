@@ -114,6 +114,7 @@ interface MultiRowPreview {
   rowCount: number      // 行数
   rowSpacing: number    // 行间距
   angle: number         // 整体角度
+  rowDirectionAngle: number  // 行排列方向角度（跟随鼠标）
 }
 
 const seatDrawStep = ref<SeatDrawStep>('idle')
@@ -1393,6 +1394,9 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
   let rowSpacing = ROW_SPACING
   let baseRow = { start: startPos, end: endPos, angle, seatCount }
 
+  // 计算行方向角度（默认垂直于第一排）
+  let rowDirectionAngle = baseRow.angle + Math.PI / 2
+
   if (seatDrawStep.value === 'segment_done' && multiRowPreview.value) {
     // 使用已保存的第一排数据
     baseRow = multiRowPreview.value.baseRow
@@ -1403,13 +1407,18 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
     const firstRowEndX = baseRow.start.x + lastSeatLocalX * Math.cos(baseRow.angle)
     const firstRowEndY = baseRow.start.y + lastSeatLocalX * Math.sin(baseRow.angle)
 
-    // 计算鼠标到第一排终点的距离（垂直方向）
+    // 计算鼠标相对于第一排终点的方向
     const dx = endPos.x - firstRowEndX
     const dy = endPos.y - firstRowEndY
-    const perpDist = Math.sqrt(dx * dx + dy * dy)
+    const dist = Math.sqrt(dx * dx + dy * dy)
 
     // 根据距离计算行数
-    rowCount = Math.max(1, Math.floor(perpDist / rowSpacing) + 1)
+    rowCount = Math.max(1, Math.floor(dist / rowSpacing) + 1)
+
+    // 根据鼠标方向计算行排列角度
+    if (dist > 5) {
+      rowDirectionAngle = Math.atan2(dy, dx)
+    }
   }
 
   // 保存预览数据
@@ -1417,13 +1426,15 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
     baseRow,
     rowCount,
     rowSpacing,
-    angle: baseRow.angle
+    angle: baseRow.angle,
+    rowDirectionAngle
   }
 
   const preview = multiRowPreview.value
+  if (!preview) return
 
-  // 计算垂直方向角度
-  const perpAngle = preview.angle + Math.PI / 2
+  // 使用鼠标方向作为行排列方向
+  const perpAngle = preview.rowDirectionAngle
 
   // 使用一个 Shape 绘制所有行
   const shape = new Konva.Shape({
@@ -1433,7 +1444,7 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
 
   shape.sceneFunc((ctx) => {
     for (let row = 0; row < preview.rowCount; row++) {
-      // 计算该行的起点（从第一排起点沿垂直方向偏移）
+      // 计算该行的起点（从第一排起点沿行方向偏移）
       const rowOffsetX = row * preview.rowSpacing * Math.cos(perpAngle)
       const rowOffsetY = row * preview.rowSpacing * Math.sin(perpAngle)
       const rowStartX = preview.baseRow.start.x + rowOffsetX
@@ -1610,15 +1621,15 @@ const submitMultiRows = () => {
   const preview = multiRowPreview.value
   const sectionId = getOrCreateDefaultSection()
 
-  // 计算垂直方向向量
-  const perpX = -Math.sin(preview.angle)
-  const perpY = Math.cos(preview.angle)
+  // 使用行方向角度计算偏移向量
+  const dirX = Math.cos(preview.rowDirectionAngle)
+  const dirY = Math.sin(preview.rowDirectionAngle)
 
   // 逐行提交
   for (let row = 0; row < preview.rowCount; row++) {
-    // 计算该行的起点
-    const rowOffsetX = row * preview.rowSpacing * perpX
-    const rowOffsetY = row * preview.rowSpacing * perpY
+    // 计算该行的起点（沿行方向偏移）
+    const rowOffsetX = row * preview.rowSpacing * dirX
+    const rowOffsetY = row * preview.rowSpacing * dirY
     const rowStartX = preview.baseRow.start.x + rowOffsetX
     const rowStartY = preview.baseRow.start.y + rowOffsetY
 
