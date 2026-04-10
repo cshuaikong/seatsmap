@@ -135,6 +135,11 @@ let _currentTool: DrawingToolMode = 'select'
 let _seatDrawStep: 'idle' | 'first' = 'idle'
 let _seatDrawStartPos: Position | null = null
 
+// 多排绘制状态（section-diagonal）
+let _multiRowStep: 'idle' | 'first' | 'second' = 'idle'
+let _multiRowStartPos: Position | null = null
+let _multiRowEndPos: Position | null = null
+
 // 多边形绘制状态
 let _polygonPoints: Position[] = []
 
@@ -181,6 +186,9 @@ export function isDrawingMode(): boolean {
 export function resetAllDrawingState() {
   _seatDrawStep = 'idle'
   _seatDrawStartPos = null
+  _multiRowStep = 'idle'
+  _multiRowStartPos = null
+  _multiRowEndPos = null
   _polygonPoints = []
   _dragStartPos = null
   clearDrawingPreview()
@@ -369,6 +377,117 @@ export function submitSeatRow(startPos: Position, endPos: Position) {
     curve: 0,
     seatSpacing: SEAT_SPACING
   })
+  
+  clearDrawingPreview()
+}
+
+/** 创建多排预览 */
+export function createMultiRowPreview(startPos: Position, endPos: Position, currentPos: Position) {
+  const { ux, uy, dist } = getUnitVector(startPos, endPos)
+  
+  if (dist < SEAT_SPACING) return
+  
+  const seatsPerRow = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
+  const rowAngle = Math.atan2(uy, ux) * 180 / Math.PI
+  
+  // 计算行方向和行数
+  const { ux: rowUx, uy: rowUy } = getUnitVector(endPos, currentPos)
+  const rowDist = Math.sqrt(
+    Math.pow(currentPos.x - endPos.x, 2) + 
+    Math.pow(currentPos.y - endPos.y, 2)
+  )
+  const rowCount = Math.max(1, Math.floor(rowDist / ROW_SPACING) + 1)
+  
+  clearDrawingPreview()
+  
+  // 绘制每排预览
+  for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+    const rowOffsetX = rowIdx * rowUx * ROW_SPACING
+    const rowOffsetY = rowIdx * rowUy * ROW_SPACING
+    const rowStartX = startPos.x + rowOffsetX
+    const rowStartY = startPos.y + rowOffsetY
+    
+    // 绘制辅助线
+    const line = new Konva.Line({
+      points: [rowStartX, rowStartY, rowStartX + ux * (seatsPerRow - 1) * SEAT_SPACING, rowStartY + uy * (seatsPerRow - 1) * SEAT_SPACING],
+      stroke: '#3b82f6',
+      strokeWidth: 1.5,
+      dash: [6, 6],
+      listening: false
+    })
+    addPreviewElement(line)
+    
+    // 绘制座位预览
+    for (let i = 0; i < seatsPerRow; i++) {
+      const seatX = rowStartX + i * ux * SEAT_SPACING
+      const seatY = rowStartY + i * uy * SEAT_SPACING
+      
+      const circle = new Konva.Circle({
+        x: seatX,
+        y: seatY,
+        radius: SEAT_RADIUS,
+        fill: '#ffffff',
+        stroke: '#3b82f6',
+        strokeWidth: 1.5,
+        listening: false
+      })
+      addPreviewElement(circle)
+    }
+  }
+  
+  batchDrawOverlay()
+}
+
+/** 提交多排到 store */
+export function submitMultiRow(startPos: Position, endPos: Position, currentPos: Position) {
+  const { ux, uy, dist } = getUnitVector(startPos, endPos)
+  
+  if (dist < SEAT_SPACING) {
+    clearDrawingPreview()
+    return
+  }
+  
+  const seatsPerRow = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
+  const rowAngle = Math.atan2(uy, ux) * 180 / Math.PI
+  
+  // 计算行方向和行数
+  const { ux: rowUx, uy: rowUy } = getUnitVector(endPos, currentPos)
+  const rowDist = Math.sqrt(
+    Math.pow(currentPos.x - endPos.x, 2) + 
+    Math.pow(currentPos.y - endPos.y, 2)
+  )
+  const rowCount = Math.max(1, Math.floor(rowDist / ROW_SPACING) + 1)
+  
+  const sectionId = getOrCreateDefaultSection()
+  
+  // 生成多排
+  for (let rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+    const rowOffsetX = rowIdx * rowUx * ROW_SPACING
+    const rowOffsetY = rowIdx * rowUy * ROW_SPACING
+    
+    const seats: Seat[] = []
+    for (let i = 0; i < seatsPerRow; i++) {
+      seats.push({
+        id: generateId(),
+        label: '',
+        x: i * SEAT_SPACING + SEAT_RADIUS,
+        y: SEAT_RADIUS,
+        categoryKey: useVenueStore().venue.categories[0]?.key || 1,
+        status: 'available',
+        objectType: 'seat'
+      })
+    }
+    
+    useVenueStore().addRow(sectionId, {
+      label: '',
+      seats,
+      x: startPos.x + rowOffsetX,
+      y: startPos.y + rowOffsetY,
+      rotation: rowAngle,
+      curve: 0,
+      seatSpacing: SEAT_SPACING
+    })
+  }
   
   clearDrawingPreview()
 }
@@ -654,8 +773,9 @@ export function handleDrawingClick(pos: Position): boolean {
     case 'draw_seat':
     case 'row-straight':
     case 'section':
-    case 'section-diagonal':
       return handleSeatClick(pos)
+    case 'section-diagonal':
+      return handleMultiRowClick(pos)
     case 'draw_rect':
     case 'draw_ellipse':
       return handleShapeClick(pos)
@@ -676,8 +796,9 @@ export function handleDrawingMove(pos: Position): boolean {
     case 'draw_seat':
     case 'row-straight':
     case 'section':
-    case 'section-diagonal':
       return handleSeatMove(pos)
+    case 'section-diagonal':
+      return handleMultiRowMove(pos)
     case 'draw_rect':
       if (_dragStartPos) {
         createRectPreview(_dragStartPos, pos)
@@ -728,6 +849,48 @@ function handleSeatMove(pos: Position): boolean {
     return true
   } else if (_seatDrawStep === 'first' && _seatDrawStartPos) {
     createSeatRowPreview(_seatDrawStartPos, pos)
+    return true
+  }
+  return false
+}
+
+/** 处理多排绘制点击 */
+function handleMultiRowClick(pos: Position): boolean {
+  if (_multiRowStep === 'idle') {
+    // 第一步：确定起点
+    _multiRowStartPos = pos
+    _multiRowStep = 'first'
+    clearDrawingPreview()
+    return true
+  } else if (_multiRowStep === 'first' && _multiRowStartPos) {
+    // 第二步：确定第一排的终点（方向、角度、座位数）
+    _multiRowEndPos = pos
+    _multiRowStep = 'second'
+    // 不清理预览，继续显示
+    return true
+  } else if (_multiRowStep === 'second' && _multiRowStartPos && _multiRowEndPos) {
+    // 第三步：确定行数和行间距，完成绘制
+    submitMultiRow(_multiRowStartPos, _multiRowEndPos, pos)
+    _multiRowStep = 'idle'
+    _multiRowStartPos = null
+    _multiRowEndPos = null
+    return true
+  }
+  return false
+}
+
+/** 处理多排绘制移动 */
+function handleMultiRowMove(pos: Position): boolean {
+  if (_multiRowStep === 'idle') {
+    createSeatCursorPreview(pos)
+    return true
+  } else if (_multiRowStep === 'first' && _multiRowStartPos) {
+    // 预览第一排
+    createSeatRowPreview(_multiRowStartPos, pos)
+    return true
+  } else if (_multiRowStep === 'second' && _multiRowStartPos && _multiRowEndPos) {
+    // 预览多排
+    createMultiRowPreview(_multiRowStartPos, _multiRowEndPos, pos)
     return true
   }
   return false
