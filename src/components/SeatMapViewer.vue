@@ -5,281 +5,319 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
-import type { VenueData, Seat, SeatRow, Section, Category } from '../types'
+import type { VenueData, Seat, SeatRow, Section } from '../types'
 
 const props = defineProps<{
   venue: VenueData
   width?: number
   height?: number
-  // 是否允许选择座位（预览模式可以设为 false）
   selectable?: boolean
-  // 已选中的座位ID列表
   selectedSeatIds?: string[]
 }>()
 
 const emit = defineEmits<{
   'seat-click': [seat: Seat, row: SeatRow, section: Section]
-  'seat-hover': [seat: Seat | null]
+  'update:selectedSeatIds': [seatIds: string[]]
 }>()
 
 const containerRef = ref<HTMLDivElement>()
 let stage: Konva.Stage | null = null
 let layer: Konva.Layer | null = null
-let seatNodes: Map<string, Konva.Circle> = new Map()
+let seatNodes: Map<string, Konva.Circle> = new Map() // 存储座位节点用于更新状态
 
-// 默认座位半径
 const SEAT_RADIUS = 6
-const SEAT_SPACING = 18
 
-// 初始化舞台
-const initStage = () => {
-  if (!containerRef.value) return
+// 计算弧形位置
+const calculateCurvedPositions = (seats: Seat[], curve: number): Array<{ x: number; y: number }> => {
+  if (!curve || curve === 0 || seats.length < 2) {
+    return seats.map(seat => ({ x: seat.x, y: seat.y }))
+  }
 
-  const width = props.width || containerRef.value.clientWidth
-  const height = props.height || containerRef.value.clientHeight
-
-  stage = new Konva.Stage({
-    container: containerRef.value,
-    width,
-    height,
-    draggable: true
-  })
-
-  layer = new Konva.Layer()
-  stage.add(layer)
-
-  // 鼠标滚轮缩放
-  stage.on('wheel', (e) => {
-    e.evt.preventDefault()
-    const scaleBy = 1.1
-    const oldScale = stage!.scaleX()
-    const pointer = stage!.getPointerPosition()!
-    
-    const mousePointTo = {
-      x: (pointer.x - stage!.x()) / oldScale,
-      y: (pointer.y - stage!.y()) / oldScale
+  const count = seats.length
+  const firstSeat = seats[0]
+  const lastSeat = seats[count - 1]
+  
+  const dx = lastSeat.x - firstSeat.x
+  const dy = lastSeat.y - firstSeat.y
+  const length = Math.sqrt(dx * dx + dy * dy)
+  const baseAngle = Math.atan2(dy, dx)
+  
+  const maxCurveAngle = curve * (Math.PI / 180)
+  const chordLength = length
+  const curveAngle = Math.abs(maxCurveAngle)
+  const radius = curveAngle > 0.001 ? chordLength / (2 * Math.sin(curveAngle / 2)) : Infinity
+  
+  const midX = (firstSeat.x + lastSeat.x) / 2
+  const midY = (firstSeat.y + lastSeat.y) / 2
+  
+  const perpX = -Math.sin(baseAngle) * (curve > 0 ? 1 : -1)
+  const perpY = Math.cos(baseAngle) * (curve > 0 ? 1 : -1)
+  
+  const centerX = midX + perpX * Math.sqrt(Math.max(0, radius * radius - (chordLength / 2) * (chordLength / 2)))
+  const centerY = midY + perpY * Math.sqrt(Math.max(0, radius * radius - (chordLength / 2) * (chordLength / 2)))
+  
+  const startAngle = Math.atan2(firstSeat.y - centerY, firstSeat.x - centerX)
+  const endAngle = Math.atan2(lastSeat.y - centerY, lastSeat.x - centerX)
+  const angleStep = (endAngle - startAngle) / (count - 1)
+  
+  return seats.map((_, index) => {
+    const angle = startAngle + angleStep * index
+    return {
+      x: centerX + radius * Math.cos(angle),
+      y: centerY + radius * Math.sin(angle)
     }
-    
-    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
-    
-    stage!.scale({ x: newScale, y: newScale })
-    stage!.position({
-      x: pointer.x - mousePointTo.x * newScale,
-      y: pointer.y - mousePointTo.y * newScale
-    })
   })
 }
 
 // 获取分类颜色
 const getCategoryColor = (categoryKey: string | number): string => {
-  const category = props.venue.categories.find(c => c.key === categoryKey)
+  if (categoryKey === 0 || categoryKey === '0') return '#BDBDBD'
+  const category = props.venue.categories.find(c => String(c.key) === String(categoryKey))
   return category?.color || '#9E9E9E'
+}
+
+// 初始化舞台
+const initStage = () => {
+  if (!containerRef.value) return
+
+  const width = props.width || containerRef.value.clientWidth || 800
+  const height = props.height || containerRef.value.clientHeight || 600
+
+  stage = new Konva.Stage({
+    container: containerRef.value,
+    width,
+    height,
+    draggable: false // 禁用舞台拖拽，避免影响座位点击
+  })
+
+  layer = new Konva.Layer({
+    listening: true // 确保层接收事件
+  })
+  stage.add(layer)
+
+  // 简单的滚轮缩放
+  stage.on('wheel', (e) => {
+    e.evt.preventDefault()
+    const scaleBy = 1.1
+    const oldScale = stage!.scaleX()
+    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+    stage!.scale({ x: newScale, y: newScale })
+    layer?.batchDraw()
+  })
 }
 
 // 渲染座位图
 const renderSeatMap = () => {
-  if (!layer || !props.venue) return
+  if (!layer) return
 
   layer.destroyChildren()
-  seatNodes.clear()
+  seatNodes.clear() // 清空座位节点映射
 
-  // 计算边界
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  let hasSeats = false
-
+  // 渲染所有 section
   props.venue.sections.forEach(section => {
-    section.rows.forEach(row => {
-      const rowX = row.x || 0
-      const rowY = row.y || 0
-      row.seats.forEach(seat => {
-        hasSeats = true
-        const x = rowX + seat.x
-        const y = rowY + seat.y
-        minX = Math.min(minX, x - SEAT_RADIUS)
-        minY = Math.min(minY, y - SEAT_RADIUS)
-        maxX = Math.max(maxX, x + SEAT_RADIUS)
-        maxY = Math.max(maxY, y + SEAT_RADIUS)
-      })
+    // 渲染形状
+    section.shapes?.forEach(shape => {
+      if (shape.type === 'rect') {
+        layer!.add(new Konva.Rect({
+          x: shape.x,
+          y: shape.y,
+          width: shape.width || 100,
+          height: shape.height || 100,
+          fill: shape.fill || 'rgba(156, 163, 175, 0.6)',
+          rotation: shape.rotation || 0
+        }))
+      } else if (shape.type === 'ellipse') {
+        layer!.add(new Konva.Ellipse({
+          x: shape.x,
+          y: shape.y,
+          radiusX: (shape.width || 100) / 2,
+          radiusY: (shape.height || 100) / 2,
+          fill: shape.fill || 'rgba(156, 163, 175, 0.6)',
+          rotation: shape.rotation || 0
+        }))
+      }
     })
-  })
 
-  if (!hasSeats) return
+    // 渲染文本
+    section.texts?.forEach(text => {
+      layer!.add(new Konva.Text({
+        x: text.x,
+        y: text.y,
+        text: text.text || text.caption || '',
+        fontSize: text.fontSize || 14,
+        fill: text.fill || text.textColor || '#333',
+        rotation: text.rotation || 0
+      }))
+    })
 
-  // 居中显示
-  const stageWidth = stage!.width()
-  const stageHeight = stage!.height()
-  const contentWidth = maxX - minX
-  const contentHeight = maxY - minY
-  const scale = Math.min(
-    (stageWidth - 40) / contentWidth,
-    (stageHeight - 40) / contentHeight,
-    1
-  )
+    // 渲染区域
+    section.areas?.forEach(area => {
+      layer!.add(new Konva.Line({
+        points: area.points || [],
+        fill: area.fill || 'rgba(100, 100, 100, 0.3)',
+        closed: true
+      }))
+    })
 
-  const offsetX = (stageWidth - contentWidth * scale) / 2 - minX * scale
-  const offsetY = (stageHeight - contentHeight * scale) / 2 - minY * scale
-
-  stage!.scale({ x: scale, y: scale })
-  stage!.position({ x: offsetX, y: offsetY })
-
-  // 渲染每个 section
-  props.venue.sections.forEach(section => {
-    renderSection(section)
+    // 使用 Group 渲染排和座位
+    section.rows.forEach(row => {
+      renderRowGroup(row, section)
+    })
   })
 
   layer.batchDraw()
 }
 
-// 渲染单个 section
-const renderSection = (section: Section) => {
-  section.rows.forEach(row => {
-    renderRow(row, section)
-  })
-}
-
-// 渲染排标签
-const renderRowLabel = (row: SeatRow, section: Section) => {
-  if (!row.label || !layer) return
+// 渲染排 Group
+const renderRowGroup = (row: SeatRow, section: Section) => {
+  if (!layer) return
 
   const rowX = row.x || 0
   const rowY = row.y || 0
+  const rotation = row.rotation || 0
+  const curve = row.curve || 0
+  
+  const curvedPositions = calculateCurvedPositions(row.seats, curve)
 
-  // 计算排标签位置（排在左侧）
-  const firstSeat = row.seats[0]
-  if (!firstSeat) return
-
-  const labelX = rowX + firstSeat.x - SEAT_SPACING
-  const labelY = rowY + firstSeat.y
-
-  const label = new Konva.Text({
-    x: labelX,
-    y: labelY - 6,
-    text: row.label,
-    fontSize: 12,
-    fontFamily: 'Inter, sans-serif',
-    fill: '#666',
-    align: 'right',
-    width: SEAT_SPACING - 4
-  })
-
-  layer!.add(label)
-}
-
-// 渲染单行
-const renderRow = (row: SeatRow, section: Section) => {
-  const rowX = row.x || 0
-  const rowY = row.y || 0
-
-  // 先渲染排标签
-  renderRowLabel(row, section)
-
-  // 渲染座位
-  row.seats.forEach(seat => {
-    renderSeat(seat, row, section)
-  })
-}
-
-// 渲染单个座位
-const renderSeat = (seat: Seat, row: SeatRow, section: Section) => {
-  const rowX = row.x || 0
-  const rowY = row.y || 0
-  const x = rowX + seat.x
-  const y = rowY + seat.y
-
-  const isSelected = props.selectedSeatIds?.includes(seat.id)
-  const categoryColor = getCategoryColor(seat.categoryKey)
-
-  // 座位圆形
-  const circle = new Konva.Circle({
-    x,
-    y,
-    radius: SEAT_RADIUS,
-    fill: isSelected ? '#FF5722' : categoryColor,
-    stroke: isSelected ? '#FF5722' : '#fff',
-    strokeWidth: isSelected ? 2 : 1,
-    shadowColor: 'rgba(0,0,0,0.2)',
-    shadowBlur: 2,
-    shadowOffset: { x: 0, y: 1 },
-    cursor: props.selectable !== false ? 'pointer' : 'default'
-  })
-
-  // 座位标签（编号）
-  if (seat.label) {
-    const label = new Konva.Text({
-      x: x - SEAT_RADIUS,
-      y: y + SEAT_RADIUS + 2,
-      text: seat.label,
-      fontSize: 9,
-      fontFamily: 'Inter, sans-serif',
-      fill: '#666',
-      align: 'center',
-      width: SEAT_RADIUS * 2
-    })
-    layer!.add(label)
-  }
-
-  // 交互事件
-  if (props.selectable !== false) {
-    circle.on('click tap', () => {
-      emit('seat-click', seat, row, section)
-    })
-
-    circle.on('mouseenter', () => {
-      circle.scale({ x: 1.2, y: 1.2 })
-      layer!.batchDraw()
-      emit('seat-hover', seat)
-    })
-
-    circle.on('mouseleave', () => {
-      circle.scale({ x: 1, y: 1 })
-      layer!.batchDraw()
-      emit('seat-hover', null)
-    })
-  }
-
-  layer!.add(circle)
-  seatNodes.set(seat.id, circle)
-}
-
-// 更新座位选中状态
-const updateSelection = () => {
-  seatNodes.forEach((node, seatId) => {
-    const isSelected = props.selectedSeatIds?.includes(seatId)
-    const seat = findSeatById(seatId)
-    if (seat) {
-      const categoryColor = getCategoryColor(seat.categoryKey)
-      node.fill(isSelected ? '#FF5722' : categoryColor)
-      node.stroke(isSelected ? '#FF5722' : '#fff')
-      node.strokeWidth(isSelected ? 2 : 1)
+  // 排标签
+  if (row.label && row.seats.length > 0) {
+    const firstPos = curvedPositions[0]
+    let labelX = rowX - SEAT_RADIUS * 3
+    let labelY = rowY - SEAT_RADIUS + firstPos.y - 6
+    
+    // 考虑旋转
+    if (rotation) {
+      const rad = rotation * Math.PI / 180
+      const relX = labelX - rowX
+      const relY = labelY - rowY
+      labelX = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
+      labelY = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
     }
+    
+    layer.add(new Konva.Text({
+      x: labelX,
+      y: labelY,
+      text: row.label,
+      fontSize: 12,
+      fill: '#666',
+      align: 'left',
+      listening: false
+    }))
+  }
+
+  // 座位（直接添加到 layer，不使用 Group）
+  row.seats.forEach((seat, index) => {
+    const pos = curvedPositions[index]
+    
+    // 计算座位位置（考虑 offset 和旋转）
+    let x = rowX - SEAT_RADIUS + pos.x
+    let y = rowY - SEAT_RADIUS + pos.y
+    
+    if (rotation) {
+      const rad = rotation * Math.PI / 180
+      const relX = x - rowX
+      const relY = y - rowY
+      x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
+      y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+    }
+    
+    const isSelected = props.selectedSeatIds?.includes(seat.id)
+    const color = getCategoryColor(seat.categoryKey)
+
+    // 座位圆形
+    const circle = new Konva.Circle({
+      x,
+      y,
+      radius: SEAT_RADIUS,
+      fill: isSelected ? '#FF5722' : color,
+      stroke: '#fff',
+      strokeWidth: 1
+    })
+
+    // 座位编号（居中）
+    if (seat.label && layer) {
+      layer.add(new Konva.Text({
+        x: x - SEAT_RADIUS,
+        y: y - 4,
+        text: seat.label,
+        fontSize: 8,
+        fill: '#fff',
+        align: 'center',
+        width: SEAT_RADIUS * 2,
+        listening: false
+      }))
+    }
+
+  // 点击事件 - 切换选择状态
+    if (props.selectable !== false) {
+      // 使用 mousedown 代替 click，更可靠
+      circle.on('mousedown', (e) => {
+        console.log('座位点击:', seat.id, seat.label)
+        e.cancelBubble = true
+        const currentSelected = new Set(props.selectedSeatIds || [])
+        if (currentSelected.has(seat.id)) {
+          currentSelected.delete(seat.id)
+          console.log('取消选择:', seat.id)
+        } else {
+          currentSelected.add(seat.id)
+          console.log('选择:', seat.id)
+        }
+        emit('update:selectedSeatIds', Array.from(currentSelected))
+        emit('seat-click', seat, row, section)
+      })
+      
+      // 鼠标样式
+      circle.on('mouseenter', () => {
+        if (stage) {
+          stage.container().style.cursor = 'pointer'
+        }
+      })
+      circle.on('mouseleave', () => {
+        if (stage) {
+          stage.container().style.cursor = 'default'
+        }
+      })
+    }
+
+    if (layer) {
+      layer.add(circle)
+    }
+    seatNodes.set(seat.id, circle) // 存储节点用于后续更新
+  })
+}
+
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）
+const updateSelection = () => {
+  seatNodes.forEach((circle, seatId) => {
+    const isSelected = props.selectedSeatIds?.includes(seatId)
+    // 从 seat 对象获取颜色
+    let categoryKey: string | number = 1
+    for (const section of props.venue.sections) {
+      for (const row of section.rows) {
+        const seat = row.seats.find(s => s.id === seatId)
+        if (seat) {
+          categoryKey = seat.categoryKey
+          break
+        }
+      }
+    }
+    const color = getCategoryColor(categoryKey)
+    circle.fill(isSelected ? '#FF5722' : color)
+    circle.stroke(isSelected ? '#FF5722' : '#fff')
+    circle.strokeWidth(isSelected ? 2 : 1)
   })
   layer?.batchDraw()
 }
 
-// 根据ID查找座位
-const findSeatById = (seatId: string): Seat | null => {
-  for (const section of props.venue.sections) {
-    for (const row of section.rows) {
-      const seat = row.seats.find(s => s.id === seatId)
-      if (seat) return seat
-    }
-  }
-  return null
-}
+onMounted(() => {
+  initStage()
+  setTimeout(renderSeatMap, 50)
+})
 
-// 监听数据变化
-watch(() => props.venue, () => {
-  renderSeatMap()
-}, { deep: true })
-
+// 监听选中状态变化，更新座位颜色
 watch(() => props.selectedSeatIds, () => {
   updateSelection()
 }, { deep: true })
-
-onMounted(() => {
-  initStage()
-  renderSeatMap()
-})
 
 onUnmounted(() => {
   if (stage) {
@@ -287,6 +325,8 @@ onUnmounted(() => {
     stage = null
   }
 })
+
+defineExpose({ refresh: renderSeatMap, updateSelection })
 </script>
 
 <style scoped>

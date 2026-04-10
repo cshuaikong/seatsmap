@@ -12,11 +12,13 @@
           </div>
 
           <!-- 预览内容 -->
-          <div class="preview-content">
+          <div class="preview-content" v-if="visible">
             <SeatMapViewer
               :venue="venue"
               :selectable="true"
-              :selected-seat-ids="selectedSeats"
+              v-model:selected-seat-ids="selectedSeats"
+              :width="1200"
+              :height="800"
               @seat-click="onSeatClick"
               class="preview-viewer"
             />
@@ -24,11 +26,7 @@
 
           <!-- 底部信息 -->
           <div class="preview-footer">
-            <div class="seat-info" v-if="hoveredSeat">
-              <span class="seat-label">{{ hoveredSeat.label }}</span>
-              <span class="seat-category">{{ getCategoryLabel(hoveredSeat.categoryKey) }}</span>
-            </div>
-            <div class="selected-count" v-else>
+            <div class="selected-count">
               已选择 {{ selectedSeats.length }} 个座位
             </div>
           </div>
@@ -69,14 +67,8 @@ const getCategoryLabel = (key: string | number): string => {
   return category?.label || '未分类'
 }
 
-// 座位点击
+// 座位点击 - 只更新悬停状态，选择逻辑由 SeatMapViewer 处理
 const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
-  const index = selectedSeats.value.indexOf(seat.id)
-  if (index > -1) {
-    selectedSeats.value.splice(index, 1)
-  } else {
-    selectedSeats.value.push(seat.id)
-  }
   hoveredSeat.value = seat
 }
 </script>
@@ -153,14 +145,18 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 .preview-content {
   flex: 1;
   padding: 20px;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f5f5f5;
 }
 
 .preview-viewer {
-  flex: 1;
   border: 1px solid #e5e5e5;
   border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .preview-footer {
