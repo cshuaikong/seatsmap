@@ -95,15 +95,113 @@ const initStage = () => {
   })
   stage.add(layer)
 
-  // 简单的滚轮缩放
+  // 以鼠标为中心的滚轮缩放
   stage.on('wheel', (e) => {
     e.evt.preventDefault()
     const scaleBy = 1.1
     const oldScale = stage!.scaleX()
     const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+    
+    // 获取鼠标位置
+    const pointer = stage!.getPointerPosition()!
+    
+    // 计算鼠标指向的舞台坐标
+    const mousePointTo = {
+      x: (pointer.x - stage!.x()) / oldScale,
+      y: (pointer.y - stage!.y()) / oldScale
+    }
+    
+    // 设置新缩放
     stage!.scale({ x: newScale, y: newScale })
+    
+    // 调整舞台位置，使鼠标指向的坐标保持不变
+    stage!.position({
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale
+    })
+    
     layer?.batchDraw()
   })
+
+  // 画布拖拽
+  let isDragging = false
+  let lastPos: { x: number; y: number } | null = null
+
+  stage.on('mousedown', (e) => {
+    // 如果点击的是座位，不启动拖拽（座位自己的 mousedown 会处理）
+    if (e.target !== stage) return
+    
+    isDragging = true
+    lastPos = { x: e.evt.clientX, y: e.evt.clientY }
+    if (stage) stage.container().style.cursor = 'grabbing'
+  })
+
+  stage.on('mousemove', (e) => {
+    if (!isDragging || !lastPos || !stage) return
+    
+    const dx = e.evt.clientX - lastPos.x
+    const dy = e.evt.clientY - lastPos.y
+    
+    stage.position({
+      x: stage.x() + dx,
+      y: stage.y() + dy
+    })
+    
+    lastPos = { x: e.evt.clientX, y: e.evt.clientY }
+    layer?.batchDraw()
+  })
+
+  stage.on('mouseup', () => {
+    isDragging = false
+    lastPos = null
+    if (stage) stage.container().style.cursor = 'default'
+  })
+
+  // 鼠标离开画布时停止拖拽
+  stage.on('mouseleave', () => {
+    isDragging = false
+    lastPos = null
+    if (stage) stage.container().style.cursor = 'default'
+  })
+}
+
+// 计算内容边界并自动缩放居中
+const fitContentToView = () => {
+  if (!stage || !layer) return
+
+  // 使用 Konva 内置方法获取所有内容的边界
+  const box = layer.getClientRect({
+    relativeTo: stage
+  })
+
+  if (box.width === 0 || box.height === 0) return
+
+  // 添加边距（让内容与边界保持一定距离，更好看）
+  const padding = 60
+  const contentWidth = box.width + padding * 2
+  const contentHeight = box.height + padding * 2
+
+  // 计算缩放比例（适应舞台）
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+  const scaleX = stageWidth / contentWidth
+  const scaleY = stageHeight / contentHeight
+  const scale = Math.min(scaleX, scaleY, 1) // 最大缩放为 1（不放大）
+
+  // 计算居中位置
+  const scaledWidth = contentWidth * scale
+  const scaledHeight = contentHeight * scale
+  const offsetX = (stageWidth - scaledWidth) / 2
+  const offsetY = (stageHeight - scaledHeight) / 2
+
+  // 应用缩放和位置
+  stage.scale({ x: scale, y: scale })
+  stage.position({
+    x: offsetX - (box.x - padding) * scale,
+    y: offsetY - (box.y - padding) * scale
+  })
+
+  layer.batchDraw()
 }
 
 // 渲染座位图
@@ -311,7 +409,12 @@ const updateSelection = () => {
 
 onMounted(() => {
   initStage()
-  setTimeout(renderSeatMap, 50)
+  // 先渲染，再自适应
+  renderSeatMap()
+  // 使用 requestAnimationFrame 确保渲染完成
+  requestAnimationFrame(() => {
+    fitContentToView()
+  })
 })
 
 // 监听选中状态变化，更新座位颜色
