@@ -976,7 +976,7 @@ export function useDrawing() {
   
   // 是否是数据驱动的绘制工具
   const isDataDrivenTool = computed(() => {
-    return ['draw_seat', 'row-straight', 'section', 'section-diagonal', 'draw_rect', 'draw_ellipse', 'draw_polygon', 'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'].includes(_currentTool)
+    return ['draw_seat', 'row-straight', 'section', 'section-diagonal', 'draw_rect', 'draw_ellipse', 'draw_polygon', 'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'].includes(currentTool.value)
   })
   
   // 多边形点（响应式包装）

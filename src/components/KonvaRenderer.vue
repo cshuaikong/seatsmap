@@ -1063,34 +1063,10 @@ const setupStageEvents = () => {
         return
       }
 
-      // 多行模式：segment_done 状态单击提交
+      // 多行模式：segment_done 状态任意单击提交
       if (isMultiRowDrawingMode() && seatDrawStep.value === 'segment_done' && multiRowPreview.value) {
-        const clickPos = getStagePosition()
-        if (!clickPos) return
-
-        // 计算最后一排最后一个座位位置
-        const preview = multiRowPreview.value
-        const perpX = -Math.sin(preview.angle)
-        const perpY = Math.cos(preview.angle)
-        const lastRowOffsetX = (preview.rowCount - 1) * preview.rowSpacing * perpX
-        const lastRowOffsetY = (preview.rowCount - 1) * preview.rowSpacing * perpY
-        const lastRowStartX = preview.baseRow.start.x + lastRowOffsetX
-        const lastRowStartY = preview.baseRow.start.y + lastRowOffsetY
-        const lastSeatLocalX = (preview.baseRow.seatCount - 1) * drawing.SEAT_SPACING
-        const lastSeatPos = {
-          x: lastRowStartX + lastSeatLocalX * Math.cos(preview.angle),
-          y: lastRowStartY + lastSeatLocalX * Math.sin(preview.angle)
-        }
-
-        // 检查点击位置是否接近最后一个座位
-        const dx = clickPos.x - lastSeatPos.x
-        const dy = clickPos.y - lastSeatPos.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-
-        if (dist < SEAT_RADIUS * 3) {
-          // 在最后一个座位附近单击：提交多行
-          submitMultiRows()
-        }
+        // 任意位置单击都提交多行
+        submitMultiRows()
         return
       }
 
