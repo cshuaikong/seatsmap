@@ -2091,7 +2091,7 @@ function renderExpandHandles() {
     const endY = lastSeatY + dirY * SEAT_RADIUS
     
     // 创建两端手柄（方形，蓝框白底）
-    const handleSize = 10
+    const handleSize = 16
     
     // 起始端手柄
     const startHandle = new Konva.Rect({
@@ -2101,10 +2101,11 @@ function renderExpandHandles() {
       height: handleSize,
       fill: '#ffffff',
       stroke: '#3b82f6',
-      strokeWidth: 2,
+      strokeWidth: 3,
       rotation: row.rotation || 0,
       name: 'expand-handle',
-      draggable: false
+      draggable: false,
+      zIndex: 9999
     })
     startHandle.setAttr('rowId', row.id)
     startHandle.setAttr('position', 'start')
@@ -2117,10 +2118,11 @@ function renderExpandHandles() {
       height: handleSize,
       fill: '#ffffff',
       stroke: '#3b82f6',
-      strokeWidth: 2,
+      strokeWidth: 3,
       rotation: row.rotation || 0,
       name: 'expand-handle',
-      draggable: false
+      draggable: false,
+      zIndex: 9999
     })
     endHandle.setAttr('rowId', row.id)
     endHandle.setAttr('position', 'end')
