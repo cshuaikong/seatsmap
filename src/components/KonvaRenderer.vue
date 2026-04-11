@@ -2071,14 +2071,24 @@ function renderExpandHandles() {
     const dirY = Math.sin(rotation)
     
     // 计算排的两端位置
+    // 注意：row.x/y 是排的原点，但座位坐标是相对于 row.x/y 的
+    // 第一个座位在 (SEAT_RADIUS, SEAT_RADIUS)，最后一个座位在 ((n-1)*spacing + SEAT_RADIUS, SEAT_RADIUS)
     const seatSpacing = row.seatSpacing || SEAT_SPACING
     const seatCount = row.seats.length
-    const rowLength = (seatCount - 1) * seatSpacing + SEAT_RADIUS * 2
     
-    const startX = (row.x || 0) - dirX * SEAT_RADIUS
-    const startY = (row.y || 0) - dirY * SEAT_RADIUS
-    const endX = (row.x || 0) + dirX * (rowLength - SEAT_RADIUS)
-    const endY = (row.y || 0) + dirY * (rowLength - SEAT_RADIUS)
+    // 计算第一个和最后一个座位的世界坐标
+    const firstSeatX = (row.x || 0) + SEAT_RADIUS * dirX - SEAT_RADIUS * dirY
+    const firstSeatY = (row.y || 0) + SEAT_RADIUS * dirX + SEAT_RADIUS * dirY
+    
+    const lastSeatLocalX = (seatCount - 1) * seatSpacing + SEAT_RADIUS
+    const lastSeatX = (row.x || 0) + lastSeatLocalX * dirX - SEAT_RADIUS * dirY
+    const lastSeatY = (row.y || 0) + lastSeatLocalX * dirX + SEAT_RADIUS * dirY
+    
+    // 手柄位置（在座位外侧）
+    const startX = firstSeatX - dirX * SEAT_RADIUS
+    const startY = firstSeatY - dirY * SEAT_RADIUS
+    const endX = lastSeatX + dirX * SEAT_RADIUS
+    const endY = lastSeatY + dirY * SEAT_RADIUS
     
     // 创建两端手柄（方形，蓝框白底）
     const handleSize = 10
