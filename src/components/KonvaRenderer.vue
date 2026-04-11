@@ -585,12 +585,20 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const handleSize = 16
   
   // 计算手柄位置
-  const startX = (row.x || 0) + firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2
-  const startY = (row.y || 0) + firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2
-  const endX = (row.x || 0) + lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2
-  const endY = (row.y || 0) + lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2
+  // 注意：排 shape 设置了 offsetX/Y = SEAT_RADIUS
+  // 所以座位的世界坐标 = row.x - SEAT_RADIUS + seat.x
+  const startX = (row.x || 0) - SEAT_RADIUS + firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2
+  const startY = (row.y || 0) - SEAT_RADIUS + firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2
+  const endX = (row.x || 0) - SEAT_RADIUS + lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2
+  const endY = (row.y || 0) - SEAT_RADIUS + lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2
   
-  console.log('Handle positions:', { startX, startY, endX, endY, rotation: row.rotation })
+  console.log('Handle positions:', { 
+    rowX: row.x, rowY: row.y, 
+    firstSeat: { x: firstSeat.x, y: firstSeat.y },
+    lastSeat: { x: lastSeat.x, y: lastSeat.y },
+    startX, startY, endX, endY, 
+    rotation: row.rotation 
+  })
   
   // 起始端手柄 - 使用本地坐标，设置和排相同的位置和旋转
   const startHandle = new Konva.Rect({
