@@ -561,7 +561,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     return
   }
 
-  // 特殊处理行间距更新 - 重新排列多排位置
+  // 特殊处理行间距更新 - 重新排列多排位置（第一排固定，保持各自旋转角度）
   if (type === 'row' && 'rowSpacing' in updates) {
     const newSpacings = updates.rowSpacing as number[]
     const rowIds = venueStore.selectedRowIds
@@ -574,43 +574,42 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
       return
     }
     
-    // 获取所有选中的排
+    // 获取所有选中的排（按当前顺序）
     const selectedRows = venueStore.selectedRows
     if (selectedRows.length < 2) return
-    
-    // 计算多排的中心点（平均值）
-    const centerX = selectedRows.reduce((sum, row) => sum + (row.x || 0), 0) / selectedRows.length
-    const centerY = selectedRows.reduce((sum, row) => sum + (row.y || 0), 0) / selectedRows.length
-    
-    // 计算平均旋转角度（转换为弧度）
-    const avgRotation = selectedRows.reduce((sum, row) => sum + (row.rotation || 0), 0) / selectedRows.length
-    const rotationRad = (avgRotation * Math.PI) / 180
-    
-    // 行方向 = 垂直于排的方向（排方向 + 90度）
-    const rowDirX = Math.cos(rotationRad + Math.PI / 2)
-    const rowDirY = Math.sin(rotationRad + Math.PI / 2)
     
     // 使用第一个新的行间距（多选时所有排使用相同的行间距）
     const newRowSpacing = newSpacings[0] || 32
     
-    // 计算总高度（从第一排到最后一排的距离）
-    const totalHeight = (selectedRows.length - 1) * newRowSpacing
+    // 以第一排为基准（固定位置）
+    const firstRow = selectedRows[0]
+    const baseX = firstRow.x || 0
+    const baseY = firstRow.y || 0
+    const baseRotation = firstRow.rotation || 0
+    const baseRotationRad = (baseRotation * Math.PI) / 180
     
-    // 从中心点向两侧分布
+    // 行方向 = 垂直于第一排的方向（排方向 + 90度）
+    const rowDirX = Math.cos(baseRotationRad + Math.PI / 2)
+    const rowDirY = Math.sin(baseRotationRad + Math.PI / 2)
+    
+    // 从第一排开始，按新行间距分布其他排
     selectedRows.forEach((row, index) => {
-      // 计算该排相对于中心点的偏移
-      const offsetFromCenter = (index - (selectedRows.length - 1) / 2) * newRowSpacing
-      
-      // 计算新位置
-      const newX = centerX + offsetFromCenter * rowDirX
-      const newY = centerY + offsetFromCenter * rowDirY
-      
-      // 更新排的位置和行间距
-      venueStore.updateRow(row.id, { 
-        x: newX,
-        y: newY,
-        rowSpacing: newRowSpacing 
-      })
+      if (index === 0) {
+        // 第一排固定位置，只更新行间距属性
+        venueStore.updateRow(row.id, { rowSpacing: newRowSpacing })
+      } else {
+        // 其他排根据与第一排的距离计算新位置
+        const offset = index * newRowSpacing
+        const newX = baseX + offset * rowDirX
+        const newY = baseY + offset * rowDirY
+        
+        // 更新位置和行间距（保持原有旋转角度）
+        venueStore.updateRow(row.id, { 
+          x: newX,
+          y: newY,
+          rowSpacing: newRowSpacing 
+        })
+      }
     })
     
     // 触发事件通知渲染器更新
