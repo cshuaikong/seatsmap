@@ -2086,16 +2086,15 @@ function renderExpandHandles() {
     // 创建两端手柄（方形，蓝框白底）
     const handleSize = 16
     
-    // 起始端手柄（使用相对于排原点的本地坐标）
+    // 起始端手柄（使用世界坐标）
     const startHandle = new Konva.Rect({
-      x: startLocalX - handleSize / 2,
-      y: startLocalY - handleSize / 2,
+      x: (row.x || 0) + startLocalX * dirX - startLocalY * dirY - handleSize / 2,
+      y: (row.y || 0) + startLocalX * dirY + startLocalY * dirX - handleSize / 2,
       width: handleSize,
       height: handleSize,
       fill: '#ffffff',
       stroke: '#3b82f6',
       strokeWidth: 3,
-      rotation: row.rotation || 0,
       name: 'expand-handle',
       draggable: false,
       zIndex: 9999
@@ -2103,16 +2102,15 @@ function renderExpandHandles() {
     startHandle.setAttr('rowId', row.id)
     startHandle.setAttr('position', 'start')
     
-    // 结束端手柄（使用相对于排原点的本地坐标）
+    // 结束端手柄（使用世界坐标）
     const endHandle = new Konva.Rect({
-      x: endLocalX - handleSize / 2,
-      y: endLocalY - handleSize / 2,
+      x: (row.x || 0) + endLocalX * dirX - endLocalY * dirY - handleSize / 2,
+      y: (row.y || 0) + endLocalX * dirY + endLocalY * dirX - handleSize / 2,
       width: handleSize,
       height: handleSize,
       fill: '#ffffff',
       stroke: '#3b82f6',
       strokeWidth: 3,
-      rotation: row.rotation || 0,
       name: 'expand-handle',
       draggable: false,
       zIndex: 9999
