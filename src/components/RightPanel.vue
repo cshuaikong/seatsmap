@@ -561,6 +561,18 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     return
   }
 
+  // 特殊处理行间距更新
+  if (type === 'row' && 'rowSpacing' in updates) {
+    const newSpacings = updates.rowSpacing as number[]
+    const rowIds = venueStore.selectedRowIds
+    // 为每个选中的排更新行间距
+    rowIds.forEach((rowId, index) => {
+      const newSpacing = newSpacings[index] || newSpacings[0] || 32
+      venueStore.updateRow(rowId, { rowSpacing: newSpacing })
+    })
+    return
+  }
+
   // 特殊处理排标签更新
   if (type === 'row' && 'rowLabeling.label' in updates) {
     const rowIds = venueStore.selectedRowIds

@@ -59,6 +59,21 @@
           </div>
         </div>
       </div>
+      <div class="property-row">
+        <!-- EN: Row spacing -->
+        <label class="property-label">行间距</label>
+        <div class="property-control">
+          <div class="seat-count-display">
+            <button class="step-btn" @click="onDecreaseRowSpacing" :disabled="!canDecreaseRowSpacing">
+              <Icon icon="lucide:minus" class="step-icon" />
+            </button>
+            <span class="count-text">{{ rowSpacingDisplay }}</span>
+            <button class="step-btn" @click="onIncreaseRowSpacing" :disabled="!canIncreaseRowSpacing">
+              <Icon icon="lucide:plus" class="step-icon" />
+            </button>
+          </div>
+        </div>
+      </div>
     </PanelSection>
 
     <!-- Row labeling 分组 -->
@@ -177,6 +192,7 @@ const localCategoryId = ref('')
 const localSeatCounts = ref<number[]>([])  // 多选时存储每个排的座位数
 const localCurves = ref<number[]>([])  // 多选时存储每个排的弧度
 const localSeatSpacings = ref<number[]>([])  // 多选时存储每个排的座位间距
+const localRowSpacings = ref<number[]>([])  // 多选时存储每个排的行间距
 
 // 排标签配置
 const localRowLabelingLabel = ref('')
@@ -299,6 +315,24 @@ const canIncreaseSpacing = computed(() => {
   return localSeatSpacings.value.length > 0
 })
 
+// 计算行间距显示文本（多选用逗号分隔）
+const rowSpacingDisplay = computed(() => {
+  if (localRowSpacings.value.length === 0) return '32'
+  if (localRowSpacings.value.length === 1) return String(localRowSpacings.value[0])
+  // 多选时显示所有行间距，用逗号分隔
+  return localRowSpacings.value.join(',')
+})
+
+// 是否可以减少行间距
+const canDecreaseRowSpacing = computed(() => {
+  return localRowSpacings.value.some(spacing => spacing > 1)
+})
+
+// 是否可以增加行间距
+const canIncreaseRowSpacing = computed(() => {
+  return localRowSpacings.value.length > 0
+})
+
 // 从节点读取属性的函数（读取所有节点）
 const readFromNodes = () => {
   if (!props.nodes || props.nodes.length === 0) {
@@ -320,6 +354,11 @@ const readFromNodes = () => {
   // 读取所有选中排的座位间距
   localSeatSpacings.value = props.nodes.map(node => {
     return node.getAttr?.('seatSpacing') || node.seatSpacing || 18
+  })
+  
+  // 读取所有选中排的行间距
+  localRowSpacings.value = props.nodes.map(node => {
+    return node.getAttr?.('rowSpacing') || node.rowSpacing || 32
   })
   
   // 其他属性只读取第一个节点
@@ -403,6 +442,26 @@ function onIncreaseSpacing() {
   localSeatSpacings.value = newSpacings
   // 发送更新事件，包含所有排的座位间距，同时重置弧度为0
   emit('update-property', 'seatSpacing', { spacings: newSpacings, resetCurve: true })
+}
+
+// 减少行间距
+function onDecreaseRowSpacing() {
+  if (!canDecreaseRowSpacing.value) return
+  // 每个选中的排都减少1个单位的行间距，但不能少于1
+  const newSpacings = localRowSpacings.value.map(spacing => Math.max(1, spacing - 1))
+  localRowSpacings.value = newSpacings
+  // 发送更新事件，包含所有排的行间距
+  emit('update-property', 'rowSpacing', newSpacings)
+}
+
+// 增加行间距
+function onIncreaseRowSpacing() {
+  if (!canIncreaseRowSpacing.value) return
+  // 每个选中的排都增加1个单位的行间距
+  const newSpacings = localRowSpacings.value.map(spacing => spacing + 1)
+  localRowSpacings.value = newSpacings
+  // 发送更新事件，包含所有排的行间距
+  emit('update-property', 'rowSpacing', newSpacings)
 }
 
 function onUpdateProperty(key: string, value: any) {
