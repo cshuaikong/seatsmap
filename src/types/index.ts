@@ -160,7 +160,7 @@ export interface SeatMapConfig {
 export const defaultSeatMapConfig: SeatMapConfig = {
   defaultSeatRadius: 6,
   defaultSeatSpacing: 18,
-  defaultRowSpacing: 18,  // 行间距与座位间距相同
+  defaultRowSpacing: 24,  // 行间距
   showRowLabels: true,
   showSeatLabels: true,
   

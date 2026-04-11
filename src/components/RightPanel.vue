@@ -568,8 +568,8 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     
     // 只处理多选情况
     if (rowIds.length < 2) {
-      // 单选只更新属性（默认18）
-      const newSpacing = newSpacings[0] || 18
+      // 单选只更新属性（默认24）
+      const newSpacing = newSpacings[0] || 24
       venueStore.updateRow(rowIds[0], { rowSpacing: newSpacing })
       return
     }
@@ -578,8 +578,8 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     const selectedRows = venueStore.selectedRows
     if (selectedRows.length < 2) return
     
-    // 使用第一个新的行间距（多选时所有排使用相同的行间距，默认18）
-    const newRowSpacing = newSpacings[0] || 18
+    // 使用第一个新的行间距（多选时所有排使用相同的行间距，默认24）
+    const newRowSpacing = newSpacings[0] || 24
     
     // 以第一排为基准（固定位置）
     const firstRow = selectedRows[0]

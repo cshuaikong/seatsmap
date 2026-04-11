@@ -360,10 +360,10 @@ const readFromNodes = () => {
   localRowSpacings.value = props.nodes.map(node => {
     const attrValue = node.getAttr?.('rowSpacing')
     const propValue = node.rowSpacing
-    // 优先使用 getAttr 的值，如果没有则使用属性值，如果没有则使用 18（默认行间距）
+    // 优先使用 getAttr 的值，如果没有则使用属性值，如果没有则使用 24（默认行间距）
     if (attrValue !== undefined && attrValue !== null) return attrValue
     if (propValue !== undefined && propValue !== null) return propValue
-    return 18
+    return 24
   })
   
   // 其他属性只读取第一个节点
