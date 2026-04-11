@@ -359,6 +359,10 @@ const handleSeatSpacingUpdated = () => {
 const handleRowSpacingUpdated = () => {
   // 重新渲染所有排以应用新的行间距
   renderAll()
+  // 更新选择框以跟随新的排位置
+  nextTick(() => {
+    tfm?.updateTransformer(true)
+  })
 }
 
 // 监听座位间距更新事件
