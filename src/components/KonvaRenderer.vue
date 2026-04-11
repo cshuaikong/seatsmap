@@ -2058,8 +2058,11 @@ function renderExpandHandles() {
   // 清除旧手柄
   clearExpandHandles()
   
+  const selectedRows = venueStore.selectedRows
+  console.log('renderExpandHandles called, selected rows:', selectedRows.length)
+  
   // 为每个选中的排渲染手柄
-  venueStore.selectedRows.forEach(row => {
+  selectedRows.forEach(row => {
     if (row.seats.length === 0) return
     
     // 计算排的方向
@@ -2091,10 +2094,10 @@ function renderExpandHandles() {
       strokeWidth: 2,
       rotation: row.rotation || 0,
       name: 'expand-handle',
-      rowId: row.id,
-      position: 'start',
       draggable: false
     })
+    startHandle.setAttr('rowId', row.id)
+    startHandle.setAttr('position', 'start')
     
     // 结束端手柄
     const endHandle = new Konva.Rect({
@@ -2107,10 +2110,10 @@ function renderExpandHandles() {
       strokeWidth: 2,
       rotation: row.rotation || 0,
       name: 'expand-handle',
-      rowId: row.id,
-      position: 'end',
       draggable: false
     })
+    endHandle.setAttr('rowId', row.id)
+    endHandle.setAttr('position', 'end')
     
     // 添加拖拽事件
     setupHandleEvents(startHandle, row, 'start')
@@ -2119,9 +2122,12 @@ function renderExpandHandles() {
     overlayLayer!.add(startHandle)
     overlayLayer!.add(endHandle)
     rowExpandState.handles.push(startHandle, endHandle)
+    
+    console.log('Added handles for row:', row.id, 'at positions:', { startX, startY, endX, endY })
   })
   
   overlayLayer.batchDraw()
+  console.log('Total handles rendered:', rowExpandState.handles.length)
 }
 
 /** 清除扩展手柄 */
