@@ -76,26 +76,6 @@
       </div>
     </PanelSection>
 
-    <!-- 扩展座位功能 -->
-    <PanelSection title="扩展座位" :collapsible="true" :defaultExpanded="true">
-      <div class="property-row">
-        <label class="property-label">拖拽扩展</label>
-        <div class="property-control">
-          <button 
-            class="expand-toggle-btn"
-            :class="{ active: isExpandMode }"
-            @click="toggleExpandMode"
-          >
-            <Icon :icon="isExpandMode ? 'lucide:check-square' : 'lucide:square'" class="toggle-icon" />
-            {{ isExpandMode ? '开启' : '关闭' }}
-          </button>
-        </div>
-      </div>
-      <div v-if="isExpandMode" class="expand-hint">
-        拖拽排两端的蓝色手柄来添加座位
-      </div>
-    </PanelSection>
-
     <!-- Row labeling 分组 -->
     <!-- EN: Row labeling -->
     <PanelSection title="排编号" :collapsible="true" :defaultExpanded="true">
@@ -183,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onBeforeUnmount } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import PanelSection from './controls/PanelSection.vue'
 import CategorySelector from './controls/CategorySelector.vue'
@@ -226,14 +206,7 @@ const localSeatLabelingLocked = ref(false)
 const batchLabelMode = ref<string>('')
 const batchLabelStart = ref('')
 
-// 扩展座位模式
-const isExpandMode = ref(false)
 
-function toggleExpandMode() {
-  isExpandMode.value = !isExpandMode.value
-  // 触发全局事件通知 KonvaRenderer
-  window.dispatchEvent(new CustomEvent('rowExpandModeChanged', { detail: { enabled: isExpandMode.value } }))
-}
 
 // 起始值占位符
 const batchLabelStartPlaceholder = computed(() => {
@@ -541,13 +514,7 @@ function onClearSeatLabeling() {
 const refresh = () => readFromNodes()
 defineExpose({ refresh })
 
-// 组件卸载时关闭扩展模式
-onBeforeUnmount(() => {
-  if (isExpandMode.value) {
-    isExpandMode.value = false
-    window.dispatchEvent(new CustomEvent('rowExpandModeChanged', { detail: { enabled: false } }))
-  }
-})
+
 </script>
 
 <style scoped>

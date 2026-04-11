@@ -83,9 +83,8 @@ let selection: ReturnType<typeof useKonvaSelection> | null = null
 // Transformer + 统一拖拽（通过 useKonvaTransformer 管理）
 let tfm: ReturnType<typeof useKonvaTransformer> | null = null
 
-// 排扩展模式状态
+// 排扩展模式状态（始终开启）
 const rowExpandState = {
-  enabled: false,
   handles: [] as Konva.Rect[],
   previewLayer: null as Konva.Layer | null,
   activeRowId: null as string | null,
@@ -320,9 +319,6 @@ onUnmounted(() => {
   // 移除行间距更新事件监听
   window.removeEventListener('rowSpacingUpdated', handleRowSpacingUpdated)
   
-  // 移除排扩展模式事件监听
-  window.removeEventListener('rowExpandModeChanged', handleRowExpandModeChanged as EventListener)
-  
   if (stage) {
     stage.destroy()
     stage = null
@@ -364,6 +360,10 @@ watch(() => [
   tfm?.updateTransformer()
   // 更新排座位的选中视觉效果（边框颜色）
   updateRowSelectionVisuals()
+  // 更新扩展手柄（选中排时显示）
+  nextTick(() => {
+    renderExpandHandles()
+  })
 }, { deep: true })
 
 // 座位间距更新事件处理函数
@@ -387,19 +387,6 @@ window.addEventListener('seatSpacingUpdated', handleSeatSpacingUpdated)
 
 // 监听行间距更新事件
 window.addEventListener('rowSpacingUpdated', handleRowSpacingUpdated)
-
-// 监听排扩展模式变化
-const handleRowExpandModeChanged = (e: CustomEvent) => {
-  rowExpandState.enabled = e.detail.enabled
-  if (rowExpandState.enabled) {
-    // 开启扩展模式，渲染手柄
-    renderExpandHandles()
-  } else {
-    // 关闭扩展模式，清除手柄
-    clearExpandHandles()
-  }
-}
-window.addEventListener('rowExpandModeChanged', handleRowExpandModeChanged as EventListener)
 
 // 获取座位颜色的辅助函数
 const getSeatColorForRow = (row: SeatRow) => (seat: Seat): string => {
