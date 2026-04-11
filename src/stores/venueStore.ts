@@ -212,6 +212,41 @@ export const useVenueStore = defineStore('venue', () => {
     })
   }
 
+  // 扩展排座位（在两端添加座位）
+  function expandRow(rowId: string, position: 'start' | 'end', count: number) {
+    if (count <= 0) return
+    
+    venue.value.sections.forEach(section => {
+      const row = section.rows.find(r => r.id === rowId)
+      if (!row || row.seats.length === 0) return
+      
+      const seatSpacing = row.seatSpacing || 18
+      const newSeats: Seat[] = []
+      
+      // 获取参考座位的分类（用于新座位继承）
+      const refSeat = position === 'start' ? row.seats[0] : row.seats[row.seats.length - 1]
+      const refCategoryKey = refSeat?.categoryKey || 0
+      
+      for (let i = 0; i < count; i++) {
+        newSeats.push({
+          id: generateId(),
+          label: '',
+          x: 0, // 位置由渲染时计算
+          y: 0,
+          categoryKey: refCategoryKey,
+          status: 'available',
+          objectType: 'seat'
+        })
+      }
+      
+      if (position === 'start') {
+        row.seats.unshift(...newSeats)
+      } else {
+        row.seats.push(...newSeats)
+      }
+    })
+  }
+
   // 更新排的座位数（保持排的位置和角度不变，重新计算座位间距和位置）
   function updateRowSeatCount(rowId: string, newSeatCount: number) {
     venue.value.sections.forEach(section => {
@@ -856,6 +891,7 @@ export const useVenueStore = defineStore('venue', () => {
     addRow,
     updateRow,
     updateMultipleRows,
+    expandRow,
     updateRowSeatCount,
     updateRowCurve,
     updateRowSeatSpacing,

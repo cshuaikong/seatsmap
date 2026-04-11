@@ -83,6 +83,17 @@ let selection: ReturnType<typeof useKonvaSelection> | null = null
 // Transformer + 统一拖拽（通过 useKonvaTransformer 管理）
 let tfm: ReturnType<typeof useKonvaTransformer> | null = null
 
+// 排扩展模式状态
+const rowExpandState = {
+  enabled: false,
+  handles: [] as Konva.Rect[],
+  previewLayer: null as Konva.Layer | null,
+  activeRowId: null as string | null,
+  activePosition: null as 'start' | 'end' | null,
+  dragStartPos: null as { x: number, y: number } | null,
+  previewSeats: [] as Konva.Circle[]
+}
+
 // 标志位：是否正在从 Transformer 同步数据（防止触发重绘）
 let isSyncingFromTransformer = false
 
@@ -290,6 +301,9 @@ onMounted(() => {
     onScaleChange: (scale) => { viewportState.scale = scale }
   })
 
+  // 设置排扩展全局事件
+  setupGlobalExpandEvents()
+
   // 初始渲染
   renderAll()
 })
@@ -305,6 +319,9 @@ onUnmounted(() => {
   
   // 移除行间距更新事件监听
   window.removeEventListener('rowSpacingUpdated', handleRowSpacingUpdated)
+  
+  // 移除排扩展模式事件监听
+  window.removeEventListener('rowExpandModeChanged', handleRowExpandModeChanged as EventListener)
   
   if (stage) {
     stage.destroy()
@@ -370,6 +387,19 @@ window.addEventListener('seatSpacingUpdated', handleSeatSpacingUpdated)
 
 // 监听行间距更新事件
 window.addEventListener('rowSpacingUpdated', handleRowSpacingUpdated)
+
+// 监听排扩展模式变化
+const handleRowExpandModeChanged = (e: CustomEvent) => {
+  rowExpandState.enabled = e.detail.enabled
+  if (rowExpandState.enabled) {
+    // 开启扩展模式，渲染手柄
+    renderExpandHandles()
+  } else {
+    // 关闭扩展模式，清除手柄
+    clearExpandHandles()
+  }
+}
+window.addEventListener('rowExpandModeChanged', handleRowExpandModeChanged as EventListener)
 
 // 获取座位颜色的辅助函数
 const getSeatColorForRow = (row: SeatRow) => (seat: Seat): string => {
@@ -2031,6 +2061,218 @@ defineExpose({
     drawing.resetDrawingState()
   }
 })
+
+// ==================== 排扩展功能 ====================
+
+/** 渲染扩展手柄 */
+function renderExpandHandles() {
+  if (!stage || !mainLayer) return
+  
+  // 清除旧手柄
+  clearExpandHandles()
+  
+  // 为每个选中的排渲染手柄
+  venueStore.selectedRows.forEach(row => {
+    if (row.seats.length === 0) return
+    
+    const rowShape = nodeMap.get(row.id) as Konva.Shape
+    if (!rowShape) return
+    
+    // 计算排的方向
+    const rotation = (row.rotation || 0) * Math.PI / 180
+    const dirX = Math.cos(rotation)
+    const dirY = Math.sin(rotation)
+    
+    // 计算排的两端位置
+    const seatSpacing = row.seatSpacing || SEAT_SPACING
+    const seatCount = row.seats.length
+    const rowLength = (seatCount - 1) * seatSpacing + SEAT_RADIUS * 2
+    
+    const startX = (row.x || 0) - dirX * SEAT_RADIUS
+    const startY = (row.y || 0) - dirY * SEAT_RADIUS
+    const endX = (row.x || 0) + dirX * (rowLength - SEAT_RADIUS)
+    const endY = (row.y || 0) + dirY * (rowLength - SEAT_RADIUS)
+    
+    // 创建两端手柄（方形，蓝框白底）
+    const handleSize = 12
+    
+    // 起始端手柄
+    const startHandle = new Konva.Rect({
+      x: startX - handleSize / 2,
+      y: startY - handleSize / 2,
+      width: handleSize,
+      height: handleSize,
+      fill: '#ffffff',
+      stroke: '#3b82f6',
+      strokeWidth: 2,
+      rotation: row.rotation || 0,
+      name: 'expand-handle',
+      rowId: row.id,
+      position: 'start'
+    })
+    
+    // 结束端手柄
+    const endHandle = new Konva.Rect({
+      x: endX - handleSize / 2,
+      y: endY - handleSize / 2,
+      width: handleSize,
+      height: handleSize,
+      fill: '#ffffff',
+      stroke: '#3b82f6',
+      strokeWidth: 2,
+      rotation: row.rotation || 0,
+      name: 'expand-handle',
+      rowId: row.id,
+      position: 'end'
+    })
+    
+    // 添加拖拽事件
+    setupHandleEvents(startHandle, row, 'start')
+    setupHandleEvents(endHandle, row, 'end')
+    
+    mainLayer!.add(startHandle)
+    mainLayer!.add(endHandle)
+    rowExpandState.handles.push(startHandle, endHandle)
+  })
+  
+  mainLayer.batchDraw()
+}
+
+/** 清除扩展手柄 */
+function clearExpandHandles() {
+  rowExpandState.handles.forEach(handle => handle.destroy())
+  rowExpandState.handles = []
+  clearExpandPreview()
+  mainLayer?.batchDraw()
+}
+
+/** 设置手柄事件 */
+function setupHandleEvents(handle: Konva.Rect, row: SeatRow, position: 'start' | 'end') {
+  handle.on('mouseenter', () => {
+    handle.stroke('#2563eb')
+    handle.scale({ x: 1.2, y: 1.2 })
+    stage!.container().style.cursor = 'ew-resize'
+    mainLayer?.batchDraw()
+  })
+  
+  handle.on('mouseleave', () => {
+    handle.stroke('#3b82f6')
+    handle.scale({ x: 1, y: 1 })
+    stage!.container().style.cursor = 'default'
+    mainLayer?.batchDraw()
+  })
+  
+  handle.on('mousedown', (e) => {
+    e.cancelBubble = true
+    rowExpandState.activeRowId = row.id
+    rowExpandState.activePosition = position
+    rowExpandState.dragStartPos = stage!.getPointerPosition()!
+  })
+}
+
+/** 清除扩展预览 */
+function clearExpandPreview() {
+  rowExpandState.previewSeats.forEach(seat => seat.destroy())
+  rowExpandState.previewSeats = []
+}
+
+/** 更新扩展预览 */
+function updateExpandPreview(rowId: string, position: 'start' | 'end', seatCount: number) {
+  clearExpandPreview()
+  if (seatCount <= 0 || !mainLayer) return
+  
+  const row = venueStore.selectedRows.find(r => r.id === rowId)
+  if (!row) return
+  
+  const rotation = (row.rotation || 0) * Math.PI / 180
+  const dirX = Math.cos(rotation)
+  const dirY = Math.sin(rotation)
+  const seatSpacing = row.seatSpacing || SEAT_SPACING
+  
+  // 计算起始位置
+  let startX: number, startY: number
+  if (position === 'start') {
+    const firstSeat = row.seats[0]
+    startX = (row.x || 0) + (firstSeat?.x || 0) * dirX - (firstSeat?.y || 0) * dirY
+    startY = (row.y || 0) + (firstSeat?.x || 0) * dirY + (firstSeat?.y || 0) * dirX
+    // 向外扩展，所以反向
+  } else {
+    const lastSeat = row.seats[row.seats.length - 1]
+    startX = (row.x || 0) + (lastSeat?.x || 0) * dirX - (lastSeat?.y || 0) * dirY
+    startY = (row.y || 0) + (lastSeat?.x || 0) * dirY + (lastSeat?.y || 0) * dirX
+  }
+  
+  // 创建预览座位（虚线样式）
+  for (let i = 1; i <= seatCount; i++) {
+    const offset = i * seatSpacing
+    const actualOffset = position === 'start' ? -offset : offset
+    
+    const previewSeat = new Konva.Circle({
+      x: startX + actualOffset * dirX,
+      y: startY + actualOffset * dirY,
+      radius: SEAT_RADIUS,
+      fill: 'transparent',
+      stroke: '#3b82f6',
+      strokeWidth: 1.5,
+      dash: [4, 4]
+    })
+    
+    mainLayer.add(previewSeat)
+    rowExpandState.previewSeats.push(previewSeat)
+  }
+  
+  mainLayer.batchDraw()
+}
+
+// 在 stage 上添加全局鼠标事件处理拖拽
+function setupGlobalExpandEvents() {
+  if (!stage) return
+  
+  stage.on('mousemove', () => {
+    if (!rowExpandState.activeRowId || !rowExpandState.dragStartPos) return
+    
+    const currentPos = stage!.getPointerPosition()!
+    const dx = currentPos.x - rowExpandState.dragStartPos.x
+    const dy = currentPos.y - rowExpandState.dragStartPos.y
+    
+    // 计算沿排方向的拖拽距离
+    const row = venueStore.selectedRows.find(r => r.id === rowExpandState.activeRowId)
+    if (!row) return
+    
+    const rotation = (row.rotation || 0) * Math.PI / 180
+    const dirX = Math.cos(rotation)
+    const dirY = Math.sin(rotation)
+    
+    // 投影到排方向
+    const dragDist = dx * dirX + dy * dirY
+    const absDist = Math.abs(dragDist)
+    
+    const seatSpacing = row.seatSpacing || SEAT_SPACING
+    const seatCount = Math.floor(absDist / seatSpacing)
+    
+    updateExpandPreview(rowExpandState.activeRowId, rowExpandState.activePosition!, seatCount)
+  })
+  
+  stage.on('mouseup', () => {
+    if (!rowExpandState.activeRowId) return
+    
+    // 计算最终添加的座位数
+    const previewCount = rowExpandState.previewSeats.length
+    if (previewCount > 0) {
+      venueStore.expandRow(rowExpandState.activeRowId, rowExpandState.activePosition!, previewCount)
+      // 重新渲染
+      renderAll()
+      // 重新渲染手柄
+      renderExpandHandles()
+    }
+    
+    // 重置状态
+    rowExpandState.activeRowId = null
+    rowExpandState.activePosition = null
+    rowExpandState.dragStartPos = null
+    clearExpandPreview()
+  })
+}
 </script>
 
 <style scoped>
