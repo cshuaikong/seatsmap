@@ -561,18 +561,60 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     return
   }
 
-  // 特殊处理行间距更新
+  // 特殊处理行间距更新 - 重新排列多排位置
   if (type === 'row' && 'rowSpacing' in updates) {
     const newSpacings = updates.rowSpacing as number[]
     const rowIds = venueStore.selectedRowIds
-    // 为每个选中的排更新行间距
-    rowIds.forEach((rowId, index) => {
-      const newSpacing = newSpacings[index] || newSpacings[0] || 32
-      venueStore.updateRow(rowId, { rowSpacing: newSpacing })
+    
+    // 只处理多选情况
+    if (rowIds.length < 2) {
+      // 单选只更新属性
+      const newSpacing = newSpacings[0] || 32
+      venueStore.updateRow(rowIds[0], { rowSpacing: newSpacing })
+      return
+    }
+    
+    // 获取所有选中的排
+    const selectedRows = venueStore.selectedRows
+    if (selectedRows.length < 2) return
+    
+    // 计算多排的中心点（平均值）
+    const centerX = selectedRows.reduce((sum, row) => sum + (row.x || 0), 0) / selectedRows.length
+    const centerY = selectedRows.reduce((sum, row) => sum + (row.y || 0), 0) / selectedRows.length
+    
+    // 计算平均旋转角度（转换为弧度）
+    const avgRotation = selectedRows.reduce((sum, row) => sum + (row.rotation || 0), 0) / selectedRows.length
+    const rotationRad = (avgRotation * Math.PI) / 180
+    
+    // 行方向 = 垂直于排的方向（排方向 + 90度）
+    const rowDirX = Math.cos(rotationRad + Math.PI / 2)
+    const rowDirY = Math.sin(rotationRad + Math.PI / 2)
+    
+    // 使用第一个新的行间距（多选时所有排使用相同的行间距）
+    const newRowSpacing = newSpacings[0] || 32
+    
+    // 计算总高度（从第一排到最后一排的距离）
+    const totalHeight = (selectedRows.length - 1) * newRowSpacing
+    
+    // 从中心点向两侧分布
+    selectedRows.forEach((row, index) => {
+      // 计算该排相对于中心点的偏移
+      const offsetFromCenter = (index - (selectedRows.length - 1) / 2) * newRowSpacing
+      
+      // 计算新位置
+      const newX = centerX + offsetFromCenter * rowDirX
+      const newY = centerY + offsetFromCenter * rowDirY
+      
+      // 更新排的位置和行间距
+      venueStore.updateRow(row.id, { 
+        x: newX,
+        y: newY,
+        rowSpacing: newRowSpacing 
+      })
     })
+    
     // 触发事件通知渲染器更新
     nextTick(() => {
-      console.log('Dispatching rowSpacingUpdated event...')
       window.dispatchEvent(new CustomEvent('rowSpacingUpdated', { detail: { rowIds } }))
     })
     return
