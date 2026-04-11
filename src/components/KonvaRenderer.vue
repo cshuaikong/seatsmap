@@ -2053,7 +2053,7 @@ defineExpose({
 
 /** 渲染扩展手柄 */
 function renderExpandHandles() {
-  if (!stage || !mainLayer) return
+  if (!stage || !overlayLayer) return
   
   // 清除旧手柄
   clearExpandHandles()
@@ -2061,9 +2061,6 @@ function renderExpandHandles() {
   // 为每个选中的排渲染手柄
   venueStore.selectedRows.forEach(row => {
     if (row.seats.length === 0) return
-    
-    const rowShape = nodeMap.get(row.id) as Konva.Shape
-    if (!rowShape) return
     
     // 计算排的方向
     const rotation = (row.rotation || 0) * Math.PI / 180
@@ -2081,7 +2078,7 @@ function renderExpandHandles() {
     const endY = (row.y || 0) + dirY * (rowLength - SEAT_RADIUS)
     
     // 创建两端手柄（方形，蓝框白底）
-    const handleSize = 12
+    const handleSize = 10
     
     // 起始端手柄
     const startHandle = new Konva.Rect({
@@ -2095,7 +2092,8 @@ function renderExpandHandles() {
       rotation: row.rotation || 0,
       name: 'expand-handle',
       rowId: row.id,
-      position: 'start'
+      position: 'start',
+      draggable: false
     })
     
     // 结束端手柄
@@ -2110,19 +2108,20 @@ function renderExpandHandles() {
       rotation: row.rotation || 0,
       name: 'expand-handle',
       rowId: row.id,
-      position: 'end'
+      position: 'end',
+      draggable: false
     })
     
     // 添加拖拽事件
     setupHandleEvents(startHandle, row, 'start')
     setupHandleEvents(endHandle, row, 'end')
     
-    mainLayer!.add(startHandle)
-    mainLayer!.add(endHandle)
+    overlayLayer!.add(startHandle)
+    overlayLayer!.add(endHandle)
     rowExpandState.handles.push(startHandle, endHandle)
   })
   
-  mainLayer.batchDraw()
+  overlayLayer.batchDraw()
 }
 
 /** 清除扩展手柄 */
@@ -2130,7 +2129,7 @@ function clearExpandHandles() {
   rowExpandState.handles.forEach(handle => handle.destroy())
   rowExpandState.handles = []
   clearExpandPreview()
-  mainLayer?.batchDraw()
+  overlayLayer?.batchDraw()
 }
 
 /** 设置手柄事件 */
@@ -2166,7 +2165,7 @@ function clearExpandPreview() {
 /** 更新扩展预览 */
 function updateExpandPreview(rowId: string, position: 'start' | 'end', seatCount: number) {
   clearExpandPreview()
-  if (seatCount <= 0 || !mainLayer) return
+  if (seatCount <= 0 || !overlayLayer) return
   
   const row = venueStore.selectedRows.find(r => r.id === rowId)
   if (!row) return
@@ -2204,11 +2203,11 @@ function updateExpandPreview(rowId: string, position: 'start' | 'end', seatCount
       dash: [4, 4]
     })
     
-    mainLayer.add(previewSeat)
+    overlayLayer.add(previewSeat)
     rowExpandState.previewSeats.push(previewSeat)
   }
   
-  mainLayer.batchDraw()
+  overlayLayer.batchDraw()
 }
 
 // 在 stage 上添加全局鼠标事件处理拖拽
