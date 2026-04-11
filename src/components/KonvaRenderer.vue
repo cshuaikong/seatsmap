@@ -360,6 +360,8 @@ watch(() => [
   tfm?.updateTransformer()
   // 更新排座位的选中视觉效果（边框颜色）
   updateRowSelectionVisuals()
+  // 重新渲染以显示/隐藏排扩展手柄
+  renderAll()
 }, { deep: true })
 
 // 座位间距更新事件处理函数
