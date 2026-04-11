@@ -2086,10 +2086,14 @@ function renderExpandHandles() {
     // 创建两端手柄（方形，蓝框白底）
     const handleSize = 16
     
-    // 起始端手柄（使用世界坐标）
+    // 起始端手柄（使用世界坐标，考虑排的 offset）
+    // 排 shape 有 offsetX/Y = SEAT_RADIUS，所以需要减去偏移
+    const startWorldX = (row.x || 0) - SEAT_RADIUS + startLocalX * dirX - startLocalY * dirY
+    const startWorldY = (row.y || 0) - SEAT_RADIUS + startLocalX * dirY + startLocalY * dirX
+    
     const startHandle = new Konva.Rect({
-      x: (row.x || 0) + startLocalX * dirX - startLocalY * dirY - handleSize / 2,
-      y: (row.y || 0) + startLocalX * dirY + startLocalY * dirX - handleSize / 2,
+      x: startWorldX - handleSize / 2,
+      y: startWorldY - handleSize / 2,
       width: handleSize,
       height: handleSize,
       fill: '#ffffff',
@@ -2102,10 +2106,13 @@ function renderExpandHandles() {
     startHandle.setAttr('rowId', row.id)
     startHandle.setAttr('position', 'start')
     
-    // 结束端手柄（使用世界坐标）
+    // 结束端手柄（使用世界坐标，考虑排的 offset）
+    const endWorldX = (row.x || 0) - SEAT_RADIUS + endLocalX * dirX - endLocalY * dirY
+    const endWorldY = (row.y || 0) - SEAT_RADIUS + endLocalX * dirY + endLocalY * dirX
+    
     const endHandle = new Konva.Rect({
-      x: (row.x || 0) + endLocalX * dirX - endLocalY * dirY - handleSize / 2,
-      y: (row.y || 0) + endLocalX * dirY + endLocalY * dirX - handleSize / 2,
+      x: endWorldX - handleSize / 2,
+      y: endWorldY - handleSize / 2,
       width: handleSize,
       height: handleSize,
       fill: '#ffffff',
