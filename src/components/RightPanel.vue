@@ -585,12 +585,30 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     const firstRow = selectedRows[0]
     const baseX = firstRow.x || 0
     const baseY = firstRow.y || 0
-    const baseRotation = firstRow.rotation || 0
-    const baseRotationRad = (baseRotation * Math.PI) / 180
     
-    // 行方向 = 垂直于第一排的方向（排方向 + 90度）
-    const rowDirX = Math.cos(baseRotationRad + Math.PI / 2)
-    const rowDirY = Math.sin(baseRotationRad + Math.PI / 2)
+    // 计算行方向：优先使用第一排和第二排的相对位置，否则使用第一排的旋转角度
+    let rowDirX = 0
+    let rowDirY = 0
+    
+    if (selectedRows.length >= 2) {
+      // 使用第一排到第二排的方向作为行方向
+      const secondRow = selectedRows[1]
+      const dx = (secondRow.x || 0) - baseX
+      const dy = (secondRow.y || 0) - baseY
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist > 0.001) {
+        rowDirX = dx / dist
+        rowDirY = dy / dist
+      }
+    }
+    
+    // 如果无法从排位置计算方向（排重叠），则使用第一排的旋转角度
+    if (rowDirX === 0 && rowDirY === 0) {
+      const baseRotation = firstRow.rotation || 0
+      const baseRotationRad = (baseRotation * Math.PI) / 180
+      rowDirX = Math.cos(baseRotationRad + Math.PI / 2)
+      rowDirY = Math.sin(baseRotationRad + Math.PI / 2)
+    }
     
     // 从第一排开始，按新行间距分布其他排
     selectedRows.forEach((row, index) => {
