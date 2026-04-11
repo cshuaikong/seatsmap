@@ -2070,26 +2070,34 @@ function renderExpandHandles() {
     const dirX = Math.cos(rotation)
     const dirY = Math.sin(rotation)
     
-    // 计算排的两端位置（相对于排原点的本地坐标）
+    // 计算排的两端位置
+    // 注意：seat.x/y 是 shape 内部坐标
+    // shape 原点在 (row.x, row.y)，但内部坐标系偏移了 (SEAT_RADIUS, SEAT_RADIUS)
+    // 所以内部坐标 (seat.x, seat.y) 对应父坐标系的：
+    //   worldX = row.x - SEAT_RADIUS + seat.x
+    //   worldY = row.y - SEAT_RADIUS + seat.y
+    // 然后再应用旋转
+    
     const firstSeat = row.seats[0]
     const lastSeat = row.seats[row.seats.length - 1]
     
-    // 手柄位置（相对于排原点的本地坐标）
+    // 手柄在 shape 内部坐标系中的位置
     // 起始端：第一个座位外侧（沿排反方向偏移一个半径）
-    const startLocalX = firstSeat.x - dirX * SEAT_RADIUS
-    const startLocalY = firstSeat.y - dirY * SEAT_RADIUS
+    const startInnerX = firstSeat.x - dirX * SEAT_RADIUS
+    const startInnerY = firstSeat.y - dirY * SEAT_RADIUS
     
     // 结束端：最后一个座位外侧（沿排正方向偏移一个半径）
-    const endLocalX = lastSeat.x + dirX * SEAT_RADIUS
-    const endLocalY = lastSeat.y + dirY * SEAT_RADIUS
+    const endInnerX = lastSeat.x + dirX * SEAT_RADIUS
+    const endInnerY = lastSeat.y + dirY * SEAT_RADIUS
     
     // 创建两端手柄（方形，蓝框白底）
     const handleSize = 16
     
-    // 起始端手柄（使用世界坐标，考虑排的 offset）
-    // 排 shape 有 offsetX/Y = SEAT_RADIUS，所以需要减去偏移
-    const startWorldX = (row.x || 0) - SEAT_RADIUS + startLocalX * dirX - startLocalY * dirY
-    const startWorldY = (row.y || 0) - SEAT_RADIUS + startLocalX * dirY + startLocalY * dirX
+    // 将 shape 内部坐标转换为世界坐标
+    // 步骤1：考虑 offset 得到 shape 原点对应的父坐标
+    // 步骤2：应用旋转
+    const startWorldX = (row.x || 0) - SEAT_RADIUS + (startInnerX * dirX - startInnerY * dirY)
+    const startWorldY = (row.y || 0) - SEAT_RADIUS + (startInnerX * dirY + startInnerY * dirX)
     
     const startHandle = new Konva.Rect({
       x: startWorldX - handleSize / 2,
@@ -2106,9 +2114,8 @@ function renderExpandHandles() {
     startHandle.setAttr('rowId', row.id)
     startHandle.setAttr('position', 'start')
     
-    // 结束端手柄（使用世界坐标，考虑排的 offset）
-    const endWorldX = (row.x || 0) - SEAT_RADIUS + endLocalX * dirX - endLocalY * dirY
-    const endWorldY = (row.y || 0) - SEAT_RADIUS + endLocalX * dirY + endLocalY * dirX
+    const endWorldX = (row.x || 0) - SEAT_RADIUS + (endInnerX * dirX - endInnerY * dirY)
+    const endWorldY = (row.y || 0) - SEAT_RADIUS + (endInnerX * dirY + endInnerY * dirX)
     
     const endHandle = new Konva.Rect({
       x: endWorldX - handleSize / 2,
@@ -2133,7 +2140,7 @@ function renderExpandHandles() {
     overlayLayer!.add(endHandle)
     rowExpandState.handles.push(startHandle, endHandle)
     
-    console.log('Added handles for row:', row.id, 'at local positions:', { startLocalX, startLocalY, endLocalX, endLocalY })
+    console.log('Added handles for row:', row.id, 'at world positions:', { startWorldX, startWorldY, endWorldX, endWorldY })
   })
   
   overlayLayer.batchDraw()
