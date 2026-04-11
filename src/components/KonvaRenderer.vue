@@ -360,10 +360,6 @@ watch(() => [
   tfm?.updateTransformer()
   // 更新排座位的选中视觉效果（边框颜色）
   updateRowSelectionVisuals()
-  // 更新扩展手柄（选中排时显示）
-  nextTick(() => {
-    renderExpandHandles()
-  })
 }, { deep: true })
 
 // 座位间距更新事件处理函数
@@ -561,6 +557,70 @@ const renderRow = (row: SeatRow, section: Section) => {
   mainLayer.add(rowShape)
   nodeMap.set(row.id, rowShape)
   
+  // 如果排被选中，添加扩展手柄
+  if (venueStore.selectedRowIds.includes(row.id) && row.seats.length > 0) {
+    addExpandHandlesToRow(row, rowShape)
+  }
+}
+
+// ==================== 排扩展手柄 ====================
+
+/** 为排添加扩展手柄（使用本地坐标，设置和排相同的位置和旋转） */
+function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
+  if (!mainLayer) return
+  
+  const firstSeat = row.seats[0]
+  const lastSeat = row.seats[row.seats.length - 1]
+  
+  // 计算排的方向（基于座位位置）
+  const dx = lastSeat.x - firstSeat.x
+  const dy = lastSeat.y - firstSeat.y
+  const dirX = dx / Math.sqrt(dx * dx + dy * dy) || 1
+  const dirY = dy / Math.sqrt(dx * dx + dy * dy) || 0
+  
+  const handleSize = 16
+  
+  // 起始端手柄 - 使用本地坐标，设置和排相同的位置和旋转
+  const startHandle = new Konva.Rect({
+    x: (row.x || 0) + firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2,
+    y: (row.y || 0) + firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2,
+    width: handleSize,
+    height: handleSize,
+    fill: '#ffffff',
+    stroke: '#3b82f6',
+    strokeWidth: 3,
+    rotation: row.rotation || 0,
+    name: 'expand-handle',
+    draggable: false
+  })
+  startHandle.setAttr('rowId', row.id)
+  startHandle.setAttr('position', 'start')
+  
+  // 结束端手柄
+  const endHandle = new Konva.Rect({
+    x: (row.x || 0) + lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2,
+    y: (row.y || 0) + lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2,
+    width: handleSize,
+    height: handleSize,
+    fill: '#ffffff',
+    stroke: '#3b82f6',
+    strokeWidth: 3,
+    rotation: row.rotation || 0,
+    name: 'expand-handle',
+    draggable: false
+  })
+  endHandle.setAttr('rowId', row.id)
+  endHandle.setAttr('position', 'end')
+  
+  // 添加事件
+  setupHandleEvents(startHandle, row, 'start')
+  setupHandleEvents(endHandle, row, 'end')
+  
+  // 添加到 mainLayer
+  mainLayer.add(startHandle)
+  mainLayer.add(endHandle)
+  
+  rowExpandState.handles.push(startHandle, endHandle)
 }
 
 // ==================== 渲染形状 ====================
@@ -2051,108 +2111,12 @@ defineExpose({
 
 // ==================== 排扩展功能 ====================
 
-/** 渲染扩展手柄 */
-function renderExpandHandles() {
-  if (!stage || !overlayLayer) return
-  
-  // 清除旧手柄
-  clearExpandHandles()
-  
-  const selectedRows = venueStore.selectedRows
-  console.log('renderExpandHandles called, selected rows:', selectedRows.length)
-  
-  // 为每个选中的排渲染手柄
-  selectedRows.forEach(row => {
-    if (row.seats.length === 0) return
-    
-    // 计算排的方向
-    const rotation = (row.rotation || 0) * Math.PI / 180
-    const dirX = Math.cos(rotation)
-    const dirY = Math.sin(rotation)
-    
-    // 计算排的两端位置
-    // 注意：seat.x/y 是 shape 内部坐标
-    // shape 原点在 (row.x, row.y)，但内部坐标系偏移了 (SEAT_RADIUS, SEAT_RADIUS)
-    // 所以内部坐标 (seat.x, seat.y) 对应父坐标系的：
-    //   worldX = row.x - SEAT_RADIUS + seat.x
-    //   worldY = row.y - SEAT_RADIUS + seat.y
-    // 然后再应用旋转
-    
-    const firstSeat = row.seats[0]
-    const lastSeat = row.seats[row.seats.length - 1]
-    
-    // 手柄在 shape 内部坐标系中的位置
-    // 起始端：第一个座位外侧（沿排反方向偏移一个半径）
-    const startInnerX = firstSeat.x - dirX * SEAT_RADIUS
-    const startInnerY = firstSeat.y - dirY * SEAT_RADIUS
-    
-    // 结束端：最后一个座位外侧（沿排正方向偏移一个半径）
-    const endInnerX = lastSeat.x + dirX * SEAT_RADIUS
-    const endInnerY = lastSeat.y + dirY * SEAT_RADIUS
-    
-    // 创建两端手柄（方形，蓝框白底）
-    const handleSize = 16
-    
-    // 将 shape 内部坐标转换为世界坐标
-    // 步骤1：考虑 offset 得到 shape 原点对应的父坐标
-    // 步骤2：应用旋转
-    const startWorldX = (row.x || 0) - SEAT_RADIUS + (startInnerX * dirX - startInnerY * dirY)
-    const startWorldY = (row.y || 0) - SEAT_RADIUS + (startInnerX * dirY + startInnerY * dirX)
-    
-    const startHandle = new Konva.Rect({
-      x: startWorldX - handleSize / 2,
-      y: startWorldY - handleSize / 2,
-      width: handleSize,
-      height: handleSize,
-      fill: '#ffffff',
-      stroke: '#3b82f6',
-      strokeWidth: 3,
-      name: 'expand-handle',
-      draggable: false,
-      zIndex: 9999
-    })
-    startHandle.setAttr('rowId', row.id)
-    startHandle.setAttr('position', 'start')
-    
-    const endWorldX = (row.x || 0) - SEAT_RADIUS + (endInnerX * dirX - endInnerY * dirY)
-    const endWorldY = (row.y || 0) - SEAT_RADIUS + (endInnerX * dirY + endInnerY * dirX)
-    
-    const endHandle = new Konva.Rect({
-      x: endWorldX - handleSize / 2,
-      y: endWorldY - handleSize / 2,
-      width: handleSize,
-      height: handleSize,
-      fill: '#ffffff',
-      stroke: '#3b82f6',
-      strokeWidth: 3,
-      name: 'expand-handle',
-      draggable: false,
-      zIndex: 9999
-    })
-    endHandle.setAttr('rowId', row.id)
-    endHandle.setAttr('position', 'end')
-    
-    // 添加拖拽事件
-    setupHandleEvents(startHandle, row, 'start')
-    setupHandleEvents(endHandle, row, 'end')
-    
-    overlayLayer!.add(startHandle)
-    overlayLayer!.add(endHandle)
-    rowExpandState.handles.push(startHandle, endHandle)
-    
-    console.log('Added handles for row:', row.id, 'at world positions:', { startWorldX, startWorldY, endWorldX, endWorldY })
-  })
-  
-  overlayLayer.batchDraw()
-  console.log('Total handles rendered:', rowExpandState.handles.length)
-}
-
 /** 清除扩展手柄 */
 function clearExpandHandles() {
   rowExpandState.handles.forEach(handle => handle.destroy())
   rowExpandState.handles = []
   clearExpandPreview()
-  overlayLayer?.batchDraw()
+  mainLayer?.batchDraw()
 }
 
 /** 设置手柄事件 */
@@ -2269,10 +2233,8 @@ function setupGlobalExpandEvents() {
     const previewCount = rowExpandState.previewSeats.length
     if (previewCount > 0) {
       venueStore.expandRow(rowExpandState.activeRowId, rowExpandState.activePosition!, previewCount)
-      // 重新渲染
+      // 重新渲染（会自动添加手柄）
       renderAll()
-      // 重新渲染手柄
-      renderExpandHandles()
     }
     
     // 重置状态
