@@ -2070,33 +2070,26 @@ function renderExpandHandles() {
     const dirX = Math.cos(rotation)
     const dirY = Math.sin(rotation)
     
-    // 计算排的两端位置
-    // 注意：座位坐标 seat.x/y 是相对于排原点的本地坐标
-    // 排的原点是 row.x/y，并且有 rotation 旋转
+    // 计算排的两端位置（相对于排原点的本地坐标）
     const firstSeat = row.seats[0]
     const lastSeat = row.seats[row.seats.length - 1]
     
-    // 将本地座位坐标转换为世界坐标
-    // 世界坐标 = 排原点 + 旋转后的本地坐标
-    const firstSeatWorldX = (row.x || 0) + firstSeat.x * dirX - firstSeat.y * dirY
-    const firstSeatWorldY = (row.y || 0) + firstSeat.x * dirY + firstSeat.y * dirX
+    // 手柄位置（相对于排原点的本地坐标）
+    // 起始端：第一个座位外侧（沿排反方向偏移一个半径）
+    const startLocalX = firstSeat.x - dirX * SEAT_RADIUS
+    const startLocalY = firstSeat.y - dirY * SEAT_RADIUS
     
-    const lastSeatWorldX = (row.x || 0) + lastSeat.x * dirX - lastSeat.y * dirY
-    const lastSeatWorldY = (row.y || 0) + lastSeat.x * dirY + lastSeat.y * dirX
-    
-    // 手柄位置（在座位外侧，沿排方向）
-    const startX = firstSeatWorldX - dirX * SEAT_RADIUS
-    const startY = firstSeatWorldY - dirY * SEAT_RADIUS
-    const endX = lastSeatWorldX + dirX * SEAT_RADIUS
-    const endY = lastSeatWorldY + dirY * SEAT_RADIUS
+    // 结束端：最后一个座位外侧（沿排正方向偏移一个半径）
+    const endLocalX = lastSeat.x + dirX * SEAT_RADIUS
+    const endLocalY = lastSeat.y + dirY * SEAT_RADIUS
     
     // 创建两端手柄（方形，蓝框白底）
     const handleSize = 16
     
-    // 起始端手柄
+    // 起始端手柄（使用相对于排原点的本地坐标）
     const startHandle = new Konva.Rect({
-      x: startX - handleSize / 2,
-      y: startY - handleSize / 2,
+      x: startLocalX - handleSize / 2,
+      y: startLocalY - handleSize / 2,
       width: handleSize,
       height: handleSize,
       fill: '#ffffff',
@@ -2110,10 +2103,10 @@ function renderExpandHandles() {
     startHandle.setAttr('rowId', row.id)
     startHandle.setAttr('position', 'start')
     
-    // 结束端手柄
+    // 结束端手柄（使用相对于排原点的本地坐标）
     const endHandle = new Konva.Rect({
-      x: endX - handleSize / 2,
-      y: endY - handleSize / 2,
+      x: endLocalX - handleSize / 2,
+      y: endLocalY - handleSize / 2,
       width: handleSize,
       height: handleSize,
       fill: '#ffffff',
@@ -2135,7 +2128,7 @@ function renderExpandHandles() {
     overlayLayer!.add(endHandle)
     rowExpandState.handles.push(startHandle, endHandle)
     
-    console.log('Added handles for row:', row.id, 'at positions:', { startX, startY, endX, endY })
+    console.log('Added handles for row:', row.id, 'at local positions:', { startLocalX, startLocalY, endLocalX, endLocalY })
   })
   
   overlayLayer.batchDraw()
