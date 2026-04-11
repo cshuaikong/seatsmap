@@ -559,6 +559,7 @@ const renderRow = (row: SeatRow, section: Section) => {
   
   // 如果排被选中，添加扩展手柄
   if (venueStore.selectedRowIds.includes(row.id) && row.seats.length > 0) {
+    console.log('Adding expand handles for row:', row.id, 'at pos:', row.x, row.y)
     addExpandHandlesToRow(row, rowShape)
   }
 }
@@ -580,10 +581,18 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   
   const handleSize = 16
   
+  // 计算手柄位置
+  const startX = (row.x || 0) + firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2
+  const startY = (row.y || 0) + firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2
+  const endX = (row.x || 0) + lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2
+  const endY = (row.y || 0) + lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2
+  
+  console.log('Handle positions:', { startX, startY, endX, endY, rotation: row.rotation })
+  
   // 起始端手柄 - 使用本地坐标，设置和排相同的位置和旋转
   const startHandle = new Konva.Rect({
-    x: (row.x || 0) + firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2,
-    y: (row.y || 0) + firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2,
+    x: startX,
+    y: startY,
     width: handleSize,
     height: handleSize,
     fill: '#ffffff',
@@ -598,8 +607,8 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   
   // 结束端手柄
   const endHandle = new Konva.Rect({
-    x: (row.x || 0) + lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2,
-    y: (row.y || 0) + lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2,
+    x: endX,
+    y: endY,
     width: handleSize,
     height: handleSize,
     fill: '#ffffff',
@@ -621,6 +630,8 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   mainLayer.add(endHandle)
   
   rowExpandState.handles.push(startHandle, endHandle)
+  
+  console.log('Handles added to mainLayer')
 }
 
 // ==================== 渲染形状 ====================
