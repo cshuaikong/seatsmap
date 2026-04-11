@@ -357,6 +357,7 @@ const handleSeatSpacingUpdated = () => {
 
 // 监听行间距更新事件
 const handleRowSpacingUpdated = () => {
+  console.log('rowSpacingUpdated event received, re-rendering...')
   // 重新渲染所有排以应用新的行间距
   renderAll()
 }

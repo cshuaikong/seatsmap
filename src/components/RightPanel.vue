@@ -572,6 +572,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     })
     // 触发事件通知渲染器更新
     nextTick(() => {
+      console.log('Dispatching rowSpacingUpdated event...')
       window.dispatchEvent(new CustomEvent('rowSpacingUpdated', { detail: { rowIds } }))
     })
     return
