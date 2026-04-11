@@ -558,6 +558,7 @@ const renderRow = (row: SeatRow, section: Section) => {
   nodeMap.set(row.id, rowShape)
   
   // 如果排被选中，添加扩展手柄
+  console.log('renderRow:', row.id, 'selected:', venueStore.selectedRowIds.includes(row.id), 'selectedRowIds:', venueStore.selectedRowIds)
   if (venueStore.selectedRowIds.includes(row.id) && row.seats.length > 0) {
     console.log('Adding expand handles for row:', row.id, 'at pos:', row.x, row.y)
     addExpandHandlesToRow(row, rowShape)
