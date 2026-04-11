@@ -303,6 +303,9 @@ onUnmounted(() => {
   // 移除座位间距更新事件监听
   window.removeEventListener('seatSpacingUpdated', handleSeatSpacingUpdated)
   
+  // 移除行间距更新事件监听
+  window.removeEventListener('rowSpacingUpdated', handleRowSpacingUpdated)
+  
   if (stage) {
     stage.destroy()
     stage = null
@@ -352,8 +355,17 @@ const handleSeatSpacingUpdated = () => {
   updateRowSelectionVisuals()
 }
 
+// 监听行间距更新事件
+const handleRowSpacingUpdated = () => {
+  // 重新渲染所有排以应用新的行间距
+  renderAll()
+}
+
 // 监听座位间距更新事件
 window.addEventListener('seatSpacingUpdated', handleSeatSpacingUpdated)
+
+// 监听行间距更新事件
+window.addEventListener('rowSpacingUpdated', handleRowSpacingUpdated)
 
 // 获取座位颜色的辅助函数
 const getSeatColorForRow = (row: SeatRow) => (seat: Seat): string => {

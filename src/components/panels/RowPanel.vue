@@ -317,7 +317,7 @@ const canIncreaseSpacing = computed(() => {
 
 // 计算行间距显示文本（多选用逗号分隔）
 const rowSpacingDisplay = computed(() => {
-  if (localRowSpacings.value.length === 0) return '32'
+  if (localRowSpacings.value.length === 0) return '-'
   if (localRowSpacings.value.length === 1) return String(localRowSpacings.value[0])
   // 多选时显示所有行间距，用逗号分隔
   return localRowSpacings.value.join(',')
@@ -356,9 +356,14 @@ const readFromNodes = () => {
     return node.getAttr?.('seatSpacing') || node.seatSpacing || 18
   })
   
-  // 读取所有选中排的行间距
+  // 读取所有选中排的行间距（注意：0 是有效值，不能作为默认值）
   localRowSpacings.value = props.nodes.map(node => {
-    return node.getAttr?.('rowSpacing') || node.rowSpacing || 32
+    const attrValue = node.getAttr?.('rowSpacing')
+    const propValue = node.rowSpacing
+    // 优先使用 getAttr 的值，如果没有则使用属性值，如果没有则使用 32（默认行间距）
+    if (attrValue !== undefined && attrValue !== null) return attrValue
+    if (propValue !== undefined && propValue !== null) return propValue
+    return 32
   })
   
   // 其他属性只读取第一个节点

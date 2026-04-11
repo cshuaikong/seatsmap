@@ -570,6 +570,10 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
       const newSpacing = newSpacings[index] || newSpacings[0] || 32
       venueStore.updateRow(rowId, { rowSpacing: newSpacing })
     })
+    // 触发事件通知渲染器更新
+    nextTick(() => {
+      window.dispatchEvent(new CustomEvent('rowSpacingUpdated', { detail: { rowIds } }))
+    })
     return
   }
 
