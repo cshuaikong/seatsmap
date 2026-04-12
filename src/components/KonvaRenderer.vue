@@ -585,21 +585,14 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const handleSize = 16
   
   // 手柄在排本地坐标系中的位置
-  // 排 shape 有 offsetX/Y = SEAT_RADIUS
-  // 座位在 shape 内部坐标系中的实际位置 = (seat.x - SEAT_RADIUS, seat.y - SEAT_RADIUS)
-  // 因为 shape 应用了 offset，所以 (0,0) 对应 (-SEAT_RADIUS, -SEAT_RADIUS)
-  
-  // 第一个和最后一个座位在 shape 内部坐标系中的位置
-  const firstLocalX = firstSeat.x - SEAT_RADIUS
-  const firstLocalY = firstSeat.y - SEAT_RADIUS
-  const lastLocalX = lastSeat.x - SEAT_RADIUS
-  const lastLocalY = lastSeat.y - SEAT_RADIUS
+  // Group 和排 shape 都有相同的 offsetX/Y = SEAT_RADIUS
+  // 所以手柄可以直接使用座位坐标（和座位渲染一致）
   
   // 手柄位置（在座位外侧，沿排方向）
-  const startLocalX = firstLocalX - dirX * SEAT_RADIUS * 2 - handleSize / 2
-  const startLocalY = firstLocalY - dirY * SEAT_RADIUS * 2 - handleSize / 2
-  const endLocalX = lastLocalX + dirX * SEAT_RADIUS * 2 - handleSize / 2
-  const endLocalY = lastLocalY + dirY * SEAT_RADIUS * 2 - handleSize / 2
+  const startLocalX = firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2
+  const startLocalY = firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2
+  const endLocalX = lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2
+  const endLocalY = lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2
   
   console.log('Handle debug:', { 
     rowX: row.x, rowY: row.y, 
@@ -613,11 +606,13 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   })
   
   // 创建 Group 来包装手柄
-  // Group 的位置和旋转与排相同，但不需要 offset（因为手柄坐标已经调整了）
+  // Group 的位置、旋转和 offset 与排 shape 相同
   const startGroup = new Konva.Group({
     x: row.x || 0,
     y: row.y || 0,
-    rotation: row.rotation || 0
+    rotation: row.rotation || 0,
+    offsetX: SEAT_RADIUS,
+    offsetY: SEAT_RADIUS
   })
   
   // 起始端手柄（在 Group 的本地坐标系中）
@@ -640,7 +635,9 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const endGroup = new Konva.Group({
     x: row.x || 0,
     y: row.y || 0,
-    rotation: row.rotation || 0
+    rotation: row.rotation || 0,
+    offsetX: SEAT_RADIUS,
+    offsetY: SEAT_RADIUS
   })
   
   const endHandle = new Konva.Rect({
