@@ -591,10 +591,14 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const endLocalX = lastSeat.x + dirX * SEAT_RADIUS * 2
   const endLocalY = lastSeat.y + dirY * SEAT_RADIUS * 2
   
-  console.log('Handle local positions:', { 
+  console.log('Handle debug:', { 
     rowX: row.x, rowY: row.y, 
     firstSeat: { x: firstSeat.x, y: firstSeat.y },
-    startLocalX, startLocalY, endLocalX, endLocalY,
+    lastSeat: { x: lastSeat.x, y: lastSeat.y },
+    dirX, dirY,
+    SEAT_RADIUS,
+    startLocalX, startLocalY, 
+    endLocalX, endLocalY,
     rotation: row.rotation 
   })
   
