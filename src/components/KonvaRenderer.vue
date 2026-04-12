@@ -595,14 +595,16 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const endLocalY = lastSeat.y + dirY * (SEAT_RADIUS + handleSize / 2)
   
   console.log('Handle debug:', { 
+    rowId: row.id,
     rowX: row.x, rowY: row.y, 
     firstSeat: { x: firstSeat.x, y: firstSeat.y },
     lastSeat: { x: lastSeat.x, y: lastSeat.y },
     dirX, dirY,
-    SEAT_RADIUS,
+    SEAT_RADIUS, handleSize,
     startLocalX, startLocalY, 
     endLocalX, endLocalY,
-    rotation: row.rotation 
+    rotation: row.rotation,
+    seatCount: row.seats.length
   })
   
   // 创建 Group 来包装手柄
