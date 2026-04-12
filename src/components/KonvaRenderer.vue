@@ -586,13 +586,13 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   
   const handleSize = 16
   
-  // 手柄在排本地坐标系中的位置
+  // 手柄在排本地坐标系中的位置（手柄中心点）
   // 起始端手柄：在第一个座位外侧（沿排反方向偏移）
   // 结束端手柄：在最后一个座位外侧（沿排正方向偏移）
-  const startLocalX = firstSeat.x - dirX * (SEAT_RADIUS + handleSize)
-  const startLocalY = firstSeat.y - dirY * (SEAT_RADIUS + handleSize)
-  const endLocalX = lastSeat.x + dirX * (SEAT_RADIUS + handleSize) - handleSize
-  const endLocalY = lastSeat.y + dirY * (SEAT_RADIUS + handleSize) - handleSize
+  const startLocalX = firstSeat.x - dirX * (SEAT_RADIUS + handleSize / 2)
+  const startLocalY = firstSeat.y - dirY * (SEAT_RADIUS + handleSize / 2)
+  const endLocalX = lastSeat.x + dirX * (SEAT_RADIUS + handleSize / 2)
+  const endLocalY = lastSeat.y + dirY * (SEAT_RADIUS + handleSize / 2)
   
   console.log('Handle debug:', { 
     rowX: row.x, rowY: row.y, 
