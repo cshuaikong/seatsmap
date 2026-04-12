@@ -654,9 +654,11 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   setupHandleEvents(startHandle, row, 'start')
   setupHandleEvents(endHandle, row, 'end')
   
-  // 添加到 mainLayer
+  // 添加到 mainLayer，但设置 zIndex 确保在排 shape 之上
   mainLayer.add(startGroup)
   mainLayer.add(endGroup)
+  startGroup.zIndex(1000)
+  endGroup.zIndex(1000)
   
   rowExpandState.handles.push(startGroup, endGroup)
   
