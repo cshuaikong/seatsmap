@@ -594,11 +594,12 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const endLocalX = lastSeat.x + dirX * (SEAT_RADIUS + handleSize / 2)
   const endLocalY = lastSeat.y + dirY * (SEAT_RADIUS + handleSize / 2)
   
+  console.log('SEAT_RADIUS:', SEAT_RADIUS)
   console.log('Row:', row.id, 'Seats:', row.seats.length)
   console.log('First seat:', firstSeat.x, firstSeat.y, 'Last seat:', lastSeat.x, lastSeat.y)
   console.log('Direction:', dirX, dirY)
-  console.log('Start handle:', startLocalX, startLocalY)
-  console.log('End handle:', endLocalX, endLocalY)
+  console.log('Start local:', startLocalX, startLocalY)
+  console.log('End local:', endLocalX, endLocalY)
   
   // 直接使用世界坐标创建手柄，不使用 Group
   // 计算世界坐标：考虑排的位置、旋转和 offset
