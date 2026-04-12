@@ -576,23 +576,23 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const firstSeat = row.seats[0]
   const lastSeat = row.seats[row.seats.length - 1]
   
-  // 计算排的方向（基于座位位置）
+  // 计算排的方向（基于座位位置，使用本地坐标）
   const dx = lastSeat.x - firstSeat.x
   const dy = lastSeat.y - firstSeat.y
-  const dirX = dx / Math.sqrt(dx * dx + dy * dy) || 1
-  const dirY = dy / Math.sqrt(dx * dx + dy * dy) || 0
+  const length = Math.sqrt(dx * dx + dy * dy)
+  // 如果长度太小（只有一个座位或所有座位重合），默认水平方向
+  const dirX = length > 0.001 ? dx / length : 1
+  const dirY = length > 0.001 ? dy / length : 0
   
   const handleSize = 16
   
   // 手柄在排本地坐标系中的位置
-  // Group 和排 shape 都有相同的 offsetX/Y = SEAT_RADIUS
-  // 所以手柄可以直接使用座位坐标（和座位渲染一致）
-  
-  // 手柄位置（在座位外侧，沿排方向）
-  const startLocalX = firstSeat.x - dirX * SEAT_RADIUS * 2 - handleSize / 2
-  const startLocalY = firstSeat.y - dirY * SEAT_RADIUS * 2 - handleSize / 2
-  const endLocalX = lastSeat.x + dirX * SEAT_RADIUS * 2 - handleSize / 2
-  const endLocalY = lastSeat.y + dirY * SEAT_RADIUS * 2 - handleSize / 2
+  // 起始端手柄：在第一个座位外侧（沿排反方向偏移）
+  // 结束端手柄：在最后一个座位外侧（沿排正方向偏移）
+  const startLocalX = firstSeat.x - dirX * (SEAT_RADIUS + handleSize)
+  const startLocalY = firstSeat.y - dirY * (SEAT_RADIUS + handleSize)
+  const endLocalX = lastSeat.x + dirX * (SEAT_RADIUS + handleSize) - handleSize
+  const endLocalY = lastSeat.y + dirY * (SEAT_RADIUS + handleSize) - handleSize
   
   console.log('Handle debug:', { 
     rowX: row.x, rowY: row.y, 
