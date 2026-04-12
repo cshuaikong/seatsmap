@@ -625,6 +625,7 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const startWorld = toWorld(startLocalX, startLocalY)
   const endWorld = toWorld(endLocalX, endLocalY)
   
+  console.log('Row rotation:', row.rotation)
   console.log('Start world:', startWorld.x, startWorld.y)
   console.log('End world:', endWorld.x, endWorld.y)
   
