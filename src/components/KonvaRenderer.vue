@@ -585,13 +585,13 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const handleSize = 16
   
   // 手柄在排本地坐标系中的位置
-  // 注意：排 shape 设置了 offsetX/Y = SEAT_RADIUS
-  // 所以 shape 内部坐标 (0,0) 对应渲染位置的 (-SEAT_RADIUS, -SEAT_RADIUS)
-  // 座位坐标 seat.x/y 是相对于排原点的，需要减去 SEAT_RADIUS 来对齐渲染位置
-  const startLocalX = firstSeat.x - SEAT_RADIUS - dirX * SEAT_RADIUS * 2
-  const startLocalY = firstSeat.y - SEAT_RADIUS - dirY * SEAT_RADIUS * 2
-  const endLocalX = lastSeat.x - SEAT_RADIUS + dirX * SEAT_RADIUS * 2
-  const endLocalY = lastSeat.y - SEAT_RADIUS + dirY * SEAT_RADIUS * 2
+  // 排 shape 有 offsetX/Y = SEAT_RADIUS
+  // 座位坐标 seat.x/y 是相对于排原点的
+  // 测试：直接放在座位位置，不加额外偏移
+  const startLocalX = firstSeat.x - handleSize / 2
+  const startLocalY = firstSeat.y - handleSize / 2
+  const endLocalX = lastSeat.x - handleSize / 2
+  const endLocalY = lastSeat.y - handleSize / 2
   
   console.log('Handle debug:', { 
     rowX: row.x, rowY: row.y, 
@@ -604,7 +604,8 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
     rotation: row.rotation 
   })
   
-  // 创建 Group 来包装手柄，Group 的位置和旋转与排相同
+  // 创建 Group 来包装手柄
+  // Group 的位置和旋转与排相同，但不需要 offset（因为手柄坐标已经调整了）
   const startGroup = new Konva.Group({
     x: row.x || 0,
     y: row.y || 0,
