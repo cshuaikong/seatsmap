@@ -585,11 +585,13 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   const handleSize = 16
   
   // 手柄在排本地坐标系中的位置
-  // 排的原点是 (row.x, row.y)，座位坐标是相对于此原点的
-  const startLocalX = firstSeat.x - dirX * SEAT_RADIUS * 2
-  const startLocalY = firstSeat.y - dirY * SEAT_RADIUS * 2
-  const endLocalX = lastSeat.x + dirX * SEAT_RADIUS * 2
-  const endLocalY = lastSeat.y + dirY * SEAT_RADIUS * 2
+  // 注意：排 shape 设置了 offsetX/Y = SEAT_RADIUS
+  // 所以 shape 内部坐标 (0,0) 对应渲染位置的 (-SEAT_RADIUS, -SEAT_RADIUS)
+  // 座位坐标 seat.x/y 是相对于排原点的，需要减去 SEAT_RADIUS 来对齐渲染位置
+  const startLocalX = firstSeat.x - SEAT_RADIUS - dirX * SEAT_RADIUS * 2
+  const startLocalY = firstSeat.y - SEAT_RADIUS - dirY * SEAT_RADIUS * 2
+  const endLocalX = lastSeat.x - SEAT_RADIUS + dirX * SEAT_RADIUS * 2
+  const endLocalY = lastSeat.y - SEAT_RADIUS + dirY * SEAT_RADIUS * 2
   
   console.log('Handle debug:', { 
     rowX: row.x, rowY: row.y, 
