@@ -85,7 +85,7 @@ let tfm: ReturnType<typeof useKonvaTransformer> | null = null
 
 // 排扩展模式状态（始终开启）
 const rowExpandState = {
-  handles: [] as Konva.Group[],
+  handles: [] as Konva.Rect[],
   previewLayer: null as Konva.Layer | null,
   activeRowId: null as string | null,
   activePosition: null as 'start' | 'end' | null,
@@ -600,67 +600,73 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   console.log('Start handle:', startLocalX, startLocalY)
   console.log('End handle:', endLocalX, endLocalY)
   
-  // 创建 Group 来包装手柄
-  // Group 的位置、旋转和 offset 与排 shape 相同
-  const startGroup = new Konva.Group({
-    x: row.x || 0,
-    y: row.y || 0,
-    rotation: row.rotation || 0,
-    offsetX: SEAT_RADIUS,
-    offsetY: SEAT_RADIUS
-  })
+  // 直接使用世界坐标创建手柄，不使用 Group
+  // 计算世界坐标：考虑排的位置、旋转和 offset
+  const rotation = (row.rotation || 0) * Math.PI / 180
+  const cos = Math.cos(rotation)
+  const sin = Math.sin(rotation)
   
-  // 起始端手柄（在 Group 的本地坐标系中）
+  // 将本地坐标转换为世界坐标
+  // 本地坐标 -> 应用 offset -> 应用旋转 -> 加上排位置
+  const toWorld = (lx: number, ly: number) => {
+    // 应用 offset（seat.x - SEAT_RADIUS）
+    const ox = lx - SEAT_RADIUS
+    const oy = ly - SEAT_RADIUS
+    // 应用旋转
+    const rx = ox * cos - oy * sin
+    const ry = ox * sin + oy * cos
+    // 加上排位置
+    return {
+      x: (row.x || 0) + rx,
+      y: (row.y || 0) + ry
+    }
+  }
+  
+  const startWorld = toWorld(startLocalX, startLocalY)
+  const endWorld = toWorld(endLocalX, endLocalY)
+  
+  console.log('Start world:', startWorld.x, startWorld.y)
+  console.log('End world:', endWorld.x, endWorld.y)
+  
+  // 起始端手柄
   const startHandle = new Konva.Rect({
-    x: startLocalX - handleSize / 2,
-    y: startLocalY - handleSize / 2,
+    x: startWorld.x - handleSize / 2,
+    y: startWorld.y - handleSize / 2,
     width: handleSize,
     height: handleSize,
     fill: '#ffffff',
     stroke: '#3b82f6',
     strokeWidth: 3,
+    rotation: row.rotation || 0,
     name: 'expand-handle'
   })
   startHandle.setAttr('rowId', row.id)
   startHandle.setAttr('position', 'start')
   
-  startGroup.add(startHandle)
-  
-  // 结束端 Group
-  const endGroup = new Konva.Group({
-    x: row.x || 0,
-    y: row.y || 0,
-    rotation: row.rotation || 0,
-    offsetX: SEAT_RADIUS,
-    offsetY: SEAT_RADIUS
-  })
-  
+  // 结束端手柄
   const endHandle = new Konva.Rect({
-    x: endLocalX - handleSize / 2,
-    y: endLocalY - handleSize / 2,
+    x: endWorld.x - handleSize / 2,
+    y: endWorld.y - handleSize / 2,
     width: handleSize,
     height: handleSize,
-    fill: '#ffffff',
+    fill: '#ff0000',  // 红色用于区分
     stroke: '#3b82f6',
     strokeWidth: 3,
+    rotation: row.rotation || 0,
     name: 'expand-handle'
   })
   endHandle.setAttr('rowId', row.id)
   endHandle.setAttr('position', 'end')
   
-  endGroup.add(endHandle)
-  
   // 添加事件
   setupHandleEvents(startHandle, row, 'start')
   setupHandleEvents(endHandle, row, 'end')
   
-  // 添加到 mainLayer，但设置 zIndex 确保在排 shape 之上
-  mainLayer.add(startGroup)
-  mainLayer.add(endGroup)
-  startGroup.zIndex(1000)
-  endGroup.zIndex(1000)
+  // 添加到 mainLayer
+  mainLayer.add(startHandle)
+  mainLayer.add(endHandle)
   
-  rowExpandState.handles.push(startGroup, endGroup)
+  rowExpandState.handles.push(startHandle, endHandle)
   
   console.log('Handle groups added to mainLayer')
 }
