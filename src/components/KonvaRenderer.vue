@@ -629,7 +629,7 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
   console.log('Start world:', startWorld.x, startWorld.y)
   console.log('End world:', endWorld.x, endWorld.y)
   
-  // 起始端手柄
+  // 起始端手柄（世界坐标已经包含旋转，不需要再设置 rotation）
   const startHandle = new Konva.Rect({
     x: startWorld.x - handleSize / 2,
     y: startWorld.y - handleSize / 2,
@@ -638,7 +638,6 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
     fill: '#ffffff',
     stroke: '#3b82f6',
     strokeWidth: 3,
-    rotation: row.rotation || 0,
     name: 'expand-handle'
   })
   startHandle.setAttr('rowId', row.id)
@@ -653,7 +652,6 @@ function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
     fill: '#ff0000',  // 红色用于区分
     stroke: '#3b82f6',
     strokeWidth: 3,
-    rotation: row.rotation || 0,
     name: 'expand-handle'
   })
   endHandle.setAttr('rowId', row.id)
