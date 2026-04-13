@@ -17,6 +17,7 @@ import { useVenueStore } from '../stores/venueStore'
 // 绘制工具模式
 export type DrawingToolMode =
   | 'select'
+  | 'selectseat'
   | 'pan'
   | 'draw_seat'
   | 'row-straight'

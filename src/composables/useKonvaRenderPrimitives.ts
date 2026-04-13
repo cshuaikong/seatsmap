@@ -215,7 +215,8 @@ export function createRowSceneFunc(
   row: SeatRow,
   getSeatColor: (seat: Seat) => string,
   isSelected: boolean,
-  seatRadius: number
+  seatRadius: number,
+  selectedSeatIds: string[] = []
 ): (context: Konva.Context, shape: Konva.Shape) => void {
   return (context, shape) => {
     const radius = seatRadius
@@ -292,6 +293,22 @@ export function createRowSceneFunc(
         context.fillText(seat.label, pos.x, pos.y)
       }
     })
+
+    // 绘制选中座位的高亮圆圈（selectseat 模式）
+    if (selectedSeatIds.length > 0) {
+      context.save()
+      context.strokeStyle = '#e53935'
+      context.lineWidth = 3
+      row.seats.forEach((seat, index) => {
+        if (selectedSeatIds.includes(seat.id)) {
+          const pos = curvedPositions[index]
+          context.beginPath()
+          context.arc(pos.x, pos.y, radius + 2, 0, Math.PI * 2)
+          context.stroke()
+        }
+      })
+      context.restore()
+    }
 
     // 关键节点高亮已移除（不需要显示黄色/橙色圈）
   }

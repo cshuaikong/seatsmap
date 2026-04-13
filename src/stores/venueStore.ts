@@ -674,6 +674,22 @@ export const useVenueStore = defineStore('venue', () => {
     return false
   }
 
+  /** 删除所有选中的座位（selectseat 模式下 Delete 键触发） */
+  function removeSelectedSeats() {
+    if (selectedSeatIds.value.length === 0) return
+    const toDelete = new Set(selectedSeatIds.value)
+    venue.value.sections.forEach(section => {
+      section.rows.forEach(row => {
+        const before = row.seats.length
+        row.seats = row.seats.filter(s => !toDelete.has(s.id))
+        if (row.seats.length !== before) {
+          renumberRowSeats(row)
+        }
+      })
+    })
+    selectedSeatIds.value = []
+  }
+
   // ==================== 通用对象更新 ====================
 
   function updateObjectProperty(type: SelectedObjectType, id: string, updates: Record<string, any>) {
@@ -997,6 +1013,7 @@ export const useVenueStore = defineStore('venue', () => {
     addSeatAtRowEnd,
     removeSeatAtRowStart,
     removeSeatAtRowEnd,
+    removeSelectedSeats,
     updateObjectProperty,
     // Category
     addCategory,

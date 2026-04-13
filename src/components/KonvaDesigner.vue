@@ -35,7 +35,7 @@
     <div class="designer-main">
       <!-- 左侧工具栏 -->
       <LeftToolbar 
-        v-model="currentTool"
+        v-model="currentTool as any"
         @undo="onUndo"
         @redo="onRedo"
         @copy="onCopy"
@@ -245,7 +245,7 @@ watch(currentTool, (newTool) => {
   // 映射工具名称
   const toolMapping: Record<string, string> = {
     'select': 'select',
-    'selectseat': 'select',
+    'selectseat': 'selectseat',
     'row-straight': 'row-straight',
     'section': 'section',
     'section-diagonal': 'section-diagonal',

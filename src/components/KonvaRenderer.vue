@@ -159,6 +159,11 @@ const isMultiRowDrawingMode = (): boolean => {
   return currentDrawingTool.value === 'section-diagonal'
 }
 
+// 判断当前是否为座位选择模式
+const isSeatSelectMode = (): boolean => {
+  return currentDrawingTool.value === 'selectseat'
+}
+
 // 设置当前绘制工具
 const setDrawingTool = (tool: DrawingToolMode) => {
   // 如果切换工具，重置座位绘制状态
@@ -419,7 +424,7 @@ const updateRowSelectionVisuals = () => {
         })
         
         // 重新设置 sceneFunc 以更新边框颜色
-        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, SEAT_RADIUS))
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, SEAT_RADIUS, venueStore.selectedSeatIds))
       }
     })
   })
@@ -524,7 +529,7 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   // 设置绘制函数
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS))
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS, venueStore.selectedSeatIds))
   rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
@@ -532,6 +537,31 @@ const renderRow = (row: SeatRow, section: Section) => {
     if (isDrawingMode()) return
     if (e.evt.button !== 0) return
     e.cancelBubble = true
+
+    // 座位选择模式：命中具体座位
+    if (isSeatSelectMode()) {
+      const pointer = stage!.getPointerPosition()!
+      // 转换到排的局部坐标（考虑 stage 缩放/平移、排的旋转/偏移/offsetX/offsetY）
+      const transform = rowShape.getAbsoluteTransform().copy().invert()
+      const localPos = transform.point(pointer)
+      // 找最近的座位（在 seatRadius 范围内命中）
+      let hitSeat: Seat | null = null
+      let minDist = SEAT_RADIUS * 1.5
+      row.seats.forEach(seat => {
+        const dx = seat.x - localPos.x
+        const dy = seat.y - localPos.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < minDist) {
+          minDist = dist
+          hitSeat = seat
+        }
+      })
+      if (hitSeat) {
+        const additive = e.evt.shiftKey
+        venueStore.selectSeat((hitSeat as Seat).id, additive)
+      }
+      return
+    }
 
     const isAlreadySelected = venueStore.selectedRowIds.includes(row.id)
     if (!isAlreadySelected) {
@@ -555,7 +585,7 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   rowShape.on('mouseenter', () => {
-    if (stage && !isDrawingMode()) stage.container().style.cursor = 'pointer'
+    if (stage && !isDrawingMode()) stage.container().style.cursor = isSeatSelectMode() ? 'crosshair' : 'pointer'
   })
   rowShape.on('mouseleave', () => {
     if (stage) stage.container().style.cursor = 'default'

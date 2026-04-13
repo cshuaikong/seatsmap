@@ -81,6 +81,12 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
 
   /** 删除选中的对象 */
   const deleteSelectedObjects = () => {
+    // 座位选择模式：删除选中的具体座位
+    if (venueStore.selectedSeatIds.length > 0) {
+      venueStore.removeSelectedSeats()
+      return
+    }
+
     // 删除选中的排
     venueStore.selectedRowIds.forEach(id => {
       venueStore.deleteRow(id)
