@@ -358,6 +358,8 @@ watch(() => [
   venueStore.selectedAreaIds,
   venueStore.selectedImageId
 ], () => {
+  // 如果从 Transformer 同步中，跳过重绘（避免拖拽过程中销毁节点）
+  if (isSyncingFromTransformer) return
   tfm?.updateSelectionVisuals()
   tfm?.updateTransformer()
   // 更新排座位的选中视觉效果（边框颜色）
@@ -451,8 +453,9 @@ const updateRowSelectionVisuals = () => {
 const renderAll = () => {
   if (!mainLayer) return
 
-  // 清空画布和节点映射
+  // 清空画布和节点映射（包括 dragLayer 防止残留）
   mainLayer.destroyChildren()
+  dragLayer?.destroyChildren()
   nodeMap.clear()
 
   // 渲染图片（在最底层）
@@ -476,6 +479,8 @@ const renderAll = () => {
   // 更新选中装饰
   tfm?.updateSelectionVisuals()
   // 重建节点后，Transformer 需要重新绑定到新节点（nodeMap 已更新）
+  // 先清空 transformer 节点引用，防止持有已销毁的旧节点
+  tfm?.transformer?.nodes([])
   tfm?.updateTransformer(true)
 
   mainLayer.batchDraw()
