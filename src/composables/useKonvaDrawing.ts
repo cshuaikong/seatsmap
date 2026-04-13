@@ -555,14 +555,18 @@ export function submitRect(startPos: Position, endPos: Position) {
 export function createEllipsePreview(startPos: Position, endPos: Position) {
   clearDrawingPreview()
   
-  const radiusX = Math.abs(endPos.x - startPos.x)
-  const radiusY = Math.abs(endPos.y - startPos.y)
+  const radiusX = Math.abs(endPos.x - startPos.x) / 2
+  const radiusY = Math.abs(endPos.y - startPos.y) / 2
   
   if (radiusX < 5 || radiusY < 5) return
   
+  // 中心点是两点的中点
+  const centerX = (startPos.x + endPos.x) / 2
+  const centerY = (startPos.y + endPos.y) / 2
+  
   const ellipse = new Konva.Ellipse({
-    x: startPos.x,
-    y: startPos.y,
+    x: centerX,
+    y: centerY,
     radiusX,
     radiusY,
     fill: 'rgba(156, 163, 175, 0.4)',
@@ -578,13 +582,17 @@ export function createEllipsePreview(startPos: Position, endPos: Position) {
 /** 提交椭圆到 store */
 /** 提交椭圆 - 创建 Section */
 export function submitEllipse(startPos: Position, endPos: Position) {
-  const radiusX = Math.abs(endPos.x - startPos.x)
-  const radiusY = Math.abs(endPos.y - startPos.y)
+  const radiusX = Math.abs(endPos.x - startPos.x) / 2
+  const radiusY = Math.abs(endPos.y - startPos.y) / 2
   
-  if (radiusX < MIN_SHAPE_SIZE || radiusY < MIN_SHAPE_SIZE) {
+  if (radiusX < MIN_SHAPE_SIZE / 2 || radiusY < MIN_SHAPE_SIZE / 2) {
     clearDrawingPreview()
     return
   }
+  
+  // 计算中心点（椭圆中心是两点的中点）
+  const centerX = (startPos.x + endPos.x) / 2
+  const centerY = (startPos.y + endPos.y) / 2
   
   // 创建 Section（不再是 Shape）
   useVenueStore().addSection({
@@ -593,8 +601,8 @@ export function submitEllipse(startPos: Position, endPos: Position) {
     x: 0,
     y: 0,
     borderType: 'ellipse',
-    borderX: startPos.x - radiusX,
-    borderY: startPos.y - radiusY,
+    borderX: centerX - radiusX,
+    borderY: centerY - radiusY,
     borderWidth: radiusX * 2,
     borderHeight: radiusY * 2,
     borderFill: 'rgba(59,130,246,0.08)'
