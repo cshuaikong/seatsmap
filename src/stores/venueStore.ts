@@ -12,6 +12,7 @@ import type {
   AreaObject,
   CanvasImage,
   SelectedObjectType,
+  Zone,
   // 旧格式类型
   SeatLegacy,
   RowLegacy,
@@ -32,6 +33,7 @@ export const useVenueStore = defineStore('venue', () => {
       { key: 3, label: '轮椅区', color: '#90CAF9', accessible: true }   // 中蓝
     ],
     sections: [],
+    zones: [],
     focalPoint: undefined
   })
 
@@ -42,6 +44,10 @@ export const useVenueStore = defineStore('venue', () => {
   const selectedShapeIds = ref<string[]>([])
   const selectedTextIds = ref<string[]>([])
   const selectedAreaIds = ref<string[]>([])
+  const selectedZoneId = ref<string | null>(null)
+
+  // 超大剧场：当前聚焦的分区 Zone id（进入分区编辑时设置）
+  const focusedZoneId = ref<string | null>(null)
 
   // 图片列表（支持多张）
   const canvasImages = ref<CanvasImage[]>([])
@@ -571,6 +577,66 @@ export const useVenueStore = defineStore('venue', () => {
     selectedTextIds.value = []
     selectedAreaIds.value = []
     selectedImageId.value = null
+    selectedZoneId.value = null
+  }
+
+  // ==================== Zone CRUD（超大剧场分区） ====================
+
+  /**
+   * 新增分区 Zone，同时自动创建关联的 Section（用于放置座位排）
+   */
+  function addZone(zone: Omit<Zone, 'id' | 'sectionId'>): string {
+    const zoneId = generateId()
+    // 为该分区创建专属 Section
+    const sectionId = generateId()
+    const newSection: Section = {
+      id: sectionId,
+      name: zone.name,
+      rows: [],
+      zoneId
+    }
+    venue.value.sections.push(newSection)
+
+    const newZone: Zone = {
+      ...zone,
+      id: zoneId,
+      sectionId
+    }
+    if (!venue.value.zones) venue.value.zones = []
+    venue.value.zones.push(newZone)
+    return zoneId
+  }
+
+  function updateZone(zoneId: string, patch: Partial<Omit<Zone, 'id' | 'sectionId'>>) {
+    const zone = venue.value.zones?.find(z => z.id === zoneId)
+    if (!zone) return
+    Object.assign(zone, patch)
+    // 同步分区名到关联 Section
+    if (patch.name !== undefined) {
+      const section = venue.value.sections.find(s => s.zoneId === zoneId)
+      if (section) section.name = patch.name
+    }
+  }
+
+  function removeZone(zoneId: string) {
+    const zone = venue.value.zones?.find(z => z.id === zoneId)
+    if (!zone) return
+    // 删除关联 Section（及其排/座位）
+    venue.value.sections = venue.value.sections.filter(s => s.zoneId !== zoneId)
+    venue.value.zones = venue.value.zones.filter(z => z.id !== zoneId)
+    if (selectedZoneId.value === zoneId) selectedZoneId.value = null
+    if (focusedZoneId.value === zoneId) focusedZoneId.value = null
+  }
+
+  /**
+   * 获取分区关联的 sectionId
+   */
+  function getZoneSectionId(zoneId: string): string | undefined {
+    return venue.value.zones?.find(z => z.id === zoneId)?.sectionId
+  }
+
+  function selectZone(zoneId: string | null) {
+    selectedZoneId.value = zoneId
   }
 
   // ==================== 排扩展座位 ====================
@@ -800,6 +866,7 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections: normalizedSections,
+      zones: Array.isArray(data.zones) ? data.zones : [],
       focalPoint: data.focalPoint
     }
   }
@@ -893,6 +960,7 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections,
+      zones: [],
       focalPoint: undefined
     }
   }
@@ -911,6 +979,7 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections: [],
+      zones: [],
       focalPoint: undefined
     }
   }
@@ -957,6 +1026,8 @@ export const useVenueStore = defineStore('venue', () => {
     selectedShapeIds,
     selectedTextIds,
     selectedAreaIds,
+    selectedZoneId,
+    focusedZoneId,
     
     // Getters
     totalSeats,
@@ -1019,6 +1090,12 @@ export const useVenueStore = defineStore('venue', () => {
     addCategory,
     updateCategory,
     deleteCategory,
+    // Zone（超大剧场分区）
+    addZone,
+    updateZone,
+    removeZone,
+    getZoneSectionId,
+    selectZone,
     // Import/Export
     importVenueData,
     exportVenueData,

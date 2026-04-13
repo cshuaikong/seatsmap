@@ -5,6 +5,15 @@
       <ImagePanel />
     </template>
 
+    <!-- Zone 分区选中面板（超大剧场模式） -->
+    <template v-else-if="selectedZone">
+      <ZonePanel
+        :zone="selectedZone"
+        @update-property="(key, val) => handleZonePropertyUpdate(key, val)"
+        @enter-zone="onEnterZone"
+      />
+    </template>
+
     <!-- 选中对象面板 -->
     <template v-else-if="shouldShowSelectionPanel">
       <!-- 面板标题栏 -->
@@ -219,7 +228,7 @@ const generateSeatLabels = (scheme: string, count: number): string[] => {
   return labels
 }
 
-import type { SeatRow as Row, PanelSelection, SelectedObjectType } from '../types'
+import type { SeatRow as Row, PanelSelection, SelectedObjectType, Zone } from '../types'
 import ChartOverviewPanel from './panels/ChartOverviewPanel.vue'
 import ShapePanel from './panels/ShapePanel.vue'
 import TextPanel from './panels/TextPanel.vue'
@@ -228,6 +237,7 @@ import RowPanel from './panels/RowPanel.vue'
 import AreaPanel from './panels/AreaPanel.vue'
 import MixedPanel from './panels/MixedPanel.vue'
 import ImagePanel from './panels/ImagePanel.vue'
+import ZonePanel from './panels/ZonePanel.vue'
 
 // 面板内部使用的 Category 类型（兼容旧版 id/name 和新版 key/label）
 interface PanelCategory {
@@ -254,10 +264,32 @@ const emit = defineEmits<{
   // 兼容旧版：update-property 现在可选，面板直接写入 store
   'update-property': [updates: Record<string, any>]
   'manage-categories': []
+  'enter-zone': [zoneId: string]
 }>()
 
 // 使用 venueStore 作为唯一数据源
 const venueStore = useVenueStore()
+
+// Zone 分区选中（超大剧场模式）
+const selectedZone = computed<Zone | null>(() => {
+  const zoneId = venueStore.selectedZoneId
+  if (!zoneId) return null
+  return venueStore.venue.zones?.find(z => z.id === zoneId) ?? null
+})
+
+const handleZonePropertyUpdate = (key: string, val: any) => {
+  if (!venueStore.selectedZoneId) return
+  venueStore.updateZone(venueStore.selectedZoneId, { [key]: val } as any)
+}
+
+// onEnterZone：通知外部（KonvaDesigner）执行 enterZoneFocus
+// RightPanel 没有直接访问 renderer 的方式，通过 venueStore.focusedZoneId 触发
+// KonvaDesigner watch focusedZoneId 变化后调用 renderer.enterZoneFocus
+const onEnterZone = () => {
+  const zoneId = venueStore.selectedZoneId
+  if (!zoneId) return
+  emit('enter-zone', zoneId)
+}
 
 const seatSpacing = ref(28)
 

@@ -6,7 +6,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
-import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
+import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position, Zone } from '../types'
 import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints, ROW_SPACING } from '../composables/useKonvaDrawing'
 import {
   setPreviewLayer,
@@ -188,6 +188,13 @@ let viewport: ReturnType<typeof useKonvaViewport> | null = null
 
 // 获取或创建默认 section
 const getOrCreateDefaultSection = (): string => {
+  // 超大剧场模式：优先使用聚焦分区对应的 Section
+  const focusedZoneId = venueStore.focusedZoneId
+  if (focusedZoneId) {
+    const sectionId = venueStore.getZoneSectionId(focusedZoneId)
+    if (sectionId) return sectionId
+  }
+
   if (venueStore.venue.sections.length === 0) {
     const sectionId = venueStore.addSection({
       name: '默认区域',
@@ -197,6 +204,9 @@ const getOrCreateDefaultSection = (): string => {
     })
     return sectionId || 'default'
   }
+  // 普通模式：返回第一个没有 zoneId 的 Section（避免混入分区专属 section）
+  const defaultSection = venueStore.venue.sections.find(s => !s.zoneId)
+  if (defaultSection) return defaultSection.id
   return venueStore.venue.sections[0].id
 }
 
@@ -448,6 +458,13 @@ const renderAll = () => {
   // 渲染图片（在最底层）
   renderImages(getImageRenderOptions())
 
+  // 渲染 Zone 分区边框（在座位排之下）
+  if (venueStore.venue.zones) {
+    venueStore.venue.zones.forEach(zone => {
+      renderZone(zone)
+    })
+  }
+
   // 渲染所有区域
   venueStore.venue.sections.forEach(section => {
     renderSection(section)
@@ -462,6 +479,96 @@ const renderAll = () => {
   tfm?.updateTransformer(true)
 
   mainLayer.batchDraw()
+}
+
+// ==================== 渲染 Zone 分区边框 ====================
+
+const renderZone = (zone: Zone) => {
+  if (!mainLayer) return
+
+  const isFocused = venueStore.focusedZoneId === zone.id
+  const isOtherFocused = venueStore.focusedZoneId !== null && !isFocused
+  const isSelected = venueStore.selectedZoneId === zone.id
+
+  let zoneShape: Konva.Rect | Konva.Ellipse
+
+  const commonAttrs = {
+    fill: zone.fill || 'rgba(59,130,246,0.08)',
+    stroke: isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (zone.stroke || '#3b82f6')),
+    strokeWidth: isSelected || isFocused ? 2 : 1.5,
+    dash: isFocused ? [] : [8, 4],
+    rotation: zone.rotation || 0,
+    opacity: isOtherFocused ? 0.3 : (zone.opacity ?? 1),
+    listening: !isOtherFocused
+  }
+
+  if (zone.shapeType === 'ellipse') {
+    zoneShape = new Konva.Ellipse({
+      x: zone.x,
+      y: zone.y,
+      radiusX: zone.width / 2,
+      radiusY: zone.height / 2,
+      ...commonAttrs
+    })
+  } else {
+    zoneShape = new Konva.Rect({
+      x: zone.x,
+      y: zone.y,
+      width: zone.width,
+      height: zone.height,
+      cornerRadius: 6,
+      ...commonAttrs
+    })
+  }
+
+  // 分区名称标签
+  const labelX = zone.shapeType === 'ellipse' ? zone.x : zone.x + zone.width / 2
+  const labelY = zone.shapeType === 'ellipse' ? zone.y : zone.y + 14
+  const label = new Konva.Text({
+    x: labelX,
+    y: labelY,
+    text: zone.name || '分区',
+    fontSize: 13,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    fontStyle: 'bold',
+    fill: isSelected ? '#3b82f6' : '#555',
+    align: 'center',
+    offsetX: 0,
+    listening: false,
+    opacity: isOtherFocused ? 0.3 : 1
+  })
+  // 水平居中
+  label.offsetX(label.width() / 2)
+
+  const zoneNode = zoneShape as Konva.Shape
+  zoneNode.setAttr('zoneId', zone.id)
+  nodeMap.set('zone_' + zone.id, zoneNode)
+
+  // 单击选中
+  zoneNode.on('click', (e) => {
+    e.cancelBubble = true
+    venueStore.clearSelection()
+    venueStore.selectZone(zone.id)
+    mainLayer?.batchDraw()
+  })
+
+  // 双击进入聚焦
+  zoneNode.on('dblclick', (e) => {
+    e.cancelBubble = true
+    enterZoneFocus(zone.id)
+  })
+
+  zoneNode.on('mouseenter', () => {
+    if (stage && !isDrawingMode()) {
+      stage.container().style.cursor = isFocused ? 'crosshair' : 'pointer'
+    }
+  })
+  zoneNode.on('mouseleave', () => {
+    if (stage) stage.container().style.cursor = 'default'
+  })
+
+  mainLayer.add(zoneShape)
+  mainLayer.add(label)
 }
 
 const renderSection = (section: Section) => {
@@ -1800,7 +1907,61 @@ const createRectPreview = (startPos: Position, endPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 提交矩形）store */
+/** 是否处于超大剧场分区绘制模式（venueType === 'WITH_SECTIONS'） */
+const isZoneMode = (): boolean => {
+  return venueStore.venue.venueType === 'WITH_SECTIONS'
+}
+
+/** 进入 Zone 聚焦模式：缩放到该分区，其余分区变暗 */
+const enterZoneFocus = (zoneId: string) => {
+  if (!stage) return
+  const zone = venueStore.venue.zones?.find(z => z.id === zoneId)
+  if (!zone) return
+
+  venueStore.focusedZoneId = zoneId
+  venueStore.selectZone(null)
+
+  // 计算目标区域在 stage 坐标系中的包围盒
+  const padding = 80
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+
+  let zoneW = zone.width
+  let zoneH = zone.height
+  let zoneX = zone.shapeType === 'ellipse' ? zone.x - zone.width / 2 : zone.x
+  let zoneY = zone.shapeType === 'ellipse' ? zone.y - zone.height / 2 : zone.y
+
+  const scaleX = (stageWidth - padding * 2) / zoneW
+  const scaleY = (stageHeight - padding * 2) / zoneH
+  const newScale = Math.min(scaleX, scaleY, 4)  // 最大缩放 4x
+
+  const newX = stageWidth / 2 - (zoneX + zoneW / 2) * newScale
+  const newY = stageHeight / 2 - (zoneY + zoneH / 2) * newScale
+
+  stage.to({ x: newX, y: newY, scaleX: newScale, scaleY: newScale, duration: 0.3 })
+  viewportState.scale = newScale
+  viewportState.x = newX
+  viewportState.y = newY
+
+  // 重绘以应用灰显效果
+  renderAll()
+}
+
+/** 退出 Zone 聚焦模式，恢复全局视图 */
+const exitZoneFocus = () => {
+  if (!stage) return
+  venueStore.focusedZoneId = null
+
+  // 恢复到默认视口
+  stage.to({ x: 0, y: 0, scaleX: 1, scaleY: 1, duration: 0.3 })
+  viewportState.scale = 1
+  viewportState.x = 0
+  viewportState.y = 0
+
+  renderAll()
+}
+
+/** 提交矩形→ store */
 const submitRect = (startPos: Position, endPos: Position) => {
   const width = Math.abs(endPos.x - startPos.x)
   const height = Math.abs(endPos.y - startPos.y)
@@ -1812,20 +1973,36 @@ const submitRect = (startPos: Position, endPos: Position) => {
   
   const x = Math.min(startPos.x, endPos.x)
   const y = Math.min(startPos.y, endPos.y)
-  
-  const sectionId = getOrCreateDefaultSection()
-  venueStore.addShape(sectionId, {
-    type: 'rect',
-    x,
-    y,
-    width,
-    height,
-    rotation: 0,
-    fill: 'rgba(156, 163, 175, 0.6)',
-    stroke: 'transparent',
-    strokeWidth: 0,
-    cornerRadius: 8
-  })
+
+  if (isZoneMode()) {
+    // 超大剧场模式：创建 Zone 分区
+    venueStore.addZone({
+      name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
+      shapeType: 'rect',
+      x,
+      y,
+      width,
+      height,
+      rotation: 0,
+      fill: 'rgba(59,130,246,0.06)',
+      stroke: '#3b82f6',
+      opacity: 1
+    })
+  } else {
+    const sectionId = getOrCreateDefaultSection()
+    venueStore.addShape(sectionId, {
+      type: 'rect',
+      x,
+      y,
+      width,
+      height,
+      rotation: 0,
+      fill: 'rgba(156, 163, 175, 0.6)',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      cornerRadius: 8
+    })
+  }
   
   clearDrawingPreview()
 }
@@ -1857,7 +2034,7 @@ const createEllipsePreview = (startPos: Position, endPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 提交椭圆）store */
+/** 提交椭圆→ store */
 const submitEllipse = (startPos: Position, endPos: Position) => {
   const radiusX = Math.abs(endPos.x - startPos.x)
   const radiusY = Math.abs(endPos.y - startPos.y)
@@ -1867,18 +2044,33 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     return
   }
   
-  const sectionId = getOrCreateDefaultSection()
-  venueStore.addShape(sectionId, {
-    type: 'ellipse',
-    x: startPos.x,
-    y: startPos.y,
-    width: radiusX * 2,
-    height: radiusY * 2,
-    rotation: 0,
-    fill: 'rgba(156, 163, 175, 0.6)',
-    stroke: 'transparent',
-    strokeWidth: 0
-  })
+  if (isZoneMode()) {
+    venueStore.addZone({
+      name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
+      shapeType: 'ellipse',
+      x: startPos.x,
+      y: startPos.y,
+      width: radiusX * 2,
+      height: radiusY * 2,
+      rotation: 0,
+      fill: 'rgba(59,130,246,0.06)',
+      stroke: '#3b82f6',
+      opacity: 1
+    })
+  } else {
+    const sectionId = getOrCreateDefaultSection()
+    venueStore.addShape(sectionId, {
+      type: 'ellipse',
+      x: startPos.x,
+      y: startPos.y,
+      width: radiusX * 2,
+      height: radiusY * 2,
+      rotation: 0,
+      fill: 'rgba(156, 163, 175, 0.6)',
+      stroke: 'transparent',
+      strokeWidth: 0
+    })
+  }
   
   clearDrawingPreview()
 }
@@ -2075,6 +2267,9 @@ defineExpose({
   // 绘制工具
   setDrawingTool,
   currentDrawingTool,
+  // Zone 聚焦
+  enterZoneFocus,
+  exitZoneFocus,
   // 删除
   deleteSelected: () => keyboard?.deleteSelectedObjects(),
   // 清除绘制状态
