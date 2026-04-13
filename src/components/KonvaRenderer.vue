@@ -2049,19 +2049,19 @@ const submitRect = (startPos: Position, endPos: Position) => {
   const x = Math.min(startPos.x, endPos.x)
   const y = Math.min(startPos.y, endPos.y)
 
-  // 绘制矩形即创建带边框的 Section 分区
-  const n = venueStore.venue.sections.filter(s => s.borderType && s.borderType !== 'none').length
-  venueStore.addSection({
-    name: `分区 ${n + 1}`,
-    rows: [],
-    borderType: 'rect',
-    borderX: x,
-    borderY: y,
-    borderWidth: width,
-    borderHeight: height,
-    borderFill: 'rgba(59,130,246,0.06)',
-    borderStroke: '#3b82f6',
-    borderOpacity: 1
+  // 绘制矩形创建 Shape（默认灰色填充，无边框）
+  const sectionId = getOrCreateDefaultSection()
+  venueStore.addShape(sectionId, {
+    type: 'rect',
+    x,
+    y,
+    width,
+    height,
+    rotation: 0,
+    fill: '#9ca3af',  // 默认灰色填充
+    stroke: 'transparent',  // 无边框
+    strokeWidth: 0,
+    categoryKey: 0  // 未分类
   })
   
   clearDrawingPreview()
@@ -2104,19 +2104,19 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     return
   }
   
-  // 绘制椭圆即创建带边框的 Section 分区
-  const n = venueStore.venue.sections.filter(s => s.borderType && s.borderType !== 'none').length
-  venueStore.addSection({
-    name: `分区 ${n + 1}`,
-    rows: [],
-    borderType: 'ellipse',
-    borderX: startPos.x - radiusX,
-    borderY: startPos.y - radiusY,
-    borderWidth: radiusX * 2,
-    borderHeight: radiusY * 2,
-    borderFill: 'rgba(59,130,246,0.06)',
-    borderStroke: '#3b82f6',
-    borderOpacity: 1
+  // 绘制椭圆创建 Shape（默认灰色填充，无边框）
+  const sectionId = getOrCreateDefaultSection()
+  venueStore.addShape(sectionId, {
+    type: 'ellipse',
+    x: startPos.x,
+    y: startPos.y,
+    width: radiusX * 2,
+    height: radiusY * 2,
+    rotation: 0,
+    fill: '#9ca3af',  // 默认灰色填充
+    stroke: 'transparent',  // 无边框
+    strokeWidth: 0,
+    categoryKey: 0  // 未分类
   })
   
   clearDrawingPreview()
@@ -2218,10 +2218,11 @@ const submitPolygon = (points: Position[]) => {
     x: center.x,
     y: center.y,
     rotation: 0,
-    fill: 'rgba(156, 163, 175, 0.6)',
-    stroke: 'transparent',
+    fill: '#9ca3af',  // 默认灰色填充
+    stroke: 'transparent',  // 无边框
     strokeWidth: 0,
-    points: relativePoints
+    points: relativePoints,
+    categoryKey: 0  // 未分类
   })
   
   clearDrawingPreview()

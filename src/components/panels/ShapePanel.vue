@@ -1,5 +1,22 @@
 <template>
   <div class="shape-panel">
+    <!-- Category 分组 -->
+    <PanelSection title="分类">
+      <div class="property-row">
+        <label class="property-label">座位分类</label>
+        <select
+          :value="localCategoryKey"
+          @change="onCategoryChange(($event.target as HTMLSelectElement).value)"
+          class="select-input"
+        >
+          <option value="0">未分类</option>
+          <option v-for="cat in categories" :key="cat.key" :value="cat.key">
+            {{ cat.label }}
+          </option>
+        </select>
+      </div>
+    </PanelSection>
+
     <!-- Shape 分组 -->
     <!-- EN: Shape -->
     <PanelSection title="形状">
@@ -221,6 +238,7 @@ import NumberInput from './controls/NumberInput.vue'
 import ColorPicker from './controls/ColorPicker.vue'
 import SliderInput from './controls/SliderInput.vue'
 import OrderControl from './controls/OrderControl.vue'
+import { useVenueStore } from '../../stores/venueStore'
 
 const props = defineProps<{
   node: any
@@ -230,6 +248,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update-property': [key: string, value: any]
 }>()
+
+const venueStore = useVenueStore()
+
+// 从 store 获取分类列表
+const categories = computed(() => venueStore.venue.categories)
 
 // 本地 ref 管理属性值
 const localWidth = ref(0)
@@ -241,6 +264,7 @@ const localAutoStroke = ref(true)
 const localStrokeWidth = ref(1)
 const localStrokeColor = ref('#000000')
 const localScale = ref(100)
+const localCategoryKey = ref<string | number>(0)
 const localSmoothing = ref(0)
 
 // Label 属性
@@ -288,6 +312,7 @@ const readFromNode = () => {
     localFontSize.value = node.getAttr?.('fontSize') || 14
     localPositionX.value = node.getAttr?.('positionX') ?? 50
     localPositionY.value = node.getAttr?.('positionY') ?? 50
+    localCategoryKey.value = node.getAttr?.('categoryKey') ?? 0
   } else {
     // 纯数据对象模式（ShapeObject）
     localWidth.value = node.width ?? 0
@@ -305,6 +330,7 @@ const readFromNode = () => {
     localFontSize.value = node.fontSize || 14
     localPositionX.value = node.positionX ?? 50
     localPositionY.value = node.positionY ?? 50
+    localCategoryKey.value = node.categoryKey ?? 0
   }
 }
 
@@ -333,6 +359,23 @@ const updateProperty = (key: string, value: any) => {
   }
   // emit 到父组件更新 Konva 节点
   emit('update-property', key, value)
+}
+
+// Category 变更处理
+const onCategoryChange = (key: string | number) => {
+  localCategoryKey.value = key
+  emit('update-property', 'categoryKey', key)
+  
+  // 根据 category 自动更新颜色
+  const category = categories.value.find(c => String(c.key) === String(key))
+  if (category) {
+    localFillColor.value = category.color
+    emit('update-property', 'fillColor', category.color)
+  } else {
+    // 未分类使用默认灰色
+    localFillColor.value = '#9ca3af'
+    emit('update-property', 'fillColor', '#9ca3af')
+  }
 }
 
 // 显示条件

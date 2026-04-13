@@ -232,6 +232,8 @@ export interface ShapeObject {
   stroke: string
   strokeWidth: number
   opacity?: number
+  // 分类关联（用于配色）
+  categoryKey?: string | number
   // polygon/polyline 专用
   points?: number[]
   // sector 专用

@@ -821,7 +821,18 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
 
   // 批量更新所有选中对象
   for (const id of ids) {
-    venueStore.updateObjectProperty(type, id, updates)
+    // 属性名映射：fillColor -> fill, strokeColor -> stroke
+    const mappedUpdates: Record<string, any> = {}
+    for (const [key, val] of Object.entries(updates)) {
+      if (key === 'fillColor') {
+        mappedUpdates['fill'] = val
+      } else if (key === 'strokeColor') {
+        mappedUpdates['stroke'] = val
+      } else {
+        mappedUpdates[key] = val
+      }
+    }
+    venueStore.updateObjectProperty(type, id, mappedUpdates)
   }
 }
 
