@@ -74,6 +74,23 @@
           </div>
         </div>
       </div>
+      
+      <!-- 扩展座位按钮 -->
+      <div class="property-row expand-seats-row">
+        <label class="property-label">扩展座位</label>
+        <div class="property-control">
+          <div class="expand-buttons">
+            <button class="expand-btn" @click="onAddSeatAtStart" title="在开头添加座位">
+              <Icon icon="lucide:chevron-left" class="expand-icon" />
+              <span class="expand-text">+1</span>
+            </button>
+            <button class="expand-btn" @click="onAddSeatAtEnd" title="在末尾添加座位">
+              <span class="expand-text">+1</span>
+              <Icon icon="lucide:chevron-right" class="expand-icon" />
+            </button>
+          </div>
+        </div>
+      </div>
     </PanelSection>
 
     <!-- Row labeling 分组 -->
@@ -471,6 +488,16 @@ function onIncreaseRowSpacing() {
   emit('update-property', 'rowSpacing', newSpacings)
 }
 
+// 在开头添加座位
+function onAddSeatAtStart() {
+  emit('update-property', 'addSeatAtStart', true)
+}
+
+// 在末尾添加座位
+function onAddSeatAtEnd() {
+  emit('update-property', 'addSeatAtEnd', true)
+}
+
 function onUpdateProperty(key: string, value: any) {
   // 更新本地 ref
   switch(key) {
@@ -809,5 +836,45 @@ defineExpose({ refresh })
 .batch-icon {
   width: 12px;
   height: 12px;
+}
+
+/* 扩展座位按钮 */
+.expand-buttons {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 1;
+  height: 28px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: #555;
+  transition: all 0.15s ease;
+  padding: 0 6px;
+}
+
+.expand-btn:hover {
+  background: #f0f7ff;
+  border-color: #4a90d9;
+  color: #4a90d9;
+}
+
+.expand-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.expand-text {
+  font-family: 'SF Mono', Monaco, monospace;
 }
 </style>

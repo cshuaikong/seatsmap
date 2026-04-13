@@ -83,16 +83,6 @@ let selection: ReturnType<typeof useKonvaSelection> | null = null
 // Transformer + 统一拖拽（通过 useKonvaTransformer 管理）
 let tfm: ReturnType<typeof useKonvaTransformer> | null = null
 
-// 排扩展模式状态（始终开启）
-const rowExpandState = {
-  handles: [] as Konva.Rect[],
-  previewLayer: null as Konva.Layer | null,
-  activeRowId: null as string | null,
-  activePosition: null as 'start' | 'end' | null,
-  dragStartPos: null as { x: number, y: number } | null,
-  previewSeats: [] as Konva.Circle[]
-}
-
 // 标志位：是否正在从 Transformer 同步数据（防止触发重绘）
 let isSyncingFromTransformer = false
 
@@ -300,9 +290,6 @@ onMounted(() => {
     onScaleChange: (scale) => { viewportState.scale = scale }
   })
 
-  // 设置排扩展全局事件
-  setupGlobalExpandEvents()
-
   // 初始渲染
   renderAll()
 })
@@ -423,6 +410,14 @@ const updateRowSelectionVisuals = () => {
         rowShape.setAttr('hitMaxX', maxX)
         rowShape.setAttr('hitMaxY', maxY)
         
+        // 同步更新 getSelfRect，确保 Transformer 包围盒跟随内容变化
+        ;(rowShape as any).getSelfRect = () => ({
+          x: minX,
+          y: minY,
+          width: width,
+          height: height
+        })
+        
         // 重新设置 sceneFunc 以更新边框颜色
         rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, SEAT_RADIUS))
       }
@@ -458,6 +453,8 @@ const renderAll = () => {
 
   // 更新选中装饰
   tfm?.updateSelectionVisuals()
+  // 重建节点后，Transformer 需要重新绑定到新节点（nodeMap 已更新）
+  tfm?.updateTransformer(true)
 
   mainLayer.batchDraw()
 }
@@ -531,6 +528,23 @@ const renderRow = (row: SeatRow, section: Section) => {
   rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
+  rowShape.on('mousedown', (e) => {
+    if (isDrawingMode()) return
+    if (e.evt.button !== 0) return
+    e.cancelBubble = true
+
+    const isAlreadySelected = venueStore.selectedRowIds.includes(row.id)
+    if (!isAlreadySelected) {
+      const additive = e.evt.shiftKey
+      venueStore.selectRow(row.id, additive)
+      // 先更新 Transformer 注册节点，再启动拖拽
+      tfm?.updateTransformer(true)
+    }
+    // 接入统一拖拽系统（updateTransformer 是同步的，可立即启动）
+    const pointer = stage!.getPointerPosition()!
+    tfm?.startDragAll(pointer)
+  })
+
   rowShape.on('click', (e) => {
     if (isDrawingMode()) return
     if (selection?.hasDragged) return
@@ -547,128 +561,11 @@ const renderRow = (row: SeatRow, section: Section) => {
     if (stage) stage.container().style.cursor = 'default'
   })
 
-  rowShape.on('dragend', () => {
-    if (tfm?.transformer?.isTransforming()) return
-    venueStore.updateRow(row.id, {
-      x: rowShape.x(),
-      y: rowShape.y(),
-      rotation: rowShape.rotation()
-    })
-  })
+  // 移除原生 dragend —— 由统一拖拽系统 endDragAll 负责同步到 store
+  // 原生 dragend 会绕过 isSyncingFromTransformer 保护，导致 renderAll 重复绘制
 
   mainLayer.add(rowShape)
   nodeMap.set(row.id, rowShape)
-  
-  // 如果排被选中，添加扩展手柄
-  console.log('renderRow:', row.id, 'selected:', venueStore.selectedRowIds.includes(row.id), 'selectedRowIds:', venueStore.selectedRowIds)
-  if (venueStore.selectedRowIds.includes(row.id) && row.seats.length > 0) {
-    console.log('Adding expand handles for row:', row.id, 'at pos:', row.x, row.y)
-    addExpandHandlesToRow(row, rowShape)
-  }
-}
-
-// ==================== 排扩展手柄 ====================
-
-/** 为排添加扩展手柄（使用相对于排原点的本地坐标） */
-function addExpandHandlesToRow(row: SeatRow, rowShape: Konva.Shape) {
-  if (!mainLayer) return
-  
-  const firstSeat = row.seats[0]
-  const lastSeat = row.seats[row.seats.length - 1]
-  
-  // 计算排的方向（基于座位位置，使用本地坐标）
-  const dx = lastSeat.x - firstSeat.x
-  const dy = lastSeat.y - firstSeat.y
-  const length = Math.sqrt(dx * dx + dy * dy)
-  // 如果长度太小（只有一个座位或所有座位重合），默认水平方向
-  const dirX = length > 0.001 ? dx / length : 1
-  const dirY = length > 0.001 ? dy / length : 0
-  
-  const handleSize = 16
-  
-  // 手柄在排本地坐标系中的位置（手柄中心点）
-  // 起始端手柄：在第一个座位外侧（沿排反方向偏移）
-  // 结束端手柄：在最后一个座位外侧（沿排正方向偏移）
-  const startLocalX = firstSeat.x - dirX * (SEAT_RADIUS + handleSize / 2)
-  const startLocalY = firstSeat.y - dirY * (SEAT_RADIUS + handleSize / 2)
-  const endLocalX = lastSeat.x + dirX * (SEAT_RADIUS + handleSize / 2)
-  const endLocalY = lastSeat.y + dirY * (SEAT_RADIUS + handleSize / 2)
-  
-  console.log('SEAT_RADIUS:', SEAT_RADIUS)
-  console.log('Row:', row.id, 'Seats:', row.seats.length)
-  console.log('First seat:', firstSeat.x, firstSeat.y, 'Last seat:', lastSeat.x, lastSeat.y)
-  console.log('Direction:', dirX, dirY)
-  console.log('Start local:', startLocalX, startLocalY)
-  console.log('End local:', endLocalX, endLocalY)
-  
-  // 直接使用世界坐标创建手柄，不使用 Group
-  // 计算世界坐标：考虑排的位置、旋转和 offset
-  const rotation = (row.rotation || 0) * Math.PI / 180
-  const cos = Math.cos(rotation)
-  const sin = Math.sin(rotation)
-  
-  // 将本地坐标转换为世界坐标
-  // 本地坐标 -> 应用 offset -> 应用旋转 -> 加上排位置
-  const toWorld = (lx: number, ly: number) => {
-    // 应用 offset（seat.x - SEAT_RADIUS）
-    const ox = lx - SEAT_RADIUS
-    const oy = ly - SEAT_RADIUS
-    // 应用旋转
-    const rx = ox * cos - oy * sin
-    const ry = ox * sin + oy * cos
-    // 加上排位置
-    return {
-      x: (row.x || 0) + rx,
-      y: (row.y || 0) + ry
-    }
-  }
-  
-  const startWorld = toWorld(startLocalX, startLocalY)
-  const endWorld = toWorld(endLocalX, endLocalY)
-  
-  console.log('Row rotation:', row.rotation)
-  console.log('Start world:', startWorld.x, startWorld.y)
-  console.log('End world:', endWorld.x, endWorld.y)
-  
-  // 起始端手柄（世界坐标已经包含旋转，不需要再设置 rotation）
-  const startHandle = new Konva.Rect({
-    x: startWorld.x - handleSize / 2,
-    y: startWorld.y - handleSize / 2,
-    width: handleSize,
-    height: handleSize,
-    fill: '#ffffff',
-    stroke: '#3b82f6',
-    strokeWidth: 3,
-    name: 'expand-handle'
-  })
-  startHandle.setAttr('rowId', row.id)
-  startHandle.setAttr('position', 'start')
-  
-  // 结束端手柄
-  const endHandle = new Konva.Rect({
-    x: endWorld.x - handleSize / 2,
-    y: endWorld.y - handleSize / 2,
-    width: handleSize,
-    height: handleSize,
-    fill: '#ff0000',  // 红色用于区分
-    stroke: '#3b82f6',
-    strokeWidth: 3,
-    name: 'expand-handle'
-  })
-  endHandle.setAttr('rowId', row.id)
-  endHandle.setAttr('position', 'end')
-  
-  // 添加事件
-  setupHandleEvents(startHandle, row, 'start')
-  setupHandleEvents(endHandle, row, 'end')
-  
-  // 添加到 mainLayer
-  mainLayer.add(startHandle)
-  mainLayer.add(endHandle)
-  
-  rowExpandState.handles.push(startHandle, endHandle)
-  
-  console.log('Handle groups added to mainLayer')
 }
 
 // ==================== 渲染形状 ====================
@@ -2157,141 +2054,6 @@ defineExpose({
   }
 })
 
-// ==================== 排扩展功能 ====================
-
-/** 清除扩展手柄 */
-function clearExpandHandles() {
-  rowExpandState.handles.forEach(handle => handle.destroy())
-  rowExpandState.handles = []
-  clearExpandPreview()
-  mainLayer?.batchDraw()
-}
-
-/** 设置手柄事件 */
-function setupHandleEvents(handle: Konva.Rect, row: SeatRow, position: 'start' | 'end') {
-  handle.on('mouseenter', () => {
-    handle.stroke('#2563eb')
-    handle.scale({ x: 1.2, y: 1.2 })
-    stage!.container().style.cursor = 'ew-resize'
-    mainLayer?.batchDraw()
-  })
-  
-  handle.on('mouseleave', () => {
-    handle.stroke('#3b82f6')
-    handle.scale({ x: 1, y: 1 })
-    stage!.container().style.cursor = 'default'
-    mainLayer?.batchDraw()
-  })
-  
-  handle.on('mousedown', (e) => {
-    e.cancelBubble = true
-    rowExpandState.activeRowId = row.id
-    rowExpandState.activePosition = position
-    rowExpandState.dragStartPos = stage!.getPointerPosition()!
-  })
-}
-
-/** 清除扩展预览 */
-function clearExpandPreview() {
-  rowExpandState.previewSeats.forEach(seat => seat.destroy())
-  rowExpandState.previewSeats = []
-}
-
-/** 更新扩展预览 */
-function updateExpandPreview(rowId: string, position: 'start' | 'end', seatCount: number) {
-  clearExpandPreview()
-  if (seatCount <= 0 || !overlayLayer) return
-  
-  const row = venueStore.selectedRows.find(r => r.id === rowId)
-  if (!row) return
-  
-  const rotation = (row.rotation || 0) * Math.PI / 180
-  const dirX = Math.cos(rotation)
-  const dirY = Math.sin(rotation)
-  const seatSpacing = row.seatSpacing || SEAT_SPACING
-  
-  // 计算起始位置
-  let startX: number, startY: number
-  if (position === 'start') {
-    const firstSeat = row.seats[0]
-    startX = (row.x || 0) + (firstSeat?.x || 0) * dirX - (firstSeat?.y || 0) * dirY
-    startY = (row.y || 0) + (firstSeat?.x || 0) * dirY + (firstSeat?.y || 0) * dirX
-    // 向外扩展，所以反向
-  } else {
-    const lastSeat = row.seats[row.seats.length - 1]
-    startX = (row.x || 0) + (lastSeat?.x || 0) * dirX - (lastSeat?.y || 0) * dirY
-    startY = (row.y || 0) + (lastSeat?.x || 0) * dirY + (lastSeat?.y || 0) * dirX
-  }
-  
-  // 创建预览座位（虚线样式）
-  for (let i = 1; i <= seatCount; i++) {
-    const offset = i * seatSpacing
-    const actualOffset = position === 'start' ? -offset : offset
-    
-    const previewSeat = new Konva.Circle({
-      x: startX + actualOffset * dirX,
-      y: startY + actualOffset * dirY,
-      radius: SEAT_RADIUS,
-      fill: 'transparent',
-      stroke: '#3b82f6',
-      strokeWidth: 1.5,
-      dash: [4, 4]
-    })
-    
-    overlayLayer.add(previewSeat)
-    rowExpandState.previewSeats.push(previewSeat)
-  }
-  
-  overlayLayer.batchDraw()
-}
-
-// 在 stage 上添加全局鼠标事件处理拖拽
-function setupGlobalExpandEvents() {
-  if (!stage) return
-  
-  stage.on('mousemove', () => {
-    if (!rowExpandState.activeRowId || !rowExpandState.dragStartPos) return
-    
-    const currentPos = stage!.getPointerPosition()!
-    const dx = currentPos.x - rowExpandState.dragStartPos.x
-    const dy = currentPos.y - rowExpandState.dragStartPos.y
-    
-    // 计算沿排方向的拖拽距离
-    const row = venueStore.selectedRows.find(r => r.id === rowExpandState.activeRowId)
-    if (!row) return
-    
-    const rotation = (row.rotation || 0) * Math.PI / 180
-    const dirX = Math.cos(rotation)
-    const dirY = Math.sin(rotation)
-    
-    // 投影到排方向
-    const dragDist = dx * dirX + dy * dirY
-    const absDist = Math.abs(dragDist)
-    
-    const seatSpacing = row.seatSpacing || SEAT_SPACING
-    const seatCount = Math.floor(absDist / seatSpacing)
-    
-    updateExpandPreview(rowExpandState.activeRowId, rowExpandState.activePosition!, seatCount)
-  })
-  
-  stage.on('mouseup', () => {
-    if (!rowExpandState.activeRowId) return
-    
-    // 计算最终添加的座位数
-    const previewCount = rowExpandState.previewSeats.length
-    if (previewCount > 0) {
-      venueStore.expandRow(rowExpandState.activeRowId, rowExpandState.activePosition!, previewCount)
-      // 重新渲染（会自动添加手柄）
-      renderAll()
-    }
-    
-    // 重置状态
-    rowExpandState.activeRowId = null
-    rowExpandState.activePosition = null
-    rowExpandState.dragStartPos = null
-    clearExpandPreview()
-  })
-}
 </script>
 
 <style scoped>

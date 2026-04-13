@@ -137,6 +137,16 @@ export function createRowShape(
     centerY: centerY
   })
 
+  // 重写 getSelfRect 修正 Transformer 包围盒
+  // Konva 的 getSelfRect 返回的是相对于 shape 局部坐标系（已应用 offset）的边界
+  // offsetX/offsetY 已经移动了原点，所以直接用 minX/minY
+  ;(rowShape as any).getSelfRect = () => ({
+    x: minX,
+    y: minY,
+    width: width,
+    height: height
+  })
+
   return rowShape
 }
 

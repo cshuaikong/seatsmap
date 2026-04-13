@@ -561,6 +561,24 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     return
   }
 
+  // 特殊处理：在开头添加座位
+  if (type === 'row' && 'addSeatAtStart' in updates) {
+    const rowIds = venueStore.selectedRowIds
+    rowIds.forEach(rowId => {
+      venueStore.addSeatAtRowStart(rowId)
+    })
+    return
+  }
+
+  // 特殊处理：在末尾添加座位
+  if (type === 'row' && 'addSeatAtEnd' in updates) {
+    const rowIds = venueStore.selectedRowIds
+    rowIds.forEach(rowId => {
+      venueStore.addSeatAtRowEnd(rowId)
+    })
+    return
+  }
+
   // 特殊处理行间距更新 - 重新排列多排位置（第一排固定，保持各自旋转角度）
   if (type === 'row' && 'rowSpacing' in updates) {
     const newSpacings = updates.rowSpacing as number[]

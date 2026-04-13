@@ -271,6 +271,8 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         transformer.nodes(selectedNodes)
         transformer.visible(true)
       }
+      // 清除缓存确保 Transformer 重新计算包围盒
+      transformer.nodes().forEach(node => node.clearCache())
       transformer.forceUpdate()
     } else {
       transformer.nodes([])
@@ -291,6 +293,9 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
 
     const selectedNodes = transformer.nodes()
     if (selectedNodes.length === 0) return
+
+    // 确保所有节点处于可拖拽状态
+    selectedNodes.forEach(node => node.draggable(true))
 
     unifiedDragState.active = true
     unifiedDragState.startScreenX = screenPos.x
@@ -356,15 +361,6 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       dragAnimationFrameId = null
     }
 
-    if (dragLayer && mainLayer && unifiedDragState.useDragLayer) {
-      unifiedDragState.items.forEach(item => {
-        const currentRotation = item.node.rotation()
-        item.node.moveTo(mainLayer)
-        item.node.rotation(currentRotation)
-      })
-      dragLayer.visible(false)
-    }
-
     const moved = unifiedDragState.items.some(item =>
       Math.abs(item.node.x() - item.startX) > 2 ||
       Math.abs(item.node.y() - item.startY) > 2
@@ -376,14 +372,42 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     if (stage) stage.container().style.cursor = 'default'
 
     if (moved) {
+      // 先设置同步标志，阻止 watch 触发 renderAll（防止 destroy 正在操作的节点）
       setIsSyncing(true)
+
+      // 再把节点移回 mainLayer（此时 isSyncingFromTransformer=true，watch 被阻断）
+      if (dragLayer && mainLayer) {
+        unifiedDragState.items.forEach(item => {
+          // getParent() 为 null 表示节点已被 destroy/remove，跳过
+          if (item.node.getParent() === null) return
+          const currentRotation = item.node.rotation()
+          item.node.moveTo(mainLayer)
+          item.node.rotation(currentRotation)
+        })
+        dragLayer.visible(false)
+      }
 
       unifiedDragState.items.forEach(item => {
         syncNodeDragToStore(item)
       })
 
       updateTransformer(true)
-      setTimeout(() => setIsSyncing(false), 0)
+      setTimeout(() => {
+        setIsSyncing(false)
+        // setIsSyncing(false) 后 Vue watch 触发 renderAll，renderAll 末尾会调 updateTransformer(true)
+        // 所以此处无需额外操作
+      }, 0)
+    } else {
+      // 未移动：也要把节点移回 mainLayer
+      if (dragLayer && mainLayer) {
+        unifiedDragState.items.forEach(item => {
+          if (item.node.getParent() === null) return
+          const currentRotation = item.node.rotation()
+          item.node.moveTo(mainLayer)
+          item.node.rotation(currentRotation)
+        })
+        dragLayer.visible(false)
+      }
     }
 
     unifiedDragState.items = []
