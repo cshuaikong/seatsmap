@@ -199,7 +199,13 @@ const getOrCreateDefaultSection = (): string => {
       name: '默认区域',
       rows: [],
       x: 0,
-      y: 0
+      y: 0,
+      borderType: 'rect',
+      borderX: 100,
+      borderY: 100,
+      borderWidth: 400,
+      borderHeight: 300,
+      borderFill: 'rgba(59,130,246,0.08)'
     })
     return sectionId || 'default'
   }
@@ -519,9 +525,10 @@ const renderSectionBorder = (section: Section) => {
 
   let borderShape: Konva.Rect | Konva.Ellipse
 
-  // 根据填充色计算边框色（加深 40%）
+  // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
   const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
-  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : darkenColor(fillColor, 40))
+  const autoStrokeColor = darkenColor(fillColor, 40)
+  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
   const commonAttrs = {
     fill: fillColor,
