@@ -138,8 +138,9 @@ export interface Section {
   shapes?: ShapeObject[]
   texts?: TextObject[]
   areas?: AreaObject[]
-  // 分区边框属性（绘制矩形/圆形时创建）
-  borderType?: 'rect' | 'ellipse' | 'none'  // none 表示无边框（默认）
+  // 分区边框属性（绘制矩形/圆形/多边形时创建）
+  borderType?: 'rect' | 'ellipse' | 'polygon' | 'none'  // none 表示无边框（默认）
+  borderPoints?: number[]  // 多边形点坐标（相对于 borderX, borderY）
   borderX?: number
   borderY?: number
   borderWidth?: number

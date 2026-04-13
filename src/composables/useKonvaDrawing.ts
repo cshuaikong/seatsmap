@@ -519,7 +519,7 @@ export function createRectPreview(startPos: Position, endPos: Position) {
   batchDrawOverlay()
 }
 
-/** 提交矩形到 store */
+/** 提交矩形 - 创建 Section */
 export function submitRect(startPos: Position, endPos: Position) {
   const width = Math.abs(endPos.x - startPos.x)
   const height = Math.abs(endPos.y - startPos.y)
@@ -532,15 +532,18 @@ export function submitRect(startPos: Position, endPos: Position) {
   const x = Math.min(startPos.x, endPos.x)
   const y = Math.min(startPos.y, endPos.y)
   
-  const sectionId = getOrCreateDefaultSection()
-  useVenueStore().addShape(sectionId, {
-    type: 'rect',
-    x, y, width, height,
-    rotation: 0,
-    fill: 'rgba(156, 163, 175, 0.6)',
-    stroke: 'transparent',
-    strokeWidth: 0,
-    cornerRadius: 8
+  // 创建 Section（不再是 Shape）
+  useVenueStore().addSection({
+    name: '矩形分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'rect',
+    borderX: x,
+    borderY: y,
+    borderWidth: width,
+    borderHeight: height,
+    borderFill: 'rgba(59,130,246,0.08)'
   })
   
   clearDrawingPreview()
@@ -573,6 +576,7 @@ export function createEllipsePreview(startPos: Position, endPos: Position) {
 }
 
 /** 提交椭圆到 store */
+/** 提交椭圆 - 创建 Section */
 export function submitEllipse(startPos: Position, endPos: Position) {
   const radiusX = Math.abs(endPos.x - startPos.x)
   const radiusY = Math.abs(endPos.y - startPos.y)
@@ -582,17 +586,18 @@ export function submitEllipse(startPos: Position, endPos: Position) {
     return
   }
   
-  const sectionId = getOrCreateDefaultSection()
-  useVenueStore().addShape(sectionId, {
-    type: 'ellipse',
-    x: startPos.x,
-    y: startPos.y,
-    width: radiusX * 2,
-    height: radiusY * 2,
-    rotation: 0,
-    fill: 'rgba(156, 163, 175, 0.6)',
-    stroke: 'transparent',
-    strokeWidth: 0
+  // 创建 Section（不再是 Shape）
+  useVenueStore().addSection({
+    name: '圆形分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'ellipse',
+    borderX: startPos.x - radiusX,
+    borderY: startPos.y - radiusY,
+    borderWidth: radiusX * 2,
+    borderHeight: radiusY * 2,
+    borderFill: 'rgba(59,130,246,0.08)'
   })
   
   clearDrawingPreview()
@@ -677,6 +682,7 @@ export function createPolygonPreview(points: Position[], currentPos: Position) {
 }
 
 /** 提交多边形到 store */
+/** 提交多边形 - 创建 Section */
 export function submitPolygon(points: Position[]) {
   if (points.length < 3) {
     clearDrawingPreview()
@@ -687,16 +693,17 @@ export function submitPolygon(points: Position[]) {
   const center = calculatePolygonCenter(points)
   const relativePoints = toRelativePoints(points, center)
   
-  const sectionId = getOrCreateDefaultSection()
-  useVenueStore().addShape(sectionId, {
-    type: 'polygon',
-    x: center.x,
-    y: center.y,
-    rotation: 0,
-    fill: 'rgba(156, 163, 175, 0.6)',
-    stroke: 'transparent',
-    strokeWidth: 0,
-    points: relativePoints
+  // 创建 Section（不再是 Shape）
+  useVenueStore().addSection({
+    name: '多边形分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'polygon',
+    borderX: center.x,
+    borderY: center.y,
+    borderPoints: relativePoints,
+    borderFill: 'rgba(59,130,246,0.08)'
   })
   
   clearDrawingPreview()

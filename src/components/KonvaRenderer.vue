@@ -523,7 +523,7 @@ const renderSectionBorder = (section: Section) => {
   const isOtherFocused = venueStore.focusedSectionId !== null && !isFocused
   const isSelected = venueStore.selectedSectionIds.includes(section.id)
 
-  let borderShape: Konva.Rect | Konva.Ellipse
+  let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line
 
   // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
   const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
@@ -547,6 +547,15 @@ const renderSectionBorder = (section: Section) => {
       radiusY: (section.borderHeight || 0) / 2,
       ...commonAttrs
     })
+  } else if (section.borderType === 'polygon') {
+    // 多边形边框
+    borderShape = new Konva.Line({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      points: section.borderPoints || [],
+      closed: true,
+      ...commonAttrs
+    })
   } else {
     borderShape = new Konva.Rect({
       x: section.borderX || 0,
@@ -558,13 +567,19 @@ const renderSectionBorder = (section: Section) => {
     })
   }
 
-  // 分区名称标签
-  const labelX = section.borderType === 'ellipse' 
-    ? (section.borderX || 0) + (section.borderWidth || 0) / 2 
-    : (section.borderX || 0) + (section.borderWidth || 0) / 2
-  const labelY = section.borderType === 'ellipse' 
-    ? (section.borderY || 0) + (section.borderHeight || 0) / 2 
-    : (section.borderY || 0) + 14
+  // 分区名称标签位置
+  let labelX: number, labelY: number
+  if (section.borderType === 'ellipse') {
+    labelX = (section.borderX || 0) + (section.borderWidth || 0) / 2
+    labelY = (section.borderY || 0) + (section.borderHeight || 0) / 2
+  } else if (section.borderType === 'polygon') {
+    // 多边形标签放在中心点
+    labelX = section.borderX || 0
+    labelY = section.borderY || 0
+  } else {
+    labelX = (section.borderX || 0) + (section.borderWidth || 0) / 2
+    labelY = (section.borderY || 0) + 14
+  }
   const label = new Konva.Text({
     x: labelX,
     y: labelY,
