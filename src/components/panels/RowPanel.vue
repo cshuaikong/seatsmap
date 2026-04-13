@@ -80,12 +80,20 @@
         <label class="property-label">扩展座位</label>
         <div class="property-control">
           <div class="expand-buttons">
+            <button class="expand-btn remove" @click="onRemoveSeatAtStart" title="移除开头座位">
+              <Icon icon="lucide:chevron-left" class="expand-icon" />
+              <span class="expand-text">-1</span>
+            </button>
             <button class="expand-btn" @click="onAddSeatAtStart" title="在开头添加座位">
               <Icon icon="lucide:chevron-left" class="expand-icon" />
               <span class="expand-text">+1</span>
             </button>
             <button class="expand-btn" @click="onAddSeatAtEnd" title="在末尾添加座位">
               <span class="expand-text">+1</span>
+              <Icon icon="lucide:chevron-right" class="expand-icon" />
+            </button>
+            <button class="expand-btn remove" @click="onRemoveSeatAtEnd" title="移除末尾座位">
+              <span class="expand-text">-1</span>
               <Icon icon="lucide:chevron-right" class="expand-icon" />
             </button>
           </div>
@@ -498,6 +506,16 @@ function onAddSeatAtEnd() {
   emit('update-property', 'addSeatAtEnd', true)
 }
 
+// 移除开头座位
+function onRemoveSeatAtStart() {
+  emit('update-property', 'removeSeatAtStart', true)
+}
+
+// 移除末尾座位
+function onRemoveSeatAtEnd() {
+  emit('update-property', 'removeSeatAtEnd', true)
+}
+
 function onUpdateProperty(key: string, value: any) {
   // 更新本地 ref
   switch(key) {
@@ -867,6 +885,16 @@ defineExpose({ refresh })
   background: #f0f7ff;
   border-color: #4a90d9;
   color: #4a90d9;
+}
+
+.expand-btn.remove {
+  color: #999;
+}
+
+.expand-btn.remove:hover {
+  background: #fff5f5;
+  border-color: #e57373;
+  color: #e57373;
 }
 
 .expand-icon {

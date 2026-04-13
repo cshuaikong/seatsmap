@@ -650,6 +650,30 @@ export const useVenueStore = defineStore('venue', () => {
     })
   }
 
+  function removeSeatAtRowStart(rowId: string) {
+    for (const section of venue.value.sections) {
+      const row = section.rows.find(r => r.id === rowId)
+      if (row && row.seats.length > 1) {
+        row.seats.shift()
+        renumberRowSeats(row)
+        return true
+      }
+    }
+    return false
+  }
+
+  function removeSeatAtRowEnd(rowId: string) {
+    for (const section of venue.value.sections) {
+      const row = section.rows.find(r => r.id === rowId)
+      if (row && row.seats.length > 1) {
+        row.seats.pop()
+        renumberRowSeats(row)
+        return true
+      }
+    }
+    return false
+  }
+
   // ==================== 通用对象更新 ====================
 
   function updateObjectProperty(type: SelectedObjectType, id: string, updates: Record<string, any>) {
@@ -971,6 +995,8 @@ export const useVenueStore = defineStore('venue', () => {
     // 排扩展座位
     addSeatAtRowStart,
     addSeatAtRowEnd,
+    removeSeatAtRowStart,
+    removeSeatAtRowEnd,
     updateObjectProperty,
     // Category
     addCategory,

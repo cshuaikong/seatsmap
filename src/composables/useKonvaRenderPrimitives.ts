@@ -230,11 +230,25 @@ export function createRowSceneFunc(
     const colorGroups = groupSeatsByColor(row.seats, getSeatColor)
 
     if (row.label) {
-      context.fillStyle = '#72716'
+      // 标签紧贴第一个座位左侧，跟随弧形切线方向旋转
+      const firstPos = curvedPositions[0] || { x: seatRadius, y: seatRadius }
+      const secondPos = curvedPositions[1] || { x: firstPos.x + (row.seatSpacing || 28), y: firstPos.y }
+
+      // 计算前两个座位的连线角度（即排的局部切线方向）
+      const dx = secondPos.x - firstPos.x
+      const dy = secondPos.y - firstPos.y
+      const angle = Math.atan2(dy, dx)
+
+      context.save()
+      // 平移到第一个座位左侧，再旋转
+      context.translate(firstPos.x, firstPos.y)
+      context.rotate(angle)
+      context.fillStyle = '#444'
       context.font = '12px Inter, -apple-system, sans-serif'
       context.textAlign = 'right'
       context.textBaseline = 'middle'
-      context.fillText(row.label, -seatRadius, seatRadius) 
+      context.fillText(row.label, -seatRadius * 2.5, 0)
+      context.restore()
     }
     // 批次绘制每个颜色组的座位
     Object.entries(colorGroups).forEach(([color, groupSeats]) => {
