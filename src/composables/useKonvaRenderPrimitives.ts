@@ -368,6 +368,8 @@ export function createShapeNode(shape: ShapeObject): Konva.Shape | null {
 
     case 'polygon':
       return new Konva.Line({
+        x: shape.x,
+        y: shape.y,
         points: shape.points || [],
         fill: shape.fill,
         stroke: shape.stroke || '#374151',
