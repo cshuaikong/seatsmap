@@ -9,13 +9,13 @@
         </div>
         <span class="chart-name">{{ chartName }}</span>
 
-        <!-- 超大剧场：聚焦分区面包屑 -->
-        <template v-if="focusedZoneName">
+        <!-- 聚焦分区面包屑 -->
+        <template v-if="focusedSectionName">
           <span class="breadcrumb-sep">
             <Icon icon="lucide:chevron-right" />
           </span>
-          <span class="breadcrumb-zone">{{ focusedZoneName }}</span>
-          <button class="action-btn secondary zone-exit-btn" @click="onExitZoneFocus">
+          <span class="breadcrumb-zone">{{ focusedSectionName }}</span>
+          <button class="action-btn secondary zone-exit-btn" @click="onExitSectionFocus">
             <Icon icon="lucide:log-out" class="btn-icon" />
             退出分区
           </button>
@@ -160,14 +160,14 @@ const chartName = ref('高性能座位图编辑器')
 
 // ==================== 分区聚焦模式 ====================
 
-const focusedZoneName = computed(() => {
-  const zoneId = venueStore.focusedZoneId
-  if (!zoneId) return null
-  return venueStore.venue.zones?.find(z => z.id === zoneId)?.name ?? null
+const focusedSectionName = computed(() => {
+  const sectionId = venueStore.focusedSectionId
+  if (!sectionId) return null
+  return venueStore.venue.sections.find(s => s.id === sectionId)?.name ?? null
 })
 
-const onExitZoneFocus = () => {
-  (rendererRef as any)?.exitZoneFocus?.()
+const onExitSectionFocus = () => {
+  (rendererRef as any)?.exitSectionFocus?.()
 }
 
 // 从 venueStore 获取分类，并映射为显示格式（id/name）

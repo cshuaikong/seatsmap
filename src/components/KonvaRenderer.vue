@@ -6,7 +6,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
-import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position, Zone } from '../types'
+import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
 import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints, ROW_SPACING } from '../composables/useKonvaDrawing'
 import {
   setPreviewLayer,
@@ -188,11 +188,10 @@ let viewport: ReturnType<typeof useKonvaViewport> | null = null
 
 // 获取或创建默认 section
 const getOrCreateDefaultSection = (): string => {
-  // 超大剧场模式：优先使用聚焦分区对应的 Section
-  const focusedZoneId = venueStore.focusedZoneId
-  if (focusedZoneId) {
-    const sectionId = venueStore.getZoneSectionId(focusedZoneId)
-    if (sectionId) return sectionId
+  // 聚焦模式：优先使用当前聚焦的 Section
+  const focusedSectionId = venueStore.focusedSectionId
+  if (focusedSectionId) {
+    return focusedSectionId
   }
 
   if (venueStore.venue.sections.length === 0) {
@@ -204,8 +203,8 @@ const getOrCreateDefaultSection = (): string => {
     })
     return sectionId || 'default'
   }
-  // 普通模式：返回第一个没有 zoneId 的 Section（避免混入分区专属 section）
-  const defaultSection = venueStore.venue.sections.find(s => !s.zoneId)
+  // 返回第一个没有边框的 Section（普通 section）或第一个 section
+  const defaultSection = venueStore.venue.sections.find(s => !s.borderType || s.borderType === 'none')
   if (defaultSection) return defaultSection.id
   return venueStore.venue.sections[0].id
 }
@@ -461,12 +460,12 @@ const renderAll = () => {
   // 渲染图片（在最底层）
   renderImages(getImageRenderOptions())
 
-  // 渲染 Zone 分区边框（在座位排之下）
-  if (venueStore.venue.zones) {
-    venueStore.venue.zones.forEach(zone => {
-      renderZone(zone)
-    })
-  }
+  // 渲染 Section 边框（在座位排之下）
+  venueStore.venue.sections.forEach(section => {
+    if (section.borderType && section.borderType !== 'none') {
+      renderSectionBorder(section)
+    }
+  })
 
   // 渲染所有区域
   venueStore.venue.sections.forEach(section => {
@@ -486,53 +485,56 @@ const renderAll = () => {
   mainLayer.batchDraw()
 }
 
-// ==================== 渲染 Zone 分区边框 ====================
+// ==================== 渲染 Section 边框 ====================
 
-const renderZone = (zone: Zone) => {
-  if (!mainLayer) return
+const renderSectionBorder = (section: Section) => {
+  if (!mainLayer || !section.borderType || section.borderType === 'none') return
 
-  const isFocused = venueStore.focusedZoneId === zone.id
-  const isOtherFocused = venueStore.focusedZoneId !== null && !isFocused
-  const isSelected = venueStore.selectedZoneId === zone.id
+  const isFocused = venueStore.focusedSectionId === section.id
+  const isOtherFocused = venueStore.focusedSectionId !== null && !isFocused
+  const isSelected = venueStore.selectedSectionIds.includes(section.id)
 
-  let zoneShape: Konva.Rect | Konva.Ellipse
+  let borderShape: Konva.Rect | Konva.Ellipse
 
   const commonAttrs = {
-    fill: zone.fill || 'rgba(59,130,246,0.08)',
-    stroke: isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (zone.stroke || '#3b82f6')),
+    fill: section.borderFill || 'rgba(59,130,246,0.08)',
+    stroke: isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || '#3b82f6')),
     strokeWidth: isSelected || isFocused ? 2 : 1.5,
     dash: isFocused ? [] : [8, 4],
-    rotation: zone.rotation || 0,
-    opacity: isOtherFocused ? 0.3 : (zone.opacity ?? 1),
+    opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
     listening: !isOtherFocused
   }
 
-  if (zone.shapeType === 'ellipse') {
-    zoneShape = new Konva.Ellipse({
-      x: zone.x,
-      y: zone.y,
-      radiusX: zone.width / 2,
-      radiusY: zone.height / 2,
+  if (section.borderType === 'ellipse') {
+    borderShape = new Konva.Ellipse({
+      x: (section.borderX || 0) + (section.borderWidth || 0) / 2,
+      y: (section.borderY || 0) + (section.borderHeight || 0) / 2,
+      radiusX: (section.borderWidth || 0) / 2,
+      radiusY: (section.borderHeight || 0) / 2,
       ...commonAttrs
     })
   } else {
-    zoneShape = new Konva.Rect({
-      x: zone.x,
-      y: zone.y,
-      width: zone.width,
-      height: zone.height,
+    borderShape = new Konva.Rect({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      width: section.borderWidth || 0,
+      height: section.borderHeight || 0,
       cornerRadius: 6,
       ...commonAttrs
     })
   }
 
   // 分区名称标签
-  const labelX = zone.shapeType === 'ellipse' ? zone.x : zone.x + zone.width / 2
-  const labelY = zone.shapeType === 'ellipse' ? zone.y : zone.y + 14
+  const labelX = section.borderType === 'ellipse' 
+    ? (section.borderX || 0) + (section.borderWidth || 0) / 2 
+    : (section.borderX || 0) + (section.borderWidth || 0) / 2
+  const labelY = section.borderType === 'ellipse' 
+    ? (section.borderY || 0) + (section.borderHeight || 0) / 2 
+    : (section.borderY || 0) + 14
   const label = new Konva.Text({
     x: labelX,
     y: labelY,
-    text: zone.name || '分区',
+    text: section.name || '分区',
     fontSize: 13,
     fontFamily: 'Inter, -apple-system, sans-serif',
     fontStyle: 'bold',
@@ -545,34 +547,34 @@ const renderZone = (zone: Zone) => {
   // 水平居中
   label.offsetX(label.width() / 2)
 
-  const zoneNode = zoneShape as Konva.Shape
-  zoneNode.setAttr('zoneId', zone.id)
-  nodeMap.set('zone_' + zone.id, zoneNode)
+  const borderNode = borderShape as Konva.Shape
+  borderNode.setAttr('sectionId', section.id)
+  nodeMap.set('sectionBorder_' + section.id, borderNode)
 
   // 单击选中
-  zoneNode.on('click', (e) => {
+  borderNode.on('click', (e) => {
     e.cancelBubble = true
     venueStore.clearSelection()
-    venueStore.selectZone(zone.id)
+    venueStore.selectedSectionIds = [section.id]
     mainLayer?.batchDraw()
   })
 
   // 双击进入聚焦
-  zoneNode.on('dblclick', (e) => {
+  borderNode.on('dblclick', (e) => {
     e.cancelBubble = true
-    enterZoneFocus(zone.id)
+    enterSectionFocus(section.id)
   })
 
-  zoneNode.on('mouseenter', () => {
+  borderNode.on('mouseenter', () => {
     if (stage && !isDrawingMode()) {
       stage.container().style.cursor = isFocused ? 'crosshair' : 'pointer'
     }
   })
-  zoneNode.on('mouseleave', () => {
+  borderNode.on('mouseleave', () => {
     if (stage) stage.container().style.cursor = 'default'
   })
 
-  mainLayer.add(zoneShape)
+  mainLayer.add(borderShape)
   mainLayer.add(label)
 }
 
@@ -642,9 +644,9 @@ const renderSection = (section: Section) => {
   if (!mainLayer) return
 
   // 检查是否处于聚焦模式
-  const focusedZoneId = venueStore.focusedZoneId
-  const isFocusedSection = section.zoneId === focusedZoneId
-  const isOtherSection = focusedZoneId && section.zoneId !== focusedZoneId
+  const focusedSectionId = venueStore.focusedSectionId
+  const isFocusedSection = section.id === focusedSectionId
+  const isOtherSection = focusedSectionId && section.id !== focusedSectionId
 
   // 如果是其他 section（非当前聚焦），渲染简化概览
   if (isOtherSection) {
@@ -714,7 +716,7 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   // 设置绘制函数（聚焦模式下传入 visualScale 保持座位视觉大小）
-  const visualScale = venueStore.focusedZoneId ? (stage?.scaleX() || 1) : 1
+  const visualScale = venueStore.focusedSectionId ? (stage?.scaleX() || 1) : 1
   rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS, venueStore.selectedSeatIds, visualScale))
   rowShape.hitFunc(createRowHitFunc())
 
@@ -1986,31 +1988,30 @@ const createRectPreview = (startPos: Position, endPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 进入 Zone 聚焦模式：缩放到该分区，其余分区变暗 */
-const enterZoneFocus = (zoneId: string) => {
+/** 进入 Section 聚焦模式：缩放到该分区，其余分区变暗 */
+const enterSectionFocus = (sectionId: string) => {
   if (!stage) return
-  const zone = venueStore.venue.zones?.find(z => z.id === zoneId)
-  if (!zone) return
+  const section = venueStore.venue.sections.find(s => s.id === sectionId)
+  if (!section) return
 
-  venueStore.focusedZoneId = zoneId
-  venueStore.selectZone(null)
+  venueStore.focusedSectionId = sectionId
 
   // 计算目标区域在 stage 坐标系中的包围盒
   const padding = 80
   const stageWidth = stage.width()
   const stageHeight = stage.height()
 
-  let zoneW = zone.width
-  let zoneH = zone.height
-  let zoneX = zone.shapeType === 'ellipse' ? zone.x - zone.width / 2 : zone.x
-  let zoneY = zone.shapeType === 'ellipse' ? zone.y - zone.height / 2 : zone.y
+  let sectionW = section.borderWidth || 100
+  let sectionH = section.borderHeight || 100
+  let sectionX = section.borderX || 0
+  let sectionY = section.borderY || 0
 
-  const scaleX = (stageWidth - padding * 2) / zoneW
-  const scaleY = (stageHeight - padding * 2) / zoneH
+  const scaleX = (stageWidth - padding * 2) / sectionW
+  const scaleY = (stageHeight - padding * 2) / sectionH
   const newScale = Math.min(scaleX, scaleY, 4)  // 最大缩放 4x
 
-  const newX = stageWidth / 2 - (zoneX + zoneW / 2) * newScale
-  const newY = stageHeight / 2 - (zoneY + zoneH / 2) * newScale
+  const newX = stageWidth / 2 - (sectionX + sectionW / 2) * newScale
+  const newY = stageHeight / 2 - (sectionY + sectionH / 2) * newScale
 
   stage.to({ x: newX, y: newY, scaleX: newScale, scaleY: newScale, duration: 0.3 })
   viewportState.scale = newScale
@@ -2021,10 +2022,10 @@ const enterZoneFocus = (zoneId: string) => {
   renderAll()
 }
 
-/** 退出 Zone 聚焦模式，恢复全局视图 */
-const exitZoneFocus = () => {
+/** 退出 Section 聚焦模式，恢复全局视图 */
+const exitSectionFocus = () => {
   if (!stage) return
-  venueStore.focusedZoneId = null
+  venueStore.focusedSectionId = null
 
   // 恢复到默认视口
   stage.to({ x: 0, y: 0, scaleX: 1, scaleY: 1, duration: 0.3 })
@@ -2048,18 +2049,19 @@ const submitRect = (startPos: Position, endPos: Position) => {
   const x = Math.min(startPos.x, endPos.x)
   const y = Math.min(startPos.y, endPos.y)
 
-  // 绘制矩形即创建 Zone 分区
-  venueStore.addZone({
-    name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
-    shapeType: 'rect',
-    x,
-    y,
-    width,
-    height,
-    rotation: 0,
-    fill: 'rgba(59,130,246,0.06)',
-    stroke: '#3b82f6',
-    opacity: 1
+  // 绘制矩形即创建带边框的 Section 分区
+  const n = venueStore.venue.sections.filter(s => s.borderType && s.borderType !== 'none').length
+  venueStore.addSection({
+    name: `分区 ${n + 1}`,
+    rows: [],
+    borderType: 'rect',
+    borderX: x,
+    borderY: y,
+    borderWidth: width,
+    borderHeight: height,
+    borderFill: 'rgba(59,130,246,0.06)',
+    borderStroke: '#3b82f6',
+    borderOpacity: 1
   })
   
   clearDrawingPreview()
@@ -2102,18 +2104,19 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     return
   }
   
-  // 绘制椭圆即创建 Zone 分区
-  venueStore.addZone({
-    name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
-    shapeType: 'ellipse',
-    x: startPos.x,
-    y: startPos.y,
-    width: radiusX * 2,
-    height: radiusY * 2,
-    rotation: 0,
-    fill: 'rgba(59,130,246,0.06)',
-    stroke: '#3b82f6',
-    opacity: 1
+  // 绘制椭圆即创建带边框的 Section 分区
+  const n = venueStore.venue.sections.filter(s => s.borderType && s.borderType !== 'none').length
+  venueStore.addSection({
+    name: `分区 ${n + 1}`,
+    rows: [],
+    borderType: 'ellipse',
+    borderX: startPos.x - radiusX,
+    borderY: startPos.y - radiusY,
+    borderWidth: radiusX * 2,
+    borderHeight: radiusY * 2,
+    borderFill: 'rgba(59,130,246,0.06)',
+    borderStroke: '#3b82f6',
+    borderOpacity: 1
   })
   
   clearDrawingPreview()
@@ -2311,9 +2314,9 @@ defineExpose({
   // 绘制工具
   setDrawingTool,
   currentDrawingTool,
-  // Zone 聚焦
-  enterZoneFocus,
-  exitZoneFocus,
+  // Section 聚焦
+  enterSectionFocus,
+  exitSectionFocus,
   // 删除
   deleteSelected: () => keyboard?.deleteSelectedObjects(),
   // 清除绘制状态
