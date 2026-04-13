@@ -210,16 +210,19 @@ function calculateCurvedPositions(seats: Seat[], curve: number): Array<{ x: numb
 /**
  * 创建排的 sceneFunc（批次绘制座位）
  * 支持多段转折排渲染和弧度渲染
+ * @param visualScale - 视觉缩放比例（聚焦模式下画布放大，座位保持视觉大小）
  */
 export function createRowSceneFunc(
   row: SeatRow,
   getSeatColor: (seat: Seat) => string,
   isSelected: boolean,
   seatRadius: number,
-  selectedSeatIds: string[] = []
+  selectedSeatIds: string[] = [],
+  visualScale: number = 1
 ): (context: Konva.Context, shape: Konva.Shape) => void {
   return (context, shape) => {
-    const radius = seatRadius
+    // 视觉半径：画布放大时缩小半径，保持视觉大小不变
+    const radius = seatRadius / visualScale
 
     // 获取关键节点索引集合
     const segmentIndices = new Set(row.segmentIndices || [])

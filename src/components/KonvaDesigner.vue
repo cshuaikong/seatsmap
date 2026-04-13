@@ -22,15 +22,6 @@
         </template>
       </div>
 
-      <!-- 中间：超大剧场模式开关 -->
-      <div class="toolbar-center">
-        <label class="mode-toggle" :class="{ active: isZoneMode }" @click="toggleZoneMode">
-          <Icon :icon="isZoneMode ? 'lucide:layout-grid' : 'lucide:layout-template'" class="mode-icon" />
-          <span>{{ isZoneMode ? '超大剧场' : '普通模式' }}</span>
-          <div class="toggle-pill" :class="{ on: isZoneMode }"></div>
-        </label>
-      </div>
-
       <!-- 右侧：操作按钮 -->
       <div class="toolbar-right">
         <button class="action-btn secondary" @click="onExportData">
@@ -167,9 +158,7 @@ const currentTool = ref<ToolMode>('select')
 // 图表数据
 const chartName = ref('高性能座位图编辑器')
 
-// ==================== 超大剧场模式 ====================
-
-const isZoneMode = computed(() => venueStore.venue.venueType === 'WITH_SECTIONS')
+// ==================== 分区聚焦模式 ====================
 
 const focusedZoneName = computed(() => {
   const zoneId = venueStore.focusedZoneId
@@ -177,16 +166,8 @@ const focusedZoneName = computed(() => {
   return venueStore.venue.zones?.find(z => z.id === zoneId)?.name ?? null
 })
 
-const toggleZoneMode = () => {
-  venueStore.venue.venueType = isZoneMode.value ? 'SIMPLE' : 'WITH_SECTIONS'
-  // 退出聚焦
-  if (!isZoneMode.value && venueStore.focusedZoneId) {
-    rendererRef.value?.exitZoneFocus()
-  }
-}
-
 const onExitZoneFocus = () => {
-  rendererRef.value?.exitZoneFocus()
+  (rendererRef as any)?.exitZoneFocus?.()
 }
 
 // 从 venueStore 获取分类，并映射为显示格式（id/name）
@@ -490,67 +471,6 @@ const onDelete = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-/* 超大剧场模式开关 */
-.toolbar-center {
-  display: flex;
-  align-items: center;
-}
-
-.mode-toggle {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-tertiary);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  transition: all 0.2s;
-  user-select: none;
-}
-
-.mode-toggle.active {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-}
-
-.mode-icon {
-  width: 15px;
-  height: 15px;
-}
-
-.toggle-pill {
-  width: 28px;
-  height: 16px;
-  border-radius: 8px;
-  background: var(--color-border);
-  position: relative;
-  transition: background 0.2s;
-}
-
-.toggle-pill::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: white;
-  transition: left 0.2s;
-}
-
-.toggle-pill.on {
-  background: var(--color-accent);
-}
-
-.toggle-pill.on::after {
-  left: 14px;
 }
 
 /* 面包屑 */

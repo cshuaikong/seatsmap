@@ -576,8 +576,81 @@ const renderZone = (zone: Zone) => {
   mainLayer.add(label)
 }
 
+/**
+ * 渲染 Section 简化概览（聚焦模式下其他分区只显示简化表示）
+ */
+const renderSectionOverview = (section: Section) => {
+  if (!mainLayer || section.rows.length === 0) return
+
+  // 计算 section 的包围盒
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  section.rows.forEach(row => {
+    row.seats.forEach(seat => {
+      minX = Math.min(minX, seat.x)
+      minY = Math.min(minY, seat.y)
+      maxX = Math.max(maxX, seat.x)
+      maxY = Math.max(maxY, seat.y)
+    })
+  })
+
+  const width = maxX - minX + 40
+  const height = maxY - minY + 40
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+
+  // 根据座位数量决定颜色（绿色=多，橙色=中，红色=少）
+  const seatCount = section.rows.reduce((sum, row) => sum + row.seats.length, 0)
+  let fillColor = 'rgba(76, 175, 80, 0.15)' // 绿色
+  if (seatCount < 50) fillColor = 'rgba(255, 152, 0, 0.15)' // 橙色
+  if (seatCount < 20) fillColor = 'rgba(244, 67, 54, 0.15)' // 红色
+
+  // 绘制简化矩形概览
+  const overview = new Konva.Rect({
+    x: centerX,
+    y: centerY,
+    width: width,
+    height: height,
+    offsetX: width / 2,
+    offsetY: height / 2,
+    fill: fillColor,
+    stroke: 'rgba(150, 150, 150, 0.3)',
+    strokeWidth: 1,
+    listening: false // 只读，不响应事件
+  })
+
+  // 添加座位数量标签
+  const label = new Konva.Text({
+    x: centerX,
+    y: centerY,
+    text: String(seatCount),
+    fontSize: 14,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    fontStyle: 'bold',
+    fill: 'rgba(100, 100, 100, 0.5)',
+    align: 'center',
+    verticalAlign: 'middle',
+    listening: false
+  })
+  label.offsetX(label.width() / 2)
+  label.offsetY(label.height() / 2)
+
+  mainLayer.add(overview)
+  mainLayer.add(label)
+}
+
 const renderSection = (section: Section) => {
   if (!mainLayer) return
+
+  // 检查是否处于聚焦模式
+  const focusedZoneId = venueStore.focusedZoneId
+  const isFocusedSection = section.zoneId === focusedZoneId
+  const isOtherSection = focusedZoneId && section.zoneId !== focusedZoneId
+
+  // 如果是其他 section（非当前聚焦），渲染简化概览
+  if (isOtherSection) {
+    renderSectionOverview(section)
+    return
+  }
 
   // 渲染排（包含座位）
   section.rows.forEach(row => {
@@ -640,8 +713,9 @@ const renderRow = (row: SeatRow, section: Section) => {
     sectionId: section.id
   })
 
-  // 设置绘制函数
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS, venueStore.selectedSeatIds))
+  // 设置绘制函数（聚焦模式下传入 visualScale 保持座位视觉大小）
+  const visualScale = venueStore.focusedZoneId ? (stage?.scaleX() || 1) : 1
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS, venueStore.selectedSeatIds, visualScale))
   rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
@@ -1912,11 +1986,6 @@ const createRectPreview = (startPos: Position, endPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 是否处于超大剧场分区绘制模式（venueType === 'WITH_SECTIONS'） */
-const isZoneMode = (): boolean => {
-  return venueStore.venue.venueType === 'WITH_SECTIONS'
-}
-
 /** 进入 Zone 聚焦模式：缩放到该分区，其余分区变暗 */
 const enterZoneFocus = (zoneId: string) => {
   if (!stage) return
@@ -1979,35 +2048,19 @@ const submitRect = (startPos: Position, endPos: Position) => {
   const x = Math.min(startPos.x, endPos.x)
   const y = Math.min(startPos.y, endPos.y)
 
-  if (isZoneMode()) {
-    // 超大剧场模式：创建 Zone 分区
-    venueStore.addZone({
-      name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
-      shapeType: 'rect',
-      x,
-      y,
-      width,
-      height,
-      rotation: 0,
-      fill: 'rgba(59,130,246,0.06)',
-      stroke: '#3b82f6',
-      opacity: 1
-    })
-  } else {
-    const sectionId = getOrCreateDefaultSection()
-    venueStore.addShape(sectionId, {
-      type: 'rect',
-      x,
-      y,
-      width,
-      height,
-      rotation: 0,
-      fill: 'rgba(156, 163, 175, 0.6)',
-      stroke: 'transparent',
-      strokeWidth: 0,
-      cornerRadius: 8
-    })
-  }
+  // 绘制矩形即创建 Zone 分区
+  venueStore.addZone({
+    name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
+    shapeType: 'rect',
+    x,
+    y,
+    width,
+    height,
+    rotation: 0,
+    fill: 'rgba(59,130,246,0.06)',
+    stroke: '#3b82f6',
+    opacity: 1
+  })
   
   clearDrawingPreview()
 }
@@ -2049,33 +2102,19 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     return
   }
   
-  if (isZoneMode()) {
-    venueStore.addZone({
-      name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
-      shapeType: 'ellipse',
-      x: startPos.x,
-      y: startPos.y,
-      width: radiusX * 2,
-      height: radiusY * 2,
-      rotation: 0,
-      fill: 'rgba(59,130,246,0.06)',
-      stroke: '#3b82f6',
-      opacity: 1
-    })
-  } else {
-    const sectionId = getOrCreateDefaultSection()
-    venueStore.addShape(sectionId, {
-      type: 'ellipse',
-      x: startPos.x,
-      y: startPos.y,
-      width: radiusX * 2,
-      height: radiusY * 2,
-      rotation: 0,
-      fill: 'rgba(156, 163, 175, 0.6)',
-      stroke: 'transparent',
-      strokeWidth: 0
-    })
-  }
+  // 绘制椭圆即创建 Zone 分区
+  venueStore.addZone({
+    name: `分区 ${(venueStore.venue.zones?.length ?? 0) + 1}`,
+    shapeType: 'ellipse',
+    x: startPos.x,
+    y: startPos.y,
+    width: radiusX * 2,
+    height: radiusY * 2,
+    rotation: 0,
+    fill: 'rgba(59,130,246,0.06)',
+    stroke: '#3b82f6',
+    opacity: 1
+  })
   
   clearDrawingPreview()
 }
