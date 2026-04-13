@@ -105,7 +105,7 @@
         :total-seats="totalSeats"
         :current-tool="currentTool as any"
         @manage-categories="onManageCategories"
-        @enter-zone="(zoneId: string) => rendererRef?.enterZoneFocus(zoneId)"
+        @enter-section="(sectionId: string) => (rendererRef as any)?.enterSectionFocus?.(sectionId)"
       />
 
       <!-- Category 管理弹窗 -->

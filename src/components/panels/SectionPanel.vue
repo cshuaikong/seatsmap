@@ -1,17 +1,17 @@
 <template>
-  <div class="zone-panel">
+  <div class="section-panel">
     <div class="panel-header">
       <Icon icon="lucide:layout-grid" class="panel-header-icon" />
       <span>分区属性</span>
     </div>
 
-    <div class="panel-body" v-if="zone">
+    <div class="panel-body" v-if="section">
       <!-- 分区名称 -->
       <div class="panel-row">
         <label class="panel-label">分区名称</label>
         <input
           class="panel-input"
-          :value="zone.name"
+          :value="section.name"
           @change="(e) => emit('update-property', 'name', (e.target as HTMLInputElement).value)"
         />
       </div>
@@ -24,7 +24,7 @@
             type="color"
             class="color-swatch"
             :value="solidFill"
-            @change="(e) => emit('update-property', 'fill', (e.target as HTMLInputElement).value)"
+            @change="(e) => emit('update-property', 'borderFill', (e.target as HTMLInputElement).value)"
           />
           <span class="color-value">{{ solidFill }}</span>
         </div>
@@ -37,10 +37,10 @@
           <input
             type="color"
             class="color-swatch"
-            :value="zone.stroke || '#3b82f6'"
-            @change="(e) => emit('update-property', 'stroke', (e.target as HTMLInputElement).value)"
+            :value="section.borderStroke || '#3b82f6'"
+            @change="(e) => emit('update-property', 'borderStroke', (e.target as HTMLInputElement).value)"
           />
-          <span class="color-value">{{ zone.stroke || '#3b82f6' }}</span>
+          <span class="color-value">{{ section.borderStroke || '#3b82f6' }}</span>
         </div>
       </div>
 
@@ -52,18 +52,18 @@
           min="0"
           max="1"
           step="0.05"
-          :value="zone.opacity ?? 1"
+          :value="section.borderOpacity ?? 1"
           class="slider"
-          @input="(e) => emit('update-property', 'opacity', parseFloat((e.target as HTMLInputElement).value))"
+          @input="(e) => emit('update-property', 'borderOpacity', parseFloat((e.target as HTMLInputElement).value))"
         />
-        <span class="slider-val">{{ Math.round((zone.opacity ?? 1) * 100) }}%</span>
+        <span class="slider-val">{{ Math.round((section.borderOpacity ?? 1) * 100) }}%</span>
       </div>
 
       <!-- 统计信息 -->
       <div class="panel-stats">
         <div class="stat-item">
           <Icon icon="lucide:rows-3" class="stat-icon" />
-          <span>{{ rowCount }} 排</span>
+          <span>{{ section.rows.length }} 排</span>
         </div>
         <div class="stat-item">
           <Icon icon="lucide:armchair" class="stat-icon" />
@@ -72,7 +72,7 @@
       </div>
 
       <!-- 进入分区按钮 -->
-      <button class="enter-zone-btn" @click="emit('enter-zone')">
+      <button class="enter-section-btn" @click="emit('enter-section')">
         <Icon icon="lucide:zoom-in" class="btn-icon" />
         进入分区编辑
       </button>
@@ -87,23 +87,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import type { Zone } from '../../types'
-import { useVenueStore } from '../../stores/venueStore'
+import type { Section } from '../../types'
 
 const props = defineProps<{
-  zone: Zone | null
+  section: Section | null
 }>()
 
 const emit = defineEmits<{
   'update-property': [key: string, val: any]
-  'enter-zone': []
+  'enter-section': []
 }>()
-
-const venueStore = useVenueStore()
 
 // 将带透明度的 rgba fill 转为纯色（用于 color input）
 const solidFill = computed(() => {
-  const f = props.zone?.fill || '#3b82f6'
+  const f = props.section?.borderFill || '#3b82f6'
   // 如果是 rgba，取前三通道近似转换
   if (f.startsWith('rgba')) {
     const match = f.match(/rgba\((\d+),\s*(\d+),\s*(\d+)/)
@@ -117,22 +114,14 @@ const solidFill = computed(() => {
   return f
 })
 
-const rowCount = computed(() => {
-  if (!props.zone) return 0
-  const section = venueStore.venue.sections.find(s => s.zoneId === props.zone!.id)
-  return section?.rows.length ?? 0
-})
-
 const seatCount = computed(() => {
-  if (!props.zone) return 0
-  const section = venueStore.venue.sections.find(s => s.zoneId === props.zone!.id)
-  if (!section) return 0
-  return section.rows.reduce((sum, row) => sum + row.seats.length, 0)
+  if (!props.section) return 0
+  return props.section.rows.reduce((sum, row) => sum + row.seats.length, 0)
 })
 </script>
 
 <style scoped>
-.zone-panel {
+.section-panel {
   padding: 0;
 }
 
@@ -245,7 +234,7 @@ const seatCount = computed(() => {
   color: var(--color-accent);
 }
 
-.enter-zone-btn {
+.enter-section-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -262,7 +251,7 @@ const seatCount = computed(() => {
   transition: all 0.2s;
 }
 
-.enter-zone-btn:hover {
+.enter-section-btn:hover {
   opacity: 0.9;
   transform: translateY(-1px);
 }
