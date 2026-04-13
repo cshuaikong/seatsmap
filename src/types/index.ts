@@ -65,31 +65,12 @@ export interface ChartData {
 }
 
 // 数据驱动架构的核心类型
-// 超大剧场分区（Zone）— 作为座位区块的容器边框
-export interface Zone {
-  id: string
-  name: string
-  // 几何信息
-  shapeType: 'rect' | 'ellipse'
-  x: number
-  y: number
-  width: number
-  height: number
-  rotation: number
-  fill: string
-  stroke: string
-  opacity: number
-  // 关联的 Section id（绘制座位时自动归属）
-  sectionId: string
-}
-
 export interface VenueData {
   id: string
   name: string
   venueType: 'SIMPLE' | 'WITH_SECTIONS' | 'WITH_SECTIONS_AND_FLOORS'
   categories: Category[]
   sections: Section[]
-  zones: Zone[]
   focalPoint?: Position
 }
 
@@ -145,7 +126,7 @@ export interface Seat {
   distanceToFocalPoint?: number
 }
 
-// 扩展 Section
+// 扩展 Section - 同时作为分区容器和可选边框
 export interface Section {
   id: string
   name: string
@@ -157,8 +138,15 @@ export interface Section {
   shapes?: ShapeObject[]
   texts?: TextObject[]
   areas?: AreaObject[]
-  // 关联分区 Zone id（超大剧场模式）
-  zoneId?: string
+  // 分区边框属性（绘制矩形/圆形时创建）
+  borderType?: 'rect' | 'ellipse' | 'none'  // none 表示无边框（默认）
+  borderX?: number
+  borderY?: number
+  borderWidth?: number
+  borderHeight?: number
+  borderFill?: string
+  borderStroke?: string
+  borderOpacity?: number
 }
 
 // 座位图配置接口

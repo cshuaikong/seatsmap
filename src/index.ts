@@ -7,7 +7,6 @@ export { default as TopToolbar } from './components/TopToolbar.vue'
 
 // Store
 export { useVenueStore } from './stores/venueStore'
-export { useChartStore } from './stores/chartStore'
 
 // 类型
 export * from './types'
