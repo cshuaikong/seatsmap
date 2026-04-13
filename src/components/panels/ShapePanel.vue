@@ -373,8 +373,8 @@ const onCategoryChange = (key: string | number) => {
     emit('update-property', 'fillColor', category.color)
   } else {
     // 未分类使用默认灰色
-    localFillColor.value = '#9ca3af'
-    emit('update-property', 'fillColor', '#9ca3af')
+    localFillColor.value = '#d1d5db'
+    emit('update-property', 'fillColor', '#d1d5db')
   }
 }
 

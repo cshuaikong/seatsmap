@@ -2058,7 +2058,7 @@ const submitRect = (startPos: Position, endPos: Position) => {
     width,
     height,
     rotation: 0,
-    fill: '#9ca3af',  // 默认灰色填充
+    fill: '#d1d5db',  // 默认浅灰色填充
     stroke: 'transparent',  // 无边框
     strokeWidth: 0,
     categoryKey: 0  // 未分类
@@ -2113,7 +2113,7 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     width: radiusX * 2,
     height: radiusY * 2,
     rotation: 0,
-    fill: '#9ca3af',  // 默认灰色填充
+    fill: '#d1d5db',  // 默认浅灰色填充
     stroke: 'transparent',  // 无边框
     strokeWidth: 0,
     categoryKey: 0  // 未分类
@@ -2218,7 +2218,7 @@ const submitPolygon = (points: Position[]) => {
     x: center.x,
     y: center.y,
     rotation: 0,
-    fill: '#9ca3af',  // 默认灰色填充
+    fill: '#d1d5db',  // 默认浅灰色填充
     stroke: 'transparent',  // 无边框
     strokeWidth: 0,
     points: relativePoints,
