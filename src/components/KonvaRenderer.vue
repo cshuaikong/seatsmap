@@ -201,10 +201,10 @@ const getOrCreateDefaultSection = (): string => {
       x: 0,
       y: 0,
       borderType: 'rect',
-      borderX: 100,
-      borderY: 100,
-      borderWidth: 400,
-      borderHeight: 300,
+      borderX: 100,      // 左上角 x
+      borderY: 100,      // 左上角 y
+      borderWidth: 400,  // 宽度
+      borderHeight: 300, // 高度
       borderFill: 'rgba(59,130,246,0.08)'
     })
     return sectionId || 'default'
@@ -540,15 +540,16 @@ const renderSectionBorder = (section: Section) => {
   }
 
   if (section.borderType === 'ellipse') {
+    // ellipse: x,y 为中心点，radiusX,radiusY 为半径（与 ShapeObject 一致）
     borderShape = new Konva.Ellipse({
-      x: (section.borderX || 0) + (section.borderWidth || 0) / 2,
-      y: (section.borderY || 0) + (section.borderHeight || 0) / 2,
-      radiusX: (section.borderWidth || 0) / 2,
-      radiusY: (section.borderHeight || 0) / 2,
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      radiusX: section.borderRadiusX || 50,
+      radiusY: section.borderRadiusY || 30,
       ...commonAttrs
     })
   } else if (section.borderType === 'polygon') {
-    // 多边形边框
+    // polygon: x,y 为中心点，points 为相对坐标（与 ShapeObject 一致）
     borderShape = new Konva.Line({
       x: section.borderX || 0,
       y: section.borderY || 0,
@@ -557,6 +558,7 @@ const renderSectionBorder = (section: Section) => {
       ...commonAttrs
     })
   } else {
+    // rect: x,y 为左上角，width,height 为宽高（与 ShapeObject 一致）
     borderShape = new Konva.Rect({
       x: section.borderX || 0,
       y: section.borderY || 0,
@@ -570,13 +572,15 @@ const renderSectionBorder = (section: Section) => {
   // 分区名称标签位置
   let labelX: number, labelY: number
   if (section.borderType === 'ellipse') {
-    labelX = (section.borderX || 0) + (section.borderWidth || 0) / 2
-    labelY = (section.borderY || 0) + (section.borderHeight || 0) / 2
+    // 椭圆中心点
+    labelX = section.borderX || 0
+    labelY = section.borderY || 0
   } else if (section.borderType === 'polygon') {
-    // 多边形标签放在中心点
+    // 多边形中心点
     labelX = section.borderX || 0
     labelY = section.borderY || 0
   } else {
+    // 矩形中心偏上
     labelX = (section.borderX || 0) + (section.borderWidth || 0) / 2
     labelY = (section.borderY || 0) + 14
   }

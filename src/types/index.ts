@@ -127,6 +127,10 @@ export interface Seat {
 }
 
 // 扩展 Section - 同时作为分区容器和可选边框
+// 坐标格式与 ShapeObject 保持一致：
+// - rect: x,y 为左上角，width,height 为宽高
+// - ellipse: x,y 为中心点，radiusX,radiusY 为半径
+// - polygon: x,y 为中心点，points 为相对坐标数组
 export interface Section {
   id: string
   name: string
@@ -140,11 +144,14 @@ export interface Section {
   areas?: AreaObject[]
   // 分区边框属性（绘制矩形/圆形/多边形时创建）
   borderType?: 'rect' | 'ellipse' | 'polygon' | 'none'  // none 表示无边框（默认）
-  borderPoints?: number[]  // 多边形点坐标（相对于 borderX, borderY）
+  // 矩形: x,y,width,height | 圆形: x,y,radiusX,radiusY | 多边形: x,y,points
   borderX?: number
   borderY?: number
   borderWidth?: number
   borderHeight?: number
+  borderRadiusX?: number  // 椭圆专用
+  borderRadiusY?: number  // 椭圆专用
+  borderPoints?: number[] // 多边形专用（相对坐标）
   borderFill?: string
   borderStroke?: string
   borderOpacity?: number

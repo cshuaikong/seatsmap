@@ -533,6 +533,7 @@ export function submitRect(startPos: Position, endPos: Position) {
   const y = Math.min(startPos.y, endPos.y)
   
   // 创建 Section（不再是 Shape）
+  // rect: x,y 为左上角，width,height 为宽高（与 ShapeObject 一致）
   useVenueStore().addSection({
     name: '矩形分区',
     rows: [],
@@ -595,16 +596,17 @@ export function submitEllipse(startPos: Position, endPos: Position) {
   const centerY = (startPos.y + endPos.y) / 2
   
   // 创建 Section（不再是 Shape）
+  // ellipse: x,y 为中心点，radiusX,radiusY 为半径（与 ShapeObject 一致）
   useVenueStore().addSection({
     name: '圆形分区',
     rows: [],
     x: 0,
     y: 0,
     borderType: 'ellipse',
-    borderX: centerX - radiusX,
-    borderY: centerY - radiusY,
-    borderWidth: radiusX * 2,
-    borderHeight: radiusY * 2,
+    borderX: centerX,
+    borderY: centerY,
+    borderRadiusX: radiusX,
+    borderRadiusY: radiusY,
     borderFill: 'rgba(59,130,246,0.08)'
   })
   
@@ -702,6 +704,7 @@ export function submitPolygon(points: Position[]) {
   const relativePoints = toRelativePoints(points, center)
   
   // 创建 Section（不再是 Shape）
+  // polygon: x,y 为中心点，points 为相对坐标（与 ShapeObject 一致）
   useVenueStore().addSection({
     name: '多边形分区',
     rows: [],
