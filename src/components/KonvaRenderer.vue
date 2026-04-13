@@ -487,6 +487,29 @@ const renderAll = () => {
 
 // ==================== 渲染 Section 边框 ====================
 
+/** 将颜色加深（用于边框） */
+const darkenColor = (color: string, percent: number = 30): string => {
+  // 处理 hex 颜色
+  if (color.startsWith('#')) {
+    const hex = color.replace('#', '')
+    const r = Math.max(0, parseInt(hex.substring(0, 2), 16) - percent * 2.55)
+    const g = Math.max(0, parseInt(hex.substring(2, 4), 16) - percent * 2.55)
+    const b = Math.max(0, parseInt(hex.substring(4, 6), 16) - percent * 2.55)
+    return `#${Math.round(r).toString(16).padStart(2, '0')}${Math.round(g).toString(16).padStart(2, '0')}${Math.round(b).toString(16).padStart(2, '0')}`
+  }
+  // 处理 rgba 颜色
+  if (color.startsWith('rgba')) {
+    const match = color.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/)
+    if (match) {
+      const r = Math.max(0, parseInt(match[1]) - percent * 2.55)
+      const g = Math.max(0, parseInt(match[2]) - percent * 2.55)
+      const b = Math.max(0, parseInt(match[3]) - percent * 2.55)
+      return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 1)`
+    }
+  }
+  return color
+}
+
 const renderSectionBorder = (section: Section) => {
   if (!mainLayer || !section.borderType || section.borderType === 'none') return
 
@@ -496,9 +519,13 @@ const renderSectionBorder = (section: Section) => {
 
   let borderShape: Konva.Rect | Konva.Ellipse
 
+  // 根据填充色计算边框色（加深 40%）
+  const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
+  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : darkenColor(fillColor, 40))
+
   const commonAttrs = {
-    fill: section.borderFill || 'rgba(59,130,246,0.08)',
-    stroke: isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || '#3b82f6')),
+    fill: fillColor,
+    stroke: strokeColor,
     strokeWidth: isSelected || isFocused ? 2 : 1.5,
     dash: isFocused ? [] : [8, 4],
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
