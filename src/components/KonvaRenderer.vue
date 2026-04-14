@@ -1407,6 +1407,9 @@ const setupStageEvents = () => {
     // B. 如果点击的是 Transformer 的组成部分（手柄、边框），直接跳）
     const parent = e.target.getParent()
     if (parent && parent.className === 'Transformer') return
+    
+    // C. 如果点击的是 path 顶点手柄，跳过（让它自己处理拖拽）
+    if (e.target.name() === 'path-vertex-handle') return
 
     // C. 获取统一的逻辑坐标
     const pos = getStagePosition()
