@@ -596,7 +596,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   const baseY = section.borderY || 0
 
   section.borderPathPoints.forEach((point, index) => {
-    // 顶点拖拽手柄
+    // 顶点拖拽手柄 - 始终可拖拽
     const vertexHandle = new Konva.Circle({
       x: baseX + point.x,
       y: baseY + point.y,
@@ -604,7 +604,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       fill: '#3b82f6',
       stroke: '#fff',
       strokeWidth: 1.5,
-      draggable: !isOtherFocused,
+      draggable: true,
       name: 'path-vertex-handle',
       shadowColor: 'rgba(0,0,0,0.2)',
       shadowBlur: 3,
@@ -1711,6 +1711,9 @@ const setupStageEvents = () => {
 
   // 鼠标按下事件
   stage.on('mousedown', (e) => {
+    // 如果点击的是 path 顶点手柄，跳过
+    if (e.target.name() === 'path-vertex-handle') return
+    
     // 座位绘制模式：处理第一次按下
     if ((isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode()) && seatDrawStep.value === 'idle') {
       const pos = getStagePosition()
