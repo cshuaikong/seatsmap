@@ -542,32 +542,24 @@ const createArcControlPoint = (start: Position, end: Position, depth: number) =>
 }
 
 /** 创建三次贝塞尔曲线控制点（更圆滑） */
-const createCubicControlPoints = (start: Position, end: Position, depth: number) => {
+/** 创建圆弧路径数据（SVG Arc）- 完美圆角 */
+const createArcSegment = (start: Position, end: Position, depth: number): string => {
   const dx = end.x - start.x
   const dy = end.y - start.y
   const length = Math.sqrt(dx * dx + dy * dy) || 1
-  const normalX = -dy / length
-  const normalY = dx / length
   
-  // 三次贝塞尔曲线有两个控制点
-  // 使用 50% 让控制点更靠近中点，曲线更圆润
-  const t = 0.5
-  const offset = length * depth * 0.5
+  // 计算圆弧的半径和方向
+  // depth 控制弯曲程度：0=直线, 1=半圆
+  const bulge = depth * 0.5  // 弯曲量
   
-  // 控制点沿法向量方向偏移
-  const perpX = normalX * offset
-  const perpY = normalY * offset
+  // 使用 SVG Arc 命令: A rx ry x-axis-rotation large-arc-flag sweep-flag x y
+  // rx=ry 表示正圆，large-arc-flag 根据 depth 决定
+  const rx = length * (0.5 + Math.abs(bulge))
+  const ry = rx
+  const largeArcFlag = Math.abs(bulge) > 0.5 ? 1 : 0
+  const sweepFlag = bulge > 0 ? 1 : 0
   
-  return {
-    cp1: {
-      x: start.x + dx * t + perpX,
-      y: start.y + dy * t + perpY
-    },
-    cp2: {
-      x: end.x - dx * t + perpX,
-      y: end.y - dy * t + perpY
-    }
-  }
+  return `M ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`
 }
 
 const isCurvedEdge = (point: PathPoint) => point.type === 'arc' && Math.abs(point.arcDepth ?? 0) > 0.0001
@@ -579,9 +571,8 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
   const end = points[(pointIndex + 1) % points.length]
 
   if (isCurvedEdge(start)) {
-    // 使用三次贝塞尔曲线（C）代替二次（Q），更圆滑
-    const { cp1, cp2 } = createCubicControlPoints(start, end, start.arcDepth ?? 0)
-    return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
+    // 使用圆弧（A）代替贝塞尔曲线，完美圆角
+    return createArcSegment(start, end, start.arcDepth ?? 0)
   }
 
   return `M ${start.x} ${start.y} L ${end.x} ${end.y}`
@@ -685,9 +676,8 @@ const pathPointsToSvgPath = (points: PathPoint[]): string => {
     const end = points[(index + 1) % points.length]
 
     if (isCurvedEdge(start)) {
-      // 使用三次贝塞尔曲线（C）代替二次（Q），更圆滑
-      const { cp1, cp2 } = createCubicControlPoints(start, end, start.arcDepth ?? 0)
-      path += ` C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
+      // 使用圆弧（A）代替贝塞尔曲线，完美圆角
+      path += ' ' + createArcSegment(start, end, start.arcDepth ?? 0).replace(`M ${start.x} ${start.y} `, '')
     } else {
       path += ` L ${end.x} ${end.y}`
     }

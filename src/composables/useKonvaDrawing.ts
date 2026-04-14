@@ -1136,7 +1136,7 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
     const depth = start.arcDepth ?? 0
 
     path += edgeType === 'arc' && Math.abs(depth) > 0.0001
-      ? ` ${createCubicSegment(start, end, depth)}`
+      ? ` ${createArcSegment(start, end, depth)}`
       : ` L ${end.x} ${end.y}`
   }
   
@@ -1147,41 +1147,24 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
   return path
 }
 
-/** 创建三次贝塞尔曲线控制点（更圆滑） */
-function getCubicControlPoints(start: Position, end: Position, depth: number) {
+/** 创建圆弧路径段（SVG Arc）- 完美圆角 */
+function createArcSegment(start: Position, end: Position, depth: number): string {
   const dx = end.x - start.x
   const dy = end.y - start.y
   const length = Math.sqrt(dx * dx + dy * dy) || 1
-  const normalX = -dy / length
-  const normalY = dx / length
   
-  // 使用 50% 让控制点更靠近中点，曲线更圆润
-  const t = 0.5
-  const offset = length * depth * 0.5
-  const perpX = normalX * offset
-  const perpY = normalY * offset
+  const bulge = depth * 0.5
+  const rx = length * (0.5 + Math.abs(bulge))
+  const ry = rx
+  const largeArcFlag = Math.abs(bulge) > 0.5 ? 1 : 0
+  const sweepFlag = bulge > 0 ? 1 : 0
   
-  return {
-    cp1: {
-      x: start.x + dx * t + perpX,
-      y: start.y + dy * t + perpY
-    },
-    cp2: {
-      x: end.x - dx * t + perpX,
-      y: end.y - dy * t + perpY
-    }
-  }
-}
-
-/** 创建三次贝塞尔曲线段（更圆滑） */
-function createCubicSegment(start: Position, end: Position, depth: number): string {
-  const { cp1, cp2 } = getCubicControlPoints(start, end, depth)
-  return `C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
+  return `A ${rx} ${ry} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`
 }
 
 /** 计算弧线预览路径 */
 function calculateEdgePath(start: PathPoint, end: Position, depth: number): string {
-  return `M ${start.x} ${start.y} ${createCubicSegment(start, end, depth)}`
+  return `M ${start.x} ${start.y} ${createArcSegment(start, end, depth)}`
 }
 
 // 模块级别导出常量
