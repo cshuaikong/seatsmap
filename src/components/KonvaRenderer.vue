@@ -600,15 +600,15 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     const vertexHandle = new Konva.Circle({
       x: baseX + point.x,
       y: baseY + point.y,
-      radius: 8,
+      radius: 5,
       fill: '#3b82f6',
       stroke: '#fff',
-      strokeWidth: 2,
+      strokeWidth: 1.5,
       draggable: !isOtherFocused,
       name: 'path-vertex-handle',
-      shadowColor: 'rgba(0,0,0,0.3)',
-      shadowBlur: 6,
-      shadowOffset: { x: 0, y: 2 }
+      shadowColor: 'rgba(0,0,0,0.2)',
+      shadowBlur: 3,
+      shadowOffset: { x: 0, y: 1 }
     })
     
     // 确保拖拽不被拦截
@@ -617,11 +617,29 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     vertexHandle.setAttr('sectionId', section.id)
     vertexHandle.setAttr('vertexIndex', index)
 
+    // 拖拽开始：记录初始位置
+    let dragStartX = 0
+    let dragStartY = 0
+    let pointStartX = point.x
+    let pointStartY = point.y
+    
+    vertexHandle.on('dragstart', () => {
+      dragStartX = vertexHandle.x()
+      dragStartY = vertexHandle.y()
+      pointStartX = section.borderPathPoints?.[index]?.x ?? point.x
+      pointStartY = section.borderPathPoints?.[index]?.y ?? point.y
+    })
+    
     vertexHandle.on('dragmove', () => {
-      const newX = vertexHandle.x() - baseX
-      const newY = vertexHandle.y() - baseY
+      // 计算拖拽偏移量
+      const dx = vertexHandle.x() - dragStartX
+      const dy = vertexHandle.y() - dragStartY
       
-      // 直接更新 section 数据（不触发重绘）
+      // 新位置 = 初始位置 + 偏移
+      const newX = pointStartX + dx
+      const newY = pointStartY + dy
+      
+      // 更新 section 数据
       if (section.borderPathPoints) {
         section.borderPathPoints[index] = { ...section.borderPathPoints[index], x: newX, y: newY }
       }
@@ -633,26 +651,16 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
         borderShape.data(newPathData)
       }
       
-      // 实时更新边段高亮
-      const activePath = mainLayer?.findOne<Konva.Path>((node: Konva.Node) => 
-        node.getAttr('sectionId') === section.id && 
-        (node as Konva.Path).stroke?.() === '#f59e0b'
-      )
-      if (activePath) {
-        const activePointIndex = venueStore.activePathPointIndex
-        if (activePointIndex !== null && activePointIndex !== undefined) {
-          const segmentData = createPathSegmentData(section.borderPathPoints || [], activePointIndex)
-          activePath.data(segmentData)
-        }
-      }
-      
       layer.batchDraw()
     })
     
     vertexHandle.on('dragend', () => {
       // 拖拽结束时同步到 store
-      const newX = vertexHandle.x() - baseX
-      const newY = vertexHandle.y() - baseY
+      const dx = vertexHandle.x() - dragStartX
+      const dy = vertexHandle.y() - dragStartY
+      const newX = pointStartX + dx
+      const newY = pointStartY + dy
+      
       const updatedPoints = [...(section.borderPathPoints || [])]
       updatedPoints[index] = { ...updatedPoints[index], x: newX, y: newY }
       venueStore.updateSectionBorder(section.id, { borderPathPoints: updatedPoints })
