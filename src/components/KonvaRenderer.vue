@@ -585,13 +585,13 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 
 /** 渲染 Path 顶点拖拽手柄 */
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
-  if (!mainLayer || !overlayLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
+  if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
   // 清理旧的顶点手柄
-  overlayLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
+  mainLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
 
-  // 顶点手柄放在 overlayLayer，避免被其他元素拦截
-  const layer = overlayLayer
+  // 顶点手柄放在 mainLayer，确保在 path 之上
+  const layer = mainLayer
   const baseX = section.borderX || 0
   const baseY = section.borderY || 0
 
@@ -624,6 +624,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     let pointStartY = point.y
     
     vertexHandle.on('dragstart', () => {
+      console.log('Vertex dragstart:', index)
       dragStartX = vertexHandle.x()
       dragStartY = vertexHandle.y()
       pointStartX = section.borderPathPoints?.[index]?.x ?? point.x
