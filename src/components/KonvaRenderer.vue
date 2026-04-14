@@ -587,6 +587,9 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   if (!mainLayer || !overlayLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
+  // 清理旧的顶点手柄
+  overlayLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
+
   // 顶点手柄放在 overlayLayer，避免被其他元素拦截
   const layer = overlayLayer
   const baseX = section.borderX || 0
