@@ -53,6 +53,9 @@ let mainLayer: Konva.Layer | null = null
 let overlayLayer: Konva.Layer | null = null  // 覆盖层：绘制预览、框选、Transformer
 let dragLayer: Konva.Layer | null = null  // 拖拽层：拖拽时临时存放选中节点（性能优化）
 
+// 拖拽状态标志
+let isDraggingPathVertex = false
+
 
 // ==================== 常量配置 ====================
 
@@ -587,6 +590,9 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
+  // 如果正在拖拽顶点，不要清理和重建手柄
+  if (isDraggingPathVertex) return
+
   // 清理旧的顶点手柄
   mainLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
 
@@ -624,6 +630,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     let pointStartY = point.y
     
     vertexHandle.on('dragstart', () => {
+      isDraggingPathVertex = true  // 设置拖拽标志
       dragStartX = vertexHandle.x() - baseX  // 相对坐标
       dragStartY = vertexHandle.y() - baseY
       pointStartX = section.borderPathPoints?.[index]?.x ?? point.x
@@ -663,6 +670,8 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       const updatedPoints = [...(section.borderPathPoints || [])]
       updatedPoints[index] = { ...updatedPoints[index], x: newX, y: newY }
       venueStore.updateSectionBorder(section.id, { borderPathPoints: updatedPoints })
+      
+      isDraggingPathVertex = false  // 清除拖拽标志
     })
 
     vertexHandle.on('mouseenter', () => {
