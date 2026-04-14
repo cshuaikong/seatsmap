@@ -583,6 +583,64 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
   return `M ${start.x} ${start.y} L ${end.x} ${end.y}`
 }
 
+/** 渲染 Path 顶点拖拽手柄 */
+const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
+  if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
+
+  const layer = mainLayer
+  const baseX = section.borderX || 0
+  const baseY = section.borderY || 0
+
+  section.borderPathPoints.forEach((point, index) => {
+    // 顶点拖拽手柄
+    const vertexHandle = new Konva.Circle({
+      x: baseX + point.x,
+      y: baseY + point.y,
+      radius: 6,
+      fill: '#3b82f6',
+      stroke: '#fff',
+      strokeWidth: 2,
+      draggable: !isOtherFocused,
+      name: 'path-vertex-handle',
+      shadowColor: 'rgba(0,0,0,0.2)',
+      shadowBlur: 4,
+      shadowOffset: { x: 0, y: 1 }
+    })
+
+    vertexHandle.setAttr('sectionId', section.id)
+    vertexHandle.setAttr('vertexIndex', index)
+
+    vertexHandle.on('dragmove', () => {
+      const newX = vertexHandle.x() - baseX
+      const newY = vertexHandle.y() - baseY
+      
+      // 更新顶点位置
+      const updatedPoints = [...(section.borderPathPoints || [])]
+      updatedPoints[index] = { ...updatedPoints[index], x: newX, y: newY }
+      
+      venueStore.updateSectionBorder(section.id, { borderPathPoints: updatedPoints })
+    })
+
+    vertexHandle.on('mouseenter', () => {
+      if (stage && !isDrawingMode()) {
+        stage.container().style.cursor = 'move'
+        vertexHandle.scale({ x: 1.2, y: 1.2 })
+        mainLayer?.batchDraw()
+      }
+    })
+
+    vertexHandle.on('mouseleave', () => {
+      if (stage) {
+        stage.container().style.cursor = 'default'
+        vertexHandle.scale({ x: 1, y: 1 })
+        mainLayer?.batchDraw()
+      }
+    })
+
+    layer.add(vertexHandle)
+  })
+}
+
 const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOtherFocused: boolean) => {
   if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
@@ -878,6 +936,10 @@ const renderSectionBorder = (section: Section) => {
 
   if (section.borderType === 'path') {
     renderPathSegmentHandles(section, strokeColor, isOtherFocused)
+    // 渲染可拖拽的顶点手柄
+    if (isSelected) {
+      renderPathVertexHandles(section, isOtherFocused)
+    }
   }
 
   mainLayer.add(label)
