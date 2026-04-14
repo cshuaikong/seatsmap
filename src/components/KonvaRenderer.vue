@@ -264,20 +264,24 @@ onMounted(() => {
     overlayLayer,
     nodeMap,
     onSelectionEnd: (result, additive) => {
-      const { rowIds, seatIds, shapeIds, textIds, areaIds } = result
+      const { rowIds, seatIds, shapeIds, textIds, areaIds, sectionIds } = result
       if (additive) {
         if (rowIds.length) venueStore.selectedRowIds = [...new Set([...venueStore.selectedRowIds, ...rowIds])]
         if (seatIds.length) venueStore.selectedSeatIds = [...new Set([...venueStore.selectedSeatIds, ...seatIds])]
         if (shapeIds.length) venueStore.selectedShapeIds = [...new Set([...venueStore.selectedShapeIds, ...shapeIds])]
         if (textIds.length) venueStore.selectedTextIds = [...new Set([...venueStore.selectedTextIds, ...textIds])]
         if (areaIds.length) venueStore.selectedAreaIds = [...new Set([...venueStore.selectedAreaIds, ...areaIds])]
+        if (sectionIds.length) venueStore.selectedSectionIds = [...new Set([...venueStore.selectedSectionIds, ...sectionIds])]
       } else {
         venueStore.selectedRowIds = rowIds
         venueStore.selectedSeatIds = seatIds
         venueStore.selectedShapeIds = shapeIds
         venueStore.selectedTextIds = textIds
         venueStore.selectedAreaIds = areaIds
+        venueStore.selectedSectionIds = sectionIds
       }
+      // 更新 Transformer 以显示选中状态
+      tfm?.updateTransformer(true)
     }
   })
   selection.initSelectionRect()

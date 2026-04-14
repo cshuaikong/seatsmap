@@ -23,6 +23,7 @@ export interface SelectionResult {
   shapeIds: string[]
   textIds: string[]
   areaIds: string[]
+  sectionIds: string[]
 }
 
 export interface UseKonvaSelectionOptions {
@@ -184,7 +185,8 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
       seatIds: [],
       shapeIds: [],
       textIds: [],
-      areaIds: []
+      areaIds: [],
+      sectionIds: []
     }
 
     nodeMap.forEach((node, id) => {
@@ -211,7 +213,7 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
 
   // ==================== 节点类型识别 ====================
 
-  const getNodeType = (node: Konva.Node): 'row' | 'seat' | 'shape' | 'text' | 'area' | null => {
+  const getNodeType = (node: Konva.Node): 'row' | 'seat' | 'shape' | 'text' | 'area' | 'section' | null => {
     const name = node.name() || ''
 
     if (name.includes('row-shape')) return 'row'
@@ -219,6 +221,10 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
     if (name.includes('shape-object')) return 'shape'
     if (name.includes('text-object')) return 'text'
     if (name.includes('area-object')) return 'area'
+    
+    // 分区边框节点
+    const sectionId = node.getAttr('sectionId') as string
+    if (sectionId && !node.getAttr('isSectionLabel')) return 'section'
 
     return null
   }
