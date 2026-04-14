@@ -1149,8 +1149,8 @@ const setupStageEvents = () => {
           return
         }
         
-        // 检查是否按住 Alt 键（标记为弧线控制点）
-        const isArc = e.evt.altKey
+        // 检查是否按住 Shift 键（标记为弧线控制点）
+        const isArc = e.evt.shiftKey
         const point: import('../types').PathPoint = {
           x: pos.x,
           y: pos.y,
