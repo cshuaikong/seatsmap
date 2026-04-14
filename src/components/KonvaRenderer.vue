@@ -1528,6 +1528,9 @@ const setupStageEvents = () => {
 
   // 鼠标移动
   stage.on('mousemove', (e) => {
+    // 如果正在拖拽 path 顶点手柄，跳过 stage 的处理
+    if (e.target.name() === 'path-vertex-handle') return
+    
     // 统一拖拽模式优先处理
     if (tfm?.unifiedDragState.active) {
       const pointer = stage!.getPointerPosition()
