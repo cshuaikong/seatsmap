@@ -348,6 +348,9 @@ watch(() => venueStore.venue, () => {
   // 如果是从 Transformer 同步数据，跳过重绘（避免破坏 Transformer 状态）
   if (isSyncingFromTransformer) return
   
+  // 如果正在拖拽 path 顶点，跳过重绘（避免手柄被重建）
+  if (isDraggingPathVertex) return
+  
   nextTick(() => {
     renderAll()
   })
@@ -376,6 +379,10 @@ watch(() => [
 ], () => {
   // 如果从 Transformer 同步中，跳过重绘（避免拖拽过程中销毁节点）
   if (isSyncingFromTransformer) return
+  
+  // 如果正在拖拽 path 顶点，跳过重绘
+  if (isDraggingPathVertex) return
+  
   tfm?.updateSelectionVisuals()
   tfm?.updateTransformer()
   // 更新排座位的选中视觉效果（边框颜色）
@@ -589,9 +596,6 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 /** 渲染 Path 顶点拖拽手柄 */
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
-
-  // 如果正在拖拽顶点，不要清理和重建手柄
-  if (isDraggingPathVertex) return
 
   // 清理旧的顶点手柄
   mainLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
