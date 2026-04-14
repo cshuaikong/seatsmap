@@ -614,10 +614,40 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       const newX = vertexHandle.x() - baseX
       const newY = vertexHandle.y() - baseY
       
-      // 更新顶点位置
+      // 直接更新 section 数据（不触发重绘）
+      if (section.borderPathPoints) {
+        section.borderPathPoints[index] = { ...section.borderPathPoints[index], x: newX, y: newY }
+      }
+      
+      // 实时更新 path 形状
+      const borderShape = nodeMap.get('sectionBorder_' + section.id) as Konva.Path
+      if (borderShape) {
+        const newPathData = pathPointsToSvgPath(section.borderPathPoints || [])
+        borderShape.data(newPathData)
+      }
+      
+      // 实时更新边段高亮
+      const activePath = mainLayer?.findOne<Konva.Path>((node: Konva.Node) => 
+        node.getAttr('sectionId') === section.id && 
+        (node as Konva.Path).stroke?.() === '#f59e0b'
+      )
+      if (activePath) {
+        const activePointIndex = venueStore.activePathPointIndex
+        if (activePointIndex !== null && activePointIndex !== undefined) {
+          const segmentData = createPathSegmentData(section.borderPathPoints || [], activePointIndex)
+          activePath.data(segmentData)
+        }
+      }
+      
+      mainLayer?.batchDraw()
+    })
+    
+    vertexHandle.on('dragend', () => {
+      // 拖拽结束时同步到 store
+      const newX = vertexHandle.x() - baseX
+      const newY = vertexHandle.y() - baseY
       const updatedPoints = [...(section.borderPathPoints || [])]
       updatedPoints[index] = { ...updatedPoints[index], x: newX, y: newY }
-      
       venueStore.updateSectionBorder(section.id, { borderPathPoints: updatedPoints })
     })
 
