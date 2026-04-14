@@ -610,6 +610,8 @@ const renderSectionBorder = (section: Section) => {
     e.cancelBubble = true
     venueStore.clearSelection()
     venueStore.selectedSectionIds = [section.id]
+    // 更新 Transformer 以显示选中边框
+    tfm?.updateTransformer(true)
     mainLayer?.batchDraw()
   })
 

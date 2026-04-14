@@ -196,6 +196,36 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         node.scaleX(1)
         node.scaleY(1)
       }
+    } else {
+      // 处理分区边框节点
+      const sectionId = node.getAttr('sectionId') as string
+      if (sectionId) {
+        const scaleX = node.scaleX()
+        const scaleY = node.scaleY()
+        const updates: any = { 
+          borderX: node.x(), 
+          borderY: node.y(),
+          rotation: node.rotation()
+        }
+        
+        // 对于矩形和椭圆，缩放会改变宽高/半径
+        const borderType = node.getAttr('borderType') as string
+        if (borderType === 'rect') {
+          const width = node.getAttr('width') || 100
+          const height = node.getAttr('height') || 100
+          updates.borderWidth = width * scaleX
+          updates.borderHeight = height * scaleY
+        } else if (borderType === 'ellipse') {
+          const radiusX = node.getAttr('radiusX') || 50
+          const radiusY = node.getAttr('radiusY') || 50
+          updates.borderRadiusX = radiusX * scaleX
+          updates.borderRadiusY = radiusY * scaleY
+        }
+        
+        venueStore.updateSectionBorder(sectionId, updates)
+        node.scaleX(1)
+        node.scaleY(1)
+      }
     }
   }
 
@@ -233,6 +263,15 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       const node = nodeMap.get(venueStore.selectedImageId)
       if (node) selectedNodes.push(node)
     }
+
+    // 添加选中的分区边框节点
+    venueStore.selectedSectionIds.forEach(id => {
+      const node = nodeMap.get('sectionBorder_' + id)
+      if (node) {
+        selectedNodes.push(node)
+        node.draggable(true)
+      }
+    })
 
     // 未选中的排禁用拖拽
     nodeMap.forEach((node, id) => {
