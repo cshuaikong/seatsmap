@@ -528,7 +528,8 @@ const renderSectionBorder = (section: Section) => {
   // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
   const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
   const autoStrokeColor = darkenColor(fillColor, 40)
-  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
+  // 调试：强制显示蓝色边框
+  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || '#2563eb'))
 
   const commonAttrs = {
     fill: fillColor,
@@ -2089,7 +2090,7 @@ const exitSectionFocus = () => {
   renderAll()
 }
 
-/** 提交矩形→ store */
+/** 提交矩形→ 创建 Section */
 const submitRect = (startPos: Position, endPos: Position) => {
   const width = Math.abs(endPos.x - startPos.x)
   const height = Math.abs(endPos.y - startPos.y)
@@ -2102,19 +2103,18 @@ const submitRect = (startPos: Position, endPos: Position) => {
   const x = Math.min(startPos.x, endPos.x)
   const y = Math.min(startPos.y, endPos.y)
 
-  // 绘制矩形创建 Shape（默认灰色填充，无边框）
-  const sectionId = getOrCreateDefaultSection()
-  venueStore.addShape(sectionId, {
-    type: 'rect',
-    x,
-    y,
-    width,
-    height,
-    rotation: 0,
-    fill: '#d1d5db',  // 默认浅灰色填充
-    stroke: 'transparent',  // 无边框
-    strokeWidth: 0,
-    categoryKey: 0  // 未分类
+  // 创建 Section（不再是 Shape）
+  venueStore.addSection({
+    name: '矩形分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'rect',
+    borderX: x,
+    borderY: y,
+    borderWidth: width,
+    borderHeight: height,
+    borderFill: 'rgba(59,130,246,0.08)'
   })
   
   clearDrawingPreview()
@@ -2147,29 +2147,32 @@ const createEllipsePreview = (startPos: Position, endPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 提交椭圆→ store */
+/** 提交椭圆→ 创建 Section */
 const submitEllipse = (startPos: Position, endPos: Position) => {
-  const radiusX = Math.abs(endPos.x - startPos.x)
-  const radiusY = Math.abs(endPos.y - startPos.y)
+  const radiusX = Math.abs(endPos.x - startPos.x) / 2
+  const radiusY = Math.abs(endPos.y - startPos.y) / 2
   
-  if (radiusX < drawing.MIN_SHAPE_SIZE || radiusY < drawing.MIN_SHAPE_SIZE) {
+  if (radiusX < drawing.MIN_SHAPE_SIZE / 2 || radiusY < drawing.MIN_SHAPE_SIZE / 2) {
     clearDrawingPreview()
     return
   }
   
-  // 绘制椭圆创建 Shape（默认灰色填充，无边框）
-  const sectionId = getOrCreateDefaultSection()
-  venueStore.addShape(sectionId, {
-    type: 'ellipse',
-    x: startPos.x,
-    y: startPos.y,
-    width: radiusX * 2,
-    height: radiusY * 2,
-    rotation: 0,
-    fill: '#d1d5db',  // 默认浅灰色填充
-    stroke: 'transparent',  // 无边框
-    strokeWidth: 0,
-    categoryKey: 0  // 未分类
+  // 计算中心点
+  const centerX = (startPos.x + endPos.x) / 2
+  const centerY = (startPos.y + endPos.y) / 2
+  
+  // 创建 Section（不再是 Shape）
+  venueStore.addSection({
+    name: '圆形分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'ellipse',
+    borderX: centerX,
+    borderY: centerY,
+    borderRadiusX: radiusX,
+    borderRadiusY: radiusY,
+    borderFill: 'rgba(59,130,246,0.08)'
   })
   
   clearDrawingPreview()
@@ -2254,7 +2257,7 @@ const createPolygonPreview = (points: Position[], currentPos: Position) => {
   overlayLayer?.batchDraw()
 }
 
-/** 提交多边形到 store */
+/** 提交多边形→ 创建 Section */
 const submitPolygon = (points: Position[]) => {
   if (points.length < 3) {
     clearDrawingPreview()
@@ -2265,17 +2268,17 @@ const submitPolygon = (points: Position[]) => {
   const center = calculatePolygonCenter(points)
   const relativePoints = toRelativePoints(points, center)
   
-  const sectionId = getOrCreateDefaultSection()
-  venueStore.addShape(sectionId, {
-    type: 'polygon',
-    x: center.x,
-    y: center.y,
-    rotation: 0,
-    fill: '#d1d5db',  // 默认浅灰色填充
-    stroke: 'transparent',  // 无边框
-    strokeWidth: 0,
-    points: relativePoints,
-    categoryKey: 0  // 未分类
+  // 创建 Section（不再是 Shape）
+  venueStore.addSection({
+    name: '多边形分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'polygon',
+    borderX: center.x,
+    borderY: center.y,
+    borderPoints: relativePoints,
+    borderFill: 'rgba(59,130,246,0.08)'
   })
   
   clearDrawingPreview()
