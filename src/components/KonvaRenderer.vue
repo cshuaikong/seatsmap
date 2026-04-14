@@ -2254,108 +2254,62 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
   clearDrawingPreview()
 }
 
-// ---------- 多边形绘）----------
+// ---------- 多边形绘制 ----------
 
-/** 创建多边形预览*/
-const createPolygonPreview = (points: Position[], currentPos: Position) => {
-  clearDrawingPreview()
-  
-  if (points.length === 0) return
-  
-  // 绘制已固定的）
-  points.forEach((p, i) => {
-    const dot = new Konva.Circle({
-      x: p.x,
-      y: p.y,
-      radius: i === 0 ? 4 : 3,
-      fill: i === 0 ? '#3b82f6' : '#60a5fa',
-      stroke: '#fff',
-      strokeWidth: 1.5,
-      listening: false
-    })
-    addPreviewElement(dot)
-  })
-  
-  // 绘制固定线段
-  if (points.length >= 2) {
-    const linePoints: number[] = []
-    points.forEach(p => linePoints.push(p.x, p.y))
-    
-    const line = new Konva.Line({
-      points: linePoints,
-      stroke: '#3b82f6',
-      strokeWidth: 2,
-      listening: false
-    })
-    addPreviewElement(line)
-  }
-  
-  // 绘制预览线段（最后一个点到鼠标位置）
-  const lastPoint = points[points.length - 1]
-  const isNearStart = drawing.isNearStartPoint(currentPos)
-  const targetPoint = isNearStart ? points[0] : currentPos
-  
-  const previewLine = new Konva.Line({
-    points: [lastPoint.x, lastPoint.y, targetPoint.x, targetPoint.y],
-    stroke: isNearStart ? '#22c55e' : '#3b82f6',
-    strokeWidth: 2,
-    dash: isNearStart ? [] : [5, 5],
-    listening: false
-  })
-  addPreviewElement(previewLine)
-  
-  // 如果靠近起点，显示闭合预览
-  if (isNearStart && points.length >= 3) {
-    const fillPoints = points.flatMap(p => [p.x, p.y])
-    fillPoints.push(points[0].x, points[0].y)
-    
-    const fill = new Konva.Line({
-      points: fillPoints,
-      fill: 'rgba(156, 163, 175, 0.4)',
-      closed: true,
-      listening: false
-    })
-    addPreviewElement(fill)
-    
-    // 高亮起点
-    const highlight = new Konva.Circle({
-      x: points[0].x,
-      y: points[0].y,
-      radius: 6,
-      fill: '#22c55e',
-      stroke: '#fff',
-      strokeWidth: 2,
-      listening: false
-    })
-    addPreviewElement(highlight)
-  }
-  
-  overlayLayer?.batchDraw()
+/** 创建多边形预览（使用 useKonvaDrawing 中的版本，支持弧线） */
+const createPolygonPreview = (points: import('../types').PathPoint[], currentPos: Position) => {
+  // 调用 useKonvaDrawing 中的 createPolygonPreview
+  _createPolygonPreview(points, currentPos)
 }
 
-/** 提交多边形→ 创建 Section */
-const submitPolygon = (points: Position[]) => {
+/** 提交多边形→ 创建 Section（支持弧线） */
+const submitPolygon = (points: import('../types').PathPoint[]) => {
   if (points.length < 3) {
     clearDrawingPreview()
     drawing.clearPolygonPoints()
     return
   }
   
+  // 检查是否包含弧线点
+  const hasArc = points.some(p => p.type === 'arc')
   const center = calculatePolygonCenter(points)
-  const relativePoints = toRelativePoints(points, center)
   
-  // 创建 Section（不再是 Shape）
-  venueStore.addSection({
-    name: '多边形分区',
-    rows: [],
-    x: 0,
-    y: 0,
-    borderType: 'polygon',
-    borderX: center.x,
-    borderY: center.y,
-    borderPoints: relativePoints,
-    borderFill: 'rgba(59,130,246,0.08)'
-  })
+  if (hasArc) {
+    // 带弧线的路径
+    const relativePathPoints = points.map(p => ({
+      x: p.x - center.x,
+      y: p.y - center.y,
+      type: p.type,
+      arcDepth: p.arcDepth
+    }))
+    
+    venueStore.addSection({
+      name: '弧线分区',
+      rows: [],
+      x: 0,
+      y: 0,
+      borderType: 'path',
+      borderX: center.x,
+      borderY: center.y,
+      borderPathPoints: relativePathPoints,
+      borderFill: 'rgba(59,130,246,0.08)'
+    })
+  } else {
+    // 普通多边形
+    const relativePoints = toRelativePoints(points, center)
+    
+    venueStore.addSection({
+      name: '多边形分区',
+      rows: [],
+      x: 0,
+      y: 0,
+      borderType: 'polygon',
+      borderX: center.x,
+      borderY: center.y,
+      borderPoints: relativePoints,
+      borderFill: 'rgba(59,130,246,0.08)'
+    })
+  }
   
   clearDrawingPreview()
   drawing.clearPolygonPoints()
