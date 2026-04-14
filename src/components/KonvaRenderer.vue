@@ -624,23 +624,16 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     let pointStartY = point.y
     
     vertexHandle.on('dragstart', () => {
-      console.log('Vertex dragstart:', index)
-      dragStartX = vertexHandle.x()
-      dragStartY = vertexHandle.y()
+      dragStartX = vertexHandle.x() - baseX  // 相对坐标
+      dragStartY = vertexHandle.y() - baseY
       pointStartX = section.borderPathPoints?.[index]?.x ?? point.x
       pointStartY = section.borderPathPoints?.[index]?.y ?? point.y
     })
     
     vertexHandle.on('dragmove', () => {
-      // 计算拖拽偏移量
-      const dx = vertexHandle.x() - dragStartX
-      const dy = vertexHandle.y() - dragStartY
-      
-      console.log('Vertex dragmove:', index, 'dx:', dx, 'dy:', dy)
-      
-      // 新位置 = 初始位置 + 偏移
-      const newX = pointStartX + dx
-      const newY = pointStartY + dy
+      // 直接使用手柄的相对坐标
+      const newX = vertexHandle.x() - baseX
+      const newY = vertexHandle.y() - baseY
       
       // 更新 section 数据
       if (section.borderPathPoints) {
