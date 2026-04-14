@@ -648,8 +648,6 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       const newX = absX - baseX
       const newY = absY - baseY
       
-      console.log('dragmove:', index, 'abs:', absX.toFixed(1), absY.toFixed(1), 'rel:', newX.toFixed(1), newY.toFixed(1))
-      
       // 更新 section 数据
       if (section.borderPathPoints) {
         section.borderPathPoints[index] = { ...section.borderPathPoints[index], x: newX, y: newY }
@@ -662,6 +660,9 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
         borderShape.data(newPathData)
         borderShape.draw()  // 强制立即绘制
       }
+      
+      // 同步更新 Transformer 选择框
+      tfm?.updateTransformer()
       
       layer.batchDraw()
     })
