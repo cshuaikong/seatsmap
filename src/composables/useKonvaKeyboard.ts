@@ -107,6 +107,11 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       venueStore.deleteArea(id)
     })
 
+    // 删除选中的分区（Section）
+    venueStore.selectedSectionIds.forEach(id => {
+      venueStore.deleteSection(id)
+    })
+
     // 清除选择状态
     venueStore.clearSelection()
   }
