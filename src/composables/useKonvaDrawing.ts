@@ -1147,19 +1147,27 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
   return path
 }
 
-/** 创建圆弧路径段（SVG Arc）- 完美圆角 */
+/** 创建圆弧路径段（SVG Arc）- 完美圆角
+ * 使用 sagitta（矢高）计算圆弧半径
+ */
 function createArcSegment(start: Position, end: Position, depth: number): string {
   const dx = end.x - start.x
   const dy = end.y - start.y
   const length = Math.sqrt(dx * dx + dy * dy) || 1
   
-  const bulge = depth * 0.5
-  const rx = length * (0.5 + Math.abs(bulge))
-  const ry = rx
-  const largeArcFlag = Math.abs(bulge) > 0.5 ? 1 : 0
-  const sweepFlag = bulge > 0 ? 1 : 0
+  // sagitta = 矢高（圆弧中点到弦的距离）
+  const sagitta = length * Math.abs(depth) * 0.5
   
-  return `A ${rx} ${ry} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`
+  // 根据矢高和弦长计算半径: r = (s^2 + (c/2)^2) / (2*s)
+  const halfChord = length / 2
+  let radius = (sagitta * sagitta + halfChord * halfChord) / (2 * Math.max(sagitta, 0.001))
+  
+  // 限制最小半径
+  radius = Math.max(radius, halfChord)
+  
+  const sweepFlag = depth > 0 ? 1 : 0
+  
+  return `A ${radius} ${radius} 0 0 ${sweepFlag} ${end.x} ${end.y}`
 }
 
 /** 计算弧线预览路径 */

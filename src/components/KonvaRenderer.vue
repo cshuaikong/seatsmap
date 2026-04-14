@@ -542,24 +542,29 @@ const createArcControlPoint = (start: Position, end: Position, depth: number) =>
 }
 
 /** 创建三次贝塞尔曲线控制点（更圆滑） */
-/** 创建圆弧路径数据（SVG Arc）- 完美圆角 */
+/** 创建圆弧路径数据（SVG Arc）- 完美圆角
+ * 使用 sagitta（矢高）计算圆弧半径
+ * depth: 0=直线, 1=半圆, >1=更弯曲
+ */
 const createArcSegment = (start: Position, end: Position, depth: number): string => {
   const dx = end.x - start.x
   const dy = end.y - start.y
   const length = Math.sqrt(dx * dx + dy * dy) || 1
   
-  // 计算圆弧的半径和方向
-  // depth 控制弯曲程度：0=直线, 1=半圆
-  const bulge = depth * 0.5  // 弯曲量
+  // sagitta = 矢高（圆弧中点到弦的距离）
+  // depth 直接控制矢高比例
+  const sagitta = length * Math.abs(depth) * 0.5
   
-  // 使用 SVG Arc 命令: A rx ry x-axis-rotation large-arc-flag sweep-flag x y
-  // rx=ry 表示正圆，large-arc-flag 根据 depth 决定
-  const rx = length * (0.5 + Math.abs(bulge))
-  const ry = rx
-  const largeArcFlag = Math.abs(bulge) > 0.5 ? 1 : 0
-  const sweepFlag = bulge > 0 ? 1 : 0
+  // 根据矢高和弦长计算半径: r = (s^2 + (c/2)^2) / (2*s)
+  const halfChord = length / 2
+  let radius = (sagitta * sagitta + halfChord * halfChord) / (2 * Math.max(sagitta, 0.001))
   
-  return `M ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`
+  // 限制最小半径，避免过于尖锐
+  radius = Math.max(radius, halfChord)
+  
+  const sweepFlag = depth > 0 ? 1 : 0
+  
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 ${sweepFlag} ${end.x} ${end.y}`
 }
 
 const isCurvedEdge = (point: PathPoint) => point.type === 'arc' && Math.abs(point.arcDepth ?? 0) > 0.0001
