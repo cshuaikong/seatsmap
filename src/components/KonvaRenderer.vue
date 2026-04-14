@@ -1224,7 +1224,7 @@ const setupStageEvents = () => {
           createRectPreview(startPos, pos)
           break
         case 'draw_ellipse':
-          createEllipsePreview(startPos, pos, e.evt.shiftKey)
+          createEllipsePreview(startPos, pos)
           break
       }
       return
@@ -1314,7 +1314,7 @@ const setupStageEvents = () => {
             submitRect(startPos, endPos)
             break
           case 'draw_ellipse':
-            submitEllipse(startPos, endPos, e.evt.shiftKey)
+            submitEllipse(startPos, endPos)
             break
         }
       }
@@ -2122,25 +2122,19 @@ const submitRect = (startPos: Position, endPos: Position) => {
 
 // ---------- 椭圆绘制 ----------
 
-/** 创建椭圆/圆形预览 */
-const createEllipsePreview = (startPos: Position, endPos: Position, isCircle: boolean = false) => {
+/** 创建椭圆预览 - 对角线拖拽方式 */
+const createEllipsePreview = (startPos: Position, endPos: Position) => {
   clearDrawingPreview()
   
-  let radiusX = Math.abs(endPos.x - startPos.x)
-  let radiusY = Math.abs(endPos.y - startPos.y)
-  
-  // 如果按住 Shift 或指定为圆形，使用等半径
-  if (isCircle) {
-    const maxRadius = Math.max(radiusX, radiusY)
-    radiusX = maxRadius
-    radiusY = maxRadius
-  }
+  // 计算宽高的一半作为半径
+  const radiusX = Math.abs(endPos.x - startPos.x) / 2
+  const radiusY = Math.abs(endPos.y - startPos.y) / 2
   
   if (radiusX < 5 || radiusY < 5) return
   
-  // 椭圆预览：中心为起点和终点的中点
+  // 椭圆中心为起点和终点的中点
   const centerX = (startPos.x + endPos.x) / 2
-  const centerY = (startPos.y + startPos.y) / 2
+  const centerY = (startPos.y + endPos.y) / 2
   
   const ellipse = new Konva.Ellipse({
     x: centerX,
@@ -2158,17 +2152,11 @@ const createEllipsePreview = (startPos: Position, endPos: Position, isCircle: bo
   overlayLayer?.batchDraw()
 }
 
-/** 提交椭圆/圆形→ 创建 Section */
-const submitEllipse = (startPos: Position, endPos: Position, isCircle: boolean = false) => {
-  let radiusX = Math.abs(endPos.x - startPos.x)
-  let radiusY = Math.abs(endPos.y - startPos.y)
-  
-  // 如果按住 Shift 或指定为圆形，使用等半径
-  if (isCircle) {
-    const maxRadius = Math.max(radiusX, radiusY)
-    radiusX = maxRadius
-    radiusY = maxRadius
-  }
+/** 提交椭圆→ 创建 Section - 对角线拖拽方式 */
+const submitEllipse = (startPos: Position, endPos: Position) => {
+  // 计算宽高的一半作为半径
+  const radiusX = Math.abs(endPos.x - startPos.x) / 2
+  const radiusY = Math.abs(endPos.y - startPos.y) / 2
   
   if (radiusX < drawing.MIN_SHAPE_SIZE / 2 || radiusY < drawing.MIN_SHAPE_SIZE / 2) {
     clearDrawingPreview()
@@ -2179,9 +2167,9 @@ const submitEllipse = (startPos: Position, endPos: Position, isCircle: boolean =
   const centerX = (startPos.x + endPos.x) / 2
   const centerY = (startPos.y + endPos.y) / 2
   
-  // 创建 Section（椭圆/圆形）
+  // 创建 Section（椭圆）
   venueStore.addSection({
-    name: isCircle ? '圆形分区' : '椭圆分区',
+    name: '椭圆分区',
     rows: [],
     x: 0,
     y: 0,
