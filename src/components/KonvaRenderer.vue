@@ -549,10 +549,10 @@ const createCubicControlPoints = (start: Position, end: Position, depth: number)
   const normalX = -dy / length
   const normalY = dx / length
   
-  // 三次贝塞尔曲线有两个控制点，分别在起点和终点附近
+  // 三次贝塞尔曲线有两个控制点
+  // 使用 50% 让控制点更靠近中点，曲线更圆润
+  const t = 0.5
   const offset = length * depth * 0.5
-  const cp1Offset = length * 0.3  // 第一个控制点距离起点 30%
-  const cp2Offset = length * 0.3  // 第二个控制点距离终点 30%
   
   // 控制点沿法向量方向偏移
   const perpX = normalX * offset
@@ -560,12 +560,12 @@ const createCubicControlPoints = (start: Position, end: Position, depth: number)
   
   return {
     cp1: {
-      x: start.x + dx * 0.3 + perpX,
-      y: start.y + dy * 0.3 + perpY
+      x: start.x + dx * t + perpX,
+      y: start.y + dy * t + perpY
     },
     cp2: {
-      x: end.x - dx * 0.3 + perpX,
-      y: end.y - dy * 0.3 + perpY
+      x: end.x - dx * t + perpX,
+      y: end.y - dy * t + perpY
     }
   }
 }
