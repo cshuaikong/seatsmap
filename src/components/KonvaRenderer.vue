@@ -585,9 +585,10 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 
 /** 渲染 Path 顶点拖拽手柄 */
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
-  if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
+  if (!mainLayer || !overlayLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
-  const layer = mainLayer
+  // 顶点手柄放在 overlayLayer，避免被其他元素拦截
+  const layer = overlayLayer
   const baseX = section.borderX || 0
   const baseY = section.borderY || 0
 
@@ -596,16 +597,19 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     const vertexHandle = new Konva.Circle({
       x: baseX + point.x,
       y: baseY + point.y,
-      radius: 6,
+      radius: 8,
       fill: '#3b82f6',
       stroke: '#fff',
       strokeWidth: 2,
       draggable: !isOtherFocused,
       name: 'path-vertex-handle',
-      shadowColor: 'rgba(0,0,0,0.2)',
-      shadowBlur: 4,
-      shadowOffset: { x: 0, y: 1 }
+      shadowColor: 'rgba(0,0,0,0.3)',
+      shadowBlur: 6,
+      shadowOffset: { x: 0, y: 2 }
     })
+    
+    // 确保拖拽不被拦截
+    vertexHandle.listening(true)
 
     vertexHandle.setAttr('sectionId', section.id)
     vertexHandle.setAttr('vertexIndex', index)
@@ -639,7 +643,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
         }
       }
       
-      mainLayer?.batchDraw()
+      layer.batchDraw()
     })
     
     vertexHandle.on('dragend', () => {
@@ -655,7 +659,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       if (stage && !isDrawingMode()) {
         stage.container().style.cursor = 'move'
         vertexHandle.scale({ x: 1.2, y: 1.2 })
-        mainLayer?.batchDraw()
+        layer.batchDraw()
       }
     })
 
@@ -663,7 +667,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       if (stage) {
         stage.container().style.cursor = 'default'
         vertexHandle.scale({ x: 1, y: 1 })
-        mainLayer?.batchDraw()
+        layer.batchDraw()
       }
     })
 
