@@ -632,8 +632,12 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     
     vertexHandle.on('dragmove', () => {
       // 直接使用手柄的相对坐标
-      const newX = vertexHandle.x() - baseX
-      const newY = vertexHandle.y() - baseY
+      const absX = vertexHandle.x()
+      const absY = vertexHandle.y()
+      const newX = absX - baseX
+      const newY = absY - baseY
+      
+      console.log('dragmove:', index, 'abs:', absX.toFixed(1), absY.toFixed(1), 'rel:', newX.toFixed(1), newY.toFixed(1))
       
       // 更新 section 数据
       if (section.borderPathPoints) {
