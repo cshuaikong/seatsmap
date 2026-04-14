@@ -655,15 +655,6 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
         borderShape.draw()  // 强制立即绘制
       }
       
-      // 同时更新所有顶点手柄位置
-      layer.find('.path-vertex-handle').forEach((handle, i) => {
-        if (section.borderPathPoints && section.borderPathPoints[i]) {
-          const p = section.borderPathPoints[i]
-          handle.x(baseX + p.x)
-          handle.y(baseY + p.y)
-        }
-      })
-      
       layer.batchDraw()
     })
     
