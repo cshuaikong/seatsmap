@@ -691,12 +691,21 @@ const renderSectionBorder = (section: Section) => {
 
   if (section.borderType === 'ellipse') {
     // ellipse: x,y 为中心点，radiusX,radiusY 为半径（与 ShapeObject 一致）
+    const rx = section.borderRadiusX || 50
+    const ry = section.borderRadiusY || 30
     borderShape = new Konva.Ellipse({
       x: section.borderX || 0,
       y: section.borderY || 0,
-      radiusX: section.borderRadiusX || 50,
-      radiusY: section.borderRadiusY || 30,
+      radiusX: rx,
+      radiusY: ry,
       ...commonAttrs
+    })
+    // 设置 getSelfRect - Ellipse 中心在原点，边界为 ±rx, ±ry
+    ;(borderShape as any).getSelfRect = () => ({
+      x: -rx,
+      y: -ry,
+      width: rx * 2,
+      height: ry * 2
     })
   } else if (section.borderType === 'polygon') {
     // polygon: x,y 为中心点，points 为相对坐标（与 ShapeObject 一致）
@@ -707,6 +716,23 @@ const renderSectionBorder = (section: Section) => {
       closed: true,
       ...commonAttrs
     })
+    // 设置 getSelfRect 确保 Transformer 包围盒正确
+    const points = section.borderPoints || []
+    if (points.length >= 2) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (let i = 0; i < points.length; i += 2) {
+        minX = Math.min(minX, points[i])
+        minY = Math.min(minY, points[i + 1])
+        maxX = Math.max(maxX, points[i])
+        maxY = Math.max(maxY, points[i + 1])
+      }
+      ;(borderShape as any).getSelfRect = () => ({
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+      })
+    }
   } else if (section.borderType === 'path') {
     // path: 带弧线的路径，使用 borderPathPoints
     const pathData = section.borderPathPoints 
@@ -718,6 +744,23 @@ const renderSectionBorder = (section: Section) => {
       data: pathData,
       ...commonAttrs
     })
+    // 设置 getSelfRect 确保 Transformer 包围盒正确
+    const pathPoints = section.borderPathPoints || []
+    if (pathPoints.length > 0) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      pathPoints.forEach(p => {
+        minX = Math.min(minX, p.x)
+        minY = Math.min(minY, p.y)
+        maxX = Math.max(maxX, p.x)
+        maxY = Math.max(maxY, p.y)
+      })
+      ;(borderShape as any).getSelfRect = () => ({
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY
+      })
+    }
   } else {
     // rect: x,y 为左上角，width,height 为宽高（与 ShapeObject 一致）
     borderShape = new Konva.Rect({
@@ -727,6 +770,15 @@ const renderSectionBorder = (section: Section) => {
       height: section.borderHeight || 0,
       cornerRadius: 6,
       ...commonAttrs
+    })
+    // Rect 自带 getSelfRect，但为了统一处理也设置一下
+    const w = section.borderWidth || 0
+    const h = section.borderHeight || 0
+    ;(borderShape as any).getSelfRect = () => ({
+      x: 0,
+      y: 0,
+      width: w,
+      height: h
     })
   }
 
