@@ -121,15 +121,21 @@
           <div v-if="segment.type === 'arc'" class="segment-slider-row">
             <label class="panel-label compact">弧度</label>
             <input
-              type="range"
-              min="-1"
-              max="1"
-              step="0.05"
+              type="number"
               :value="segment.arcDepth"
+              class="number-input"
+              step="0.1"
+              @input="updatePathPointArcDepth(segment.pointIndex, parseFloat(($event.target as HTMLInputElement).value))"
+            />
+            <input
+              type="range"
+              min="-2"
+              max="2"
+              step="0.05"
+              :value="Math.max(-2, Math.min(2, segment.arcDepth))"
               class="slider"
               @input="updatePathPointArcDepth(segment.pointIndex, parseFloat(($event.target as HTMLInputElement).value))"
             />
-            <span class="slider-val">{{ segment.arcDepth.toFixed(2) }}</span>
           </div>
 
           <div v-if="segment.type === 'arc' && segment.isStraightPreview" class="path-editor-tip">
@@ -447,6 +453,23 @@ const pathSegments = computed(() => {
 
 .panel-label.compact {
   width: 36px;
+}
+
+.number-input {
+  width: 60px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 13px;
+  text-align: center;
+}
+
+.number-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 .note-icon {
