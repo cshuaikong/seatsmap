@@ -2126,16 +2126,19 @@ const submitRect = (startPos: Position, endPos: Position) => {
 const createEllipsePreview = (startPos: Position, endPos: Position) => {
   clearDrawingPreview()
   
-  const radiusX = Math.abs(endPos.x - startPos.x)
-  const radiusY = Math.abs(endPos.y - startPos.y)
+  // 计算起点到终点的距离作为半径
+  const dx = endPos.x - startPos.x
+  const dy = endPos.y - startPos.y
+  const radius = Math.sqrt(dx * dx + dy * dy)
   
-  if (radiusX < 5 || radiusY < 5) return
+  if (radius < 5) return
   
-  const ellipse = new Konva.Ellipse({
+  // 圆形预览：圆心为起点
+  const circle = new Konva.Ellipse({
     x: startPos.x,
     y: startPos.y,
-    radiusX,
-    radiusY,
+    radiusX: radius,
+    radiusY: radius,
     fill: 'rgba(156, 163, 175, 0.4)',
     stroke: '#3b82f6',
     strokeWidth: 1.5,
@@ -2143,35 +2146,33 @@ const createEllipsePreview = (startPos: Position, endPos: Position) => {
     listening: false
   })
   
-  addPreviewElement(ellipse)
+  addPreviewElement(circle)
   overlayLayer?.batchDraw()
 }
 
-/** 提交椭圆→ 创建 Section */
+/** 提交圆形→ 创建 Section */
 const submitEllipse = (startPos: Position, endPos: Position) => {
-  const radiusX = Math.abs(endPos.x - startPos.x) / 2
-  const radiusY = Math.abs(endPos.y - startPos.y) / 2
+  // 计算起点到终点的距离作为半径
+  const dx = endPos.x - startPos.x
+  const dy = endPos.y - startPos.y
+  const radius = Math.sqrt(dx * dx + dy * dy)
   
-  if (radiusX < drawing.MIN_SHAPE_SIZE / 2 || radiusY < drawing.MIN_SHAPE_SIZE / 2) {
+  if (radius < drawing.MIN_SHAPE_SIZE / 2) {
     clearDrawingPreview()
     return
   }
   
-  // 计算中心点
-  const centerX = (startPos.x + endPos.x) / 2
-  const centerY = (startPos.y + endPos.y) / 2
-  
-  // 创建 Section（不再是 Shape）
+  // 创建 Section（圆形）：圆心为起点，半径为起点到终点的距离
   venueStore.addSection({
     name: '圆形分区',
     rows: [],
     x: 0,
     y: 0,
     borderType: 'ellipse',
-    borderX: centerX,
-    borderY: centerY,
-    borderRadiusX: radiusX,
-    borderRadiusY: radiusY,
+    borderX: startPos.x,  // 圆心 x
+    borderY: startPos.y,  // 圆心 y
+    borderRadiusX: radius,
+    borderRadiusY: radius,
     borderFill: 'rgba(59,130,246,0.08)'
   })
   
