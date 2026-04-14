@@ -652,11 +652,9 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     })
     
     vertexHandle.on('dragend', () => {
-      // 拖拽结束时同步到 store
-      const dx = vertexHandle.x() - dragStartX
-      const dy = vertexHandle.y() - dragStartY
-      const newX = pointStartX + dx
-      const newY = pointStartY + dy
+      // 拖拽结束时同步到 store - 使用最终的相对坐标
+      const newX = vertexHandle.x() - baseX
+      const newY = vertexHandle.y() - baseY
       
       const updatedPoints = [...(section.borderPathPoints || [])]
       updatedPoints[index] = { ...updatedPoints[index], x: newX, y: newY }
