@@ -143,7 +143,6 @@ let _multiRowEndPos: Position | null = null
 
 // 多边形绘制状态
 let _polygonPoints: PathPoint[] = []
-let _isArcMode: boolean = false  // 是否弧线模式（按住 Alt）
 
 // 矩形/椭圆拖拽状态
 let _dragStartPos: Position | null = null
@@ -618,22 +617,21 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
   
   if (points.length === 0) return
   
-  // 绘制已固定的点（弧线点用不同颜色）
+  // 绘制已固定的点（从该点出发的边若为弧线则高亮）
   points.forEach((p, i) => {
-    const isArc = p.type === 'arc'
+    const isArcStart = p.type === 'arc'
     const dot = new Konva.Circle({
       x: p.x,
       y: p.y,
       radius: i === 0 ? 4 : 3,
-      fill: isArc ? '#f59e0b' : (i === 0 ? '#3b82f6' : '#60a5fa'),
+      fill: isArcStart ? '#f59e0b' : (i === 0 ? '#3b82f6' : '#60a5fa'),
       stroke: '#fff',
       strokeWidth: 1.5,
       listening: false
     })
     addPreviewElement(dot)
     
-    // 弧线点显示小标记
-    if (isArc) {
+    if (isArcStart) {
       const arcMark = new Konva.Text({
         x: p.x - 8,
         y: p.y - 16,
@@ -646,7 +644,6 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     }
   })
   
-  // 绘制固定线段（支持弧线）
   if (points.length >= 2) {
     const pathData = pointsToPathData(points, false)
     
@@ -659,18 +656,16 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     addPreviewElement(path)
   }
   
-  // 绘制预览线段
   const lastPoint = points[points.length - 1]
   const isNearStart = checkNearStartPoint(currentPos, points)
   const targetPoint = isNearStart ? points[0] : currentPos
+  const previewType = lastPoint.type ?? 'line'
+  const previewDepth = lastPoint.arcDepth ?? 0
+  const useArcPreview = previewType === 'arc' && Math.abs(previewDepth) > 0.0001
   
-  // 检查最后一段是否是弧线
-  if (lastPoint.type === 'arc' && points.length >= 2) {
-    const prevPoint = points[points.length - 2]
-    const arcPath = calculateArcPath(prevPoint, lastPoint, targetPoint)
-    
+  if (useArcPreview) {
     const previewPath = new Konva.Path({
-      data: arcPath,
+      data: calculateEdgePath(lastPoint, targetPoint, previewDepth),
       stroke: isNearStart ? '#22c55e' : '#3b82f6',
       strokeWidth: 2,
       dash: isNearStart ? [] : [5, 5],
@@ -688,7 +683,6 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     addPreviewElement(previewLine)
   }
   
-  // 如果靠近起点，显示闭合预览
   if (isNearStart && points.length >= 3) {
     const fillPath = pointsToPathData(points, true)
     
@@ -714,7 +708,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
   batchDrawOverlay()
 }
 
-/** 提交多边形/路径到 store - 创建 Section（支持弧线） */
+/** 提交多边形/路径到 store - 创建 Section（统一使用 path 数据） */
 export function submitPolygon(points: PathPoint[]) {
   if (points.length < 3) {
     clearDrawingPreview()
@@ -722,46 +716,25 @@ export function submitPolygon(points: PathPoint[]) {
     return
   }
   
-  // 检查是否包含弧线点
-  const hasArc = points.some(p => p.type === 'arc')
   const center = calculatePolygonCenter(points)
+  const relativePathPoints = points.map((p) => ({
+    x: p.x - center.x,
+    y: p.y - center.y,
+    type: p.type ?? 'line',
+    arcDepth: p.arcDepth
+  }))
   
-  if (hasArc) {
-    // 带弧线的路径：使用 borderPathPoints
-    const relativePathPoints = points.map(p => ({
-      x: p.x - center.x,
-      y: p.y - center.y,
-      type: p.type,
-      arcDepth: p.arcDepth
-    }))
-    
-    useVenueStore().addSection({
-      name: '弧线分区',
-      rows: [],
-      x: 0,
-      y: 0,
-      borderType: 'path',
-      borderX: center.x,
-      borderY: center.y,
-      borderPathPoints: relativePathPoints,
-      borderFill: 'rgba(59,130,246,0.08)'
-    })
-  } else {
-    // 普通多边形：使用 borderPoints（兼容旧格式）
-    const relativePoints = toRelativePoints(points, center)
-    
-    useVenueStore().addSection({
-      name: '多边形分区',
-      rows: [],
-      x: 0,
-      y: 0,
-      borderType: 'polygon',
-      borderX: center.x,
-      borderY: center.y,
-      borderPoints: relativePoints,
-      borderFill: 'rgba(59,130,246,0.08)'
-    })
-  }
+  useVenueStore().addSection({
+    name: '路径分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'path',
+    borderX: center.x,
+    borderY: center.y,
+    borderPathPoints: relativePathPoints,
+    borderFill: 'rgba(59,130,246,0.08)'
+  })
   
   clearDrawingPreview()
   _polygonPoints = []
@@ -977,7 +950,7 @@ function handleShapeClick(pos: Position): boolean {
   }
 }
 
-/** 处理多边形绘制点击（支持 Alt 键标记弧线） */
+/** 处理多边形绘制点击（支持 Shift 键标记当前点出发的弧线边） */
 function handlePolygonClick(pos: Position, event?: MouseEvent): boolean {
   // 检查是否闭合
   if (_polygonPoints.length >= 3 && checkNearStartPoint(pos, _polygonPoints)) {
@@ -989,13 +962,13 @@ function handlePolygonClick(pos: Position, event?: MouseEvent): boolean {
     return true
   }
   
-  // 检查是否按住 Alt 键（标记为弧线控制点）
-  const isArc = event?.altKey || _isArcMode
+  // 检查是否按住 Shift 键（标记从当前点出发的下一条边为弧线）
+  const isArc = !!event?.shiftKey
   const point: PathPoint = {
     x: pos.x,
     y: pos.y,
     type: isArc ? 'arc' : 'line',
-    arcDepth: isArc ? 0.3 : undefined  // 默认弧线深度 30%
+    arcDepth: isArc ? 0 : 0
   }
   
   _polygonPoints.push(point)
@@ -1154,33 +1127,17 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
   if (points.length < 2) return ''
   
   let path = `M ${points[0].x} ${points[0].y}`
-  
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1]
-    const curr = points[i]
-    
-    if (curr.type === 'arc' && i >= 2) {
-      // 弧线：使用二次贝塞尔曲线
-      const start = points[i - 2]
-      const control = prev
-      const end = curr
-      
-      // 计算控制点偏移，使曲线通过 control 点附近
-      const midX = (start.x + end.x) / 2
-      const midY = (start.y + end.y) / 2
-      const depth = curr.arcDepth || 0.3
-      
-      const cpX = control.x + (control.x - midX) * depth * 2
-      const cpY = control.y + (control.y - midY) * depth * 2
-      
-      path += ` Q ${cpX} ${cpY} ${end.x} ${end.y}`
-    } else if (curr.type === 'arc') {
-      // 第一个点不能是弧线，画直线
-      path += ` L ${curr.x} ${curr.y}`
-    } else {
-      // 直线
-      path += ` L ${curr.x} ${curr.y}`
-    }
+  const segmentCount = closed ? points.length : points.length - 1
+
+  for (let i = 0; i < segmentCount; i++) {
+    const start = points[i]
+    const end = points[(i + 1) % points.length]
+    const edgeType = start.type ?? 'line'
+    const depth = start.arcDepth ?? 0
+
+    path += edgeType === 'arc' && Math.abs(depth) > 0.0001
+      ? ` ${createQuadraticSegment(start, end, depth)}`
+      : ` L ${end.x} ${end.y}`
   }
   
   if (closed && points.length > 0) {
@@ -1190,18 +1147,30 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
   return path
 }
 
-/** 计算弧线预览路径 */
-function calculateArcPath(start: PathPoint, control: PathPoint, end: Position): string {
-  const depth = control.arcDepth || 0.3
-  
-  // 计算控制点偏移
+function createQuadraticSegment(start: Position, end: Position, depth: number): string {
+  const controlPoint = getArcControlPoint(start, end, depth)
+  return `Q ${controlPoint.x} ${controlPoint.y} ${end.x} ${end.y}`
+}
+
+function getArcControlPoint(start: Position, end: Position, depth: number): Position {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const length = Math.sqrt(dx * dx + dy * dy) || 1
   const midX = (start.x + end.x) / 2
   const midY = (start.y + end.y) / 2
-  
-  const cpX = control.x + (control.x - midX) * depth * 2
-  const cpY = control.y + (control.y - midY) * depth * 2
-  
-  return `M ${start.x} ${start.y} Q ${cpX} ${cpY} ${end.x} ${end.y}`
+  const normalX = -dy / length
+  const normalY = dx / length
+  const offset = length * depth * 0.5
+
+  return {
+    x: midX + normalX * offset,
+    y: midY + normalY * offset
+  }
+}
+
+/** 计算弧线预览路径 */
+function calculateEdgePath(start: PathPoint, end: Position, depth: number): string {
+  return `M ${start.x} ${start.y} ${createQuadraticSegment(start, end, depth)}`
 }
 
 // 模块级别导出常量

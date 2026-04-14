@@ -130,8 +130,8 @@ export interface Seat {
 export interface PathPoint {
   x: number
   y: number
-  type?: 'line' | 'arc'  // 默认 line，arc 表示弧线控制点
-  arcDepth?: number      // 弧线凸出程度（0-1，相对于弦长）
+  type?: 'line' | 'arc'  // 从当前点出发的下一条边类型
+  arcDepth?: number      // 当前点到下一点这条边的弯曲深度（-1~1，0 为直线，正负表示两侧）
 }
 
 // 扩展 Section - 同时作为分区容器和可选边框
@@ -161,7 +161,7 @@ export interface Section {
   borderRadiusX?: number  // 椭圆专用
   borderRadiusY?: number  // 椭圆专用
   borderPoints?: number[] // 多边形专用（相对坐标）
-  borderPathPoints?: PathPoint[] // 带弧线的路径点（新）
+  borderPathPoints?: PathPoint[] // 路径点，type/arcDepth 定义从当前点出发的边，arcDepth=0 视为直线
   borderFill?: string
   borderStroke?: string
   borderOpacity?: number

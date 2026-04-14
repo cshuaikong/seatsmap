@@ -62,12 +62,79 @@
       <!-- 统计信息 -->
       <div class="panel-stats">
         <div class="stat-item">
+          <Icon icon="lucide:vector-square" class="stat-icon" />
+          <span>{{ borderTypeLabel }}</span>
+        </div>
+        <div class="stat-item">
           <Icon icon="lucide:rows-3" class="stat-icon" />
           <span>{{ section.rows.length }} 排</span>
         </div>
         <div class="stat-item">
           <Icon icon="lucide:armchair" class="stat-icon" />
           <span>{{ seatCount }} 座</span>
+        </div>
+      </div>
+
+      <div v-if="section.borderType === 'path'" class="panel-note">
+        <Icon icon="lucide:pen-tool" class="note-icon" />
+        <span>当前走 path 数据</span>
+      </div>
+
+      <div v-if="section.borderType === 'path' && pathSegments.length" class="path-editor">
+        <div class="path-editor-header">
+          <Icon icon="lucide:spline-pointer" class="note-icon" />
+          <span>边段编辑</span>
+        </div>
+
+        <div class="path-editor-tip">
+          点画布边段可快速定位，弧度支持正负，0 就是直线
+        </div>
+
+        <div
+          v-for="segment in pathSegments"
+          :key="segment.pointIndex"
+          class="path-segment-card"
+          :class="{ active: activePointIndex === segment.pointIndex }"
+          @click="activateSegment(segment.pointIndex)"
+        >
+          <div class="path-segment-top">
+            <span class="segment-title">边 {{ segment.segmentIndex + 1 }}</span>
+            <span class="segment-points">
+              ({{ Math.round(segment.startPoint.x) }}, {{ Math.round(segment.startPoint.y) }}) →
+              ({{ Math.round(segment.endPoint.x) }}, {{ Math.round(segment.endPoint.y) }})
+            </span>
+          </div>
+
+          <div class="path-segment-actions">
+            <button
+              class="segment-mode-btn"
+              :class="{ active: segment.type === 'line' }"
+              @click.stop="updatePathPointType(segment.pointIndex, 'line')"
+            >直线</button>
+            <button
+              class="segment-mode-btn"
+              :class="{ active: segment.type === 'arc' }"
+              @click.stop="updatePathPointType(segment.pointIndex, 'arc')"
+            >弧线</button>
+          </div>
+
+          <div v-if="segment.type === 'arc'" class="segment-slider-row">
+            <label class="panel-label compact">弧度</label>
+            <input
+              type="range"
+              min="-1"
+              max="1"
+              step="0.05"
+              :value="segment.arcDepth"
+              class="slider"
+              @input="updatePathPointArcDepth(segment.pointIndex, parseFloat(($event.target as HTMLInputElement).value))"
+            />
+            <span class="slider-val">{{ segment.arcDepth.toFixed(2) }}</span>
+          </div>
+
+          <div v-if="segment.type === 'arc' && segment.isStraightPreview" class="path-editor-tip">
+            当前是弧线模式，但弧度为 0，所以画面还是直线
+          </div>
         </div>
       </div>
 
@@ -87,16 +154,48 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import type { Section } from '../../types'
+import type { PathPoint, Section } from '../../types'
 
 const props = defineProps<{
   section: Section | null
+  activePointIndex?: number | null
 }>()
 
 const emit = defineEmits<{
   'update-property': [key: string, val: any]
   'enter-section': []
+  'activate-path-segment': [pointIndex: number]
 }>()
+
+const activateSegment = (pointIndex: number) => {
+  emit('activate-path-segment', pointIndex)
+}
+
+const updatePathPointType = (pointIndex: number, nextType: 'line' | 'arc') => {
+  if (!props.section?.borderPathPoints) return
+  const nextPoints: PathPoint[] = props.section.borderPathPoints.map((point, currentIndex) => {
+    if (currentIndex !== pointIndex) return { ...point }
+    return {
+      ...point,
+      type: nextType,
+      arcDepth: nextType === 'arc' ? (point.arcDepth ?? 0) : 0
+    }
+  })
+  emit('update-property', 'borderPathPoints', nextPoints)
+}
+
+const updatePathPointArcDepth = (pointIndex: number, nextDepth: number) => {
+  if (!props.section?.borderPathPoints) return
+  const nextPoints: PathPoint[] = props.section.borderPathPoints.map((point, currentIndex) => {
+    if (currentIndex !== pointIndex) return { ...point }
+    return {
+      ...point,
+      type: 'arc',
+      arcDepth: nextDepth
+    }
+  })
+  emit('update-property', 'borderPathPoints', nextPoints)
+}
 
 // 将带透明度的 rgba fill 转为纯色（用于 color input）
 const solidFill = computed(() => {
@@ -117,6 +216,35 @@ const solidFill = computed(() => {
 const seatCount = computed(() => {
   if (!props.section) return 0
   return props.section.rows.reduce((sum, row) => sum + row.seats.length, 0)
+})
+
+const borderTypeLabel = computed(() => {
+  const type = props.section?.borderType
+  if (type === 'path') return '路径分区'
+  if (type === 'ellipse') return '椭圆分区'
+  if (type === 'rect') return '矩形分区'
+  if (type === 'polygon') return '多边形分区'
+  return '普通分区'
+})
+
+const pathPoints = computed(() => props.section?.borderPathPoints || [])
+
+const pathSegments = computed(() => {
+  if (pathPoints.value.length < 2) return []
+
+  return pathPoints.value.map((startPoint, pointIndex) => {
+    const endPoint = pathPoints.value[(pointIndex + 1) % pathPoints.value.length]
+
+    return {
+      segmentIndex: pointIndex,
+      pointIndex,
+      startPoint,
+      endPoint,
+      type: startPoint.type ?? 'line',
+      arcDepth: startPoint.arcDepth ?? 0,
+      isStraightPreview: Math.abs(startPoint.arcDepth ?? 0) <= 0.0001
+    }
+  })
 })
 </script>
 
@@ -214,10 +342,117 @@ const seatCount = computed(() => {
 
 .panel-stats {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   padding: 10px 12px;
   background: var(--color-bg-tertiary);
   border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.panel-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.path-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.path-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.path-editor-tip {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.path-segment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+}
+
+.path-segment-card.active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+
+.path-segment-top {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.segment-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.segment-points {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-family: monospace;
+}
+
+.path-segment-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.segment-mode-btn {
+  flex: 1;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.segment-mode-btn.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.segment-mode-btn.disabled {
+  opacity: 0.45;
+}
+
+.segment-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-label.compact {
+  width: 36px;
+}
+
+.note-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-accent);
 }
 
 .stat-item {

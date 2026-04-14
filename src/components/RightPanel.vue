@@ -9,7 +9,9 @@
     <template v-else-if="selectedSectionWithBorder">
       <SectionPanel
         :section="selectedSectionWithBorder"
+        :active-point-index="activePathPointIndex"
         @update-property="(key, val) => handleSectionPropertyUpdate(key, val)"
+        @activate-path-segment="(pointIndex) => handleActivatePathSegment(pointIndex)"
         @enter-section="onEnterSection"
       />
     </template>
@@ -279,10 +281,22 @@ const selectedSectionWithBorder = computed<Section | null>(() => {
   return section
 })
 
+const activePathPointIndex = computed<number | null>(() => {
+  const sectionId = venueStore.selectedSectionIds[0]
+  if (!sectionId || venueStore.activePathSectionId !== sectionId) return null
+  return venueStore.activePathPointIndex
+})
+
 const handleSectionPropertyUpdate = (key: string, val: any) => {
   const sectionId = venueStore.selectedSectionIds[0]
   if (!sectionId) return
   venueStore.updateSectionBorder(sectionId, { [key]: val } as any)
+}
+
+const handleActivatePathSegment = (pointIndex: number) => {
+  const sectionId = venueStore.selectedSectionIds[0]
+  if (!sectionId) return
+  venueStore.setActivePathSegment(sectionId, pointIndex)
 }
 
 // onEnterSection：通知外部（KonvaDesigner）执行 enterSectionFocus
@@ -391,7 +405,8 @@ watch(() => [
   venueStore.selectedRowIds,
   venueStore.selectedShapeIds,
   venueStore.selectedTextIds,
-  venueStore.selectedAreaIds
+  venueStore.selectedAreaIds,
+  venueStore.selectedSectionIds
 ], () => {
   refreshKey.value++
 }, { deep: true })

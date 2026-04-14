@@ -6,7 +6,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Konva from 'konva'
 import { useVenueStore } from '../stores/venueStore'
-import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position } from '../types'
+import type { SeatRow, Seat, Section, ShapeObject, TextObject, AreaObject, CanvasImage, Position, PathPoint } from '../types'
 import { useDrawing, type DrawingToolMode, getUnitVector, generateSeatsAlongLine, calculateBoundingBox, calculatePolygonCenter, toRelativePoints, ROW_SPACING } from '../composables/useKonvaDrawing'
 import {
   setPreviewLayer,
@@ -265,6 +265,7 @@ onMounted(() => {
     nodeMap,
     onSelectionEnd: (result, additive) => {
       const { rowIds, seatIds, shapeIds, textIds, areaIds, sectionIds } = result
+      venueStore.setActivePathSegment(null, null)
       if (additive) {
         if (rowIds.length) venueStore.selectedRowIds = [...new Set([...venueStore.selectedRowIds, ...rowIds])]
         if (seatIds.length) venueStore.selectedSeatIds = [...new Set([...venueStore.selectedSeatIds, ...seatIds])]
@@ -365,7 +366,10 @@ watch(() => [
   venueStore.selectedShapeIds,
   venueStore.selectedTextIds,
   venueStore.selectedAreaIds,
-  venueStore.selectedImageId
+  venueStore.selectedSectionIds,
+  venueStore.selectedImageId,
+  venueStore.activePathSectionId,
+  venueStore.activePathPointIndex
 ], () => {
   // 如果从 Transformer 同步中，跳过重绘（避免拖拽过程中销毁节点）
   if (isSyncingFromTransformer) return
@@ -521,40 +525,144 @@ const darkenColor = (color: string, percent: number = 30): string => {
 }
 
 /** 将 PathPoint 数组转换为 SVG Path 数据 */
-const pathPointsToSvgPath = (points: import('../types').PathPoint[]): string => {
+const createArcControlPoint = (start: Position, end: Position, depth: number) => {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const length = Math.sqrt(dx * dx + dy * dy) || 1
+  const midX = (start.x + end.x) / 2
+  const midY = (start.y + end.y) / 2
+  const normalX = -dy / length
+  const normalY = dx / length
+  const offset = length * depth * 0.5
+
+  return {
+    x: midX + normalX * offset,
+    y: midY + normalY * offset
+  }
+}
+
+const isCurvedEdge = (point: PathPoint) => point.type === 'arc' && Math.abs(point.arcDepth ?? 0) > 0.0001
+
+const createPathSegmentData = (points: PathPoint[], pointIndex: number): string => {
+  if (pointIndex < 0 || pointIndex >= points.length) return ''
+
+  const start = points[pointIndex]
+  const end = points[(pointIndex + 1) % points.length]
+
+  if (isCurvedEdge(start)) {
+    const controlPoint = createArcControlPoint(start, end, start.arcDepth ?? 0)
+    return `M ${start.x} ${start.y} Q ${controlPoint.x} ${controlPoint.y} ${end.x} ${end.y}`
+  }
+
+  return `M ${start.x} ${start.y} L ${end.x} ${end.y}`
+}
+
+const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOtherFocused: boolean) => {
+  if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
+
+  const layer = mainLayer
+  const activePointIndex = venueStore.activePathSectionId === section.id ? venueStore.activePathPointIndex : null
+
+  section.borderPathPoints.forEach((startPoint, segmentIndex) => {
+    const pointIndex = segmentIndex
+    const nextPoint = section.borderPathPoints![(segmentIndex + 1) % section.borderPathPoints!.length]
+    const segmentData = createPathSegmentData(section.borderPathPoints!, pointIndex)
+    if (!segmentData) return
+
+    const isActive = activePointIndex === pointIndex
+    const isCurveSegment = isCurvedEdge(startPoint)
+
+    const hitPath = new Konva.Path({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      data: segmentData,
+      stroke: 'rgba(0,0,0,0.001)',
+      strokeWidth: 16,
+      fillEnabled: false,
+      listening: !isOtherFocused,
+      perfectDrawEnabled: false
+    })
+
+    hitPath.on('click', (e) => {
+      e.cancelBubble = true
+      venueStore.selectSection(section.id, e.evt.shiftKey)
+      venueStore.setActivePathSegment(section.id, pointIndex)
+      tfm?.updateTransformer(true)
+      mainLayer?.batchDraw()
+    })
+
+    hitPath.on('mouseenter', () => {
+      if (stage && !isDrawingMode()) {
+        stage.container().style.cursor = 'pointer'
+      }
+    })
+
+    hitPath.on('mouseleave', () => {
+      if (stage) stage.container().style.cursor = 'default'
+    })
+
+    layer.add(hitPath)
+
+    if (!isActive) return
+
+    const activePath = new Konva.Path({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      data: segmentData,
+      stroke: '#f59e0b',
+      strokeWidth: 5,
+      fillEnabled: false,
+      listening: false,
+      opacity: isOtherFocused ? 0.3 : 0.95,
+      dash: isCurveSegment ? [] : [10, 6]
+    })
+
+    layer.add(activePath)
+
+    const activeStart = new Konva.Circle({
+      x: (section.borderX || 0) + startPoint.x,
+      y: (section.borderY || 0) + startPoint.y,
+      radius: 4,
+      fill: '#f59e0b',
+      stroke: '#fff',
+      strokeWidth: 1.5,
+      listening: false,
+      opacity: isOtherFocused ? 0.3 : 1
+    })
+
+    const activeEnd = new Konva.Circle({
+      x: (section.borderX || 0) + nextPoint.x,
+      y: (section.borderY || 0) + nextPoint.y,
+      radius: 3,
+      fill: '#fff',
+      stroke: '#f59e0b',
+      strokeWidth: 1.5,
+      listening: false,
+      opacity: isOtherFocused ? 0.3 : 1
+    })
+
+    layer.add(activeStart)
+    layer.add(activeEnd)
+  })
+}
+
+const pathPointsToSvgPath = (points: PathPoint[]): string => {
   if (points.length < 2) return ''
   
   let path = `M ${points[0].x} ${points[0].y}`
-  
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1]
-    const curr = points[i]
-    
-    if (curr.type === 'arc' && i >= 2) {
-      // 弧线：使用二次贝塞尔曲线
-      const start = points[i - 2]
-      const control = prev
-      const end = curr
-      
-      // 计算控制点偏移
-      const midX = (start.x + end.x) / 2
-      const midY = (start.y + end.y) / 2
-      const depth = curr.arcDepth || 0.3
-      
-      const cpX = control.x + (control.x - midX) * depth * 2
-      const cpY = control.y + (control.y - midY) * depth * 2
-      
-      path += ` Q ${cpX} ${cpY} ${end.x} ${end.y}`
-    } else if (curr.type === 'arc') {
-      // 第一个点不能是弧线，画直线
-      path += ` L ${curr.x} ${curr.y}`
+
+  points.forEach((start, index) => {
+    const end = points[(index + 1) % points.length]
+
+    if (isCurvedEdge(start)) {
+      const controlPoint = createArcControlPoint(start, end, start.arcDepth ?? 0)
+      path += ` Q ${controlPoint.x} ${controlPoint.y} ${end.x} ${end.y}`
     } else {
-      // 直线
-      path += ` L ${curr.x} ${curr.y}`
+      path += ` L ${end.x} ${end.y}`
     }
-  }
+  })
   
-  path += ' Z'  // 闭合路径
+  path += ' Z'
   return path
 }
 
@@ -570,8 +678,7 @@ const renderSectionBorder = (section: Section) => {
   // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
   const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
   const autoStrokeColor = darkenColor(fillColor, 40)
-  // 调试：强制显示蓝色边框
-  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || '#2563eb'))
+  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
   const commonAttrs = {
     fill: fillColor,
@@ -690,6 +797,11 @@ const renderSectionBorder = (section: Section) => {
   })
 
   mainLayer.add(borderShape)
+
+  if (section.borderType === 'path') {
+    renderPathSegmentHandles(section, strokeColor, isOtherFocused)
+  }
+
   mainLayer.add(label)
 }
 
@@ -1137,7 +1249,7 @@ const setupStageEvents = () => {
         return
       }
       
-      // 多边形/区域工具：点击添加点（支持 Alt 键标记弧线）
+      // 多边形/区域工具：点击添加点（Shift 可把当前点出发的边标成弧线）
       if (tool === 'draw_polygon' || tool === 'draw_area') {
         // 检查是否闭合
         if (drawing.polygonPoints.value.length >= 3 && drawing.isNearStartPoint(pos)) {
@@ -1149,13 +1261,13 @@ const setupStageEvents = () => {
           return
         }
         
-        // 检查是否按住 Shift 键（标记为弧线控制点）
+        // 检查是否按住 Shift 键（标记从当前点出发的边）
         const isArc = e.evt.shiftKey
         const point: import('../types').PathPoint = {
           x: pos.x,
           y: pos.y,
           type: isArc ? 'arc' : 'line',
-          arcDepth: isArc ? 0.3 : undefined
+          arcDepth: 0
         }
         
         drawing.addPolygonPoint(point as any)
@@ -2262,7 +2374,7 @@ const createPolygonPreview = (points: import('../types').PathPoint[], currentPos
   _createPolygonPreview(points, currentPos)
 }
 
-/** 提交多边形→ 创建 Section（支持弧线） */
+/** 提交多边形→ 创建 Section（统一使用 path 数据） */
 const submitPolygon = (points: import('../types').PathPoint[]) => {
   if (points.length < 3) {
     clearDrawingPreview()
@@ -2270,46 +2382,25 @@ const submitPolygon = (points: import('../types').PathPoint[]) => {
     return
   }
   
-  // 检查是否包含弧线点
-  const hasArc = points.some(p => p.type === 'arc')
   const center = calculatePolygonCenter(points)
+  const relativePathPoints = points.map(p => ({
+    x: p.x - center.x,
+    y: p.y - center.y,
+    type: p.type ?? 'line',
+    arcDepth: p.arcDepth
+  }))
   
-  if (hasArc) {
-    // 带弧线的路径
-    const relativePathPoints = points.map(p => ({
-      x: p.x - center.x,
-      y: p.y - center.y,
-      type: p.type,
-      arcDepth: p.arcDepth
-    }))
-    
-    venueStore.addSection({
-      name: '弧线分区',
-      rows: [],
-      x: 0,
-      y: 0,
-      borderType: 'path',
-      borderX: center.x,
-      borderY: center.y,
-      borderPathPoints: relativePathPoints,
-      borderFill: 'rgba(59,130,246,0.08)'
-    })
-  } else {
-    // 普通多边形
-    const relativePoints = toRelativePoints(points, center)
-    
-    venueStore.addSection({
-      name: '多边形分区',
-      rows: [],
-      x: 0,
-      y: 0,
-      borderType: 'polygon',
-      borderX: center.x,
-      borderY: center.y,
-      borderPoints: relativePoints,
-      borderFill: 'rgba(59,130,246,0.08)'
-    })
-  }
+  venueStore.addSection({
+    name: '路径分区',
+    rows: [],
+    x: 0,
+    y: 0,
+    borderType: 'path',
+    borderX: center.x,
+    borderY: center.y,
+    borderPathPoints: relativePathPoints,
+    borderFill: 'rgba(59,130,246,0.08)'
+  })
   
   clearDrawingPreview()
   drawing.clearPolygonPoints()

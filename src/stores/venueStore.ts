@@ -46,6 +46,10 @@ export const useVenueStore = defineStore('venue', () => {
   // 当前聚焦的 Section id（进入分区编辑时设置）
   const focusedSectionId = ref<string | null>(null)
 
+  // 当前激活的 path 边段（用于画布与右侧面板联动）
+  const activePathSectionId = ref<string | null>(null)
+  const activePathPointIndex = ref<number | null>(null)
+
   // 图片列表（支持多张）
   const canvasImages = ref<CanvasImage[]>([])
   const selectedImageId = ref<string | null>(null)
@@ -499,6 +503,8 @@ export const useVenueStore = defineStore('venue', () => {
       selectedSeatIds.value = [seatId]
       selectedRowIds.value = []
       selectedSectionIds.value = []
+      activePathSectionId.value = null
+      activePathPointIndex.value = null
     } else if (!selectedSeatIds.value.includes(seatId)) {
       selectedSeatIds.value.push(seatId)
     }
@@ -509,6 +515,8 @@ export const useVenueStore = defineStore('venue', () => {
       selectedRowIds.value = [rowId]
       selectedSeatIds.value = []
       selectedSectionIds.value = []
+      activePathSectionId.value = null
+      activePathPointIndex.value = null
     } else if (!selectedRowIds.value.includes(rowId)) {
       selectedRowIds.value.push(rowId)
     }
@@ -525,6 +533,11 @@ export const useVenueStore = defineStore('venue', () => {
     } else if (!selectedSectionIds.value.includes(sectionId)) {
       selectedSectionIds.value.push(sectionId)
     }
+
+    if (activePathSectionId.value !== sectionId) {
+      activePathSectionId.value = null
+      activePathPointIndex.value = null
+    }
   }
 
   function selectShape(shapeId: string, additive = false) {
@@ -535,6 +548,8 @@ export const useVenueStore = defineStore('venue', () => {
       selectedSectionIds.value = []
       selectedTextIds.value = []
       selectedAreaIds.value = []
+      activePathSectionId.value = null
+      activePathPointIndex.value = null
     } else if (!selectedShapeIds.value.includes(shapeId)) {
       selectedShapeIds.value.push(shapeId)
     }
@@ -548,6 +563,8 @@ export const useVenueStore = defineStore('venue', () => {
       selectedSectionIds.value = []
       selectedShapeIds.value = []
       selectedAreaIds.value = []
+      activePathSectionId.value = null
+      activePathPointIndex.value = null
     } else if (!selectedTextIds.value.includes(textId)) {
       selectedTextIds.value.push(textId)
     }
@@ -561,6 +578,8 @@ export const useVenueStore = defineStore('venue', () => {
       selectedSectionIds.value = []
       selectedShapeIds.value = []
       selectedTextIds.value = []
+      activePathSectionId.value = null
+      activePathPointIndex.value = null
     } else if (!selectedAreaIds.value.includes(areaId)) {
       selectedAreaIds.value.push(areaId)
     }
@@ -574,6 +593,13 @@ export const useVenueStore = defineStore('venue', () => {
     selectedTextIds.value = []
     selectedAreaIds.value = []
     selectedImageId.value = null
+    activePathSectionId.value = null
+    activePathPointIndex.value = null
+  }
+
+  function setActivePathSegment(sectionId: string | null, pointIndex: number | null) {
+    activePathSectionId.value = sectionId
+    activePathPointIndex.value = pointIndex
   }
 
   // ==================== Section 边框更新 ====================
@@ -581,7 +607,22 @@ export const useVenueStore = defineStore('venue', () => {
   /**
    * 更新 Section 的边框属性
    */
-  function updateSectionBorder(sectionId: string, border: Partial<Pick<Section, 'borderType' | 'borderX' | 'borderY' | 'borderWidth' | 'borderHeight' | 'borderFill' | 'borderStroke' | 'borderOpacity'>>) {
+  function updateSectionBorder(sectionId: string, border: Partial<Pick<Section,
+    'name'
+    | 'rotation'
+    | 'borderType'
+    | 'borderX'
+    | 'borderY'
+    | 'borderWidth'
+    | 'borderHeight'
+    | 'borderRadiusX'
+    | 'borderRadiusY'
+    | 'borderPoints'
+    | 'borderPathPoints'
+    | 'borderFill'
+    | 'borderStroke'
+    | 'borderOpacity'
+  >>) {
     const section = venue.value.sections.find(s => s.id === sectionId)
     if (!section) return
     Object.assign(section, border)
@@ -972,6 +1013,8 @@ export const useVenueStore = defineStore('venue', () => {
     selectedTextIds,
     selectedAreaIds,
     focusedSectionId,
+    activePathSectionId,
+    activePathPointIndex,
     
     // Getters
     totalSeats,
@@ -1023,6 +1066,7 @@ export const useVenueStore = defineStore('venue', () => {
     selectText,
     selectArea,
     clearSelection,
+    setActivePathSegment,
     // 排扩展座位
     addSeatAtRowStart,
     addSeatAtRowEnd,
