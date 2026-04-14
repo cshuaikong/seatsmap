@@ -603,13 +603,19 @@ const renderSectionBorder = (section: Section) => {
 
   const borderNode = borderShape as Konva.Shape
   borderNode.setAttr('sectionId', section.id)
+  borderNode.setAttr('borderType', section.borderType)
   nodeMap.set('sectionBorder_' + section.id, borderNode)
+  
+  // 标签也加入 nodeMap 以便跟随移动
+  label.setAttr('sectionId', section.id)
+  label.setAttr('isSectionLabel', true)
+  nodeMap.set('sectionLabel_' + section.id, label)
 
-  // 单击选中
+  // 单击选中（支持 Shift 多选）
   borderNode.on('click', (e) => {
     e.cancelBubble = true
-    venueStore.clearSelection()
-    venueStore.selectedSectionIds = [section.id]
+    const additive = e.evt.shiftKey
+    venueStore.selectSection(section.id, additive)
     // 更新 Transformer 以显示选中边框
     tfm?.updateTransformer(true)
     mainLayer?.batchDraw()

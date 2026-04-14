@@ -197,6 +197,16 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         node.scaleY(1)
       }
     } else {
+      // 处理分区标签节点（只同步位置，不参与缩放旋转）
+      const isSectionLabel = node.getAttr('isSectionLabel') as boolean
+      if (isSectionLabel) {
+        // 标签只更新位置，保持文字不旋转
+        node.rotation(0)
+        node.scaleX(1)
+        node.scaleY(1)
+        return
+      }
+      
       // 处理分区边框节点
       const sectionId = node.getAttr('sectionId') as string
       if (sectionId) {
@@ -264,12 +274,17 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       if (node) selectedNodes.push(node)
     }
 
-    // 添加选中的分区边框节点
+    // 添加选中的分区边框节点和标签
     venueStore.selectedSectionIds.forEach(id => {
-      const node = nodeMap.get('sectionBorder_' + id)
-      if (node) {
-        selectedNodes.push(node)
-        node.draggable(true)
+      const borderNode = nodeMap.get('sectionBorder_' + id)
+      const labelNode = nodeMap.get('sectionLabel_' + id)
+      if (borderNode) {
+        selectedNodes.push(borderNode)
+        borderNode.draggable(true)
+      }
+      if (labelNode) {
+        selectedNodes.push(labelNode)
+        labelNode.draggable(true)
       }
     })
 
