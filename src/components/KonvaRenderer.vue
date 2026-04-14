@@ -649,16 +649,22 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       
       // 实时更新 path 形状
       const borderShape = nodeMap.get('sectionBorder_' + section.id) as Konva.Path
-      console.log('Border shape found:', !!borderShape)
       if (borderShape) {
         const newPathData = pathPointsToSvgPath(section.borderPathPoints || [])
-        console.log('New path data:', newPathData.substring(0, 50))
         borderShape.data(newPathData)
-        console.log('Data updated')
+        borderShape.draw()  // 强制立即绘制
       }
       
+      // 同时更新所有顶点手柄位置
+      layer.find('.path-vertex-handle').forEach((handle, i) => {
+        if (section.borderPathPoints && section.borderPathPoints[i]) {
+          const p = section.borderPathPoints[i]
+          handle.x(baseX + p.x)
+          handle.y(baseY + p.y)
+        }
+      })
+      
       layer.batchDraw()
-      console.log('Batch draw called')
     })
     
     vertexHandle.on('dragend', () => {
