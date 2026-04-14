@@ -1224,7 +1224,7 @@ const setupStageEvents = () => {
           createRectPreview(startPos, pos)
           break
         case 'draw_ellipse':
-          createEllipsePreview(startPos, pos)
+          createEllipsePreview(startPos, pos, e.evt.shiftKey)
           break
       }
       return
@@ -1314,7 +1314,7 @@ const setupStageEvents = () => {
             submitRect(startPos, endPos)
             break
           case 'draw_ellipse':
-            submitEllipse(startPos, endPos)
+            submitEllipse(startPos, endPos, e.evt.shiftKey)
             break
         }
       }
@@ -2122,23 +2122,31 @@ const submitRect = (startPos: Position, endPos: Position) => {
 
 // ---------- 椭圆绘制 ----------
 
-/** 创建椭圆预览 */
-const createEllipsePreview = (startPos: Position, endPos: Position) => {
+/** 创建椭圆/圆形预览 */
+const createEllipsePreview = (startPos: Position, endPos: Position, isCircle: boolean = false) => {
   clearDrawingPreview()
   
-  // 计算起点到终点的距离作为半径
-  const dx = endPos.x - startPos.x
-  const dy = endPos.y - startPos.y
-  const radius = Math.sqrt(dx * dx + dy * dy)
+  let radiusX = Math.abs(endPos.x - startPos.x)
+  let radiusY = Math.abs(endPos.y - startPos.y)
   
-  if (radius < 5) return
+  // 如果按住 Shift 或指定为圆形，使用等半径
+  if (isCircle) {
+    const maxRadius = Math.max(radiusX, radiusY)
+    radiusX = maxRadius
+    radiusY = maxRadius
+  }
   
-  // 圆形预览：圆心为起点
-  const circle = new Konva.Ellipse({
-    x: startPos.x,
-    y: startPos.y,
-    radiusX: radius,
-    radiusY: radius,
+  if (radiusX < 5 || radiusY < 5) return
+  
+  // 椭圆预览：中心为起点和终点的中点
+  const centerX = (startPos.x + endPos.x) / 2
+  const centerY = (startPos.y + startPos.y) / 2
+  
+  const ellipse = new Konva.Ellipse({
+    x: centerX,
+    y: centerY,
+    radiusX,
+    radiusY,
     fill: 'rgba(156, 163, 175, 0.4)',
     stroke: '#3b82f6',
     strokeWidth: 1.5,
@@ -2146,33 +2154,42 @@ const createEllipsePreview = (startPos: Position, endPos: Position) => {
     listening: false
   })
   
-  addPreviewElement(circle)
+  addPreviewElement(ellipse)
   overlayLayer?.batchDraw()
 }
 
-/** 提交圆形→ 创建 Section */
-const submitEllipse = (startPos: Position, endPos: Position) => {
-  // 计算起点到终点的距离作为半径
-  const dx = endPos.x - startPos.x
-  const dy = endPos.y - startPos.y
-  const radius = Math.sqrt(dx * dx + dy * dy)
+/** 提交椭圆/圆形→ 创建 Section */
+const submitEllipse = (startPos: Position, endPos: Position, isCircle: boolean = false) => {
+  let radiusX = Math.abs(endPos.x - startPos.x)
+  let radiusY = Math.abs(endPos.y - startPos.y)
   
-  if (radius < drawing.MIN_SHAPE_SIZE / 2) {
+  // 如果按住 Shift 或指定为圆形，使用等半径
+  if (isCircle) {
+    const maxRadius = Math.max(radiusX, radiusY)
+    radiusX = maxRadius
+    radiusY = maxRadius
+  }
+  
+  if (radiusX < drawing.MIN_SHAPE_SIZE / 2 || radiusY < drawing.MIN_SHAPE_SIZE / 2) {
     clearDrawingPreview()
     return
   }
   
-  // 创建 Section（圆形）：圆心为起点，半径为起点到终点的距离
+  // 椭圆中心为起点和终点的中点
+  const centerX = (startPos.x + endPos.x) / 2
+  const centerY = (startPos.y + endPos.y) / 2
+  
+  // 创建 Section（椭圆/圆形）
   venueStore.addSection({
-    name: '圆形分区',
+    name: isCircle ? '圆形分区' : '椭圆分区',
     rows: [],
     x: 0,
     y: 0,
     borderType: 'ellipse',
-    borderX: startPos.x,  // 圆心 x
-    borderY: startPos.y,  // 圆心 y
-    borderRadiusX: radius,
-    borderRadiusY: radius,
+    borderX: centerX,
+    borderY: centerY,
+    borderRadiusX: radiusX,
+    borderRadiusY: radiusY,
     borderFill: 'rgba(59,130,246,0.08)'
   })
   
