@@ -520,6 +520,44 @@ const darkenColor = (color: string, percent: number = 30): string => {
   return color
 }
 
+/** 将 PathPoint 数组转换为 SVG Path 数据 */
+const pathPointsToSvgPath = (points: import('../types').PathPoint[]): string => {
+  if (points.length < 2) return ''
+  
+  let path = `M ${points[0].x} ${points[0].y}`
+  
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    
+    if (curr.type === 'arc' && i >= 2) {
+      // 弧线：使用二次贝塞尔曲线
+      const start = points[i - 2]
+      const control = prev
+      const end = curr
+      
+      // 计算控制点偏移
+      const midX = (start.x + end.x) / 2
+      const midY = (start.y + end.y) / 2
+      const depth = curr.arcDepth || 0.3
+      
+      const cpX = control.x + (control.x - midX) * depth * 2
+      const cpY = control.y + (control.y - midY) * depth * 2
+      
+      path += ` Q ${cpX} ${cpY} ${end.x} ${end.y}`
+    } else if (curr.type === 'arc') {
+      // 第一个点不能是弧线，画直线
+      path += ` L ${curr.x} ${curr.y}`
+    } else {
+      // 直线
+      path += ` L ${curr.x} ${curr.y}`
+    }
+  }
+  
+  path += ' Z'  // 闭合路径
+  return path
+}
+
 const renderSectionBorder = (section: Section) => {
   if (!mainLayer || !section.borderType || section.borderType === 'none') return
 
@@ -527,7 +565,7 @@ const renderSectionBorder = (section: Section) => {
   const isOtherFocused = venueStore.focusedSectionId !== null && !isFocused
   const isSelected = venueStore.selectedSectionIds.includes(section.id)
 
-  let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line
+  let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
   // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
   const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
@@ -562,6 +600,17 @@ const renderSectionBorder = (section: Section) => {
       closed: true,
       ...commonAttrs
     })
+  } else if (section.borderType === 'path') {
+    // path: 带弧线的路径，使用 borderPathPoints
+    const pathData = section.borderPathPoints 
+      ? pathPointsToSvgPath(section.borderPathPoints)
+      : ''
+    borderShape = new Konva.Path({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      data: pathData,
+      ...commonAttrs
+    })
   } else {
     // rect: x,y 为左上角，width,height 为宽高（与 ShapeObject 一致）
     borderShape = new Konva.Rect({
@@ -580,8 +629,8 @@ const renderSectionBorder = (section: Section) => {
     // 椭圆中心点
     labelX = section.borderX || 0
     labelY = section.borderY || 0
-  } else if (section.borderType === 'polygon') {
-    // 多边形中心点
+  } else if (section.borderType === 'polygon' || section.borderType === 'path') {
+    // 多边形/路径中心点
     labelX = section.borderX || 0
     labelY = section.borderY || 0
   } else {
@@ -1088,9 +1137,9 @@ const setupStageEvents = () => {
         return
       }
       
-      // 多边）区域工具：点击添加点
+      // 多边形/区域工具：点击添加点（支持 Alt 键标记弧线）
       if (tool === 'draw_polygon' || tool === 'draw_area') {
-        // 检查是否闭）
+        // 检查是否闭合
         if (drawing.polygonPoints.value.length >= 3 && drawing.isNearStartPoint(pos)) {
           if (tool === 'draw_polygon') {
             submitPolygon(drawing.polygonPoints.value)
@@ -1100,7 +1149,16 @@ const setupStageEvents = () => {
           return
         }
         
-        drawing.addPolygonPoint(pos)
+        // 检查是否按住 Alt 键（标记为弧线控制点）
+        const isArc = e.evt.altKey
+        const point: import('../types').PathPoint = {
+          x: pos.x,
+          y: pos.y,
+          type: isArc ? 'arc' : 'line',
+          arcDepth: isArc ? 0.3 : undefined
+        }
+        
+        drawing.addPolygonPoint(point as any)
         createPolygonPreview(drawing.polygonPoints.value, pos)
         return
       }

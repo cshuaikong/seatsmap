@@ -126,11 +126,20 @@ export interface Seat {
   distanceToFocalPoint?: number
 }
 
+// 多边形/路径点类型
+export interface PathPoint {
+  x: number
+  y: number
+  type?: 'line' | 'arc'  // 默认 line，arc 表示弧线控制点
+  arcDepth?: number      // 弧线凸出程度（0-1，相对于弦长）
+}
+
 // 扩展 Section - 同时作为分区容器和可选边框
 // 坐标格式与 ShapeObject 保持一致：
 // - rect: x,y 为左上角，width,height 为宽高
 // - ellipse: x,y 为中心点，radiusX,radiusY 为半径
 // - polygon: x,y 为中心点，points 为相对坐标数组
+// - path: x,y 为中心点，pathPoints 为带弧线的路径点
 export interface Section {
   id: string
   name: string
@@ -143,7 +152,7 @@ export interface Section {
   texts?: TextObject[]
   areas?: AreaObject[]
   // 分区边框属性（绘制矩形/圆形/多边形时创建）
-  borderType?: 'rect' | 'ellipse' | 'polygon' | 'none'  // none 表示无边框（默认）
+  borderType?: 'rect' | 'ellipse' | 'polygon' | 'path' | 'none'  // none 表示无边框（默认）
   // 矩形: x,y,width,height | 圆形: x,y,radiusX,radiusY | 多边形: x,y,points
   borderX?: number
   borderY?: number
@@ -152,6 +161,7 @@ export interface Section {
   borderRadiusX?: number  // 椭圆专用
   borderRadiusY?: number  // 椭圆专用
   borderPoints?: number[] // 多边形专用（相对坐标）
+  borderPathPoints?: PathPoint[] // 带弧线的路径点（新）
   borderFill?: string
   borderStroke?: string
   borderOpacity?: number
