@@ -636,6 +636,8 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       const dx = vertexHandle.x() - dragStartX
       const dy = vertexHandle.y() - dragStartY
       
+      console.log('Vertex dragmove:', index, 'dx:', dx, 'dy:', dy)
+      
       // 新位置 = 初始位置 + 偏移
       const newX = pointStartX + dx
       const newY = pointStartY + dy
