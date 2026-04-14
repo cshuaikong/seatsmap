@@ -541,6 +541,35 @@ const createArcControlPoint = (start: Position, end: Position, depth: number) =>
   }
 }
 
+/** 创建三次贝塞尔曲线控制点（更圆滑） */
+const createCubicControlPoints = (start: Position, end: Position, depth: number) => {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const length = Math.sqrt(dx * dx + dy * dy) || 1
+  const normalX = -dy / length
+  const normalY = dx / length
+  
+  // 三次贝塞尔曲线有两个控制点，分别在起点和终点附近
+  const offset = length * depth * 0.5
+  const cp1Offset = length * 0.3  // 第一个控制点距离起点 30%
+  const cp2Offset = length * 0.3  // 第二个控制点距离终点 30%
+  
+  // 控制点沿法向量方向偏移
+  const perpX = normalX * offset
+  const perpY = normalY * offset
+  
+  return {
+    cp1: {
+      x: start.x + dx * 0.3 + perpX,
+      y: start.y + dy * 0.3 + perpY
+    },
+    cp2: {
+      x: end.x - dx * 0.3 + perpX,
+      y: end.y - dy * 0.3 + perpY
+    }
+  }
+}
+
 const isCurvedEdge = (point: PathPoint) => point.type === 'arc' && Math.abs(point.arcDepth ?? 0) > 0.0001
 
 const createPathSegmentData = (points: PathPoint[], pointIndex: number): string => {
@@ -550,8 +579,9 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
   const end = points[(pointIndex + 1) % points.length]
 
   if (isCurvedEdge(start)) {
-    const controlPoint = createArcControlPoint(start, end, start.arcDepth ?? 0)
-    return `M ${start.x} ${start.y} Q ${controlPoint.x} ${controlPoint.y} ${end.x} ${end.y}`
+    // 使用三次贝塞尔曲线（C）代替二次（Q），更圆滑
+    const { cp1, cp2 } = createCubicControlPoints(start, end, start.arcDepth ?? 0)
+    return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
   }
 
   return `M ${start.x} ${start.y} L ${end.x} ${end.y}`
@@ -655,8 +685,9 @@ const pathPointsToSvgPath = (points: PathPoint[]): string => {
     const end = points[(index + 1) % points.length]
 
     if (isCurvedEdge(start)) {
-      const controlPoint = createArcControlPoint(start, end, start.arcDepth ?? 0)
-      path += ` Q ${controlPoint.x} ${controlPoint.y} ${end.x} ${end.y}`
+      // 使用三次贝塞尔曲线（C）代替二次（Q），更圆滑
+      const { cp1, cp2 } = createCubicControlPoints(start, end, start.arcDepth ?? 0)
+      path += ` C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
     } else {
       path += ` L ${end.x} ${end.y}`
     }

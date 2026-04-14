@@ -1136,7 +1136,7 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
     const depth = start.arcDepth ?? 0
 
     path += edgeType === 'arc' && Math.abs(depth) > 0.0001
-      ? ` ${createQuadraticSegment(start, end, depth)}`
+      ? ` ${createCubicSegment(start, end, depth)}`
       : ` L ${end.x} ${end.y}`
   }
   
@@ -1147,30 +1147,39 @@ function pointsToPathData(points: PathPoint[], closed: boolean = false): string 
   return path
 }
 
-function createQuadraticSegment(start: Position, end: Position, depth: number): string {
-  const controlPoint = getArcControlPoint(start, end, depth)
-  return `Q ${controlPoint.x} ${controlPoint.y} ${end.x} ${end.y}`
-}
-
-function getArcControlPoint(start: Position, end: Position, depth: number): Position {
+/** 创建三次贝塞尔曲线控制点（更圆滑） */
+function getCubicControlPoints(start: Position, end: Position, depth: number) {
   const dx = end.x - start.x
   const dy = end.y - start.y
   const length = Math.sqrt(dx * dx + dy * dy) || 1
-  const midX = (start.x + end.x) / 2
-  const midY = (start.y + end.y) / 2
   const normalX = -dy / length
   const normalY = dx / length
+  
   const offset = length * depth * 0.5
-
+  const perpX = normalX * offset
+  const perpY = normalY * offset
+  
   return {
-    x: midX + normalX * offset,
-    y: midY + normalY * offset
+    cp1: {
+      x: start.x + dx * 0.3 + perpX,
+      y: start.y + dy * 0.3 + perpY
+    },
+    cp2: {
+      x: end.x - dx * 0.3 + perpX,
+      y: end.y - dy * 0.3 + perpY
+    }
   }
+}
+
+/** 创建三次贝塞尔曲线段（更圆滑） */
+function createCubicSegment(start: Position, end: Position, depth: number): string {
+  const { cp1, cp2 } = getCubicControlPoints(start, end, depth)
+  return `C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${end.x} ${end.y}`
 }
 
 /** 计算弧线预览路径 */
 function calculateEdgePath(start: PathPoint, end: Position, depth: number): string {
-  return `M ${start.x} ${start.y} ${createQuadraticSegment(start, end, depth)}`
+  return `M ${start.x} ${start.y} ${createCubicSegment(start, end, depth)}`
 }
 
 // 模块级别导出常量
