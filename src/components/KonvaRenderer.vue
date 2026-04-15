@@ -1414,11 +1414,14 @@ const isDrawingMode = (): boolean => {
 const setupStageEvents = () => {
   if (!stage) return
 
-  // 滚轮缩放（已禁用）
-  // stage.on('wheel', (e) => {
-  //   e.evt.preventDefault()
-  //   handleWheel(e)
-  // })
+  // 滚轮缩放（Ctrl+滚轮以鼠标为中心缩放）
+  stage.on('wheel', (e) => {
+    // 只有按住 Ctrl 键时才触发缩放
+    if (!e.evt.ctrlKey) return
+    
+    e.evt.preventDefault()
+    viewport?.handleWheel(e)
+  })
 
   // 鼠标按下
   stage.on('mousedown', (e) => {
