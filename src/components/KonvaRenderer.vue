@@ -296,7 +296,7 @@ onMounted(() => {
   
   // 初始化键盘事件处理
   keyboard = useKonvaKeyboard({
-    currentTool: currentDrawingTool.value,
+    currentTool: () => currentDrawingTool.value,
     isDrawingMode: () => drawing.isDataDrivenTool.value,
     isSeatDrawingMode: () => isSingleRowDrawingMode() || isSegmentDrawingMode() || isMultiRowDrawingMode(),
     seatDrawStep: { get value() { return seatDrawStep.value } },
@@ -306,17 +306,13 @@ onMounted(() => {
     // 多边形点撤销功能
     undoPolygonPoint: () => {
       const points = drawing.polygonPoints.value
-      console.log('undoPolygonPoint called, points count:', points.length)
       if (points.length > 0) {
         // 创建新数组，移除最后一个点
         const newPoints = [...points]
         newPoints.pop()
-        console.log('After pop, newPoints count:', newPoints.length)
         // 清空并重新添加
         drawing.clearPolygonPoints()
-        console.log('After clear, polygonPoints count:', drawing.polygonPoints.value.length)
         newPoints.forEach(p => drawing.addPolygonPoint(p))
-        console.log('After re-add, polygonPoints count:', drawing.polygonPoints.value.length)
         // 更新预览
         const pos = drawing.previewState.value.currentPos
         if (pos) {

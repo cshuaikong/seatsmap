@@ -14,7 +14,7 @@ import type { DrawingToolMode } from './useKonvaDrawing'
 
 export interface UseKonvaKeyboardOptions {
   /** 当前绘制工具 */
-  currentTool: DrawingToolMode
+  currentTool: DrawingToolMode | (() => DrawingToolMode)
   /** 是否处于绘制模式 */
   isDrawingMode: () => boolean
   /** 是否处于座位绘制模式（单排/转折/多行） */
@@ -106,15 +106,14 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     // Ctrl+Z 撤销
     if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
-      console.log('Ctrl+Z in keyboard, currentTool:', currentTool, 'getPolygonPointCount:', getPolygonPointCount?.())
+      // 获取当前工具（支持函数或值）
+      const tool = typeof currentTool === 'function' ? currentTool() : currentTool
       
       // 多边形/区域绘制模式：优先撤销最后一个点
-      if ((currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
+      if ((tool === 'draw_polygon' || tool === 'draw_area')) {
         const pointCount = getPolygonPointCount?.() || 0
-        console.log('Polygon mode detected, pointCount:', pointCount)
         if (pointCount > 0) {
           // 有绘制点时，撤销最后一个点
-          console.log('Calling undoPolygonPoint')
           undoPolygonPoint?.()
           return
         } else {
@@ -126,7 +125,6 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       }
       
       // 其他情况：撤销历史记录
-      console.log('Calling venueStore.undo()')
       venueStore.undo()
       return
     }
