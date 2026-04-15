@@ -528,9 +528,11 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       }
     } else if (sectionId && borderType) {
       // Section 边框拖拽 - 更新 borderX, borderY
+      // 需要获取相对于 Stage 的绝对坐标（因为节点可能在 dragLayer 中）
+      const absolutePos = node.getAbsolutePosition()
       venueStore.updateSectionBorder(sectionId, { 
-        borderX: node.x(), 
-        borderY: node.y(),
+        borderX: absolutePos.x, 
+        borderY: absolutePos.y,
         rotation: node.rotation() 
       })
     }
