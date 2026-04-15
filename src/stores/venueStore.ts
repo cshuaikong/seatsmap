@@ -702,6 +702,11 @@ export const useVenueStore = defineStore('venue', () => {
     const section = venue.value.sections.find(s => s.id === sectionId)
     if (!section) return
     Object.assign(section, border)
+    
+    // 如果设置为只读，自动取消选中状态
+    if (border.readonly === true && selectedSectionIds.value.includes(sectionId)) {
+      selectedSectionIds.value = selectedSectionIds.value.filter(id => id !== sectionId)
+    }
   }
 
   // ==================== 排扩展座位 ====================
