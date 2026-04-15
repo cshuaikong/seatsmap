@@ -622,6 +622,8 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
+  console.log('renderPathVertexHandles called, section:', section.id, 'borderX:', section.borderX, 'borderY:', section.borderY)
+
   // 清理旧的顶点手柄
   mainLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
 
@@ -629,6 +631,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   const layer = mainLayer
   const baseX = section.borderX || 0
   const baseY = section.borderY || 0
+  console.log('baseX:', baseX, 'baseY:', baseY)
 
   section.borderPathPoints.forEach((point, index) => {
     // 顶点拖拽手柄 - 始终可拖拽
