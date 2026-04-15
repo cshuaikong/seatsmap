@@ -65,6 +65,16 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
         clearDrawingPreview()
         return
       }
+      // 多边形/区域绘制模式：清空所有点并退出
+      if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
+        const pointCount = getPolygonPointCount?.() || 0
+        if (pointCount > 0) {
+          // 有绘制点时，ESC 清空所有点
+          clearDrawingPreview()
+          resetDrawingState()
+        }
+        return
+      }
       if (isDrawingMode()) {
         clearDrawingPreview()
         resetDrawingState()

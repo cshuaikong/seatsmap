@@ -2335,6 +2335,9 @@ const submitAllSegments = () => {
     segmentIndices  // 记录关键节点
   })
 
+  // 保存历史记录
+  venueStore.saveHistory()
+
   resetSeatDrawingState()
 }
 
@@ -2383,6 +2386,9 @@ const submitMultiRows = () => {
     })
   }
 
+  // 保存历史记录
+  venueStore.saveHistory()
+
   resetSeatDrawingState()
 }
 
@@ -2422,6 +2428,9 @@ const submitSeatRow = (startPos: Position, endPos: Position) => {
     curve: 0,
     seatSpacing: drawing.SEAT_SPACING
   })
+
+  // 保存历史记录
+  venueStore.saveHistory()
   
   clearDrawingPreview()
 }
@@ -2680,6 +2689,9 @@ const submitText = (pos: Position) => {
     fill: '#333333',
     rotation: 0
   })
+
+  // 保存历史记录
+  venueStore.saveHistory()
   
   clearDrawingPreview()
 }
@@ -2706,6 +2718,9 @@ const submitArea = (points: Position[]) => {
     opacity: 0.3,
     translucent: true
   })
+
+  // 保存历史记录
+  venueStore.saveHistory()
   
   clearDrawingPreview()
   drawing.clearPolygonPoints()
