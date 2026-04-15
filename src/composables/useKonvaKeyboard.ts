@@ -85,28 +85,9 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       return
     }
 
-    // Backspace 处理：绘制模式下撤销最后一个点，非绘制模式下删除选中对象
+    // Backspace 删除选中对象（绘制模式下不处理）
     if (e.key === 'Backspace') {
-      // 多边形/区域绘制模式：撤销最后一个点
-      if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
-        e.preventDefault()
-        // 获取当前多边形点数量
-        const pointCount = getPolygonPointCount?.() || 0
-        if (pointCount > 0) {
-          // 撤销最后一个点
-          undoPolygonPoint?.()
-        } else {
-          // 没有点了，退出绘制模式
-          clearDrawingPreview()
-          resetDrawingState()
-        }
-        return
-      }
-      
-      // 其他绘制模式下不处理
       if (isDrawingMode()) return
-
-      // 非绘制模式：删除选中对象
       deleteSelectedObjects()
       return
     }
@@ -114,7 +95,20 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     // Ctrl+Z 撤销
     if (e.key === 'z' && e.ctrlKey) {
       e.preventDefault()
-      venueStore.undo()
+      // 多边形/区域绘制模式：撤销最后一个点
+      if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
+        const pointCount = getPolygonPointCount?.() || 0
+        if (pointCount > 0) {
+          undoPolygonPoint?.()
+        } else {
+          // 没有点了，退出绘制模式
+          clearDrawingPreview()
+          resetDrawingState()
+        }
+      } else {
+        // 非绘制模式：撤销历史记录
+        venueStore.undo()
+      }
       return
     }
 
