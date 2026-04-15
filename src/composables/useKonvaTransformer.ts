@@ -41,6 +41,8 @@ export interface UseKonvaTransformerOptions {
   nodeMap: Map<string, Konva.Node>
   /** 同步完成后触发 watch 的防重入标志，由外部传入 setter */
   setIsSyncing: (val: boolean) => void
+  /** 实时更新路径顶点手柄位置（拖拽中同步） */
+  updatePathVertexHandlesPosition?: (sectionId: string, x: number, y: number) => void
 }
 
 export interface UseKonvaTransformerReturn {
@@ -63,7 +65,7 @@ export interface UseKonvaTransformerReturn {
 // ==================== Main Composable ====================
 
 export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKonvaTransformerReturn {
-  const { overlayLayer, mainLayer, dragLayer, stage, nodeMap, setIsSyncing } = options
+  const { overlayLayer, mainLayer, dragLayer, stage, nodeMap, setIsSyncing, updatePathVertexHandlesPosition } = options
   const venueStore = useVenueStore()
 
   // ==================== State ====================
@@ -393,6 +395,13 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
 
       unifiedDragState.items.forEach(item => {
         item.node.setAttrs({ x: item.startX + dx, y: item.startY + dy })
+        
+        // 如果是 Section 边框，实时更新顶点手柄位置
+        const sectionId = item.node.getAttr('sectionId') as string
+        const borderType = item.node.getAttr('borderType') as string
+        if (sectionId && borderType && updatePathVertexHandlesPosition) {
+          updatePathVertexHandlesPosition(sectionId, item.startX + dx, item.startY + dy)
+        }
       })
 
       if (unifiedDragState.useDragLayer) {
@@ -528,7 +537,6 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       // Section 边框拖拽 - 更新 borderX, borderY
       // 需要获取相对于 Stage 的绝对坐标（因为节点可能在 dragLayer 中）
       const absolutePos = node.getAbsolutePosition()
-      console.log('syncNodeDragToStore for Section:', sectionId, 'absolutePos:', absolutePos.x, absolutePos.y)
       venueStore.updateSectionBorder(sectionId, { 
         borderX: absolutePos.x, 
         borderY: absolutePos.y,

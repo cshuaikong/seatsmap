@@ -261,7 +261,8 @@ onMounted(() => {
     dragLayer,
     stage,
     nodeMap,
-    setIsSyncing: (val) => { isSyncingFromTransformer = val }
+    setIsSyncing: (val) => { isSyncingFromTransformer = val },
+    updatePathVertexHandlesPosition
   })
   tfm.initTransformer()
 
@@ -370,20 +371,12 @@ onUnmounted(() => {
 
 // 监听 venue 数据变化，自动重绘
 watch(() => venueStore.venue, () => {
-  console.log('venue watch triggered, isSyncingFromTransformer:', isSyncingFromTransformer, 'isDraggingPathVertex:', isDraggingPathVertex)
   // 如果是从 Transformer 同步数据，跳过重绘（避免破坏 Transformer 状态）
-  if (isSyncingFromTransformer) {
-    console.log('Skipping renderAll due to isSyncingFromTransformer')
-    return
-  }
+  if (isSyncingFromTransformer) return
   
   // 如果正在拖拽 path 顶点，跳过重绘（避免手柄被重建）
-  if (isDraggingPathVertex) {
-    console.log('Skipping renderAll due to isDraggingPathVertex')
-    return
-  }
+  if (isDraggingPathVertex) return
   
-  console.log('Calling renderAll from venue watch')
   nextTick(() => {
     renderAll()
   })
@@ -630,8 +623,6 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
 
-  console.log('renderPathVertexHandles called, section:', section.id, 'borderX:', section.borderX, 'borderY:', section.borderY)
-
   // 清理旧的顶点手柄
   mainLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
 
@@ -639,7 +630,6 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
   const layer = mainLayer
   const baseX = section.borderX || 0
   const baseY = section.borderY || 0
-  console.log('baseX:', baseX, 'baseY:', baseY)
 
   section.borderPathPoints.forEach((point, index) => {
     // 顶点拖拽手柄 - 始终可拖拽
@@ -733,6 +723,28 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
 
     layer.add(vertexHandle)
   })
+}
+
+/** 实时更新路径顶点手柄位置（拖拽中同步，不经过 store） */
+const updatePathVertexHandlesPosition = (sectionId: string, x: number, y: number) => {
+  if (!mainLayer) return
+  
+  // 找到该 section 的所有顶点手柄
+  const handles = mainLayer.find('.path-vertex-handle')
+  handles.forEach((handle) => {
+    const handleSectionId = handle.getAttr('sectionId')
+    if (handleSectionId === sectionId) {
+      const vertexIndex = handle.getAttr('vertexIndex') as number
+      const section = venueStore.venue.sections.find(s => s.id === sectionId)
+      if (section && section.borderPathPoints && section.borderPathPoints[vertexIndex]) {
+        const point = section.borderPathPoints[vertexIndex]
+        // 更新手柄位置：新的 baseX/baseY + 相对坐标
+        handle.position({ x: x + point.x, y: y + point.y })
+      }
+    }
+  })
+  
+  mainLayer.batchDraw()
 }
 
 const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOtherFocused: boolean) => {
