@@ -587,6 +587,16 @@ export const useVenueStore = defineStore('venue', () => {
   }
 
   function selectSection(sectionId: string, additive = false) {
+    // 检查分区是否存在且不是只读
+    const section = venue.value.sections.find(s => s.id === sectionId)
+    if (!section || section.readonly === true) {
+      // 只读分区不能被选中，如果是非加选模式，清空其他选择
+      if (!additive) {
+        selectedSectionIds.value = []
+      }
+      return
+    }
+    
     if (!additive) {
       selectedSectionIds.value = [sectionId]
       selectedSeatIds.value = []

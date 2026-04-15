@@ -165,6 +165,10 @@ export interface Section {
   borderFill?: string
   borderStroke?: string
   borderOpacity?: number
+  // 层级控制（数值越大越在上层，默认 0）
+  zIndex?: number
+  // 只读属性（只读的分区不能选中、不参与点击）
+  readonly?: boolean
 }
 
 // 座位图配置接口

@@ -273,6 +273,13 @@ onMounted(() => {
     nodeMap,
     onSelectionEnd: (result, additive) => {
       const { rowIds, seatIds, shapeIds, textIds, areaIds, sectionIds } = result
+      
+      // 过滤掉只读分区
+      const filteredSectionIds = sectionIds.filter(id => {
+        const section = venueStore.venue.sections.find(s => s.id === id)
+        return section && section.readonly !== true
+      })
+      
       venueStore.setActivePathSegment(null, null)
       if (additive) {
         if (rowIds.length) venueStore.selectedRowIds = [...new Set([...venueStore.selectedRowIds, ...rowIds])]
@@ -280,14 +287,14 @@ onMounted(() => {
         if (shapeIds.length) venueStore.selectedShapeIds = [...new Set([...venueStore.selectedShapeIds, ...shapeIds])]
         if (textIds.length) venueStore.selectedTextIds = [...new Set([...venueStore.selectedTextIds, ...textIds])]
         if (areaIds.length) venueStore.selectedAreaIds = [...new Set([...venueStore.selectedAreaIds, ...areaIds])]
-        if (sectionIds.length) venueStore.selectedSectionIds = [...new Set([...venueStore.selectedSectionIds, ...sectionIds])]
+        if (filteredSectionIds.length) venueStore.selectedSectionIds = [...new Set([...venueStore.selectedSectionIds, ...filteredSectionIds])]
       } else {
         venueStore.selectedRowIds = rowIds
         venueStore.selectedSeatIds = seatIds
         venueStore.selectedShapeIds = shapeIds
         venueStore.selectedTextIds = textIds
         venueStore.selectedAreaIds = areaIds
-        venueStore.selectedSectionIds = sectionIds
+        venueStore.selectedSectionIds = filteredSectionIds  // 使用过滤后的分区列表
       }
       // 更新 Transformer 以显示选中状态
       tfm?.updateTransformer(true)
@@ -510,15 +517,22 @@ const renderAll = () => {
   // 渲染图片（在最底层）
   renderImages(getImageRenderOptions())
 
+  // 按 zIndex 排序 Section（层级低的先渲染，层级高的后渲染在上层）
+  const sortedSections = [...venueStore.venue.sections].sort((a, b) => {
+    const zIndexA = a.zIndex ?? 0
+    const zIndexB = b.zIndex ?? 0
+    return zIndexA - zIndexB
+  })
+
   // 渲染 Section 边框（在座位排之下）
-  venueStore.venue.sections.forEach(section => {
+  sortedSections.forEach(section => {
     if (section.borderType && section.borderType !== 'none') {
       renderSectionBorder(section)
     }
   })
 
-  // 渲染所有区域
-  venueStore.venue.sections.forEach(section => {
+  // 渲染所有区域（只读分区 listening: false）
+  sortedSections.forEach(section => {
     renderSection(section)
   })
 
@@ -862,6 +876,7 @@ const renderSectionBorder = (section: Section) => {
   const isFocused = venueStore.focusedSectionId === section.id
   const isOtherFocused = venueStore.focusedSectionId !== null && !isFocused
   const isSelected = venueStore.selectedSectionIds.includes(section.id)
+  const isReadonly = section.readonly === true
 
   let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
@@ -870,13 +885,14 @@ const renderSectionBorder = (section: Section) => {
   const autoStrokeColor = darkenColor(fillColor, 40)
   const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
+  // 只读分区：不参与交互（listening: false），使用灰色边框
   const commonAttrs = {
     fill: fillColor,
-    stroke: strokeColor,
+    stroke: isReadonly ? '#9ca3af' : strokeColor,
     strokeWidth: isSelected || isFocused ? 2 : 1.5,
     dash: isFocused ? [] : [8, 4],
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
-    listening: !isOtherFocused
+    listening: !isOtherFocused && !isReadonly  // 只读分区不参与交互
   }
 
   if (section.borderType === 'ellipse') {
@@ -1013,21 +1029,23 @@ const renderSectionBorder = (section: Section) => {
   label.setAttr('isSectionLabel', true)
   nodeMap.set('sectionLabel_' + section.id, label)
 
-  // 单击选中（支持 Shift 多选）
-  borderNode.on('click', (e) => {
-    e.cancelBubble = true
-    const additive = e.evt.shiftKey
-    venueStore.selectSection(section.id, additive)
-    // 更新 Transformer 以显示选中边框
-    tfm?.updateTransformer(true)
-    mainLayer?.batchDraw()
-  })
+  // 单击选中（支持 Shift 多选）- 只读分区不触发
+  if (!section.readonly) {
+    borderNode.on('click', (e) => {
+      e.cancelBubble = true
+      const additive = e.evt.shiftKey
+      venueStore.selectSection(section.id, additive)
+      // 更新 Transformer 以显示选中边框
+      tfm?.updateTransformer(true)
+      mainLayer?.batchDraw()
+    })
 
-  // 双击进入聚焦
-  borderNode.on('dblclick', (e) => {
-    e.cancelBubble = true
-    enterSectionFocus(section.id)
-  })
+    // 双击进入聚焦 - 只读分区不触发
+    borderNode.on('dblclick', (e) => {
+      e.cancelBubble = true
+      enterSectionFocus(section.id)
+    })
+  }
 
   borderNode.on('mouseenter', () => {
     if (stage && !isDrawingMode()) {
