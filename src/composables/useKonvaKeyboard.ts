@@ -104,35 +104,26 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     }
 
     // Ctrl+Z 撤销
-    console.log('Key pressed:', e.key, 'ctrl:', e.ctrlKey, 'meta:', e.metaKey)
     if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
-      const drawingMode = isDrawingMode()
-      console.log('Ctrl+Z triggered, isDrawingMode:', drawingMode, 'currentTool:', currentTool)
       
-      // 如果当前是 select 工具，强制设置为非绘制模式
-      if (currentTool === 'select') {
-        console.log('Forcing non-drawing mode for select tool')
-        // 非绘制模式：撤销历史记录
-        venueStore.undo()
-        return
-      }
-      // 多边形/区域绘制模式：撤销最后一个点
-      if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
+      // 多边形/区域绘制模式：优先撤销最后一个点
+      if ((currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
         const pointCount = getPolygonPointCount?.() || 0
-        console.log('Polygon point count:', pointCount)
         if (pointCount > 0) {
+          // 有绘制点时，撤销最后一个点
           undoPolygonPoint?.()
+          return
         } else {
-          // 没有点了，退出绘制模式
+          // 没有点了，退出绘制模式（不执行历史撤销）
           clearDrawingPreview()
           resetDrawingState()
+          return
         }
-      } else {
-        // 非绘制模式：撤销历史记录
-        console.log('Calling venueStore.undo()')
-        venueStore.undo()
       }
+      
+      // 其他情况：撤销历史记录
+      venueStore.undo()
       return
     }
 
