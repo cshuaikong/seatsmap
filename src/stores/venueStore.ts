@@ -54,6 +54,51 @@ export const useVenueStore = defineStore('venue', () => {
   const canvasImages = ref<CanvasImage[]>([])
   const selectedImageId = ref<string | null>(null)
 
+  // ==================== 撤销/重做 ====================
+  const history = ref<VenueData[]>([])
+  const historyIndex = ref(-1)
+  const MAX_HISTORY = 50  // 最大历史记录数
+
+  // 保存当前状态到历史
+  const saveHistory = () => {
+    // 删除当前索引之后的历史（如果有）
+    if (historyIndex.value < history.value.length - 1) {
+      history.value = history.value.slice(0, historyIndex.value + 1)
+    }
+    // 添加新状态（深拷贝）
+    history.value.push(JSON.parse(JSON.stringify(venue.value)))
+    // 限制历史记录数量
+    if (history.value.length > MAX_HISTORY) {
+      history.value.shift()
+    } else {
+      historyIndex.value++
+    }
+  }
+
+  // 撤销
+  const undo = () => {
+    if (historyIndex.value > 0) {
+      historyIndex.value--
+      venue.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]))
+      // 清除选中状态
+      clearSelection()
+    }
+  }
+
+  // 重做
+  const redo = () => {
+    if (historyIndex.value < history.value.length - 1) {
+      historyIndex.value++
+      venue.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]))
+      // 清除选中状态
+      clearSelection()
+    }
+  }
+
+  // 是否可以撤销/重做
+  const canUndo = computed(() => historyIndex.value > 0)
+  const canRedo = computed(() => historyIndex.value < history.value.length - 1)
+
   // ==================== Getters ====================
   
   const totalSeats = computed(() => {
@@ -1087,6 +1132,12 @@ export const useVenueStore = defineStore('venue', () => {
     resetVenue,
     // Snapshot
     createSnapshot,
-    restoreSnapshot
+    restoreSnapshot,
+    // Undo/Redo
+    saveHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo
   }
 })

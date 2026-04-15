@@ -169,9 +169,11 @@ const isSeatSelectMode = (): boolean => {
 
 // 设置当前绘制工具
 const setDrawingTool = (tool: DrawingToolMode) => {
-  // 如果切换工具，重置座位绘制状态
+  // 如果切换工具，重置所有绘制状态
   if (currentDrawingTool.value !== tool) {
     resetSeatDrawingState()
+    drawing.resetDrawingState()
+    drawing.clearPolygonPoints()
   }
   currentDrawingTool.value = tool
   drawing.setTool(tool as any)
@@ -2509,6 +2511,9 @@ const submitRect = (startPos: Position, endPos: Position) => {
     borderFill: 'rgba(59,130,246,0.08)'
   })
   
+  // 保存历史记录
+  venueStore.saveHistory()
+  
   clearDrawingPreview()
 }
 
@@ -2573,6 +2578,9 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     borderFill: 'rgba(59,130,246,0.08)'
   })
   
+  // 保存历史记录
+  venueStore.saveHistory()
+  
   clearDrawingPreview()
 }
 
@@ -2611,6 +2619,9 @@ const submitPolygon = (points: import('../types').PathPoint[]) => {
     borderPathPoints: relativePathPoints,
     borderFill: 'rgba(59,130,246,0.08)'
   })
+  
+  // 保存历史记录
+  venueStore.saveHistory()
   
   clearDrawingPreview()
   drawing.clearPolygonPoints()

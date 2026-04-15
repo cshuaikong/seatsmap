@@ -76,6 +76,21 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       if (isDrawingMode()) return
 
       deleteSelectedObjects()
+      return
+    }
+
+    // Ctrl+Z 撤销
+    if (e.key === 'z' && e.ctrlKey) {
+      e.preventDefault()
+      venueStore.undo()
+      return
+    }
+
+    // Ctrl+Y 重做
+    if (e.key === 'y' && e.ctrlKey) {
+      e.preventDefault()
+      venueStore.redo()
+      return
     }
   }
 
