@@ -106,12 +106,15 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     // Ctrl+Z 撤销
     if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
+      console.log('Ctrl+Z in keyboard, currentTool:', currentTool, 'getPolygonPointCount:', getPolygonPointCount?.())
       
       // 多边形/区域绘制模式：优先撤销最后一个点
       if ((currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
         const pointCount = getPolygonPointCount?.() || 0
+        console.log('Polygon mode detected, pointCount:', pointCount)
         if (pointCount > 0) {
           // 有绘制点时，撤销最后一个点
+          console.log('Calling undoPolygonPoint')
           undoPolygonPoint?.()
           return
         } else {
@@ -123,6 +126,7 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       }
       
       // 其他情况：撤销历史记录
+      console.log('Calling venueStore.undo()')
       venueStore.undo()
       return
     }
