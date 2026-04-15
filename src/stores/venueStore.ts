@@ -59,8 +59,21 @@ export const useVenueStore = defineStore('venue', () => {
   const historyIndex = ref(-1)
   const MAX_HISTORY = 50  // 最大历史记录数
 
+  // 初始化时保存初始状态
+  const initHistory = () => {
+    if (historyIndex.value === -1) {
+      history.value.push(JSON.parse(JSON.stringify(venue.value)))
+      historyIndex.value = 0
+    }
+  }
+
   // 保存当前状态到历史
   const saveHistory = () => {
+    // 确保已初始化
+    if (historyIndex.value === -1) {
+      initHistory()
+      return
+    }
     // 删除当前索引之后的历史（如果有）
     if (historyIndex.value < history.value.length - 1) {
       history.value = history.value.slice(0, historyIndex.value + 1)
@@ -1138,6 +1151,7 @@ export const useVenueStore = defineStore('venue', () => {
     createSnapshot,
     restoreSnapshot,
     // Undo/Redo
+    initHistory,
     saveHistory,
     undo,
     redo,

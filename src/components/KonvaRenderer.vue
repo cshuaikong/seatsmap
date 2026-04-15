@@ -326,6 +326,9 @@ onMounted(() => {
   // 初始化绘制预览
   initDrawingPreview()
 
+  // 初始化历史记录（保存初始状态）
+  venueStore.initHistory()
+
   // 设置事件监听
   setupStageEvents()
   
