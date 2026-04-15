@@ -107,7 +107,16 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     console.log('Key pressed:', e.key, 'ctrl:', e.ctrlKey, 'meta:', e.metaKey)
     if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
-      console.log('Ctrl+Z triggered, isDrawingMode:', isDrawingMode(), 'currentTool:', currentTool)
+      const drawingMode = isDrawingMode()
+      console.log('Ctrl+Z triggered, isDrawingMode:', drawingMode, 'currentTool:', currentTool)
+      
+      // 如果当前是 select 工具，强制设置为非绘制模式
+      if (currentTool === 'select') {
+        console.log('Forcing non-drawing mode for select tool')
+        // 非绘制模式：撤销历史记录
+        venueStore.undo()
+        return
+      }
       // 多边形/区域绘制模式：撤销最后一个点
       if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
         const pointCount = getPolygonPointCount?.() || 0
