@@ -481,6 +481,8 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     const textData = node.getAttr('textData') as TextObject
     const areaData = node.getAttr('areaData') as AreaObject
     const imageData = node.getAttr('canvasImageData') as CanvasImage
+    const sectionId = node.getAttr('sectionId') as string
+    const borderType = node.getAttr('borderType') as string
 
     if (imageData) {
       const updatedImgData = { ...imageData, x: node.x(), y: node.y(), rotation: node.rotation() }
@@ -524,6 +526,13 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         venueStore.updateArea(areaData.id, { points: newPoints })
         node.position({ x: 0, y: 0 })
       }
+    } else if (sectionId && borderType) {
+      // Section 边框拖拽 - 更新 borderX, borderY
+      venueStore.updateSectionBorder(sectionId, { 
+        borderX: node.x(), 
+        borderY: node.y(),
+        rotation: node.rotation() 
+      })
     }
   }
 
