@@ -696,6 +696,8 @@ export const useVenueStore = defineStore('venue', () => {
     | 'borderFill'
     | 'borderStroke'
     | 'borderOpacity'
+    | 'zIndex'
+    | 'readonly'
   >>) {
     const section = venue.value.sections.find(s => s.id === sectionId)
     if (!section) return

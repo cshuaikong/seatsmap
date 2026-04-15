@@ -59,6 +59,32 @@
         <span class="slider-val">{{ Math.round((section.borderOpacity ?? 1) * 100) }}%</span>
       </div>
 
+      <!-- 层级设置 -->
+      <div class="panel-row">
+        <label class="panel-label">层级</label>
+        <input
+          type="number"
+          class="panel-input"
+          :value="section.zIndex ?? 0"
+          @change="(e) => emit('update-property', 'zIndex', parseInt((e.target as HTMLInputElement).value) || 0)"
+          style="width: 80px;"
+        />
+        <span class="panel-hint">数值越大越在上层</span>
+      </div>
+
+      <!-- 只读设置 -->
+      <div class="panel-row">
+        <label class="panel-label">只读</label>
+        <label class="checkbox-label">
+          <input
+            type="checkbox"
+            :checked="section.readonly === true"
+            @change="(e) => emit('update-property', 'readonly', (e.target as HTMLInputElement).checked)"
+          />
+          <span>禁止选中和编辑</span>
+        </label>
+      </div>
+
       <!-- 统计信息 -->
       <div class="panel-stats">
         <div class="stat-item">
@@ -524,5 +550,27 @@ const pathSegments = computed(() => {
   text-align: center;
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+/* 复选框样式 */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.panel-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-left: 8px;
 }
 </style>
