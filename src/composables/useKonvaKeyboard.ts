@@ -104,11 +104,14 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     }
 
     // Ctrl+Z 撤销
-    if (e.key === 'z' && e.ctrlKey) {
+    console.log('Key pressed:', e.key, 'ctrl:', e.ctrlKey, 'meta:', e.metaKey)
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
+      console.log('Ctrl+Z triggered, isDrawingMode:', isDrawingMode(), 'currentTool:', currentTool)
       // 多边形/区域绘制模式：撤销最后一个点
       if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
         const pointCount = getPolygonPointCount?.() || 0
+        console.log('Polygon point count:', pointCount)
         if (pointCount > 0) {
           undoPolygonPoint?.()
         } else {
@@ -118,6 +121,7 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
         }
       } else {
         // 非绘制模式：撤销历史记录
+        console.log('Calling venueStore.undo()')
         venueStore.undo()
       }
       return
