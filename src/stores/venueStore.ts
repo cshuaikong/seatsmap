@@ -77,11 +77,15 @@ export const useVenueStore = defineStore('venue', () => {
 
   // 撤销
   const undo = () => {
+    console.log('undo called, historyIndex:', historyIndex.value, 'history length:', history.value.length)
     if (historyIndex.value > 0) {
       historyIndex.value--
       venue.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]))
       // 清除选中状态
       clearSelection()
+      console.log('undo executed, new historyIndex:', historyIndex.value)
+    } else {
+      console.log('undo skipped: historyIndex <= 0')
     }
   }
 
