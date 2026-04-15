@@ -61,9 +61,11 @@ export const useVenueStore = defineStore('venue', () => {
 
   // 初始化时保存初始状态
   const initHistory = () => {
+    console.log('initHistory called, historyIndex:', historyIndex.value)
     if (historyIndex.value === -1) {
       history.value.push(JSON.parse(JSON.stringify(venue.value)))
       historyIndex.value = 0
+      console.log('initHistory executed, history length:', history.value.length)
     }
   }
 
