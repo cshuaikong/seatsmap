@@ -27,6 +27,10 @@ export interface UseKonvaKeyboardOptions {
   clearDrawingPreview: () => void
   /** 重置绘制工具状态 */
   resetDrawingState: () => void
+  /** 撤销多边形最后一个点 */
+  undoPolygonPoint?: () => void
+  /** 获取多边形点数量 */
+  getPolygonPointCount?: () => number
 }
 
 export interface UseKonvaKeyboardReturn {
@@ -44,7 +48,9 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     seatDrawStep,
     resetSeatDrawingState,
     clearDrawingPreview,
-    resetDrawingState
+    resetDrawingState,
+    undoPolygonPoint,
+    getPolygonPointCount
   } = options
 
   const venueStore = useVenueStore()
@@ -70,11 +76,37 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       return
     }
 
-    // Delete/Backspace 删除选中
-    if (e.key === 'Delete' || e.key === 'Backspace') {
+    // Delete 删除选中对象
+    if (e.key === 'Delete') {
       // 绘制模式下不处理删除
       if (isDrawingMode()) return
 
+      deleteSelectedObjects()
+      return
+    }
+
+    // Backspace 处理：绘制模式下撤销最后一个点，非绘制模式下删除选中对象
+    if (e.key === 'Backspace') {
+      // 多边形/区域绘制模式：撤销最后一个点
+      if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
+        e.preventDefault()
+        // 获取当前多边形点数量
+        const pointCount = getPolygonPointCount?.() || 0
+        if (pointCount > 0) {
+          // 撤销最后一个点
+          undoPolygonPoint?.()
+        } else {
+          // 没有点了，退出绘制模式
+          clearDrawingPreview()
+          resetDrawingState()
+        }
+        return
+      }
+      
+      // 其他绘制模式下不处理
+      if (isDrawingMode()) return
+
+      // 非绘制模式：删除选中对象
       deleteSelectedObjects()
       return
     }

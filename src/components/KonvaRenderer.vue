@@ -171,13 +171,15 @@ const isSeatSelectMode = (): boolean => {
 const setDrawingTool = (tool: DrawingToolMode) => {
   // 如果切换工具，重置所有绘制状态
   if (currentDrawingTool.value !== tool) {
+    // 清空座位绘制状态
     resetSeatDrawingState()
     drawing.resetDrawingState()
+    // 清空多边形绘制点
     drawing.clearPolygonPoints()
+    clearDrawingPreview()
   }
   currentDrawingTool.value = tool
   drawing.setTool(tool as any)
-  clearDrawingPreview()
 }
 
 // 初始化绘制预览
@@ -300,7 +302,25 @@ onMounted(() => {
     seatDrawStep: { get value() { return seatDrawStep.value } },
     resetSeatDrawingState,
     clearDrawingPreview,
-    resetDrawingState: () => drawing.resetDrawingState()
+    resetDrawingState: () => drawing.resetDrawingState(),
+    // 多边形点撤销功能
+    undoPolygonPoint: () => {
+      const points = drawing.polygonPoints.value
+      if (points.length > 0) {
+        // 创建新数组，移除最后一个点
+        const newPoints = [...points]
+        newPoints.pop()
+        // 清空并重新添加
+        drawing.clearPolygonPoints()
+        newPoints.forEach(p => drawing.addPolygonPoint(p))
+        // 更新预览
+        const pos = drawing.previewState.value.currentPos
+        if (pos) {
+          createPolygonPreview(drawing.polygonPoints.value, pos)
+        }
+      }
+    },
+    getPolygonPointCount: () => drawing.polygonPoints.value.length
   })
   
   // 初始化绘制预览
