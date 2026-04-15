@@ -530,6 +530,7 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       // Section 边框拖拽 - 更新 borderX, borderY
       // 需要获取相对于 Stage 的绝对坐标（因为节点可能在 dragLayer 中）
       const absolutePos = node.getAbsolutePosition()
+      console.log('syncNodeDragToStore for Section:', sectionId, 'absolutePos:', absolutePos.x, absolutePos.y)
       venueStore.updateSectionBorder(sectionId, { 
         borderX: absolutePos.x, 
         borderY: absolutePos.y,

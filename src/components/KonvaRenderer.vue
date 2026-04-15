@@ -370,12 +370,20 @@ onUnmounted(() => {
 
 // 监听 venue 数据变化，自动重绘
 watch(() => venueStore.venue, () => {
+  console.log('venue watch triggered, isSyncingFromTransformer:', isSyncingFromTransformer, 'isDraggingPathVertex:', isDraggingPathVertex)
   // 如果是从 Transformer 同步数据，跳过重绘（避免破坏 Transformer 状态）
-  if (isSyncingFromTransformer) return
+  if (isSyncingFromTransformer) {
+    console.log('Skipping renderAll due to isSyncingFromTransformer')
+    return
+  }
   
   // 如果正在拖拽 path 顶点，跳过重绘（避免手柄被重建）
-  if (isDraggingPathVertex) return
+  if (isDraggingPathVertex) {
+    console.log('Skipping renderAll due to isDraggingPathVertex')
+    return
+  }
   
+  console.log('Calling renderAll from venue watch')
   nextTick(() => {
     renderAll()
   })
