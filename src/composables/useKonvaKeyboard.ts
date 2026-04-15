@@ -69,10 +69,11 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
       if (isDrawingMode() && (currentTool === 'draw_polygon' || currentTool === 'draw_area')) {
         const pointCount = getPolygonPointCount?.() || 0
         if (pointCount > 0) {
-          // 有绘制点时，ESC 清空所有点
+          // 有绘制点时，ESC 清空所有点并退出
           clearDrawingPreview()
           resetDrawingState()
         }
+        // 无论是否有绘制点，都退出绘制模式
         return
       }
       if (isDrawingMode()) {

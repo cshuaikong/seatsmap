@@ -1074,8 +1074,9 @@ export function useDrawing() {
   }
   
   const clearPolygonPoints = () => {
-    _polygonPoints.length = 0
-    previewState.value.points = []
+    // 使用 splice 清空数组以触发响应式更新
+    _polygonPoints.splice(0, _polygonPoints.length)
+    previewState.value.points = _polygonPoints
   }
   
   const isNearStartPoint = (pos: Position): boolean => {
