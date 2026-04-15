@@ -441,16 +441,14 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         dragLayer.visible(false)
       }
 
+      // 先设置 isSyncing 为 false，让 store 更新能触发 renderAll
+      setIsSyncing(false)
+      
       unifiedDragState.items.forEach(item => {
         syncNodeDragToStore(item)
       })
 
       updateTransformer(true)
-      setTimeout(() => {
-        setIsSyncing(false)
-        // setIsSyncing(false) 后 Vue watch 触发 renderAll，renderAll 末尾会调 updateTransformer(true)
-        // 所以此处无需额外操作
-      }, 0)
     } else {
       // 未移动：也要把节点移回 mainLayer
       if (dragLayer && mainLayer) {
