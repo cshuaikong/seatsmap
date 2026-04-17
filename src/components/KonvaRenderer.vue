@@ -788,6 +788,7 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
     })
 
     hitPath.on('click', (e) => {
+      if (isDrawingMode()) return  // 绘制模式下不触发选中
       e.cancelBubble = true
       venueStore.selectSection(section.id, e.evt.shiftKey)
       venueStore.setActivePathSegment(section.id, pointIndex)
@@ -1029,9 +1030,10 @@ const renderSectionBorder = (section: Section) => {
   label.setAttr('isSectionLabel', true)
   nodeMap.set('sectionLabel_' + section.id, label)
 
-  // 单击选中（支持 Shift 多选）- 只读分区不触发
+  // 单击选中（支持 Shift 多选）- 只读分区不触发，绘制模式不触发
   if (!section.readonly) {
     borderNode.on('click', (e) => {
+      if (isDrawingMode()) return  // 绘制模式下不触发选中
       e.cancelBubble = true
       const additive = e.evt.shiftKey
       venueStore.selectSection(section.id, additive)
@@ -1040,8 +1042,9 @@ const renderSectionBorder = (section: Section) => {
       mainLayer?.batchDraw()
     })
 
-    // 双击进入聚焦 - 只读分区不触发
+    // 双击进入聚焦 - 只读分区不触发，绘制模式不触发
     borderNode.on('dblclick', (e) => {
+      if (isDrawingMode()) return  // 绘制模式下不触发聚焦
       e.cancelBubble = true
       enterSectionFocus(section.id)
     })
@@ -1308,6 +1311,7 @@ const renderShape = (shape: ShapeObject, section: Section) => {
 
     // 点击事件
     konvaShape.on('click', (e) => {
+      if (isDrawingMode()) return  // 绘制模式下不触发选中
       e.cancelBubble = true
       const additive = e.evt.shiftKey
       venueStore.selectShape(shape.id, additive)
@@ -1357,6 +1361,7 @@ const renderText = (text: TextObject, section: Section) => {
 
   // 点击事件
   konvaText.on('click', (e) => {
+    if (isDrawingMode()) return  // 绘制模式下不触发选中
     e.cancelBubble = true
     const additive = e.evt.shiftKey
     venueStore.selectText(text.id, additive)
@@ -1409,6 +1414,7 @@ const renderArea = (area: AreaObject, section: Section) => {
 
   // 点击事件
   areaShape.on('click', (e) => {
+    if (isDrawingMode()) return  // 绘制模式下不触发选中
     e.cancelBubble = true
     const additive = e.evt.shiftKey
     venueStore.selectArea(area.id, additive)

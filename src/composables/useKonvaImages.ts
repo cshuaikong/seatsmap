@@ -82,6 +82,7 @@ export function createImageNode(
     existing.height(canvasImage.height)
     existing.rotation(canvasImage.rotation || 0)
     existing.opacity(canvasImage.opacity ?? 1)
+    existing.zIndex(canvasImage.zIndex ?? 0)
     // 锁定时禁止事件穿透，解锁时恢复
     existing.listening(!canvasImage.locked)
     existing.setAttr('canvasImageData', canvasImage)
@@ -102,6 +103,9 @@ export function createImageNode(
     // 锁定时不响应事件
     listening: !canvasImage.locked
   })
+
+  // 设置层级（必须在添加到图层后生效）
+  konvaImage.zIndex(canvasImage.zIndex ?? 0)
 
   konvaImage.setAttr('canvasImageData', canvasImage)
 
@@ -177,6 +181,7 @@ export function syncImageNodes(
       existingNode.height(img.height)
       existingNode.rotation(img.rotation || 0)
       existingNode.opacity(img.opacity ?? 1)
+      existingNode.zIndex(img.zIndex ?? 0)
       existingNode.listening(!img.locked)
       existingNode.setAttr('canvasImageData', img)
       mainLayer.batchDraw()

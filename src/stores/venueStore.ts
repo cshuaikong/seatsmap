@@ -908,9 +908,10 @@ export const useVenueStore = defineStore('venue', () => {
     // 清除选择状态
     clearSelection()
 
-    // 为 section 填充默认值
+    // 为 section 填充默认值（强制重置 readonly 为 false，确保导入后可编辑）
     const normalizedSections: Section[] = data.sections.map(section => ({
       ...section,
+      readonly: false,  // 导入后强制可编辑
       rows: Array.isArray(section.rows) ? section.rows : [],
       shapes: Array.isArray(section.shapes) ? section.shapes : [],
       texts: Array.isArray(section.texts) ? section.texts : [],

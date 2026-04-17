@@ -15,8 +15,8 @@ import Konva from 'konva'
 // ==================== 常量 ====================
 
 const VIEWPORT_PADDING = 200 // 视口外扩像素
-const MIN_SCALE = 0.1
-const MAX_SCALE = 5
+const MIN_SCALE = 0.001  // 最小缩放 0.1%，几乎无限制
+const MAX_SCALE = 500    // 最大缩放 500x，几乎无限制
 
 // ==================== 类型定义 ====================
 

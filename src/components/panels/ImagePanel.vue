@@ -129,6 +129,20 @@
           <span>锁定位置（禁止拖拽）</span>
         </label>
       </PanelSection>
+
+      <PanelSection title="层级">
+        <div class="property-row">
+          <label class="property-label">层级</label>
+          <NumberInput
+            :model-value="selectedImage.zIndex ?? 0"
+            :step="1"
+            @update:model-value="updateImage('zIndex', $event)"
+          />
+        </div>
+        <div class="zindex-hint">
+          数值越大越在上层，可输入负数
+        </div>
+      </PanelSection>
     </template>
   </div>
 </template>
@@ -421,5 +435,13 @@ const updateImage = (key: keyof CanvasImage, value: any) => {
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+/* 层级提示 */
+.zindex-hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  padding-left: 62px;
 }
 </style>

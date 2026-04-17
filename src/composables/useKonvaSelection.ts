@@ -95,6 +95,23 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
     overlayLayer.add(selectionRect)
   }
 
+  // ==================== 坐标转换 ====================
+
+  /**
+   * 将屏幕坐标转换为 stage 内部坐标
+   * getPointerPosition() 返回相对于容器的坐标，需要考虑 stage 的位移和缩放
+   */
+  const screenToStageCoord = (screenPos: { x: number; y: number }) => {
+    if (!stage) return { x: 0, y: 0 }
+    const stageX = stage.x()
+    const stageY = stage.y()
+    const scale = stage.scaleX()
+    return {
+      x: (screenPos.x - stageX) / scale,
+      y: (screenPos.y - stageY) / scale
+    }
+  }
+
   // ==================== 框选操作 ====================
 
   const startBoxSelection = (screenPos: { x: number; y: number }) => {
@@ -102,12 +119,15 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
 
     isSelecting = true
     hasDragged = false
-    startX = screenPos.x
-    startY = screenPos.y
+    
+    // 转换到 stage 内部坐标
+    const stagePos = screenToStageCoord(screenPos)
+    startX = stagePos.x
+    startY = stagePos.y
 
     selectionRect.setAttrs({
-      x: screenPos.x,
-      y: screenPos.y,
+      x: stagePos.x,
+      y: stagePos.y,
       width: 0,
       height: 0,
       visible: true
@@ -119,18 +139,21 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
   const updateBoxSelection = (screenPos: { x: number; y: number }) => {
     if (!selectionRect || !stage) return
 
+    // 转换到 stage 内部坐标
+    const stagePos = screenToStageCoord(screenPos)
+
     // 检查是否有拖动（移动超过阈值认为是框选）
-    const dx = Math.abs(screenPos.x - startX)
-    const dy = Math.abs(screenPos.y - startY)
+    const dx = Math.abs(stagePos.x - startX)
+    const dy = Math.abs(stagePos.y - startY)
     if (dx > MIN_DRAG_DISTANCE || dy > MIN_DRAG_DISTANCE) {
       hasDragged = true
     }
 
-    // 使用屏幕坐标
-    const x = Math.min(startX, screenPos.x)
-    const y = Math.min(startY, screenPos.y)
-    const width = Math.abs(screenPos.x - startX)
-    const height = Math.abs(screenPos.y - startY)
+    // 使用 stage 内部坐标绘制选择框
+    const x = Math.min(startX, stagePos.x)
+    const y = Math.min(startY, stagePos.y)
+    const width = Math.abs(stagePos.x - startX)
+    const height = Math.abs(stagePos.y - startY)
 
     selectionRect.setAttrs({ x, y, width, height })
     overlayLayer?.batchDraw()
@@ -141,8 +164,13 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
 
     isSelecting = false
 
-    // 屏幕坐标 → 舞台坐标
-    const selRect = screenToStageRect(selectionRect)
+    // 选择框已经是 stage 内部坐标，可以直接用于命中检测
+    const selRect: SelectionRect = {
+      x: selectionRect.x(),
+      y: selectionRect.y(),
+      width: selectionRect.width(),
+      height: selectionRect.height()
+    }
 
     // 框选区域太小，忽略
     if (selRect.width < MIN_SELECTION_SIZE || selRect.height < MIN_SELECTION_SIZE) {
@@ -162,21 +190,6 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
     overlayLayer?.batchDraw()
   }
 
-  // ==================== 坐标转换 ====================
-
-  const screenToStageRect = (rect: Konva.Rect): SelectionRect => {
-    const scale = stage!.scaleX()
-    const stageX = stage!.x()
-    const stageY = stage!.y()
-
-    return {
-      x: (rect.x() - stageX) / scale,
-      y: (rect.y() - stageY) / scale,
-      width: rect.width() / scale,
-      height: rect.height() / scale
-    }
-  }
-
   // ==================== 命中检测 ====================
 
   const performHitTest = (selRect: SelectionRect): SelectionResult => {
@@ -189,8 +202,20 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
       sectionIds: []
     }
 
+    const scale = stage!.scaleX()
+    const stageX = stage!.x()
+    const stageY = stage!.y()
+
     nodeMap.forEach((node, id) => {
-      const nodeRect = node.getClientRect({ relativeTo: stage! })
+      // getClientRect({ relativeTo: stage }) 返回相对于舞台容器的像素坐标
+      // 需要转换成 stage 内部坐标才能与 selRect 比较
+      const nodeRectPx = node.getClientRect({ relativeTo: stage! })
+      const nodeRect = {
+        x: (nodeRectPx.x - stageX) / scale,
+        y: (nodeRectPx.y - stageY) / scale,
+        width: nodeRectPx.width / scale,
+        height: nodeRectPx.height / scale
+      }
 
       // AABB 相交检测
       const isIntersecting = (

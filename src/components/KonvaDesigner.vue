@@ -376,10 +376,8 @@ const onImportData = async () => {
   
   const venue = await importSeatMap(file)
   if (venue) {
-    // 替换当前数据
-    venueStore.venue = venue
-    // 清空选中状态
-    venueStore.clearSelection()
+    // 使用 importVenueData 导入（会自动重置 readonly 等属性）
+    venueStore.importVenueData(venue)
     alert(`导入成功！共 ${venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)} 个座位`)
   } else {
     alert('导入失败，请检查文件格式')

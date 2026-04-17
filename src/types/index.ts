@@ -345,6 +345,8 @@ export interface CanvasImage {
   fileName?: string
   // 是否可见
   visible?: boolean
+  // 层级控制（数值越大越在上层，默认 0）
+  zIndex?: number
 }
 
 // 选中对象类型
