@@ -623,20 +623,20 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const dot = new Konva.Circle({
       x: p.x,
       y: p.y,
-      radius: i === 0 ? 4 : 3,
+      radius: i === 0 ? 3 : 2,  // 从 4/3 改为 3/2，更小更精致
       fill: isArcStart ? '#f59e0b' : (i === 0 ? '#3b82f6' : '#60a5fa'),
       stroke: '#fff',
-      strokeWidth: 1.5,
+      strokeWidth: 1,
       listening: false
     })
     addPreviewElement(dot)
     
     if (isArcStart) {
       const arcMark = new Konva.Text({
-        x: p.x - 8,
-        y: p.y - 16,
+        x: p.x - 6,
+        y: p.y - 12,
         text: '⌒',
-        fontSize: 12,
+        fontSize: 10,
         fill: '#f59e0b',
         listening: false
       })
@@ -650,7 +650,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const path = new Konva.Path({
       data: pathData,
       stroke: '#3b82f6',
-      strokeWidth: 2,
+      strokeWidth: 1.5,  // 从 2 改为 1.5，更细
       listening: false
     })
     addPreviewElement(path)
@@ -667,7 +667,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const previewPath = new Konva.Path({
       data: calculateEdgePath(lastPoint, targetPoint, previewDepth),
       stroke: isNearStart ? '#22c55e' : '#3b82f6',
-      strokeWidth: 2,
+      strokeWidth: 1.5,  // 从 2 改为 1.5
       dash: isNearStart ? [] : [5, 5],
       listening: false
     })
@@ -676,7 +676,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const previewLine = new Konva.Line({
       points: [lastPoint.x, lastPoint.y, targetPoint.x, targetPoint.y],
       stroke: isNearStart ? '#22c55e' : '#3b82f6',
-      strokeWidth: 2,
+      strokeWidth: 1.5,  // 从 2 改为 1.5
       dash: isNearStart ? [] : [5, 5],
       listening: false
     })
@@ -688,7 +688,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     
     const fill = new Konva.Path({
       data: fillPath,
-      fill: 'rgba(156, 163, 175, 0.4)',
+      fill: 'rgba(156, 163, 175, 0.3)',  // 从 0.4 改为 0.3，更透明
       listening: false
     })
     addPreviewElement(fill)
@@ -696,10 +696,10 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const highlight = new Konva.Circle({
       x: points[0].x,
       y: points[0].y,
-      radius: 6,
+      radius: 4,  // 从 6 改为 4
       fill: '#22c55e',
       stroke: '#fff',
-      strokeWidth: 2,
+      strokeWidth: 1.5,
       listening: false
     })
     addPreviewElement(highlight)
