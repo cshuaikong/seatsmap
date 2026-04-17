@@ -1067,10 +1067,15 @@ export const useVenueStore = defineStore('venue', () => {
 
   /**
    * 创建当前状态的快照（用于撤销/重做）
+   * 包含 venue 和 canvasImages
    * 返回 JSON 字符串
    */
   function createSnapshot(): string {
-    return JSON.stringify(venue.value)
+    const data = {
+      venue: venue.value,
+      canvasImages: canvasImages.value
+    }
+    return JSON.stringify(data)
   }
 
   /**
@@ -1078,8 +1083,11 @@ export const useVenueStore = defineStore('venue', () => {
    */
   function restoreSnapshot(snapshot: string) {
     try {
-      const data = JSON.parse(snapshot) as VenueData
-      importVenueData(data)
+      const data = JSON.parse(snapshot) as { venue: VenueData; canvasImages: CanvasImage[] }
+      importVenueData(data.venue)
+      // 恢复图片
+      canvasImages.value = data.canvasImages || []
+      console.log('[恢复] 已恢复', data.canvasImages?.length || 0, '张图片')
     } catch (error) {
       console.error('恢复快照失败:', error)
     }

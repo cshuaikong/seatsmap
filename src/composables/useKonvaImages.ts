@@ -24,6 +24,7 @@ export interface ImageRenderOptions {
     startDragAll: (pointer: Position) => void
   } | null
   isDrawingMode: () => boolean
+  isSelecting?: () => boolean  // 框选状态检查
 }
 
 // ==================== 核心函数 ====================
@@ -113,6 +114,7 @@ export function createImageNode(
   konvaImage.on('mousedown', (e) => {
     if (e.evt.button !== 0) return
     if (isDrawingMode()) return
+    if (options.isSelecting?.()) return  // 框选模式下不触发选中
 
     // 实时读取最新锁定状态
     const latestData = konvaImage.getAttr('canvasImageData') as CanvasImage

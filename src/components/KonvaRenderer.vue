@@ -647,18 +647,24 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
 
   section.borderPathPoints.forEach((point, index) => {
     // 顶点拖拽手柄 - 始终可拖拽
+    // 计算反向缩放因子，使手柄在视觉上保持固定大小
+    const stageScale = stage?.scaleX() || 1
+    const handleScale = 1 / stageScale
+    
     const vertexHandle = new Konva.Circle({
       x: baseX + point.x,
       y: baseY + point.y,
-      radius: 5,
+      radius: 4,  // 从 5 改为 4，更小更精致
       fill: '#3b82f6',
       stroke: '#fff',
-      strokeWidth: 1.5,
+      strokeWidth: 1.5 / stageScale,  // 描边宽度也随缩放调整
       draggable: true,
       name: 'path-vertex-handle',
+      scaleX: handleScale,  // 反向缩放，保持视觉大小恒定
+      scaleY: handleScale,
       shadowColor: 'rgba(0,0,0,0.2)',
-      shadowBlur: 3,
-      shadowOffset: { x: 0, y: 1 }
+      shadowBlur: 3 / stageScale,
+      shadowOffset: { x: 0, y: 1 / stageScale }
     })
     
     // 确保拖拽不被拦截
@@ -743,6 +749,10 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
 const updatePathVertexHandlesPosition = (sectionId: string, x: number, y: number) => {
   if (!mainLayer) return
   
+  // 计算反向缩放因子
+  const stageScale = stage?.scaleX() || 1
+  const handleScale = 1 / stageScale
+  
   // 找到该 section 的所有顶点手柄
   const handles = mainLayer.find('.path-vertex-handle')
   handles.forEach((handle) => {
@@ -754,6 +764,10 @@ const updatePathVertexHandlesPosition = (sectionId: string, x: number, y: number
         const point = section.borderPathPoints[vertexIndex]
         // 更新手柄位置：新的 baseX/baseY + 相对坐标
         handle.position({ x: x + point.x, y: y + point.y })
+        // 同步更新缩放，保持视觉大小恒定
+        handle.scaleX(handleScale)
+        handle.scaleY(handleScale)
+        ;(handle as Konva.Circle).strokeWidth(1.5 / stageScale)
       }
     }
   })
@@ -891,7 +905,7 @@ const renderSectionBorder = (section: Section) => {
     fill: fillColor,
     stroke: isReadonly ? '#9ca3af' : strokeColor,
     strokeWidth: isSelected || isFocused ? 2 : 1.5,
-    dash: isFocused ? [] : [8, 4],
+    dash: [],  // 实线边框，无虚线
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
     listening: !isOtherFocused && !isReadonly  // 只读分区不参与交互
   }
@@ -1182,7 +1196,8 @@ const getImageRenderOptions = () => ({
   stage,
   nodeMap,
   tfm,
-  isDrawingMode
+  isDrawingMode,
+  isSelecting: () => selection?.isSelecting ?? false
 })
 
 // ==================== 渲染排====================

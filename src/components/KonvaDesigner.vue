@@ -36,7 +36,7 @@
           <Icon icon="lucide:eye" class="btn-icon" />
           预览
         </button>
-        <button class="action-btn primary">
+        <button class="action-btn primary" @click="onSave">
           <Icon icon="lucide:check" class="btn-icon" />
           保存
         </button>
@@ -129,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import Konva from 'konva'
 import RightPanel from './RightPanel.vue'
@@ -157,6 +157,19 @@ const currentTool = ref<ToolMode>('select')
 
 // 图表数据
 const chartName = ref('高性能座位图编辑器')
+
+// 页面加载时自动恢复本地数据
+onMounted(() => {
+  const saved = localStorage.getItem('seatsmap-autosave')
+  if (saved) {
+    try {
+      venueStore.restoreSnapshot(saved)
+      console.log('[自动恢复] 已从本地存储恢复数据')
+    } catch (error) {
+      console.error('[自动恢复] 恢复失败:', error)
+    }
+  }
+})
 
 // ==================== 分区聚焦模式 ====================
 
@@ -387,6 +400,13 @@ const onImportData = async () => {
 // 打开预览
 const onPreview = () => {
   showPreview.value = true
+}
+
+// 保存到本地存储
+const onSave = () => {
+  const snapshot = venueStore.createSnapshot()
+  localStorage.setItem('seatsmap-autosave', snapshot)
+  alert('已保存到本地！刷新页面会自动恢复')
 }
 
 const onCloseCategoryManager = () => {

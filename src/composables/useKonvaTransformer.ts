@@ -101,10 +101,11 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
 
       anchorFill: '#ffffff',
       anchorStroke: '#3b82f6',
-      anchorStrokeWidth: 1.5,
-      anchorSize: 8,
+      anchorStrokeWidth: 1,
+      anchorSize: 6,  // 手柄大小从 8 改为 6
+      anchorCornerRadius: 3,
 
-      rotateAnchorOffset: 30,
+      rotateAnchorOffset: 25,  // 旋转手柄偏移从 30 改为 25
       rotateAnchorCursor: 'crosshair'
     })
 
