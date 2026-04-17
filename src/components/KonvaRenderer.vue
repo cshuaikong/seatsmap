@@ -348,7 +348,11 @@ onMounted(() => {
     stage,
     mainLayer,
     nodeMap,
-    onScaleChange: (scale) => { viewportState.scale = scale }
+    onScaleChange: (scale) => {
+      viewportState.scale = scale
+      // 缩放变化时重新渲染，更新分区边框和 label 的视觉大小
+      renderAll()
+    }
   })
 
   // 初始渲染
