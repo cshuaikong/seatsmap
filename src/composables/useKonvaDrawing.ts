@@ -617,26 +617,31 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
   
   if (points.length === 0) return
   
+  // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+  const stage = _overlayLayer?.getStage()
+  const stageScale = stage?.scaleX() || 1
+  const handleScale = 1 / stageScale
+  
   // 绘制已固定的点（从该点出发的边若为弧线则高亮）
   points.forEach((p, i) => {
     const isArcStart = p.type === 'arc'
     const dot = new Konva.Circle({
       x: p.x,
       y: p.y,
-      radius: i === 0 ? 3 : 2,  // 从 4/3 改为 3/2，更小更精致
+      radius: (i === 0 ? 3 : 2) * handleScale,  // 反向缩放，保持视觉大小恒定
       fill: isArcStart ? '#f59e0b' : (i === 0 ? '#3b82f6' : '#60a5fa'),
       stroke: '#fff',
-      strokeWidth: 1,
+      strokeWidth: 1 * handleScale,
       listening: false
     })
     addPreviewElement(dot)
     
     if (isArcStart) {
       const arcMark = new Konva.Text({
-        x: p.x - 6,
-        y: p.y - 12,
+        x: p.x - 6 * handleScale,
+        y: p.y - 12 * handleScale,
         text: '⌒',
-        fontSize: 10,
+        fontSize: 10 * handleScale,
         fill: '#f59e0b',
         listening: false
       })
@@ -650,7 +655,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const path = new Konva.Path({
       data: pathData,
       stroke: '#3b82f6',
-      strokeWidth: 1.5,  // 从 2 改为 1.5，更细
+      strokeWidth: 1.5 * handleScale,  // 反向缩放保持视觉大小恒定
       listening: false
     })
     addPreviewElement(path)
@@ -667,8 +672,8 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const previewPath = new Konva.Path({
       data: calculateEdgePath(lastPoint, targetPoint, previewDepth),
       stroke: isNearStart ? '#22c55e' : '#3b82f6',
-      strokeWidth: 1.5,  // 从 2 改为 1.5
-      dash: isNearStart ? [] : [5, 5],
+      strokeWidth: 1.5 * handleScale,  // 反向缩放保持视觉大小恒定
+      dash: isNearStart ? [] : [5 * handleScale, 5 * handleScale],
       listening: false
     })
     addPreviewElement(previewPath)
@@ -676,8 +681,8 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const previewLine = new Konva.Line({
       points: [lastPoint.x, lastPoint.y, targetPoint.x, targetPoint.y],
       stroke: isNearStart ? '#22c55e' : '#3b82f6',
-      strokeWidth: 1.5,  // 从 2 改为 1.5
-      dash: isNearStart ? [] : [5, 5],
+      strokeWidth: 1.5 * handleScale,  // 反向缩放保持视觉大小恒定
+      dash: isNearStart ? [] : [5 * handleScale, 5 * handleScale],
       listening: false
     })
     addPreviewElement(previewLine)
@@ -688,7 +693,7 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     
     const fill = new Konva.Path({
       data: fillPath,
-      fill: 'rgba(156, 163, 175, 0.3)',  // 从 0.4 改为 0.3，更透明
+      fill: 'rgba(156, 163, 175, 0.3)',
       listening: false
     })
     addPreviewElement(fill)
@@ -696,10 +701,10 @@ export function createPolygonPreview(points: PathPoint[], currentPos: Position) 
     const highlight = new Konva.Circle({
       x: points[0].x,
       y: points[0].y,
-      radius: 4,  // 从 6 改为 4
+      radius: 4 * handleScale,  // 反向缩放保持视觉大小恒定
       fill: '#22c55e',
       stroke: '#fff',
-      strokeWidth: 1.5,
+      strokeWidth: 1.5 * handleScale,
       listening: false
     })
     addPreviewElement(highlight)
