@@ -893,6 +893,10 @@ const renderSectionBorder = (section: Section) => {
   const isSelected = venueStore.selectedSectionIds.includes(section.id)
   const isReadonly = section.readonly === true
 
+  // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+  const stageScale = stage?.scaleX() || 1
+  const visualScale = 1 / stageScale
+
   let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
   // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
@@ -901,10 +905,11 @@ const renderSectionBorder = (section: Section) => {
   const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
   // 只读分区：不参与交互（listening: false），使用灰色边框
+  // strokeWidth 使用反向缩放，保持视觉大小恒定
   const commonAttrs = {
     fill: fillColor,
     stroke: isReadonly ? '#9ca3af' : strokeColor,
-    strokeWidth: isSelected || isFocused ? 2 : 1.5,
+    strokeWidth: (isSelected || isFocused ? 2 : 1.5) * visualScale,
     dash: [],  // 实线边框，无虚线
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
     listening: !isOtherFocused && !isReadonly  // 只读分区不参与交互
@@ -1022,7 +1027,7 @@ const renderSectionBorder = (section: Section) => {
     x: labelX,
     y: labelY,
     text: section.name || '分区',
-    fontSize: 13,
+    fontSize: 13 * visualScale,  // 反向缩放保持视觉大小恒定
     fontFamily: 'Inter, -apple-system, sans-serif',
     fontStyle: 'bold',
     fill: isSelected ? '#3b82f6' : '#555',
