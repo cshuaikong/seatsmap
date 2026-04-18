@@ -277,13 +277,16 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   const stageScale = getStageScale()
   const visualScale = 1 / stageScale
   
-  // 视觉间距和半径（反向缩放，保持视觉大小恒定）
-  const visualSeatSpacing = SEAT_SPACING * visualScale
-  const visualSeatRadius = SEAT_RADIUS * visualScale
+  // 屏幕坐标系下的固定间距和半径（视觉大小恒定）
+  const screenSeatSpacing = SEAT_SPACING
+  const screenSeatRadius = SEAT_RADIUS
+  
+  // 将舞台距离转换为屏幕距离来计算座位数量
+  const screenDist = dist * stageScale
 
-  if (dist < visualSeatSpacing) return
+  if (screenDist < screenSeatSpacing) return
 
-  const count = Math.max(2, Math.floor(dist / visualSeatSpacing) + 1)
+  const count = Math.max(2, Math.floor(screenDist / screenSeatSpacing) + 1)
 
   clearDrawingPreview()
 
@@ -311,19 +314,24 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   })
   addPreviewElement(startDot)
   
-  // 生成座位数据（使用视觉间距）
+  // 生成座位数据（在屏幕坐标系下计算，然后转换回舞台坐标）
   const seats: { x: number; y: number }[] = []
   for (let i = 0; i < count; i++) {
-    seats.push({ x: i * visualSeatSpacing, y: 0 })
+    // 屏幕坐标下的位置
+    const screenX = i * screenSeatSpacing
+    // 转换回舞台坐标
+    const stageX = screenX * visualScale
+    seats.push({ x: stageX, y: 0 })
   }
   
-  // 计算边界
+  // 计算边界（使用舞台坐标）
+  const stageSeatRadius = screenSeatRadius * visualScale
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   seats.forEach(seat => {
-    minX = Math.min(minX, seat.x - visualSeatRadius)
-    minY = Math.min(minY, seat.y - visualSeatRadius)
-    maxX = Math.max(maxX, seat.x + visualSeatRadius)
-    maxY = Math.max(maxY, seat.y + visualSeatRadius)
+    minX = Math.min(minX, seat.x - stageSeatRadius)
+    minY = Math.min(minY, seat.y - stageSeatRadius)
+    maxX = Math.max(maxX, seat.x + stageSeatRadius)
+    maxY = Math.max(maxY, seat.y + stageSeatRadius)
   })
   
   const width = maxX - minX
@@ -344,7 +352,7 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   shape.sceneFunc((ctx) => {
     seats.forEach(seat => {
       ctx.beginPath()
-      ctx.arc(seat.x, seat.y, visualSeatRadius, 0, Math.PI * 2)
+      ctx.arc(seat.x, seat.y, stageSeatRadius, 0, Math.PI * 2)
       ctx.fillStyle = '#ffffff'
       ctx.fill()
       ctx.strokeStyle = '#3b82f6'
@@ -364,25 +372,36 @@ export function submitSeatRow(startPos: Position, endPos: Position) {
   const stageScale = getStageScale()
   const visualScale = 1 / stageScale
   
-  // 视觉间距（用于计算座位数量）
-  const visualSeatSpacing = SEAT_SPACING * visualScale
+  // 屏幕坐标系下的固定间距和半径
+  const screenSeatSpacing = SEAT_SPACING
+  const screenSeatRadius = SEAT_RADIUS
   
-  if (dist < visualSeatSpacing) {
+  // 将舞台距离转换为屏幕距离来计算座位数量
+  const screenDist = dist * stageScale
+  
+  if (screenDist < screenSeatSpacing) {
     clearDrawingPreview()
     return
   }
   
-  const count = Math.max(2, Math.floor(dist / visualSeatSpacing) + 1)
+  const count = Math.max(2, Math.floor(screenDist / screenSeatSpacing) + 1)
   const angle = Math.atan2(uy, ux) * 180 / Math.PI
   
-  // 生成座位（使用视觉间距，这样座位大小与预览一致）
+  // 生成座位（屏幕坐标 -> 舞台坐标）
   const seats: Seat[] = []
   for (let i = 0; i < count; i++) {
+    // 屏幕坐标下的位置
+    const screenX = i * screenSeatSpacing
+    const screenY = 0
+    // 转换回舞台坐标
+    const stageX = screenX * visualScale
+    const stageY = screenY * visualScale
+    
     seats.push({
       id: generateId(),
       label: '',  // 默认空标签
-      x: i * visualSeatSpacing + SEAT_RADIUS * visualScale,
-      y: SEAT_RADIUS * visualScale,
+      x: stageX + screenSeatRadius * visualScale,
+      y: stageY + screenSeatRadius * visualScale,
       categoryKey: useVenueStore().venue.categories[0]?.key || 1,
       status: 'available',
       objectType: 'seat'
@@ -398,7 +417,7 @@ export function submitSeatRow(startPos: Position, endPos: Position) {
     y: startPos.y,
     rotation: angle,
     curve: 0,
-    seatSpacing: visualSeatSpacing  // 使用视觉间距
+    seatSpacing: screenSeatSpacing * visualScale  // 舞台坐标系下的间距
   })
   
   clearDrawingPreview()
