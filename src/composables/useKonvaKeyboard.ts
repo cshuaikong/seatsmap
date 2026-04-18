@@ -91,6 +91,12 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     if (e.key === 'Delete') {
       // 绘制模式下不处理删除
       if (isDrawingMode()) return
+      
+      // 如果当前有输入框聚焦，不执行删除
+      const activeElement = document.activeElement
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('contenteditable'))) {
+        return
+      }
 
       deleteSelectedObjects()
       return
@@ -99,6 +105,13 @@ export function useKonvaKeyboard(options: UseKonvaKeyboardOptions): UseKonvaKeyb
     // Backspace 删除选中对象（绘制模式下不处理）
     if (e.key === 'Backspace') {
       if (isDrawingMode()) return
+      
+      // 如果当前有输入框聚焦，不执行删除
+      const activeElement = document.activeElement
+      if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('contenteditable'))) {
+        return
+      }
+      
       deleteSelectedObjects()
       return
     }
