@@ -909,11 +909,14 @@ const renderSectionBorder = (section: Section) => {
   const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
   // 只读分区：不参与交互（listening: false），使用灰色边框
-  // strokeWidth 使用反向缩放，保持视觉大小恒定
+  // strokeWidth 使用反向缩放，保持视觉大小恒定，但设置最小值确保始终可见
+  const baseStrokeWidth = isSelected || isFocused ? 2 : 1.5
+  const scaledStrokeWidth = Math.max(baseStrokeWidth * visualScale, 0.5)  // 最小 0.5 像素
+  
   const commonAttrs = {
     fill: fillColor,
     stroke: isReadonly ? '#9ca3af' : strokeColor,
-    strokeWidth: (isSelected || isFocused ? 2 : 1.5) * visualScale,
+    strokeWidth: scaledStrokeWidth,
     dash: [],  // 实线边框，无虚线
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
     listening: !isOtherFocused && !isReadonly  // 只读分区不参与交互
@@ -1031,7 +1034,7 @@ const renderSectionBorder = (section: Section) => {
     x: labelX,
     y: labelY,
     text: section.name || '分区',
-    fontSize: 13 * visualScale,  // 反向缩放保持视觉大小恒定
+    fontSize: Math.max(13 * visualScale, 8),  // 反向缩放保持视觉大小恒定，最小 8px
     fontFamily: 'Inter, -apple-system, sans-serif',
     fontStyle: 'bold',
     fill: isSelected ? '#3b82f6' : '#555',
