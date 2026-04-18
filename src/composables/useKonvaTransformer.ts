@@ -392,10 +392,11 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       dragAnimationFrameId = null
       if (!unifiedDragState.active || !stage) return
 
-      // screenPos 已经是舞台坐标，直接使用
-      // startScreenX/Y 也是舞台坐标，直接计算位移
-      const dx = screenPos.x - unifiedDragState.startScreenX
-      const dy = screenPos.y - unifiedDragState.startScreenY
+      // screenPos 是屏幕坐标，需要转换为世界坐标增量
+      // 屏幕坐标增量 / 缩放因子 = 世界坐标增量
+      const scale = stage.scaleX()
+      const dx = (screenPos.x - unifiedDragState.startScreenX) / scale
+      const dy = (screenPos.y - unifiedDragState.startScreenY) / scale
 
       unifiedDragState.items.forEach(item => {
         item.node.setAttrs({ x: item.startX + dx, y: item.startY + dy })
