@@ -523,16 +523,58 @@ const renderSectionBorder = (section: Section) => {
     }))
   }
 
-  // 渲染分区标签
+  // 渲染分区标签 - 计算分区中心位置
   if (section.name) {
-    layer.add(new Konva.Text({
-      x: (section.borderX || 0) - 30,
-      y: (section.borderY || 0) - 15,
+    let labelX = section.borderX || 0
+    let labelY = section.borderY || 0
+    
+    // 根据不同类型计算中心点
+    if (section.borderType === 'rect') {
+      labelX += (section.borderWidth || 100) / 2
+      labelY += (section.borderHeight || 100) / 2
+    } else if (section.borderType === 'ellipse') {
+      labelX += (section.borderRadiusX || 50) / 2
+      labelY += (section.borderRadiusY || 50) / 2
+    } else if (section.borderType === 'polygon' && section.borderPoints) {
+      // 计算多边形中心
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (let i = 0; i < section.borderPoints.length; i += 2) {
+        minX = Math.min(minX, section.borderPoints[i])
+        minY = Math.min(minY, section.borderPoints[i + 1])
+        maxX = Math.max(maxX, section.borderPoints[i])
+        maxY = Math.max(maxY, section.borderPoints[i + 1])
+      }
+      labelX += (minX + maxX) / 2
+      labelY += (minY + maxY) / 2
+    } else if (section.borderType === 'path' && section.borderPathPoints) {
+      // 计算路径中心
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      section.borderPathPoints.forEach(p => {
+        minX = Math.min(minX, p.x)
+        minY = Math.min(minY, p.y)
+        maxX = Math.max(maxX, p.x)
+        maxY = Math.max(maxY, p.y)
+      })
+      labelX += (minX + maxX) / 2
+      labelY += (minY + maxY) / 2
+    }
+    
+    const text = new Konva.Text({
+      x: labelX,
+      y: labelY,
       text: section.name,
-      fontSize: 12,
+      fontSize: 10,
       fontStyle: 'bold',
-      fill: '#555'
-    }))
+      fill: '#666',
+      align: 'center',
+      verticalAlign: 'middle'
+    })
+    
+    // 居中显示
+    text.offsetX(text.width() / 2)
+    text.offsetY(text.height() / 2)
+    
+    layer.add(text)
   }
 }
 
