@@ -544,7 +544,8 @@ export function submitRect(startPos: Position, endPos: Position) {
     borderY: y,
     borderWidth: width,
     borderHeight: height,
-    borderFill: 'rgba(59,130,246,0.08)'
+    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    borderStroke: '#808080'  // 默认灰色边框
   })
   
   clearDrawingPreview()
@@ -603,7 +604,8 @@ export function submitEllipse(startPos: Position, endPos: Position) {
     borderY: startPos.y,
     borderRadiusX: radius,
     borderRadiusY: radius,
-    borderFill: 'rgba(59,130,246,0.08)'
+    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    borderStroke: '#808080'  // 默认灰色边框
   })
   
   clearDrawingPreview()
@@ -738,7 +740,8 @@ export function submitPolygon(points: PathPoint[]) {
     borderX: center.x,
     borderY: center.y,
     borderPathPoints: relativePathPoints,
-    borderFill: 'rgba(59,130,246,0.08)'
+    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    borderStroke: '#808080'  // 默认灰色边框
   })
   
   clearDrawingPreview()

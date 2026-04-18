@@ -212,7 +212,8 @@ const getOrCreateDefaultSection = (): string => {
       borderY: 100,      // 左上角 y
       borderWidth: 400,  // 宽度
       borderHeight: 300, // 高度
-      borderFill: 'rgba(59,130,246,0.08)'
+      borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+      borderStroke: '#808080'  // 默认灰色边框
     })
     return sectionId || 'default'
   }
@@ -898,7 +899,7 @@ const renderSectionBorder = (section: Section) => {
   let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
   // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
-  const fillColor = section.borderFill || 'rgba(59,130,246,0.08)'
+  const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'  // 默认灰色半透明
   const autoStrokeColor = darkenColor(fillColor, 40)
   const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
@@ -2608,7 +2609,8 @@ const submitRect = (startPos: Position, endPos: Position) => {
     borderY: y,
     borderWidth: width,
     borderHeight: height,
-    borderFill: 'rgba(59,130,246,0.08)'
+    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    borderStroke: '#808080'  // 默认灰色边框
   })
   
   // 保存历史记录
@@ -2675,7 +2677,8 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     borderY: centerY,
     borderRadiusX: radiusX,
     borderRadiusY: radiusY,
-    borderFill: 'rgba(59,130,246,0.08)'
+    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    borderStroke: '#808080'  // 默认灰色边框
   })
   
   // 保存历史记录
@@ -2717,7 +2720,8 @@ const submitPolygon = (points: import('../types').PathPoint[]) => {
     borderX: center.x,
     borderY: center.y,
     borderPathPoints: relativePathPoints,
-    borderFill: 'rgba(59,130,246,0.08)'
+    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    borderStroke: '#808080'  // 默认灰色边框
   })
   
   // 保存历史记录
