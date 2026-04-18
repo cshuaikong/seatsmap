@@ -213,6 +213,11 @@ const renderSeatMap = () => {
 
   // 渲染所有 section
   props.venue.sections.forEach(section => {
+    // 渲染分区边框（如果有）
+    if (section.borderType && section.borderType !== 'none') {
+      renderSectionBorder(section)
+    }
+
     // 渲染形状
     section.shapes?.forEach(shape => {
       if (shape.type === 'rect') {
@@ -428,6 +433,73 @@ onUnmounted(() => {
     stage = null
   }
 })
+
+// 渲染分区边框
+const renderSectionBorder = (section: Section) => {
+  if (!layer || !section.borderType || section.borderType === 'none') return
+
+  const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'
+  const strokeColor = section.borderStroke || '#808080'
+
+  if (section.borderType === 'rect') {
+    layer.add(new Konva.Rect({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      width: section.borderWidth || 100,
+      height: section.borderHeight || 100,
+      fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth: 1
+    }))
+  } else if (section.borderType === 'ellipse') {
+    layer.add(new Konva.Ellipse({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      radiusX: section.borderRadiusX || 50,
+      radiusY: section.borderRadiusY || 50,
+      fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth: 1
+    }))
+  } else if (section.borderType === 'polygon' && section.borderPoints) {
+    layer.add(new Konva.Line({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      points: section.borderPoints,
+      closed: true,
+      fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth: 1
+    }))
+  } else if (section.borderType === 'path' && section.borderPathPoints) {
+    // 简化为多边形渲染路径
+    const points: number[] = []
+    section.borderPathPoints.forEach(p => {
+      points.push(p.x, p.y)
+    })
+    layer.add(new Konva.Line({
+      x: section.borderX || 0,
+      y: section.borderY || 0,
+      points,
+      closed: true,
+      fill: fillColor,
+      stroke: strokeColor,
+      strokeWidth: 1
+    }))
+  }
+
+  // 渲染分区标签
+  if (section.name) {
+    layer.add(new Konva.Text({
+      x: (section.borderX || 0) - 30,
+      y: (section.borderY || 0) - 15,
+      text: section.name,
+      fontSize: 12,
+      fontStyle: 'bold',
+      fill: '#555'
+    }))
+  }
+}
 
 defineExpose({ refresh: renderSeatMap, updateSelection })
 </script>
