@@ -123,6 +123,9 @@ const initStage = () => {
     // 更新所有 label 的反向缩放
     updateLabelScale()
     
+    // 重新渲染座位以应用新的视觉缩放
+    renderSeatMap()
+    
     layer?.batchDraw()
   })
 
@@ -329,27 +332,31 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     
     const isSelected = props.selectedSeatIds?.includes(seat.id)
     const color = getCategoryColor(seat.categoryKey)
+    
+    // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+    const stageScale = stage?.scaleX() || 1
+    const visualScale = 1 / stageScale
 
     // 座位圆形
     const circle = new Konva.Circle({
       x,
       y,
-      radius: SEAT_RADIUS,
+      radius: SEAT_RADIUS * visualScale,
       fill: isSelected ? '#FF5722' : color,
       stroke: '#fff',
-      strokeWidth: 1
+      strokeWidth: 1 * visualScale
     })
 
     // 座位编号（居中）
     if (seat.label && layer) {
       layer.add(new Konva.Text({
-        x: x - SEAT_RADIUS,
-        y: y - 4,
+        x: x - SEAT_RADIUS * visualScale,
+        y: y - 4 * visualScale,
         text: seat.label,
-        fontSize: 8,
+        fontSize: 8 * visualScale,
         fill: '#fff',
         align: 'center',
-        width: SEAT_RADIUS * 2,
+        width: SEAT_RADIUS * 2 * visualScale,
         listening: false
       }))
     }
