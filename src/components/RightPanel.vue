@@ -10,6 +10,8 @@
       <SectionPanel
         :section="selectedSectionWithBorder"
         :active-point-index="activePathPointIndex"
+        :is-multi="isMultiSectionSelected"
+        :selected-count="selectedSections.length"
         @update-property="(key, val) => handleSectionPropertyUpdate(key, val)"
         @activate-path-segment="(pointIndex) => handleActivatePathSegment(pointIndex)"
         @enter-section="onEnterSection"
@@ -272,7 +274,7 @@ const emit = defineEmits<{
 // 使用 venueStore 作为唯一数据源
 const venueStore = useVenueStore()
 
-// Section 分区选中（有边框的 section）
+// Section 分区选中（有边框的 section）- 单选时返回第一个，多选时也返回第一个用于显示
 const selectedSectionWithBorder = computed<Section | null>(() => {
   const sectionId = venueStore.selectedSectionIds[0]
   if (!sectionId) return null
@@ -281,6 +283,16 @@ const selectedSectionWithBorder = computed<Section | null>(() => {
   return section
 })
 
+// 获取所有选中的分区（用于批量编辑）
+const selectedSections = computed<Section[]>(() => {
+  return venueStore.selectedSectionIds
+    .map(id => venueStore.venue.sections.find(s => s.id === id))
+    .filter((s): s is Section => !!s && !!s.borderType && s.borderType !== 'none')
+})
+
+// 是否多选分区
+const isMultiSectionSelected = computed(() => selectedSections.value.length > 1)
+
 const activePathPointIndex = computed<number | null>(() => {
   const sectionId = venueStore.selectedSectionIds[0]
   if (!sectionId || venueStore.activePathSectionId !== sectionId) return null
@@ -288,9 +300,10 @@ const activePathPointIndex = computed<number | null>(() => {
 })
 
 const handleSectionPropertyUpdate = (key: string, val: any) => {
-  const sectionId = venueStore.selectedSectionIds[0]
-  if (!sectionId) return
-  venueStore.updateSectionBorder(sectionId, { [key]: val } as any)
+  // 批量更新所有选中的分区
+  venueStore.selectedSectionIds.forEach(sectionId => {
+    venueStore.updateSectionBorder(sectionId, { [key]: val } as any)
+  })
 }
 
 const handleActivatePathSegment = (pointIndex: number) => {

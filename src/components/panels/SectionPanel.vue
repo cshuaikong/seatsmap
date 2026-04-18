@@ -2,12 +2,12 @@
   <div class="section-panel">
     <div class="panel-header">
       <Icon icon="lucide:layout-grid" class="panel-header-icon" />
-      <span>分区属性</span>
+      <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
     </div>
 
     <div class="panel-body" v-if="section">
-      <!-- 分区名称 -->
-      <div class="panel-row">
+      <!-- 分区名称 - 单选时显示，多选时隐藏 -->
+      <div class="panel-row" v-if="!isMulti">
         <label class="panel-label">分区名称</label>
         <input
           class="panel-input"
@@ -89,24 +89,24 @@
       <div class="panel-stats">
         <div class="stat-item">
           <Icon icon="lucide:vector-square" class="stat-icon" />
-          <span>{{ borderTypeLabel }}</span>
+          <span>{{ isMulti ? `${selectedCount} 个分区` : borderTypeLabel }}</span>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" v-if="!isMulti">
           <Icon icon="lucide:rows-3" class="stat-icon" />
           <span>{{ section.rows.length }} 排</span>
         </div>
-        <div class="stat-item">
+        <div class="stat-item" v-if="!isMulti">
           <Icon icon="lucide:armchair" class="stat-icon" />
           <span>{{ seatCount }} 座</span>
         </div>
       </div>
 
-      <div v-if="section.borderType === 'path'" class="panel-note">
+      <div v-if="section.borderType === 'path' && !isMulti" class="panel-note">
         <Icon icon="lucide:pen-tool" class="note-icon" />
         <span>当前走 path 数据</span>
       </div>
 
-      <div v-if="section.borderType === 'path' && pathSegments.length" class="path-editor">
+      <div v-if="section.borderType === 'path' && pathSegments.length && !isMulti" class="path-editor">
         <div class="path-editor-header">
           <Icon icon="lucide:spline-pointer" class="note-icon" />
           <span>边段编辑</span>
@@ -191,6 +191,8 @@ import type { PathPoint, Section } from '../../types'
 const props = defineProps<{
   section: Section | null
   activePointIndex?: number | null
+  isMulti?: boolean  // 是否多选模式
+  selectedCount?: number  // 选中的分区数量
 }>()
 
 const emit = defineEmits<{
