@@ -351,8 +351,8 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     const selectedNodes = transformer.nodes()
     if (selectedNodes.length === 0) return
 
-    // 确保所有节点处于可拖拽状态
-    selectedNodes.forEach(node => node.draggable(true))
+    // 禁用原生拖拽，完全由手动控制（避免冲突）
+    selectedNodes.forEach(node => node.draggable(false))
 
     // 将屏幕坐标转换为舞台坐标（考虑缩放和平移）
     const scaleVal = stage.scaleX()
