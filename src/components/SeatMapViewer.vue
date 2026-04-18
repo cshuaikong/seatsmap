@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
-import type { VenueData, Seat, SeatRow, Section } from '../types'
+import type { VenueData, Seat, SeatRow, Section, PathPoint } from '../types'
 
 const props = defineProps<{
   venue: VenueData
@@ -434,6 +434,45 @@ onUnmounted(() => {
   }
 })
 
+// 判断是否是弯曲边
+const isCurvedEdge = (point: PathPoint) => point.type === 'arc' && Math.abs(point.arcDepth ?? 0) > 0.0001
+
+// 创建圆弧段（SVG Arc）
+const createArcSegment = (start: PathPoint, end: PathPoint, depth: number): string => {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const length = Math.sqrt(dx * dx + dy * dy) || 1
+  
+  const sagitta = length * Math.abs(depth) * 0.5
+  const halfChord = length / 2
+  let radius = (sagitta * sagitta + halfChord * halfChord) / (2 * Math.max(sagitta, 0.001))
+  radius = Math.max(radius, halfChord)
+  
+  const sweepFlag = depth > 0 ? 1 : 0
+  
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 ${sweepFlag} ${end.x} ${end.y}`
+}
+
+// 将路径点转换为 SVG Path 数据
+const pathPointsToSvgPath = (points: PathPoint[]): string => {
+  if (points.length < 2) return ''
+  
+  let path = `M ${points[0].x} ${points[0].y}`
+
+  points.forEach((start, index) => {
+    const end = points[(index + 1) % points.length]
+
+    if (isCurvedEdge(start)) {
+      path += ' ' + createArcSegment(start, end, start.arcDepth ?? 0).replace(`M ${start.x} ${start.y} `, '')
+    } else {
+      path += ` L ${end.x} ${end.y}`
+    }
+  })
+  
+  path += ' Z'
+  return path
+}
+
 // 渲染分区边框
 const renderSectionBorder = (section: Section) => {
   if (!layer || !section.borderType || section.borderType === 'none') return
@@ -472,16 +511,12 @@ const renderSectionBorder = (section: Section) => {
       strokeWidth: 1
     }))
   } else if (section.borderType === 'path' && section.borderPathPoints) {
-    // 简化为多边形渲染路径
-    const points: number[] = []
-    section.borderPathPoints.forEach(p => {
-      points.push(p.x, p.y)
-    })
-    layer.add(new Konva.Line({
+    // 使用 SVG Path 渲染带弧度的路径
+    const pathData = pathPointsToSvgPath(section.borderPathPoints)
+    layer.add(new Konva.Path({
       x: section.borderX || 0,
       y: section.borderY || 0,
-      points,
-      closed: true,
+      data: pathData,
       fill: fillColor,
       stroke: strokeColor,
       strokeWidth: 1
