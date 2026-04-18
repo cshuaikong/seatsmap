@@ -25,7 +25,7 @@ let stage: Konva.Stage | null = null
 let layer: Konva.Layer | null = null
 let seatNodes: Map<string, Konva.Circle> = new Map() // 存储座位节点用于更新状态
 
-const SEAT_RADIUS = 6
+const SEAT_RADIUS = 4
 
 // 计算弧形位置
 const calculateCurvedPositions = (seats: Seat[], curve: number): Array<{ x: number; y: number }> => {
