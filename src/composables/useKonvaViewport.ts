@@ -133,17 +133,17 @@ export function useKonvaViewport(options: UseKonvaViewportOptions): UseKonvaView
   // ==================== 节点视口检测 ====================
 
   const isNodeInViewport = (node: Konva.Node, viewport: ViewportBounds): boolean => {
-    // 获取节点在舞台坐标系中的包围盒（不是屏幕坐标）
-    const rect = node.getClientRect({ skipTransform: false })
-    const scale = stage?.scaleX() || 1
-    const stageX = stage?.x() || 0
-    const stageY = stage?.y() || 0
+    // 使用 getClientRect({ skipTransform: true }) 获取节点在父坐标系中的本地包围盒
+    // 然后手动计算在世界坐标系中的位置
+    const localRect = node.getClientRect({ skipTransform: true })
+    const transform = node.getAbsoluteTransform()
+    const pos = transform.point({ x: localRect.x, y: localRect.y })
+    const scale = node.getAbsoluteScale()
     
-    // 将屏幕坐标转换为舞台坐标
-    const nodeX = (rect.x - stageX) / scale
-    const nodeY = (rect.y - stageY) / scale
-    const nodeWidth = rect.width / scale
-    const nodeHeight = rect.height / scale
+    const nodeX = pos.x
+    const nodeY = pos.y
+    const nodeWidth = localRect.width * scale.x
+    const nodeHeight = localRect.height * scale.y
     
     return (
       nodeX + nodeWidth >= viewport.minX &&
