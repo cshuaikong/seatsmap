@@ -354,16 +354,11 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     // 禁用原生拖拽，完全由手动控制（避免冲突）
     selectedNodes.forEach(node => node.draggable(false))
 
-    // 将屏幕坐标转换为舞台坐标（考虑缩放和平移）
-    const scaleVal = stage.scaleX()
-    const stageX = stage.x()
-    const stageY = stage.y()
-    const startStageX = (screenPos.x - stageX) / scaleVal
-    const startStageY = (screenPos.y - stageY) / scaleVal
-
+    // screenPos 已经是舞台坐标（stage.getPointerPosition() 返回）
+    // 直接使用，不需要转换
     unifiedDragState.active = true
-    unifiedDragState.startScreenX = startStageX  // 记录舞台坐标
-    unifiedDragState.startScreenY = startStageY  // 记录舞台坐标
+    unifiedDragState.startScreenX = screenPos.x
+    unifiedDragState.startScreenY = screenPos.y
     unifiedDragState.useDragLayer = !isRotation
     unifiedDragState.items = selectedNodes.map(node => ({
       node,
@@ -397,14 +392,10 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       dragAnimationFrameId = null
       if (!unifiedDragState.active || !stage) return
 
-      // 将屏幕坐标转换为舞台坐标
-      const scaleVal = stage.scaleX()
-      const currentStageX = (screenPos.x - stage.x()) / scaleVal
-      const currentStageY = (screenPos.y - stage.y()) / scaleVal
-      
-      // startScreenX/Y 已经是舞台坐标，直接计算位移
-      const dx = currentStageX - unifiedDragState.startScreenX
-      const dy = currentStageY - unifiedDragState.startScreenY
+      // screenPos 已经是舞台坐标，直接使用
+      // startScreenX/Y 也是舞台坐标，直接计算位移
+      const dx = screenPos.x - unifiedDragState.startScreenX
+      const dy = screenPos.y - unifiedDragState.startScreenY
 
       unifiedDragState.items.forEach(item => {
         item.node.setAttrs({ x: item.startX + dx, y: item.startY + dy })
