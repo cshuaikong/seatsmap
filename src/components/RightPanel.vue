@@ -12,9 +12,11 @@
         :active-point-index="activePathPointIndex"
         :is-multi="isMultiSectionSelected"
         :selected-count="selectedSections.length"
+        :selected-sections="selectedSections"
         @update-property="(key, val) => handleSectionPropertyUpdate(key, val)"
         @activate-path-segment="(pointIndex) => handleActivatePathSegment(pointIndex)"
         @enter-section="onEnterSection"
+        @batch-update-names="handleBatchUpdateNames"
       />
     </template>
 
@@ -303,6 +305,15 @@ const handleSectionPropertyUpdate = (key: string, val: any) => {
   // 批量更新所有选中的分区
   venueStore.selectedSectionIds.forEach(sectionId => {
     venueStore.updateSectionBorder(sectionId, { [key]: val } as any)
+  })
+}
+
+// 批量更新分区名称
+const handleBatchUpdateNames = (names: string[]) => {
+  venueStore.selectedSectionIds.forEach((sectionId, index) => {
+    if (names[index]) {
+      venueStore.updateSectionBorder(sectionId, { name: names[index] } as any)
+    }
   })
 }
 

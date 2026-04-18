@@ -6,7 +6,7 @@
     </div>
 
     <div class="panel-body" v-if="section">
-      <!-- 分区名称 - 单选时显示，多选时隐藏 -->
+      <!-- 分区名称 - 单选时显示 -->
       <div class="panel-row" v-if="!isMulti">
         <label class="panel-label">分区名称</label>
         <input
@@ -14,6 +14,40 @@
           :value="section.name"
           @change="(e) => emit('update-property', 'name', (e.target as HTMLInputElement).value)"
         />
+      </div>
+
+      <!-- 批量重命名 - 多选时显示 -->
+      <div v-if="isMulti" class="batch-rename-section">
+        <div class="panel-row">
+          <label class="panel-label">批量命名</label>
+        </div>
+        <div class="batch-rename-row">
+          <input
+            class="panel-input"
+            v-model="batchPrefix"
+            placeholder="前缀，如：A区、第"
+            style="width: 80px;"
+          />
+          <input
+            class="panel-input"
+            v-model="batchStartNum"
+            type="number"
+            placeholder="起始"
+            style="width: 60px;"
+          />
+          <input
+            class="panel-input"
+            v-model="batchSuffix"
+            placeholder="后缀，如：区、排"
+            style="width: 60px;"
+          />
+        </div>
+        <div class="batch-preview">
+          预览: {{ batchPreview }}
+        </div>
+        <button class="batch-apply-btn" @click="applyBatchRename">
+          应用命名
+        </button>
       </div>
 
       <!-- 填充色 -->
@@ -184,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { PathPoint, Section } from '../../types'
 
@@ -193,13 +227,38 @@ const props = defineProps<{
   activePointIndex?: number | null
   isMulti?: boolean  // 是否多选模式
   selectedCount?: number  // 选中的分区数量
+  selectedSections?: Section[]  // 所有选中的分区
 }>()
 
 const emit = defineEmits<{
   'update-property': [key: string, val: any]
   'enter-section': []
   'activate-path-segment': [pointIndex: number]
+  'batch-update-names': [names: string[]]  // 批量更新名称
 }>()
+
+// 批量重命名状态
+const batchPrefix = ref('')
+const batchStartNum = ref(1)
+const batchSuffix = ref('')
+
+// 批量命名预览
+const batchPreview = computed(() => {
+  const start = batchStartNum.value || 1
+  return `${batchPrefix.value}${start}${batchSuffix.value}`
+})
+
+// 应用批量命名
+const applyBatchRename = () => {
+  if (!props.selectedSections || props.selectedSections.length === 0) return
+  
+  const names = props.selectedSections.map((section, index) => {
+    const num = (batchStartNum.value || 1) + index
+    return `${batchPrefix.value}${num}${batchSuffix.value}`
+  })
+  
+  emit('batch-update-names', names)
+}
 
 const activateSegment = (pointIndex: number) => {
   emit('activate-path-segment', pointIndex)
@@ -574,5 +633,46 @@ const pathSegments = computed(() => {
   font-size: 12px;
   color: var(--color-text-secondary);
   margin-left: 8px;
+}
+
+/* 批量重命名样式 */
+.batch-rename-section {
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.batch-rename-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.batch-preview {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+  padding: 6px 8px;
+  background: var(--color-bg);
+  border-radius: 4px;
+}
+
+.batch-apply-btn {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.batch-apply-btn:hover {
+  opacity: 0.9;
 }
 </style>
