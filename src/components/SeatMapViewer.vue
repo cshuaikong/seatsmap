@@ -570,7 +570,7 @@ const renderSectionBorder = (section: Section) => {
       x: labelX,
       y: labelY,
       text: section.name,
-      fontSize: Math.max(10 * visualScale, 8),  // 反向缩放，最小8px
+      fontSize: 10,  // 固定字体大小
       fontStyle: 'bold',
       fill: '#666',
       align: 'center',
@@ -598,12 +598,7 @@ const updateLabelScale = () => {
   
   layer.find('Text').forEach((textNode) => {
     const text = textNode as Konva.Text
-    // 重新计算字体大小
-    text.fontSize(Math.max(10 * visualScale, 8))
-    // 重新居中
-    text.offsetX(text.width() / 2)
-    text.offsetY(text.height() / 2)
-    // 应用反向缩放
+    // 应用反向缩放（只使用 scale，不修改 fontSize）
     text.scaleX(visualScale)
     text.scaleY(visualScale)
   })
