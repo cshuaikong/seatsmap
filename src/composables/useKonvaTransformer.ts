@@ -391,8 +391,17 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       if (!unifiedDragState.active || !stage) return
 
       const scaleVal = stage.scaleX()
-      const dx = (screenPos.x - unifiedDragState.startScreenX) / scaleVal
-      const dy = (screenPos.y - unifiedDragState.startScreenY) / scaleVal
+      const stageX = stage.x()
+      const stageY = stage.y()
+      
+      // 将屏幕坐标转换为舞台坐标（考虑缩放和平移）
+      const currentStageX = (screenPos.x - stageX) / scaleVal
+      const currentStageY = (screenPos.y - stageY) / scaleVal
+      const startStageX = (unifiedDragState.startScreenX - stageX) / scaleVal
+      const startStageY = (unifiedDragState.startScreenY - stageY) / scaleVal
+      
+      const dx = currentStageX - startStageX
+      const dy = currentStageY - startStageY
 
       unifiedDragState.items.forEach(item => {
         item.node.setAttrs({ x: item.startX + dx, y: item.startY + dy })
