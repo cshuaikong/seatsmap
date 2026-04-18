@@ -244,17 +244,25 @@ const checkNearStartPoint = (pos: Position, points: Position[]): boolean => {
 
 // ==================== 座位排绘制 ====================
 
+/** 获取舞台缩放比例 */
+const getStageScale = (): number => {
+  return _overlayLayer?.getStage()?.scaleX() || 1
+}
+
 /** 创建鼠标跟随的预览圆（idle 状态） */
 export function createSeatCursorPreview(pos: Position) {
   clearDrawingPreview()
   
+  const stageScale = getStageScale()
+  const visualScale = 1 / stageScale
+  
   const circle = new Konva.Circle({
     x: pos.x,
     y: pos.y,
-    radius: SEAT_RADIUS,
+    radius: SEAT_RADIUS * visualScale,
     fill: '#ffffff',
     stroke: '#3b82f6',
-    strokeWidth: 1.5,
+    strokeWidth: 1.5 * visualScale,
     opacity: 0.8,
     listening: false
   })
@@ -271,13 +279,16 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
 
   clearDrawingPreview()
+  
+  const stageScale = getStageScale()
+  const visualScale = 1 / stageScale
 
   // 绘制辅助线
   const line = new Konva.Line({
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
     stroke: '#3b82f6',
-    strokeWidth: 1.5,
-    dash: [6, 6],
+    strokeWidth: 1.5 * visualScale,
+    dash: [6 * visualScale, 6 * visualScale],
     listening: false
   })
   addPreviewElement(line)
@@ -288,10 +299,10 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   const startDot = new Konva.Circle({
     x: startPos.x,
     y: startPos.y,
-    radius: 5,
+    radius: 5 * visualScale,
     fill: '#3b82f6',
     stroke: '#fff',
-    strokeWidth: 1.5,
+    strokeWidth: 1.5 * visualScale,
     listening: false
   })
   addPreviewElement(startDot)
@@ -329,11 +340,11 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   shape.sceneFunc((ctx) => {
     seats.forEach(seat => {
       ctx.beginPath()
-      ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
+      ctx.arc(seat.x, seat.y, SEAT_RADIUS * visualScale, 0, Math.PI * 2)
       ctx.fillStyle = '#ffffff'
       ctx.fill()
       ctx.strokeStyle = '#3b82f6'
-      ctx.lineWidth = 1.5
+      ctx.lineWidth = 1.5 * visualScale
       ctx.stroke()
     })
   })
