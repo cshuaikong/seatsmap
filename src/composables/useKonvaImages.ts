@@ -83,7 +83,9 @@ export function createImageNode(
     existing.height(canvasImage.height)
     existing.rotation(canvasImage.rotation || 0)
     existing.opacity(canvasImage.opacity ?? 1)
-    existing.zIndex(canvasImage.zIndex ?? 0)
+    // 背景图默认层级为 -100，确保在最底层，除非手动设置了 zIndex
+    const finalZIndex = canvasImage.zIndex !== undefined ? canvasImage.zIndex : -100
+    existing.zIndex(finalZIndex)
     // 锁定时禁止事件穿透，解锁时恢复
     existing.listening(!canvasImage.locked)
     existing.setAttr('canvasImageData', canvasImage)
@@ -106,7 +108,9 @@ export function createImageNode(
   })
 
   // 设置层级（必须在添加到图层后生效）
-  konvaImage.zIndex(canvasImage.zIndex ?? 0)
+  // 背景图默认层级为 -100，确保在最底层，除非手动设置了 zIndex
+  const finalZIndex = canvasImage.zIndex !== undefined ? canvasImage.zIndex : -100
+  konvaImage.zIndex(finalZIndex)
 
   konvaImage.setAttr('canvasImageData', canvasImage)
 
