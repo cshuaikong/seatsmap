@@ -120,6 +120,9 @@ const initStage = () => {
       y: pointer.y - mousePointTo.y * newScale
     })
     
+    // 更新所有 label 的反向缩放
+    updateLabelScale()
+    
     layer?.batchDraw()
   })
 
@@ -559,11 +562,15 @@ const renderSectionBorder = (section: Section) => {
       labelY += (minY + maxY) / 2
     }
     
+    // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+    const stageScale = stage?.scaleX() || 1
+    const visualScale = 1 / stageScale
+    
     const text = new Konva.Text({
       x: labelX,
       y: labelY,
       text: section.name,
-      fontSize: 10,
+      fontSize: Math.max(10 * visualScale, 8),  // 反向缩放，最小8px
       fontStyle: 'bold',
       fill: '#666',
       align: 'center',
@@ -574,8 +581,34 @@ const renderSectionBorder = (section: Section) => {
     text.offsetX(text.width() / 2)
     text.offsetY(text.height() / 2)
     
+    // 设置缩放变换，保持视觉大小恒定
+    text.scaleX(visualScale)
+    text.scaleY(visualScale)
+    
     layer.add(text)
   }
+}
+
+// 更新所有 label 的缩放，保持视觉大小恒定
+const updateLabelScale = () => {
+  if (!stage || !layer) return
+  
+  const stageScale = stage.scaleX()
+  const visualScale = 1 / stageScale
+  
+  layer.find('Text').forEach((textNode) => {
+    const text = textNode as Konva.Text
+    // 重新计算字体大小
+    text.fontSize(Math.max(10 * visualScale, 8))
+    // 重新居中
+    text.offsetX(text.width() / 2)
+    text.offsetY(text.height() / 2)
+    // 应用反向缩放
+    text.scaleX(visualScale)
+    text.scaleY(visualScale)
+  })
+  
+  layer.batchDraw()
 }
 
 defineExpose({ refresh: renderSeatMap, updateSelection })
