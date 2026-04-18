@@ -90,7 +90,7 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 }
 
 .preview-modal {
-  background: #fff;
+  background: var(--color-bg-secondary);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   width: 540px;  /* 500px + padding */
@@ -148,20 +148,20 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #f5f5f5;
+  background: var(--color-bg);
 }
 
 .preview-viewer {
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-bg);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .preview-footer {
   padding: 12px 20px;
-  border-top: 1px solid #e5e5e5;
-  background: #fafafa;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
   min-height: 48px;
   display: flex;
   align-items: center;
