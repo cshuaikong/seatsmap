@@ -274,12 +274,6 @@ onMounted(() => {
     onSelectionEnd: (result, additive) => {
       const { rowIds, seatIds, shapeIds, textIds, areaIds, sectionIds } = result
       
-      // 过滤掉只读分区
-      const filteredSectionIds = sectionIds.filter(id => {
-        const section = venueStore.venue.sections.find(s => s.id === id)
-        return section && section.readonly !== true
-      })
-      
       venueStore.setActivePathSegment(null, null)
       if (additive) {
         if (rowIds.length) venueStore.selectedRowIds = [...new Set([...venueStore.selectedRowIds, ...rowIds])]
@@ -287,14 +281,14 @@ onMounted(() => {
         if (shapeIds.length) venueStore.selectedShapeIds = [...new Set([...venueStore.selectedShapeIds, ...shapeIds])]
         if (textIds.length) venueStore.selectedTextIds = [...new Set([...venueStore.selectedTextIds, ...textIds])]
         if (areaIds.length) venueStore.selectedAreaIds = [...new Set([...venueStore.selectedAreaIds, ...areaIds])]
-        if (filteredSectionIds.length) venueStore.selectedSectionIds = [...new Set([...venueStore.selectedSectionIds, ...filteredSectionIds])]
+        if (sectionIds.length) venueStore.selectedSectionIds = [...new Set([...venueStore.selectedSectionIds, ...sectionIds])]
       } else {
         venueStore.selectedRowIds = rowIds
         venueStore.selectedSeatIds = seatIds
         venueStore.selectedShapeIds = shapeIds
         venueStore.selectedTextIds = textIds
         venueStore.selectedAreaIds = areaIds
-        venueStore.selectedSectionIds = filteredSectionIds  // 使用过滤后的分区列表
+        venueStore.selectedSectionIds = sectionIds
       }
       // 更新 Transformer 以显示选中状态
       tfm?.updateTransformer(true)
