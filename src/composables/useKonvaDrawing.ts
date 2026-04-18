@@ -273,15 +273,19 @@ export function createSeatCursorPreview(pos: Position) {
 /** 创建座位排预览 */
 export function createSeatRowPreview(startPos: Position, endPos: Position) {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-
-  if (dist < SEAT_SPACING) return
-
-  const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
-
-  clearDrawingPreview()
   
   const stageScale = getStageScale()
   const visualScale = 1 / stageScale
+  
+  // 视觉间距和半径（反向缩放，保持视觉大小恒定）
+  const visualSeatSpacing = SEAT_SPACING * visualScale
+  const visualSeatRadius = SEAT_RADIUS * visualScale
+
+  if (dist < visualSeatSpacing) return
+
+  const count = Math.max(2, Math.floor(dist / visualSeatSpacing) + 1)
+
+  clearDrawingPreview()
 
   // 绘制辅助线
   const line = new Konva.Line({
@@ -307,19 +311,19 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   })
   addPreviewElement(startDot)
   
-  // 生成座位数据
+  // 生成座位数据（使用视觉间距）
   const seats: { x: number; y: number }[] = []
   for (let i = 0; i < count; i++) {
-    seats.push({ x: i * SEAT_SPACING, y: 0 })
+    seats.push({ x: i * visualSeatSpacing, y: 0 })
   }
   
   // 计算边界
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   seats.forEach(seat => {
-    minX = Math.min(minX, seat.x - SEAT_RADIUS)
-    minY = Math.min(minY, seat.y - SEAT_RADIUS)
-    maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
-    maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
+    minX = Math.min(minX, seat.x - visualSeatRadius)
+    minY = Math.min(minY, seat.y - visualSeatRadius)
+    maxX = Math.max(maxX, seat.x + visualSeatRadius)
+    maxY = Math.max(maxY, seat.y + visualSeatRadius)
   })
   
   const width = maxX - minX
@@ -340,7 +344,7 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   shape.sceneFunc((ctx) => {
     seats.forEach(seat => {
       ctx.beginPath()
-      ctx.arc(seat.x, seat.y, SEAT_RADIUS * visualScale, 0, Math.PI * 2)
+      ctx.arc(seat.x, seat.y, visualSeatRadius, 0, Math.PI * 2)
       ctx.fillStyle = '#ffffff'
       ctx.fill()
       ctx.strokeStyle = '#3b82f6'
@@ -356,29 +360,36 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
 export function submitSeatRow(startPos: Position, endPos: Position) {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
   
-  if (dist < SEAT_SPACING) {
+  // 获取当前缩放比例
+  const stageScale = getStageScale()
+  const visualScale = 1 / stageScale
+  
+  // 视觉间距（用于计算座位数量）
+  const visualSeatSpacing = SEAT_SPACING * visualScale
+  
+  if (dist < visualSeatSpacing) {
     clearDrawingPreview()
     return
   }
   
-  const count = Math.max(2, Math.floor(dist / SEAT_SPACING) + 1)
+  const count = Math.max(2, Math.floor(dist / visualSeatSpacing) + 1)
   const angle = Math.atan2(uy, ux) * 180 / Math.PI
   
-  // 生成座位
+  // 生成座位（使用视觉间距，这样座位大小与预览一致）
   const seats: Seat[] = []
   for (let i = 0; i < count; i++) {
     seats.push({
       id: generateId(),
       label: '',  // 默认空标签
-      x: i * SEAT_SPACING + SEAT_RADIUS,
-      y: SEAT_RADIUS,
+      x: i * visualSeatSpacing + SEAT_RADIUS * visualScale,
+      y: SEAT_RADIUS * visualScale,
       categoryKey: useVenueStore().venue.categories[0]?.key || 1,
       status: 'available',
       objectType: 'seat'
     })
   }
   
-  // 提交到 store
+  // 提交到 store（保存视觉间距，这样座位会随分区一起缩放）
   const sectionId = getOrCreateDefaultSection()
   useVenueStore().addRow(sectionId, {
     label: '',
@@ -387,7 +398,7 @@ export function submitSeatRow(startPos: Position, endPos: Position) {
     y: startPos.y,
     rotation: angle,
     curve: 0,
-    seatSpacing: SEAT_SPACING
+    seatSpacing: visualSeatSpacing  // 使用视觉间距
   })
   
   clearDrawingPreview()
