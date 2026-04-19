@@ -113,14 +113,19 @@ export function createRowShape(
   const { seatRadius, isSelected, sectionId } = options
   const { minX, minY, maxX, maxY, width, height, centerX, centerY } = bounds
 
+  // 【方案2修正】offset 使用保存的 baseScale 半径
+  // 保存的座位 x 坐标从 baseRadius 开始
+  // 注意：offset 是局部坐标，sceneFunc 内部会应用 scaleRatio
+  const baseRadius = row.seats.length > 0 ? row.seats[0].y : seatRadius / (row.baseScale || 1)
+  
   const rowShape = new Konva.Shape({
     x: row.x,
     y: row.y,
     rotation: row.rotation || 0,
     width: width,
     height: height,
-    offsetX: seatRadius,
-    offsetY: seatRadius,
+    offsetX: baseRadius,
+    offsetY: baseRadius,
     draggable: false,
     id: `row-${row.id}`,
     name: 'row-shape',
@@ -210,7 +215,8 @@ function calculateCurvedPositions(seats: Seat[], curve: number): Array<{ x: numb
 /**
  * 创建排的 sceneFunc（批次绘制座位）
  * 支持多段转折排渲染和弧度渲染
- * @param visualScale - 视觉缩放比例（聚焦模式下画布放大，座位保持视觉大小）
+ * @param visualScale - 视觉缩放比例（当前舞台缩放）
+ * @param baseScale - 基准缩放比例（进入分区编辑时记录的逻辑1:1缩放）
  */
 export function createRowSceneFunc(
   row: SeatRow,
@@ -218,25 +224,30 @@ export function createRowSceneFunc(
   isSelected: boolean,
   seatRadius: number,
   selectedSeatIds: string[] = [],
-  visualScale: number = 1
+  visualScale: number = 1,
+  baseScale: number = 1
 ): (context: Konva.Context, shape: Konva.Shape) => void {
   return (context, shape) => {
-    // 视觉半径：画布放大时缩小半径，保持视觉大小不变
-    const radius = seatRadius / visualScale
-
+   
     // 获取关键节点索引集合
     const segmentIndices = new Set(row.segmentIndices || [])
     
-    // 根据弧度计算座位位置
+    // 【修正】sceneFunc 中 Konva 会自动应用 visualScale
+    // 所以直接使用保存的 baseScale 坐标，不要再手动缩放
     const curvedPositions = calculateCurvedPositions(row.seats, row.curve || 0)
+    
+    // 【修正】直接使用保存的 baseScale 半径
+    const radius = row.seats.length > 0 ? row.seats[0].y : seatRadius / baseScale
 
     // 按分类颜色分组绘制
     const colorGroups = groupSeatsByColor(row.seats, getSeatColor)
 
     if (row.label) {
       // 标签紧贴第一个座位左侧，跟随弧形切线方向旋转
-      const firstPos = curvedPositions[0] || { x: seatRadius, y: seatRadius }
-      const secondPos = curvedPositions[1] || { x: firstPos.x + (row.seatSpacing || 28), y: firstPos.y }
+      const firstPos = curvedPositions[0] || { x: radius, y: radius }
+      // 直接使用保存的 baseScale 间距
+      const seatSpacingStage = row.seatSpacing || seatRadius * 3
+      const secondPos = curvedPositions[1] || { x: firstPos.x + seatSpacingStage, y: firstPos.y }
 
       // 计算前两个座位的连线角度（即排的局部切线方向）
       const dx = secondPos.x - firstPos.x
@@ -251,38 +262,72 @@ export function createRowSceneFunc(
       context.font = '12px Inter, -apple-system, sans-serif'
       context.textAlign = 'right'
       context.textBaseline = 'middle'
-      context.fillText(row.label, -seatRadius * 2.5, 0)
+      context.fillText(row.label, -radius * 2.5, 0)
       context.restore()
     }
-    // 批次绘制每个颜色组的座位
-    Object.entries(colorGroups).forEach(([color, groupSeats]) => {
-      if (groupSeats.length === 0) return
-
-      context.beginPath()
-      context.fillStyle = color
-
-      // 使用计算后的弧形位置绘制
-      groupSeats.forEach((seat, index) => {
-        const pos = curvedPositions[row.seats.indexOf(seat)]
-        context.moveTo(pos.x, pos.y)
-        context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
-      })
-
-      context.fill()
-
-      // 绘制边框 - 使用加深后的颜色（seats.io 风格）
+    // 【方案2】根据缩放比例决定显示模式
+    // 当当前缩放相对于基准缩放小于阈值时，显示为横条
+    const zoomRatio = visualScale / baseScale
+    const displayMode = zoomRatio < 0.6 ? 'bar' : 'seat'
+    
+    if (displayMode === 'bar') {
+      // 绘制横条表示座位排
+      const firstPos = curvedPositions[0]
+      const lastPos = curvedPositions[curvedPositions.length - 1]
+      const rowLength = Math.sqrt(
+        Math.pow(lastPos.x - firstPos.x, 2) + Math.pow(lastPos.y - firstPos.y, 2)
+      )
+      const rowAngle = Math.atan2(lastPos.y - firstPos.y, lastPos.x - firstPos.x)
+      
+      // 横条高度 = 座位直径
+      const barHeight = radius * 2
+      
       context.save()
-      const borderColor = darkenColor(color, 25)
-      context.strokeStyle = borderColor
-      context.lineWidth = 2
-      groupSeats.forEach((seat) => {
-        const pos = curvedPositions[row.seats.indexOf(seat)]
-        context.beginPath()
-        context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
-        context.stroke()
-      })
+      context.translate(firstPos.x, firstPos.y)
+      context.rotate(rowAngle)
+      
+      // 绘制横条背景
+      context.fillStyle = '#9E9E9E'
+      context.fillRect(0, -barHeight / 2, rowLength, barHeight)
+      
+      // 绘制横条边框
+      context.strokeStyle = '#757575'
+      context.lineWidth = 1
+      context.strokeRect(0, -barHeight / 2, rowLength, barHeight)
+      
       context.restore()
-    })
+    } else {
+      // 批次绘制每个颜色组的座位
+      Object.entries(colorGroups).forEach(([color, groupSeats]) => {
+        if (groupSeats.length === 0) return
+
+        context.beginPath()
+        context.fillStyle = color
+
+        // 使用计算后的弧形位置绘制
+        groupSeats.forEach((seat, index) => {
+          const pos = curvedPositions[row.seats.indexOf(seat)]
+          context.moveTo(pos.x, pos.y)
+          context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
+        })
+
+        context.fill()
+
+        // 绘制边框 - 使用加深后的颜色（seats.io 风格）
+        context.save()
+        const borderColor = darkenColor(color, 25)
+        context.strokeStyle = borderColor
+        // 边框线宽除以 baseScale，保持视觉比例
+        context.lineWidth = 2 / baseScale
+        groupSeats.forEach((seat) => {
+          const pos = curvedPositions[row.seats.indexOf(seat)]
+          context.beginPath()
+          context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
+          context.stroke()
+        })
+        context.restore()
+      })
+    }
 
     // 绘制座位标签（如果有）
     context.fillStyle = '#ffffff'
@@ -301,12 +346,12 @@ export function createRowSceneFunc(
     if (selectedSeatIds.length > 0) {
       context.save()
       context.strokeStyle = '#e53935'
-      context.lineWidth = 3
+      context.lineWidth = 3 / baseScale  // 选中边框线宽随 baseScale 缩放
       row.seats.forEach((seat, index) => {
         if (selectedSeatIds.includes(seat.id)) {
           const pos = curvedPositions[index]
           context.beginPath()
-          context.arc(pos.x, pos.y, radius + 2, 0, Math.PI * 2)
+          context.arc(pos.x, pos.y, radius + 2 / baseScale, 0, Math.PI * 2)
           context.stroke()
         }
       })

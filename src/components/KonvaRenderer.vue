@@ -1212,8 +1212,13 @@ const getImageRenderOptions = () => ({
 const renderRow = (row: SeatRow, section: Section) => {
   if (!mainLayer || row.seats.length === 0) return
 
-  // 计算边界
-  const bounds = calculateRowBounds(row, SEAT_RADIUS)
+  // 获取排的基准缩放（seats.io 风格）
+  const baseScale = row.baseScale || 1
+  console.log('[RenderRow] row.baseScale:', row.baseScale, 'using baseScale:', baseScale, 'row.id:', row.id)
+  
+  // 计算边界（座位位置是屏幕坐标，需要按 baseScale 缩放后计算）
+  const seatRadiusForBounds = SEAT_RADIUS / baseScale
+  const bounds = calculateRowBounds(row, seatRadiusForBounds)
 
   // 获取座位颜色函数
   const getSeatColor = (seat: Seat): string => {
@@ -1224,16 +1229,19 @@ const renderRow = (row: SeatRow, section: Section) => {
   }
 
   // 创建 Shape
+  // 【方案2】传入标准座位半径（SEAT_RADIUS），由 createRowSceneFunc 根据 scaleRatio 计算实际半径
+  const rowSeatRadius = SEAT_RADIUS
   const rowShape = createRowShape(row, bounds, {
-    seatRadius: SEAT_RADIUS,
+    seatRadius: rowSeatRadius,
     getSeatColor,
     isSelected: venueStore.selectedRowIds.includes(row.id),
     sectionId: section.id
   })
 
-  // 设置绘制函数（聚焦模式下传入 visualScale 保持座位视觉大小）
+  // 设置绘制函数（传入 visualScale 和 baseScale）
+  // 【方案2】传入标准半径，渲染函数会根据 scaleRatio 计算实际舞台坐标半径
   const visualScale = venueStore.focusedSectionId ? (stage?.scaleX() || 1) : 1
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), SEAT_RADIUS, venueStore.selectedSeatIds, visualScale))
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, visualScale, baseScale))
   rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
@@ -1579,10 +1587,10 @@ const setupStageEvents = () => {
         return
       }
 
-      // 座位绘制：分段式单击处理（在 click 事件中处理）
+      // 座位绘制：分段式单击处理（在第二个 mousedown 和 click 事件中处理）
+      // 注意：这里不要 return，让事件继续传播到第二个 mousedown 处理器
       if (tool === 'row-straight' || tool === 'section' || tool === 'section-diagonal') {
-        // 分段式绘制在 click 事件中处理，这里不处理 mousedown
-        return
+        // 不处理，让事件继续传播
       }
     }
     
@@ -1759,6 +1767,7 @@ const setupStageEvents = () => {
             seatDrawStep.value = 'segment_done'
           } else if (isSingleRowDrawingMode()) {
             // 单排模式：直接提交
+            console.log('[MouseUp] calling submitSeatRow (drag mode)')
             submitSeatRow(seatDrawPoints.value.first, endPos)
             resetSeatDrawingState()
           } else if (isMultiRowDrawingMode()) {
@@ -1854,6 +1863,7 @@ const setupStageEvents = () => {
         if (!pos) return
 
         // 第二次单击：确定终点，提交座位排
+        console.log('[Click] calling submitSeatRow (click mode)')
         submitSeatRow(seatDrawPoints.value.first, pos)
         // 重置状态，允许继续绘制下一排
         resetSeatDrawingState()
@@ -1984,14 +1994,24 @@ const createSeatCursorPreview = (pos: Position) => {
 const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
 
-  if (dist < drawing.SEAT_SPACING) return
+  // 获取当前舞台缩放
+  const stageScale = stage?.scaleX() || 1
+  
+  // 使用屏幕坐标系的间距和半径（视觉大小恒定）
+  const screenSeatSpacing = drawing.SEAT_SPACING  // 28
+  const screenSeatRadius = SEAT_RADIUS            // 6
+  
+  // 将舞台距离转换为屏幕距离来计算座位数量
+  const screenDist = dist * stageScale
 
-  const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
+  if (screenDist < screenSeatSpacing) return
+
+  const count = Math.max(2, Math.floor(screenDist / screenSeatSpacing) + 1)
 
   // 清除旧预览
   clearDrawingPreview()
 
-  // 绘制辅助线
+  // 绘制辅助线（视觉大小恒定）
   const line = new Konva.Line({
     points: [startPos.x, startPos.y, endPos.x, endPos.y],
     stroke: '#3b82f6',
@@ -2001,11 +2021,11 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   })
   addPreviewElement(line)
 
-  // 生成座位数据（局部坐标）
+  // 生成座位数据（局部坐标，屏幕坐标系）
   const seats: { x: number; y: number }[] = []
   for (let i = 0; i < count; i++) {
     seats.push({
-      x: i * drawing.SEAT_SPACING,  
+      x: i * screenSeatSpacing,  // 屏幕坐标（28px 间距）
       y: 0
     })
   }
@@ -2013,10 +2033,10 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   // 计算边界（包含座位半径）
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   seats.forEach((seat) => {
-    minX = Math.min(minX, seat.x - SEAT_RADIUS)
-    minY = Math.min(minY, seat.y - SEAT_RADIUS)
-    maxX = Math.max(maxX, seat.x + SEAT_RADIUS)
-    maxY = Math.max(maxY, seat.y + SEAT_RADIUS)
+    minX = Math.min(minX, seat.x - screenSeatRadius)
+    minY = Math.min(minY, seat.y - screenSeatRadius)
+    maxX = Math.max(maxX, seat.x + screenSeatRadius)
+    maxY = Math.max(maxY, seat.y + screenSeatRadius)
   })
   
   const width = maxX - minX
@@ -2025,12 +2045,12 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   // 计算旋转角度
   const angle = Math.atan2(uy, ux) * 180 / Math.PI
 
-  // 绘制座位预览
+  // 绘制座位预览（视觉大小恒定）
   const shape = new Konva.Shape({
     x: startPos.x,  
     y: startPos.y,
-    width: width,
-    height: height,
+    width: width / stageScale,   // 转换为舞台坐标
+    height: height / stageScale,
     rotation: angle,
     listening: false,
     perfectDrawEnabled: false
@@ -2038,9 +2058,15 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   
   shape.sceneFunc((ctx) => {
     // 座位圆圈 - 浅蓝色填充 + 蓝色边框
+    // 预览使用屏幕坐标绘制（视觉大小恒定）
     seats.forEach((seat, index) => {
+      // 将屏幕坐标转换为舞台坐标用于绘制
+      const x = seat.x / stageScale
+      const y = seat.y / stageScale
+      const r = screenSeatRadius / stageScale
+      
       ctx.beginPath()
-      ctx.arc(seat.x, seat.y, SEAT_RADIUS, 0, Math.PI * 2)
+      ctx.arc(x, y, r, 0, Math.PI * 2)
       
       // 统一填充：浅蓝色
       ctx.fillStyle = '#dbeafe'
@@ -2049,12 +2075,12 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
       if (index === 0) {
         // 第一个座位：粗边框（2px），表示起点
         ctx.strokeStyle = '#3b82f6'
-        ctx.lineWidth = 2
+        ctx.lineWidth = 2 / stageScale
         ctx.stroke()
       } else {
         // 其他座位：标准边框（1px）
         ctx.strokeStyle = '#3b82f6'
-        ctx.lineWidth = 1
+        ctx.lineWidth = 1 / stageScale
         ctx.stroke()
       }
     })
@@ -2070,6 +2096,18 @@ const createMultiSegmentPreview = (
   segments: SeatSegment[]
 ) => {
   clearDrawingPreview()
+
+  // 获取舞台缩放和基准缩放
+  const stageScale = stage?.scaleX() || 1
+  const baseScale = venueStore.sectionBaseScale || 1
+  const visualScale = 1 / stageScale
+  
+  // 【方案2】计算缩放比例因子
+  const scaleRatio = stageScale / baseScale
+  
+  // 【方案2】舞台坐标系下的间距和半径（按 scaleRatio 缩放）
+  const stageSeatSpacing = drawing.SEAT_SPACING / scaleRatio
+  const stageSeatRadius = SEAT_RADIUS / scaleRatio
 
   // 1. 批量绘制已完成的段（合并为一个 Shape 减少渲染开销）
   if (segments.length > 0) {
@@ -2087,11 +2125,11 @@ const createMultiSegmentPreview = (
         ctx.rotate(segment.angle)
 
         for (let i = 0; i < segment.seatCount; i++) {
-          const x = i * drawing.SEAT_SPACING
+          const x = i * stageSeatSpacing
           const y = 0
 
           ctx.beginPath()
-          ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
+          ctx.arc(x, y, stageSeatRadius, 0, Math.PI * 2)
 
           // 关键节点判断：最后一段的最后一个座位，或非第一段的第一个座位
           const isKeyNode = (isLastSegment && i === segment.seatCount - 1) || (i === 0 && segIndex > 0)
@@ -2101,14 +2139,14 @@ const createMultiSegmentPreview = (
             ctx.fillStyle = '#ffffff'
             ctx.fill()
             ctx.strokeStyle = '#3b82f6'
-            ctx.lineWidth = 2
+            ctx.lineWidth = 2 * visualScale
             ctx.stroke()
           } else {
             // 普通座位：浅蓝色填充 + 蓝色边框
             ctx.fillStyle = '#dbeafe'
             ctx.fill()
             ctx.strokeStyle = '#3b82f6'
-            ctx.lineWidth = 1
+            ctx.lineWidth = 1 * visualScale
             ctx.stroke()
           }
         }
@@ -2121,8 +2159,10 @@ const createMultiSegmentPreview = (
 
   // 2. 绘制当前预览段
   const { ux, uy, dist } = getUnitVector(currentStart, currentEnd)
-  if (dist >= drawing.SEAT_SPACING) {
-    const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
+  // 在分区编辑模式下，需要将距离乘以 stageScale 来得到屏幕距离
+  const screenDist = dist * stageScale
+  if (screenDist >= drawing.SEAT_SPACING) {
+    const count = Math.max(2, Math.floor(screenDist / drawing.SEAT_SPACING) + 1)
     const angle = Math.atan2(uy, ux)
 
     const previewShape = new Konva.Shape({
@@ -2136,32 +2176,32 @@ const createMultiSegmentPreview = (
       ctx.rotate(angle)
 
       for (let i = 0; i < count; i++) {
-        const x = i * drawing.SEAT_SPACING
+        const x = i * stageSeatSpacing
         const y = 0
 
         ctx.beginPath()
-        ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
+        ctx.arc(x, y, stageSeatRadius, 0, Math.PI * 2)
 
         // 第一个座位：关键节点样式（白色填充+蓝色边框）
         if (i === 0) {
           ctx.fillStyle = '#ffffff'
           ctx.fill()
           ctx.strokeStyle = '#3b82f6'
-          ctx.lineWidth = 2
+          ctx.lineWidth = 2 * visualScale
           ctx.stroke()
         } else if (i === count - 1) {
           // 最后一个座位：可点击提交的关键节点（绿色边框提示）
           ctx.fillStyle = '#dbeafe'
           ctx.fill()
           ctx.strokeStyle = '#22c55e'  // 绿色边框表示可点击
-          ctx.lineWidth = 2
+          ctx.lineWidth = 2 * visualScale
           ctx.stroke()
         } else {
           // 其他座位：标准样式
           ctx.fillStyle = '#dbeafe'
           ctx.fill()
           ctx.strokeStyle = '#3b82f6'
-          ctx.lineWidth = 1
+          ctx.lineWidth = 1 * visualScale
           ctx.stroke()
         }
       }
@@ -2178,16 +2218,28 @@ const createMultiSegmentPreview = (
 const createMultiRowPreview = (startPos: Position, endPos: Position) => {
   clearDrawingPreview()
 
+  // 【方案B】使用当前舞台缩放作为基准
+  const stageScale = stage?.scaleX() || 1
+  const baseScale = stageScale  // 当前缩放即为基准
+  const visualScale = 1 / stageScale
+  
+  // 【方案B】直接使用当前缩放计算间距和半径
+  // 预览和实际绘制使用相同的逻辑
+  const stageSeatSpacing = drawing.SEAT_SPACING / baseScale
+  const stageRowSpacing = ROW_SPACING / baseScale
+  const stageSeatRadius = SEAT_RADIUS / baseScale
+
   // 计算第一排数据（实时计算，不缓存）
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-  if (dist < drawing.SEAT_SPACING) return
+  // 【方案2】使用舞台距离直接计算
+  if (dist < stageSeatSpacing) return
 
-  const seatCount = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
+  const seatCount = Math.max(2, Math.floor(dist / stageSeatSpacing) + 1)
   const angle = Math.atan2(uy, ux)
 
   // 在 segment_done 状态下，使用已保存的第一排数据，只更新行数
   let rowCount = 1
-  let rowSpacing = ROW_SPACING
+  let rowSpacing = stageRowSpacing
   let baseRow = { start: startPos, end: endPos, angle, seatCount }
 
   // 计算行方向角度（默认垂直于第一排）
@@ -2196,10 +2248,10 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
   if (seatDrawStep.value === 'segment_done' && multiRowPreview.value) {
     // 使用已保存的第一排数据
     baseRow = multiRowPreview.value.baseRow
-    rowSpacing = multiRowPreview.value.rowSpacing
+    rowSpacing = multiRowPreview.value.rowSpacing / scaleRatio
 
     // 计算第一排最后一个座位位置
-    const lastSeatLocalX = (baseRow.seatCount - 1) * drawing.SEAT_SPACING
+    const lastSeatLocalX = (baseRow.seatCount - 1) * stageSeatSpacing
     const firstRowEndX = baseRow.start.x + lastSeatLocalX * Math.cos(baseRow.angle)
     const firstRowEndY = baseRow.start.y + lastSeatLocalX * Math.sin(baseRow.angle)
 
@@ -2217,11 +2269,11 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
     }
   }
 
-  // 保存预览数据
+  // 保存预览数据（保存屏幕坐标系下的值）
   multiRowPreview.value = {
     baseRow,
     rowCount,
-    rowSpacing,
+    rowSpacing: rowSpacing * stageScale, // 保存时转换为屏幕坐标系
     angle: baseRow.angle,
     rowDirectionAngle
   }
@@ -2241,8 +2293,8 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
   shape.sceneFunc((ctx) => {
     for (let row = 0; row < preview.rowCount; row++) {
       // 计算该行的起点（从第一排起点沿行方向偏移）
-      const rowOffsetX = row * preview.rowSpacing * Math.cos(perpAngle)
-      const rowOffsetY = row * preview.rowSpacing * Math.sin(perpAngle)
+      const rowOffsetX = row * rowSpacing * Math.cos(perpAngle)
+      const rowOffsetY = row * rowSpacing * Math.sin(perpAngle)
       const rowStartX = preview.baseRow.start.x + rowOffsetX
       const rowStartY = preview.baseRow.start.y + rowOffsetY
 
@@ -2251,32 +2303,32 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
       ctx.rotate(preview.angle)
 
       for (let i = 0; i < preview.baseRow.seatCount; i++) {
-        const x = i * drawing.SEAT_SPACING
+        const x = i * stageSeatSpacing
         const y = 0
 
         ctx.beginPath()
-        ctx.arc(x, y, SEAT_RADIUS, 0, Math.PI * 2)
+        ctx.arc(x, y, stageSeatRadius, 0, Math.PI * 2)
 
         // 第一排第一个座位：白色填充（起点标记）
         if (row === 0 && i === 0) {
           ctx.fillStyle = '#ffffff'
           ctx.fill()
           ctx.strokeStyle = '#3b82f6'
-          ctx.lineWidth = 2
+          ctx.lineWidth = 2 * visualScale
           ctx.stroke()
         } else if (row === preview.rowCount - 1 && i === preview.baseRow.seatCount - 1) {
           // 最后一排最后一个座位：绿色边框（可点击提交）
           ctx.fillStyle = '#dbeafe'
           ctx.fill()
           ctx.strokeStyle = '#22c55e'
-          ctx.lineWidth = 2
+          ctx.lineWidth = 2 * visualScale
           ctx.stroke()
         } else {
           // 其他座位：标准样式
           ctx.fillStyle = '#dbeafe'
           ctx.fill()
           ctx.strokeStyle = '#3b82f6'
-          ctx.lineWidth = 1
+          ctx.lineWidth = 1 * visualScale
           ctx.stroke()
         }
       }
@@ -2292,13 +2344,21 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
 /** 保存当前段到 completedSegments */
 const saveSegment = (startPos: Position, endPos: Position) => {
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-  if (dist < drawing.SEAT_SPACING) return
+  
+  const stageScale = stage?.scaleX() || 1
+  
+  // 将舞台距离转换为屏幕距离
+  const screenDist = dist * stageScale
+  if (screenDist < drawing.SEAT_SPACING) return
 
-  const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
+  const count = Math.max(2, Math.floor(screenDist / drawing.SEAT_SPACING) + 1)
   const angle = Math.atan2(uy, ux)
+  
+  // 舞台坐标系下的间距
+  const stageSeatSpacing = drawing.SEAT_SPACING / stageScale
 
   // 推算最后一个座位的精确中心位置（不是鼠标位置）
-  const lastSeatLocalX = (count - 1) * drawing.SEAT_SPACING
+  const lastSeatLocalX = (count - 1) * stageSeatSpacing
   const lastSeatPos = {
     x: startPos.x + lastSeatLocalX * Math.cos(angle),
     y: startPos.y + lastSeatLocalX * Math.sin(angle)
@@ -2372,11 +2432,17 @@ const calculateMultiSegmentSeats = (
 const submitAllSegments = () => {
   if (completedSegments.value.length === 0) return
 
+  const stageScale = stage?.scaleX() || 1
+  
+  // 舞台坐标系下的间距和半径 = 屏幕值 / 舞台缩放
+  const stageSeatSpacing = drawing.SEAT_SPACING / stageScale
+  const stageSeatRadius = SEAT_RADIUS / stageScale
+
   // 计算所有座位和关键节点
   const { seats: seatPositions, segmentIndices } = calculateMultiSegmentSeats(
     completedSegments.value,
-    drawing.SEAT_SPACING,
-    SEAT_RADIUS
+    stageSeatSpacing,
+    stageSeatRadius
   )
 
   if (seatPositions.length === 0) return
@@ -2403,7 +2469,7 @@ const submitAllSegments = () => {
     y: firstSegment.start.y,
     rotation: 0,  // 多段排不使用整体旋转
     curve: 0,
-    seatSpacing: drawing.SEAT_SPACING,
+    seatSpacing: stageSeatSpacing,
     segmentIndices  // 记录关键节点
   })
 
@@ -2419,6 +2485,16 @@ const submitMultiRows = () => {
 
   const preview = multiRowPreview.value
   const sectionId = getOrCreateDefaultSection()
+  
+  // 【方案2】获取舞台缩放和基准缩放
+  const stageScale = stage?.scaleX() || 1
+  const baseScale = venueStore.sectionBaseScale || 1
+  const scaleRatio = stageScale / baseScale
+  
+  // 【方案2】舞台坐标系下的间距和半径（按 scaleRatio 缩放）
+  const stageSeatSpacing = drawing.SEAT_SPACING / scaleRatio
+  const stageRowSpacing = preview.rowSpacing / scaleRatio
+  const stageSeatRadius = SEAT_RADIUS / scaleRatio
 
   // 使用行方向角度计算偏移向量
   const dirX = Math.cos(preview.rowDirectionAngle)
@@ -2427,8 +2503,8 @@ const submitMultiRows = () => {
   // 逐行提交
   for (let row = 0; row < preview.rowCount; row++) {
     // 计算该行的起点（沿行方向偏移）
-    const rowOffsetX = row * preview.rowSpacing * dirX
-    const rowOffsetY = row * preview.rowSpacing * dirY
+    const rowOffsetX = row * stageRowSpacing * dirX
+    const rowOffsetY = row * stageRowSpacing * dirY
     const rowStartX = preview.baseRow.start.x + rowOffsetX
     const rowStartY = preview.baseRow.start.y + rowOffsetY
 
@@ -2438,15 +2514,15 @@ const submitMultiRows = () => {
       seats.push({
         id: generateId(),
         label: '',  // 默认空标签
-        x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
-        y: SEAT_RADIUS,
+        x: i * stageSeatSpacing + stageSeatRadius,
+        y: stageSeatRadius,
         categoryKey: 0,  // 默认未分类（灰色）
         status: 'available',
         objectType: 'seat'
       })
     }
 
-    // 提交每一排
+    // 【方案2】提交每一排（保存舞台坐标和基准缩放）
     venueStore.addRow(sectionId, {
       label: '',
       seats,
@@ -2454,7 +2530,8 @@ const submitMultiRows = () => {
       y: rowStartY,
       rotation: preview.angle * 180 / Math.PI,
       curve: 0,
-      seatSpacing: drawing.SEAT_SPACING
+      seatSpacing: stageSeatSpacing,
+      baseScale: baseScale
     })
   }
 
@@ -2466,30 +2543,45 @@ const submitMultiRows = () => {
 
 /** 提交座位排到 store */
 const submitSeatRow = (startPos: Position, endPos: Position) => {
+  console.log('[submitSeatRow] called with startPos:', startPos, 'endPos:', endPos)
   const { ux, uy, dist } = getUnitVector(startPos, endPos)
-  if (dist < drawing.SEAT_SPACING) {
+  
+  // 【方案B】使用当前舞台缩放作为该排的 baseScale
+  // 每排独立记录绘制时的缩放值
+  const stageScale = stage?.scaleX() || 1
+  const baseScale = stageScale  // 当前缩放即为基准
+  
+  // 【方案B】使用当前 baseScale 计算座位间距和半径
+  const baseSeatSpacing = drawing.SEAT_SPACING / baseScale
+  const baseSeatRadius = SEAT_RADIUS / baseScale
+  
+  console.log('[submitSeatRow] dist:', dist, 'baseSeatSpacing:', baseSeatSpacing, 'stageScale:', stageScale, 'baseScale:', baseScale)
+  if (dist < baseSeatSpacing) {
+    console.log('[submitSeatRow] dist too small, returning')
     clearDrawingPreview()
     return
   }
   
-  const count = Math.max(2, Math.floor(dist / drawing.SEAT_SPACING) + 1)
+  const count = Math.max(2, Math.floor(dist / baseSeatSpacing) + 1)
   const angle = Math.atan2(uy, ux) * 180 / Math.PI
   
-  // 生成座位（使用局部坐标，偏移半径使 minX=0）
+  // 【方案2修正】生成座位（使用 baseScale 下的标准坐标）
   const seats: Seat[] = []
   for (let i = 0; i < count; i++) {
     seats.push({
       id: generateId(),
       label: '',  // 默认空标签
-      x: i * drawing.SEAT_SPACING + SEAT_RADIUS,
-      y: SEAT_RADIUS,
+      x: i * baseSeatSpacing + baseSeatRadius,
+      y: baseSeatRadius,
       categoryKey: 0,  // 默认未分类（灰色）
       status: 'available',
       objectType: 'seat'
     })
   }
   
-  // 提交）store
+  console.log('[KonvaRenderer submitSeatRow] baseScale:', baseScale, 'baseSeatRadius:', baseSeatRadius)
+  
+  // 【方案2修正】提交到 store（保存 baseScale 下的标准坐标）
   const sectionId = getOrCreateDefaultSection()
   venueStore.addRow(sectionId, {
     label: '',
@@ -2498,7 +2590,8 @@ const submitSeatRow = (startPos: Position, endPos: Position) => {
     y: startPos.y,
     rotation: angle,
     curve: 0,
-    seatSpacing: drawing.SEAT_SPACING
+    seatSpacing: baseSeatSpacing,
+    baseScale: baseScale
   })
 
   // 保存历史记录
@@ -2544,7 +2637,10 @@ const enterSectionFocus = (sectionId: string) => {
   if (!section) return
 
   venueStore.focusedSectionId = sectionId
-
+  
+  // 清空所有选中状态，避免绘制座位时触发分区拖拽
+  venueStore.clearSelection()
+  
   // 计算目标区域在 stage 坐标系中的包围盒
   const padding = 80
   const stageWidth = stage.width()
@@ -2558,6 +2654,13 @@ const enterSectionFocus = (sectionId: string) => {
   const scaleX = (stageWidth - padding * 2) / sectionW
   const scaleY = (stageHeight - padding * 2) / sectionH
   const newScale = Math.min(scaleX, scaleY, 4)  // 最大缩放 4x
+
+  // 【方案2】进入分区时的缩放即为基准缩放 baseScale
+  // 此时画布缩放为 newScale，我们将它视为逻辑上的 1:1 基准
+  // 座位将按默认大小绘制，保存时直接使用舞台坐标
+  console.log('[EnterSection] Setting baseScale to:', newScale)
+  venueStore.resetBaseScale()  // 先重置
+  venueStore.setSectionBaseScale(newScale)  // 设置为进入时的缩放
 
   const newX = stageWidth / 2 - (sectionX + sectionW / 2) * newScale
   const newY = stageHeight / 2 - (sectionY + sectionH / 2) * newScale
@@ -2575,6 +2678,9 @@ const enterSectionFocus = (sectionId: string) => {
 const exitSectionFocus = () => {
   if (!stage) return
   venueStore.focusedSectionId = null
+  
+  // 重置基准缩放（下次进入分区编辑模式时重新记录）
+  venueStore.resetBaseScale()
 
   // 恢复到默认视口
   stage.to({ x: 0, y: 0, scaleX: 1, scaleY: 1, duration: 0.3 })

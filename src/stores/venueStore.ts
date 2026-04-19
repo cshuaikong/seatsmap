@@ -46,6 +46,11 @@ export const useVenueStore = defineStore('venue', () => {
   // 当前聚焦的 Section id（进入分区编辑时设置）
   const focusedSectionId = ref<string | null>(null)
 
+  // 分区编辑模式的基准缩放比例（首次绘制座位时记录）
+  const sectionBaseScale = ref<number>(1)
+  // 标记是否已设置基准缩放（首次绘制时设置）
+  const hasSetBaseScale = ref<boolean>(false)
+
   // 当前激活的 path 边段（用于画布与右侧面板联动）
   const activePathSectionId = ref<string | null>(null)
   const activePathPointIndex = ref<number | null>(null)
@@ -1184,6 +1189,20 @@ export const useVenueStore = defineStore('venue', () => {
     undo,
     redo,
     canUndo,
-    canRedo
+    canRedo,
+    // BaseScale
+    sectionBaseScale,
+    hasSetBaseScale,
+    setSectionBaseScale: (scale: number) => { 
+      if (!hasSetBaseScale.value) {
+        sectionBaseScale.value = scale 
+        hasSetBaseScale.value = true
+      }
+    },
+    getSectionBaseScale: () => sectionBaseScale.value,
+    resetBaseScale: () => {
+      sectionBaseScale.value = 1
+      hasSetBaseScale.value = false
+    }
   }
 })

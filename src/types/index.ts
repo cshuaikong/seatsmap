@@ -96,6 +96,8 @@ export interface SeatRow {
   // 多段转折座位排的关键节点索引数组
   // 记录每段转折处的座位索引，用于渲染多段转折排
   segmentIndices?: number[]
+  // 基准缩放比例（seats.io 风格：首次绘制时记录，用于后续渲染）
+  baseScale?: number
 }
 
 // 扩展 Seat 支持 Seats.io 风格
