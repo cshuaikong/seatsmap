@@ -333,17 +333,21 @@ export function createRowSceneFunc(
     }
 
     // 绘制座位标签（如果有）
-    context.fillStyle = '#ffffff'
-    context.font = `bold ${Math.max(8, radius - 2)}px Inter, -apple-system, sans-serif`
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    
-    row.seats.forEach((seat, index) => {
-      if (seat.label) {
-        const pos = curvedPositions[index]
-        context.fillText(seat.label, pos.x, pos.y)
-      }
-    })
+    // 【优化】根据当前舞台缩放决定是否显示标签，避免过于密集
+    if (currentStageScale >= 1.5) {  // 缩放大于 1.5 时才显示标签
+      context.fillStyle = '#333333'  // 黑色字体
+      // 字体大小与半径一致
+      context.font = `${radius}px Inter, -apple-system, sans-serif`
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      
+      row.seats.forEach((seat, index) => {
+        if (seat.label) {
+          const pos = curvedPositions[index]
+          context.fillText(seat.label, pos.x, pos.y)
+        }
+      })
+    }
 
     // 绘制选中座位的高亮圆圈（selectseat 模式）
     if (selectedSeatIds.length > 0) {
