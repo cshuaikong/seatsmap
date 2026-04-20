@@ -90,7 +90,7 @@
               当前工具: {{ currentToolLabel }}
             </span>
             <span class="status-item">
-              缩放: {{ Math.round(zoomLevel * 100) }}%
+              画布缩放: {{ currentStageScale.toFixed(2) }} | baseScale: {{ currentBaseScale }}
             </span>
           </div>
 
@@ -129,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import Konva from 'konva'
 import RightPanel from './RightPanel.vue'
@@ -151,6 +151,8 @@ const showGrid = ref(true)
 
 // 视图状态
 const zoomLevel = ref(1)
+const currentStageScale = ref(1)
+const currentBaseScale = ref(1)
 
 // 工具状态
 const currentTool = ref<ToolMode>('select')
@@ -169,6 +171,17 @@ onMounted(() => {
       console.error('[自动恢复] 恢复失败:', error)
     }
   }
+  
+  // 定期更新缩放显示
+  const updateScaleInterval = setInterval(() => {
+    currentStageScale.value = (rendererRef.value as any)?.getStageScale?.() || 1
+    currentBaseScale.value = (rendererRef.value as any)?.getBaseScale?.() || 1
+  }, 100)
+  
+  // 清理定时器
+  onUnmounted(() => {
+    clearInterval(updateScaleInterval)
+  })
 })
 
 // ==================== 分区聚焦模式 ====================

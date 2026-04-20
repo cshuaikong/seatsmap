@@ -47,9 +47,16 @@ export const useVenueStore = defineStore('venue', () => {
   const focusedSectionId = ref<string | null>(null)
 
   // 分区编辑模式的基准缩放比例（首次绘制座位时记录）
-  const sectionBaseScale = ref<number>(1)
-  // 标记是否已设置基准缩放（首次绘制时设置）
-  const hasSetBaseScale = ref<boolean>(false)
+  // 核心公式：逻辑尺寸 = 视觉尺寸 / baseScale
+  // 这样无论当前 Stage 缩放多少，生成的座位在世界坐标系里大小恒定
+  const baseScale = ref<number | null>(null)
+
+  // 默认的座位视觉配置（用户在屏幕上期望看到的像素大小）
+  const visualConfig = {
+    radius: 6,      // 期望在屏幕上看到的半径 6px
+    gap: 18,        // 期望在屏幕上看到的间距 18px（= SEAT_SPACING）
+    rowGap: 24      // 期望在屏幕上看到的行距 24px（= ROW_SPACING）
+  }
 
   // 当前激活的 path 边段（用于画布与右侧面板联动）
   const activePathSectionId = ref<string | null>(null)
@@ -1191,18 +1198,17 @@ export const useVenueStore = defineStore('venue', () => {
     canUndo,
     canRedo,
     // BaseScale
-    sectionBaseScale,
-    hasSetBaseScale,
-    setSectionBaseScale: (scale: number) => { 
-      if (!hasSetBaseScale.value) {
-        sectionBaseScale.value = scale 
-        hasSetBaseScale.value = true
+    baseScale,
+    visualConfig,
+    initBaseScale: (currentScale: number) => {
+      if (baseScale.value === null) {
+        baseScale.value = currentScale
+        console.log('[baseScale] 基准缩放已锁定:', baseScale.value)
       }
     },
-    getSectionBaseScale: () => sectionBaseScale.value,
+    getBaseScale: () => baseScale.value ?? 1,
     resetBaseScale: () => {
-      sectionBaseScale.value = 1
-      hasSetBaseScale.value = false
+      baseScale.value = null
     }
   }
 })
