@@ -351,11 +351,13 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, storeBaseScale=${store.getBaseScale()}`)
   }
   
+  // 【修复】排标签精确定位
   if (row.label && row.seats.length > 0) {
     const firstPos = curvedPositions[0]
-    // 【修复】标签位置基于第一个座位位置
-    let labelX = rowX + firstPos.x - logicalRadius * 4
-    let labelY = rowY + firstPos.y - 6
+    // 标签位置：第一个座位左侧，垂直居中
+    const labelOffsetX = logicalRadius * 2.5  // 座位左侧偏移
+    let labelX = rowX + firstPos.x - labelOffsetX
+    let labelY = rowY + firstPos.y
     
     // 考虑旋转
     if (rotation) {
@@ -366,15 +368,21 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       labelY = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
     }
     
-    layer.add(new Konva.Text({
+    // 精确居中：创建后计算文本宽高
+    const rowLabelText = new Konva.Text({
       x: labelX,
       y: labelY,
       text: row.label,
       fontSize: 12,
       fill: '#666',
-      align: 'left',
+      align: 'center',
+      verticalAlign: 'middle',
       listening: false
-    }))
+    })
+    // 设置 offset 让文本居中
+    rowLabelText.offsetX(rowLabelText.width() / 2)
+    rowLabelText.offsetY(rowLabelText.height() / 2)
+    layer.add(rowLabelText)
   }
 
   // 座位（直接添加到 layer，不使用 Group）
