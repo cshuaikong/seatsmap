@@ -345,6 +345,11 @@ onMounted(() => {
     nodeMap,
     onScaleChange: (scale) => {
       viewportState.scale = scale
+      // 【关键】用户手动缩放后，更新 baseScale 为当前缩放值
+      // 这样后续绘制的座位都会以当前缩放为基准
+      if (venueStore.focusedSectionId) {
+        venueStore.setSectionBaseScale(scale)
+      }
       // 缩放变化时重新渲染，更新分区边框和 label 的视觉大小
       renderAll()
     }
@@ -2493,8 +2498,14 @@ const submitSeatRow = (startPos: Position, endPos: Position) => {
   
   // 核心转换：视觉像素 -> 逻辑尺寸
   const stageScale = stage?.scaleX() || 1
-  venueStore.initBaseScale(stageScale)
+  
+  // 【关键】如果还没有设置 baseScale（首次绘制），则使用当前缩放初始化
+  // 如果已有 baseScale，则继续使用（保持所有座位基准一致）
+  if (!venueStore.getBaseScale()) {
+    venueStore.initBaseScale(stageScale)
+  }
   const base = venueStore.getBaseScale()
+  
   const { radius, gap } = venueStore.visualConfig
   const logicalRadius = radius / base
   const logicalGap = gap / base
@@ -2590,12 +2601,30 @@ const enterSectionFocus = (sectionId: string) => {
   let sectionX = section.borderX || 0
   let sectionY = section.borderY || 0
 
-  const scaleX = (stageWidth - padding * 2) / sectionW
-  const scaleY = (stageHeight - padding * 2) / sectionH
-  const newScale = Math.min(scaleX, scaleY, 4)  // 最大缩放 4x
+  // 【修复】使用固定默认缩放 2，而不是自动计算的最大值
+  // 这样座位绘制时大小一致，用户可根据需要手动调整
+  const defaultScale = 2
+  
+  // 计算分区在默认缩放下的尺寸
+  const scaledSectionW = sectionW * defaultScale
+  const scaledSectionH = sectionH * defaultScale
+  
+  // 如果分区在默认缩放下超出画布，则适当缩小
+  const maxWidth = stageWidth - padding * 2
+  const maxHeight = stageHeight - padding * 2
+  
+  let newScale = defaultScale
+  if (scaledSectionW > maxWidth || scaledSectionH > maxHeight) {
+    // 分区太大，需要缩小以适应画布
+    const scaleX = maxWidth / sectionW
+    const scaleY = maxHeight / sectionH
+    newScale = Math.min(scaleX, scaleY, defaultScale)
+  }
+  
+  // 确保缩放不小于 0.5，不小于 4
+  newScale = Math.max(0.5, Math.min(newScale, 4))
 
   // 进入分区时的缩放即为基准缩放 baseScale
-  // 此时画布缩放为 newScale，我们将它视为逻辑上的 1:1 基准
   console.log('[EnterSection] Setting baseScale to:', newScale)
   venueStore.resetBaseScale()  // 先重置
   venueStore.initBaseScale(newScale)  // 设置为进入时的缩放

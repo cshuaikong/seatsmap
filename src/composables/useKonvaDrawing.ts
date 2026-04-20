@@ -168,8 +168,11 @@ const SNAP_TO_START_DISTANCE = 15
  * @param currentScale 当前 Stage 的缩放倍数
  */
 function getLogicalDimensions(store: ReturnType<typeof useVenueStore>, currentScale: number) {
-  // 1. 如果是第一次，锁定基准
-  store.initBaseScale(currentScale)
+  // 【关键】如果还没有设置 baseScale（首次绘制），则使用当前缩放初始化
+  // 如果已有 baseScale，则继续使用（保持所有座位基准一致）
+  if (!store.getBaseScale()) {
+    store.initBaseScale(currentScale)
+  }
   
   const base = store.getBaseScale()  // baseScale，第一次绘制时锁定
   const { radius, gap, rowGap } = store.visualConfig
