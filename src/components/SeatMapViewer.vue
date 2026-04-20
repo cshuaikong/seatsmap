@@ -6,6 +6,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Konva from 'konva'
 import type { VenueData, Seat, SeatRow, Section, PathPoint } from '../types'
+import { useVenueStore } from '../stores/venueStore'
 
 const props = defineProps<{
   venue: VenueData
@@ -24,8 +25,39 @@ const containerRef = ref<HTMLDivElement>()
 let stage: Konva.Stage | null = null
 let layer: Konva.Layer | null = null
 let seatNodes: Map<string, Konva.Circle> = new Map() // 存储座位节点用于更新状态
+let isInitialFit = true // 标记是否是初始自适应
 
-const SEAT_RADIUS = 4
+// 【修复】座位半径基于 baseScale 计算，与编辑器一致
+const getLogicalRadius = () => {
+  // 1. 优先从 store 获取配置（与编辑器实时同步）
+  const store = useVenueStore()
+  const configRadius = store.visualConfig?.radius || 6
+  
+  // 【关键】从 seat 数据反推 baseScale
+  // 如果 store 中没有 baseScale，根据座位间距反推
+  let baseScale = store.getBaseScale()
+  if (baseScale === 1) {
+    // 尝试从第一个排的第一个座位间距反推
+    const firstSection = props.venue.sections[0]
+    const firstRow = firstSection?.rows[0]
+    if (firstRow?.seats.length >= 2) {
+      const seat0 = firstRow.seats[0]
+      const seat1 = firstRow.seats[1]
+      const dist = Math.sqrt(Math.pow(seat1.x - seat0.x, 2) + Math.pow(seat1.y - seat0.y, 2))
+      // 间距 = gap / baseScale，所以 baseScale = gap / dist
+      const gap = store.visualConfig?.gap || 18
+      baseScale = gap / dist
+      console.log('[SeatMapViewer] Inferred baseScale from seat distance:', baseScale)
+    }
+  }
+  
+  // 2. 计算逻辑半径：和编辑器存坐标时的逻辑一致
+  // 坐标存的是 (pos / baseScale)，半径也得 (radius / baseScale)
+  const logicalRadius = configRadius / baseScale
+  
+  // 【保险】限制逻辑半径的最大值，避免重叠
+  return Math.min(logicalRadius, 4)
+}
 
 // 计算弧形位置
 const calculateCurvedPositions = (seats: Seat[], curve: number): Array<{ x: number; y: number }> => {
@@ -123,9 +155,6 @@ const initStage = () => {
     // 更新所有 label 的反向缩放
     updateLabelScale()
     
-    // 重新渲染座位以应用新的视觉缩放
-    renderSeatMap()
-    
     layer?.batchDraw()
   })
 
@@ -171,48 +200,65 @@ const initStage = () => {
   })
 }
 
-// 计算内容边界并自动缩放居中
+// 【重构】计算内容边界并自动缩放居中
 const fitContentToView = () => {
   if (!stage || !layer) return
+  
+  // 【修复】只在初始渲染时执行自适应，避免和用户手动缩放冲突
+  if (!isInitialFit) return
+  isInitialFit = false
 
-  // 使用 Konva 内置方法获取所有内容的边界
-  const box = layer.getClientRect({
-    relativeTo: stage
-  })
-
-  if (box.width === 0 || box.height === 0) return
-
-  // 添加边距（让内容与边界保持一定距离，更好看）
-  const padding = 60
-  const contentWidth = box.width + padding * 2
-  const contentHeight = box.height + padding * 2
-
-  // 计算缩放比例（适应舞台）
-  const stageWidth = stage.width()
-  const stageHeight = stage.height()
-  const scaleX = stageWidth / contentWidth
-  const scaleY = stageHeight / contentHeight
-  const scale = Math.min(scaleX, scaleY, 1) // 最大缩放为 1（不放大）
-
-  // 计算居中位置
-  const scaledWidth = contentWidth * scale
-  const scaledHeight = contentHeight * scale
-  const offsetX = (stageWidth - scaledWidth) / 2
-  const offsetY = (stageHeight - scaledHeight) / 2
-
-  // 应用缩放和位置
-  stage.scale({ x: scale, y: scale })
-  stage.position({
-    x: offsetX - (box.x - padding) * scale,
-    y: offsetY - (box.y - padding) * scale
-  })
-
+  // 1. 强制刷新图元，确保 getClientRect 能拿到最新数据
   layer.batchDraw()
+  
+  // 2. 获取所有图元的总边界
+  const box = layer.getClientRect()
+  
+  // 【调试】打印边界信息
+  const store = useVenueStore()
+  console.log('[SeatMapViewer] Content bounds:', box)
+  console.log('[SeatMapViewer] Store baseScale:', store.getBaseScale())
+  console.log('[SeatMapViewer] Store radius:', store.visualConfig?.radius)
+  
+  if (box.width === 0 || box.height === 0) {
+    console.warn('[SeatMapViewer] Empty content, skipping fit')
+    return
+  }
+
+  const padding = 40
+  const containerW = props.width || stage.width() || 500
+  const containerH = props.height || stage.height() || 500
+
+  // 3. 计算缩放比 (取宽高缩小比例中更小的那个)
+  const scale = Math.min(
+    (containerW - padding * 2) / box.width,
+    (containerH - padding * 2) / box.height
+  )
+  
+  console.log('[SeatMapViewer] Calculated scale:', scale)
+
+  // 4. 应用缩放
+  stage.scale({ x: scale, y: scale })
+
+  // 5. 将内容的中心点平移到容器中心
+  const contentCenterX = box.x + box.width / 2
+  const contentCenterY = box.y + box.height / 2
+
+  stage.position({
+    x: containerW / 2 - contentCenterX * scale,
+    y: containerH / 2 - contentCenterY * scale
+  })
+
+  stage.batchDraw()
 }
 
 // 渲染座位图
 const renderSeatMap = () => {
-  if (!layer) return
+  if (!stage || !layer) return
+
+  // 【修复】重置 Stage 状态，避免多次重绘导致位移叠加
+  stage.scale({ x: 1, y: 1 })
+  stage.position({ x: 0, y: 0 })
 
   layer.destroyChildren()
   seatNodes.clear() // 清空座位节点映射
@@ -275,6 +321,11 @@ const renderSeatMap = () => {
   })
 
   layer.batchDraw()
+  
+  // 【修复】渲染完成后自适应缩放
+  requestAnimationFrame(() => {
+    fitContentToView()
+  })
 }
 
 // 渲染排 Group
@@ -289,10 +340,22 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   const curvedPositions = calculateCurvedPositions(row.seats, curve)
 
   // 排标签
+  const logicalRadius = getLogicalRadius()
+  
+  // 【调试】打印第一排的信息
+  if (row.seats.length > 1) {
+    const seat0 = row.seats[0]
+    const seat1 = row.seats[1]
+    const dist = Math.sqrt(Math.pow(seat1.x - seat0.x, 2) + Math.pow(seat1.y - seat0.y, 2))
+    const store = useVenueStore()
+    console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, storeBaseScale=${store.getBaseScale()}`)
+  }
+  
   if (row.label && row.seats.length > 0) {
     const firstPos = curvedPositions[0]
-    let labelX = rowX - SEAT_RADIUS * 3
-    let labelY = rowY - SEAT_RADIUS + firstPos.y - 6
+    // 【修复】标签位置基于第一个座位位置
+    let labelX = rowX + firstPos.x - logicalRadius * 4
+    let labelY = rowY + firstPos.y - 6
     
     // 考虑旋转
     if (rotation) {
@@ -318,9 +381,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   row.seats.forEach((seat, index) => {
     const pos = curvedPositions[index]
     
-    // 计算座位位置（考虑 offset 和旋转）
-    let x = rowX - SEAT_RADIUS + pos.x
-    let y = rowY - SEAT_RADIUS + pos.y
+    // 【修复】座位位置直接使用 pos.x, pos.y，不再减去 SEAT_RADIUS
+    // pos.x, pos.y 已经是相对于 row 原点的正确位置
+    let x = rowX + pos.x
+    let y = rowY + pos.y
     
     if (rotation) {
       const rad = rotation * Math.PI / 180
@@ -333,33 +397,18 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     const isSelected = props.selectedSeatIds?.includes(seat.id)
     const color = getCategoryColor(seat.categoryKey)
     
-    // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
-    const stageScale = stage?.scaleX() || 1
-    const visualScale = 1 / stageScale
+    // 【修复】移除视觉恒定缩放，座位随舞台缩放
+    // 这样预览时座位大小与实际绘制一致
 
     // 座位圆形
     const circle = new Konva.Circle({
       x,
       y,
-      radius: SEAT_RADIUS * visualScale,
+      radius: logicalRadius,
       fill: isSelected ? '#FF5722' : color,
       stroke: '#fff',
-      strokeWidth: 1 * visualScale
+      strokeWidth: 1
     })
-
-    // 座位编号（居中）
-    if (seat.label && layer) {
-      layer.add(new Konva.Text({
-        x: x - SEAT_RADIUS * visualScale,
-        y: y - 4 * visualScale,
-        text: seat.label,
-        fontSize: 8 * visualScale,
-        fill: '#fff',
-        align: 'center',
-        width: SEAT_RADIUS * 2 * visualScale,
-        listening: false
-      }))
-    }
 
   // 点击事件 - 切换选择状态
     if (props.selectable !== false) {
@@ -396,6 +445,31 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       layer.add(circle)
     }
     seatNodes.set(seat.id, circle) // 存储节点用于后续更新
+    
+    // 【修复】座位编号在座位圆形之后添加，确保显示在上层
+    // 根据当前舞台缩放决定是否显示标签
+    const currentStageScale = stage?.scaleX() || 1
+    if (seat.label && layer && currentStageScale >= 0.8) {
+      // 字体大小等于逻辑半径，随座位一起缩放
+      const fontSize = logicalRadius
+      
+      // 精确居中：创建后计算文本宽高
+      const text = new Konva.Text({
+        x: x,
+        y: y,
+        text: String(seat.label),
+        fontSize: fontSize,
+        fill: '#333',
+        align: 'center',
+        verticalAlign: 'middle',
+        listening: false,
+        name: 'seat-label'  // 标记为座位标签，用于缩放时更新
+      })
+      // 设置 offset 让文本真正居中
+      text.offsetX(text.width() / 2)
+      text.offsetY(text.height() / 2)
+      layer.add(text)
+    }
   })
 }
 
@@ -436,6 +510,18 @@ onMounted(() => {
 watch(() => props.selectedSeatIds, () => {
   updateSelection()
 }, { deep: true })
+
+// 【修复】监听 venue 的 sections 变化，重新渲染并自适应
+watch(() => props.venue.sections, (newSections, oldSections) => {
+  // 只在 sections 真正变化时重新渲染（比较引用或长度）
+  if (newSections !== oldSections || newSections.length !== oldSections?.length) {
+    isInitialFit = true // 重置标志，允许重新自适应
+    renderSeatMap()
+    requestAnimationFrame(() => {
+      fitContentToView()
+    })
+  }
+})
 
 onUnmounted(() => {
   if (stage) {
@@ -596,18 +682,34 @@ const renderSectionBorder = (section: Section) => {
   }
 }
 
-// 更新所有 label 的缩放，保持视觉大小恒定
+// 更新所有 label 的缩放
 const updateLabelScale = () => {
   if (!stage || !layer) return
   
   const stageScale = stage.scaleX()
   const visualScale = 1 / stageScale
   
+  // 获取逻辑半径用于计算座位标签字体大小
+  const logicalRadius = getLogicalRadius()
+  
   layer.find('Text').forEach((textNode) => {
     const text = textNode as Konva.Text
-    // 应用反向缩放（只使用 scale，不修改 fontSize）
-    text.scaleX(visualScale)
-    text.scaleY(visualScale)
+    const textName = text.name()
+    
+    if (textName === 'seat-label') {
+      // 座位标签：字体大小等于逻辑半径，随座位一起缩放
+      if (stageScale >= 0.8) {
+        text.fontSize(logicalRadius)
+        // 不需要设置 offset，Konva 的 align 和 verticalAlign 会自动居中
+        text.visible(true)
+      } else {
+        text.visible(false)
+      }
+    } else {
+      // 分区/排标签：应用反向缩放保持视觉大小恒定
+      text.scaleX(visualScale)
+      text.scaleY(visualScale)
+    }
   })
   
   layer.batchDraw()

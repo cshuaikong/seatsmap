@@ -1,11 +1,19 @@
 import { ref } from 'vue'
 import type { VenueData, Section, SeatRow, Seat, Category } from '../types'
+import { useVenueStore } from '../stores/venueStore'
 
 // 导出数据格式
 export interface SeatMapExportData {
   version: string
   exportTime: string
-  venue: VenueData
+  venue: VenueData & {
+    baseScale?: number
+    visualConfig?: {
+      radius: number
+      gap: number
+      rowGap: number
+    }
+  }
 }
 
 // 验证导入数据
@@ -25,10 +33,22 @@ export function useSeatMapIO() {
   // 导出座位图数据为 JSON 文件
   const exportSeatMap = (venue: VenueData, fileName?: string) => {
     try {
+      // 获取 store 中的 baseScale 和 visualConfig
+      const store = useVenueStore()
+      const baseScale = store.getBaseScale()
+      const visualConfig = store.visualConfig
+      
+      // 深拷贝 venue 并添加 baseScale 和 visualConfig
+      const venueWithMeta = {
+        ...JSON.parse(JSON.stringify(venue)),
+        baseScale,
+        visualConfig
+      }
+      
       const exportData: SeatMapExportData = {
         version: '1.0',
         exportTime: new Date().toISOString(),
-        venue: JSON.parse(JSON.stringify(venue)) // 深拷贝
+        venue: venueWithMeta
       }
 
       const jsonStr = JSON.stringify(exportData, null, 2)

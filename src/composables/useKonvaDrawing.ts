@@ -313,11 +313,18 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
   
   const stageScale = getStageScale()
   const venueStore = useVenueStore()
-  const { logicalRadius, logicalGap } = getLogicalDimensions(venueStore, stageScale)
   
-  // 使用逻辑间距判断是否有效
-  if (stageDist < logicalGap) return
-  const count = Math.max(2, Math.floor(stageDist / logicalGap) + 1)
+  // 【修复】预览使用逻辑坐标，与实际绘制一致
+  // 让 Konva 自动应用 stageScale 进行屏幕渲染
+  const { radius, gap } = venueStore.visualConfig
+  const base = venueStore.getBaseScale() || stageScale
+  const logicalRadius = radius / base  // 逻辑半径
+  const logicalGap = gap / base        // 逻辑间距
+  
+  // 使用逻辑间距判断是否有效（转换为屏幕距离）
+  const screenGap = logicalGap * stageScale
+  if (stageDist < screenGap) return
+  const count = Math.max(2, Math.floor(stageDist / screenGap) + 1)
 
   clearDrawingPreview()
 

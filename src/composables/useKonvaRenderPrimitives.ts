@@ -122,14 +122,19 @@ export function createRowShape(
   // seatRadius 已经是逻辑半径（调用端已处理 baseScale），直接使用
   const drawRadius = seatRadius
   
+  // 【修复】offset 应该从第一个座位的位置开始，而不是从半径开始
+  // 座位 x 坐标从 logicalRadius 开始（i * gap + radius）
+  const offsetX = row.seats.length > 0 ? row.seats[0].x : drawRadius
+  const offsetY = row.seats.length > 0 ? row.seats[0].y : drawRadius
+  
   const rowShape = new Konva.Shape({
     x: row.x,
     y: row.y,
     rotation: row.rotation || 0,
     width: width,
     height: height,
-    offsetX: drawRadius,
-    offsetY: drawRadius,
+    offsetX: offsetX,
+    offsetY: offsetY,
     draggable: false,
     id: `row-${row.id}`,
     name: 'row-shape',
