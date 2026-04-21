@@ -476,8 +476,8 @@ const updateRowSelectionVisuals = () => {
         const isSelected = venueStore.selectedRowIds.includes(row.id)
         
         // 重新计算 bounds（座位位置可能已变化）
-        // 使用排的 baseScale 计算逻辑半径
-        const rowBaseScale = row.baseScale || 1
+        // 使用 baseScale 计算逻辑半径
+        const rowBaseScale = venueStore.getBaseScale()
         const rowSeatRadius = SEAT_RADIUS / rowBaseScale
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
         row.seats.forEach((seat) => {
@@ -1066,23 +1066,36 @@ const renderSectionBorder = (section: Section) => {
   label.setAttr('isSectionLabel', true)
   nodeMap.set('sectionLabel_' + section.id, label)
 
-  // 单击选中（支持 Shift 多选）- 只读分区不触发，绘制模式不触发
+  // 单击选中 + 双击检测 - 只读分区不触发，绘制模式不触发
   if (!section.readonly) {
+    let lastClickTime = 0
+    let lastClickPos = { x: 0, y: 0 }
+    
     borderNode.on('click', (e) => {
-      if (isDrawingMode()) return  // 绘制模式下不触发选中
+      if (isDrawingMode()) return  // 绘制模式下不触发
       e.cancelBubble = true
-      const additive = e.evt.shiftKey
-      venueStore.selectSection(section.id, additive)
-      // 更新 Transformer 以显示选中边框
-      tfm?.updateTransformer(true)
-      mainLayer?.batchDraw()
-    })
-
-    // 双击进入聚焦 - 只读分区不触发，绘制模式不触发
-    borderNode.on('dblclick', (e) => {
-      if (isDrawingMode()) return  // 绘制模式下不触发聚焦
-      e.cancelBubble = true
-      enterSectionFocus(section.id)
+      
+      const now = Date.now()
+      const pos = stage?.getPointerPosition() || { x: 0, y: 0 }
+      const timeDiff = now - lastClickTime
+      const dist = Math.sqrt(Math.pow(pos.x - lastClickPos.x, 2) + Math.pow(pos.y - lastClickPos.y, 2))
+      
+      // 双击检测：300ms 内且距离小于 10 像素
+      if (timeDiff < 300 && dist < 10) {
+        // 双击：进入分区编辑
+        console.log('[双击] 进入分区:', section.id)
+        enterSectionFocus(section.id)
+        lastClickTime = 0  // 重置，避免三击触发
+      } else {
+        // 单击：选中分区
+        const additive = e.evt.shiftKey
+        venueStore.selectSection(section.id, additive)
+        tfm?.updateTransformer(true)
+        mainLayer?.batchDraw()
+      }
+      
+      lastClickTime = now
+      lastClickPos = pos
     })
   }
 
@@ -1227,8 +1240,9 @@ const getImageRenderOptions = () => ({
 const renderRow = (row: SeatRow, section: Section) => {
   if (!mainLayer || row.seats.length === 0) return
 
-  // 使用排的 baseScale 计算逻辑半径
-  const rowBaseScale = row.baseScale || 1
+  // 使用 baseScale 计算逻辑半径，视觉大小随 stageScale 变化（跟随缩放）
+  const isGlobalView = !venueStore.focusedSectionId
+  const rowBaseScale = venueStore.getBaseScale()
   const rowSeatRadius = SEAT_RADIUS / rowBaseScale
   
   const bounds = calculateRowBounds(row, rowSeatRadius)
@@ -1249,7 +1263,8 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   // 设置绘制函数
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds))
+  // 【修复】全局视图下强制使用横条模式，分区编辑模式下显示具体座位
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, isGlobalView))
   rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
@@ -2652,9 +2667,9 @@ const enterSectionFocus = (sectionId: string) => {
 const exitSectionFocus = () => {
   if (!stage) return
   venueStore.focusedSectionId = null
-  
-  // 重置基准缩放（下次进入分区编辑模式时重新记录）
-  venueStore.resetBaseScale()
+
+  // 退出分区后 stageScale = 1，座位逻辑坐标基于 baseScale 缩小
+  // 所以视觉大小 = 逻辑大小 × 1 = 原始大小 / baseScale（预期行为）
 
   // 恢复到默认视口
   stage.to({ x: 0, y: 0, scaleX: 1, scaleY: 1, duration: 0.3 })

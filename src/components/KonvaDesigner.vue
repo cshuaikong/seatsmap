@@ -10,16 +10,20 @@
         <span class="chart-name">{{ chartName }}</span>
 
         <!-- 聚焦分区面包屑 -->
-        <template v-if="focusedSectionName">
-          <span class="breadcrumb-sep">
-            <Icon icon="lucide:chevron-right" />
-          </span>
-          <span class="breadcrumb-zone">{{ focusedSectionName }}</span>
-          <button class="action-btn secondary zone-exit-btn" @click="onExitSectionFocus">
-            <Icon icon="lucide:log-out" class="btn-icon" />
-            退出分区
-          </button>
-        </template>
+        <span v-if="focusedSectionName" class="breadcrumb-sep">
+          <Icon icon="lucide:chevron-right" />
+        </span>
+        <span v-if="focusedSectionName" class="breadcrumb-zone">{{ focusedSectionName }}</span>
+        <button 
+          v-if="focusedSectionName" 
+          type="button"
+          class="action-btn secondary zone-exit-btn" 
+          @mousedown="onExitSectionFocus"
+          style="cursor: pointer; position: relative; z-index: 999;"
+        >
+          <Icon icon="lucide:log-out" class="btn-icon" />
+          退出分区
+        </button>
       </div>
 
       <!-- 右侧：操作按钮 -->
@@ -193,7 +197,10 @@ const focusedSectionName = computed(() => {
 })
 
 const onExitSectionFocus = () => {
-  (rendererRef as any)?.exitSectionFocus?.()
+  console.log('[退出分区] 按钮被点击')
+  console.log('[退出分区] rendererRef:', rendererRef.value)
+  console.log('[退出分区] exitSectionFocus 方法:', (rendererRef.value as any)?.exitSectionFocus)
+  ;(rendererRef.value as any)?.exitSectionFocus?.()
 }
 
 // 从 venueStore 获取分类，并映射为显示格式（id/name）

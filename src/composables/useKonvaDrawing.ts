@@ -427,8 +427,7 @@ export function submitSeatRow(startPos: Position, endPos: Position) {
     y: startPos.y,
     rotation: angle,
     curve: 0,
-    seatSpacing: logicalGap,  // 逻辑间距
-    baseScale: bs             // 记录绘制时的 baseScale
+    seatSpacing: logicalGap  // 逻辑间距
   })
   
   clearDrawingPreview()
@@ -548,8 +547,7 @@ export function submitMultiRow(startPos: Position, endPos: Position, currentPos:
       y: startPos.y + rowOffsetY,
       rotation: rowAngle,
       curve: 0,
-      seatSpacing: logicalGap,  // 逻辑间距
-      baseScale: bs             // 记录绘制时的 baseScale
+      seatSpacing: logicalGap  // 逻辑间距
     })
   }
   

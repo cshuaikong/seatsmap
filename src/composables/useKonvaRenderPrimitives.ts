@@ -234,7 +234,8 @@ export function createRowSceneFunc(
   seatRadius: number,
   selectedSeatIds: string[] = [],
   visualScale: number = 1,
-  baseScale: number = 1
+  baseScale: number = 1,
+  forceBarMode: boolean = false
 ): (context: Konva.Context, shape: Konva.Shape) => void {
   return (context, shape) => {
    
@@ -252,7 +253,7 @@ export function createRowSceneFunc(
     // 按分类颜色分组绘制
     const colorGroups = groupSeatsByColor(row.seats, getSeatColor)
 
-    if (row.label) {
+    if (row.label && !forceBarMode) {
       // 标签紧贴第一个座位左侧，跟随弧形切线方向旋转
       const firstPos = curvedPositions[0] || { x: radius, y: radius }
       const seatSpacingStage = row.seatSpacing || seatRadius * 3
@@ -276,7 +277,8 @@ export function createRowSceneFunc(
     }
     // 根据当前舞台缩放动态决定显示模式
     // 当屏幕上每个座位小于阈值时，显示为横条
-    const displayMode = currentStageScale < 0.6 ? 'bar' : 'seat'
+    // 全局视图下强制使用横条模式
+    const displayMode = forceBarMode || currentStageScale < 0.6 ? 'bar' : 'seat'
     
     if (displayMode === 'bar') {
       // 绘制横条表示座位排
