@@ -1207,6 +1207,10 @@ export const useVenueStore = defineStore('venue', () => {
       }
     },
     getBaseScale: () => baseScale.value ?? 1,
+    setSectionBaseScale: (scale: number) => {
+      baseScale.value = scale
+      console.log('[baseScale] 更新为:', scale)
+    },
     resetBaseScale: () => {
       baseScale.value = null
     }

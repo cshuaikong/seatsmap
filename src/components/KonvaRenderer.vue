@@ -346,9 +346,16 @@ onMounted(() => {
     onScaleChange: (scale) => {
       viewportState.scale = scale
       // 【关键】用户手动缩放后，更新 baseScale 为当前缩放值
-      // 这样后续绘制的座位都会以当前缩放为基准
+      // 但只在还没有绘制座位时才更新，绘制后锁定 baseScale
       if (venueStore.focusedSectionId) {
-        venueStore.setSectionBaseScale(scale)
+        const section = venueStore.venue.sections.find(s => s.id === venueStore.focusedSectionId)
+        const hasSeats = section?.rows.some((row: SeatRow) => row.seats.length > 0)
+        if (!hasSeats) {
+          venueStore.setSectionBaseScale(scale)
+          console.log('[onScaleChange] baseScale updated to:', scale)
+        } else {
+          console.log('[onScaleChange] baseScale locked, skipping update')
+        }
       }
       // 缩放变化时重新渲染，更新分区边框和 label 的视觉大小
       renderAll()
