@@ -296,14 +296,17 @@ export function createRowSceneFunc(
       context.translate(firstPos.x, firstPos.y)
       context.rotate(rowAngle)
       
-      // 绘制横条背景
+      // 绘制横条背景（圆角）
       context.fillStyle = '#9E9E9E'
-      context.fillRect(0, -barHeight / 2, rowLength, barHeight)
+      const cornerRadius = Math.min(4 / currentStageScale, barHeight / 4)
+      context.beginPath()
+      context.roundRect(0, -barHeight / 2, rowLength, barHeight, cornerRadius)
+      context.fill()
       
-      // 绘制横条边框
+      // 绘制横条边框（圆角，使用逻辑缩放保持视觉大小恒定）
       context.strokeStyle = '#757575'
-      context.lineWidth = 1
-      context.strokeRect(0, -barHeight / 2, rowLength, barHeight)
+      context.lineWidth = 1 / currentStageScale  // 反向缩放，保持1px视觉大小
+      context.stroke()
       
       context.restore()
     } else {

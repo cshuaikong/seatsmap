@@ -1202,14 +1202,14 @@ export const useVenueStore = defineStore('venue', () => {
     visualConfig,
     initBaseScale: (currentScale: number) => {
       if (baseScale.value === null) {
-        baseScale.value = currentScale
+        baseScale.value = Math.round(currentScale * 100) / 100
         console.log('[baseScale] 基准缩放已锁定:', baseScale.value)
       }
     },
     getBaseScale: () => baseScale.value ?? 1,
     setSectionBaseScale: (scale: number) => {
-      baseScale.value = scale
-      console.log('[baseScale] 更新为:', scale)
+      baseScale.value = Math.round(scale * 100) / 100
+      console.log('[baseScale] 更新为:', baseScale.value)
     },
     resetBaseScale: () => {
       baseScale.value = null
