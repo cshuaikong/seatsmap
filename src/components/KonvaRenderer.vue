@@ -2623,33 +2623,34 @@ const enterSectionFocus = (sectionId: string) => {
   let sectionX = section.borderX || 0
   let sectionY = section.borderY || 0
 
-  // 【修复】使用固定默认缩放 2，而不是自动计算的最大值
-  // 这样座位绘制时大小一致，用户可根据需要手动调整
-  const defaultScale = 2
+  // 如果已存在 baseScale，直接使用该值；否则计算合适的缩放
+  const existingBaseScale = venueStore.getBaseScale()
+  let newScale: number
   
-  // 计算分区在默认缩放下的尺寸
-  const scaledSectionW = sectionW * defaultScale
-  const scaledSectionH = sectionH * defaultScale
-  
-  // 如果分区在默认缩放下超出画布，则适当缩小
-  const maxWidth = stageWidth - padding * 2
-  const maxHeight = stageHeight - padding * 2
-  
-  let newScale = defaultScale
-  if (scaledSectionW > maxWidth || scaledSectionH > maxHeight) {
-    // 分区太大，需要缩小以适应画布
-    const scaleX = maxWidth / sectionW
-    const scaleY = maxHeight / sectionH
-    newScale = Math.min(scaleX, scaleY, defaultScale)
+  if (existingBaseScale > 1) {
+    // baseScale 已存在，直接使用，不重置、不重新计算
+    newScale = existingBaseScale
+    console.log('[EnterSection] 使用已存在的 baseScale:', newScale)
+  } else {
+    // baseScale 不存在，计算合适的默认缩放
+    const defaultScale = 2
+    const scaledSectionW = sectionW * defaultScale
+    const scaledSectionH = sectionH * defaultScale
+    const maxWidth = stageWidth - padding * 2
+    const maxHeight = stageHeight - padding * 2
+    
+    newScale = defaultScale
+    if (scaledSectionW > maxWidth || scaledSectionH > maxHeight) {
+      const scaleX = maxWidth / sectionW
+      const scaleY = maxHeight / sectionH
+      newScale = Math.min(scaleX, scaleY, defaultScale)
+    }
+    newScale = Math.max(0.5, Math.min(newScale, 4))
+    
+    // 首次进入，锁定 baseScale
+    console.log('[EnterSection] 首次进入，锁定 baseScale:', newScale)
+    venueStore.initBaseScale(newScale)
   }
-  
-  // 确保缩放不小于 0.5，不小于 4
-  newScale = Math.max(0.5, Math.min(newScale, 4))
-
-  // 进入分区时的缩放即为基准缩放 baseScale
-  console.log('[EnterSection] Setting baseScale to:', newScale)
-  venueStore.resetBaseScale()  // 先重置
-  venueStore.initBaseScale(newScale)  // 设置为进入时的缩放
 
   const newX = stageWidth / 2 - (sectionX + sectionW / 2) * newScale
   const newY = stageHeight / 2 - (sectionY + sectionH / 2) * newScale

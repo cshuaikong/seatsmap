@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { generateId } from '../utils/id'
 import type { 
@@ -48,8 +48,7 @@ export const useVenueStore = defineStore('venue', () => {
 
   // 分区编辑模式的基准缩放比例（首次绘制座位时记录）
   // 核心公式：逻辑尺寸 = 视觉尺寸 / baseScale
-  // 这样无论当前 Stage 缩放多少，生成的座位在世界坐标系里大小恒定
-  const baseScale = ref<number | null>(null)
+  // 存储在 venue 数据源中，随项目一起持久化
 
   // 默认的座位视觉配置（用户在屏幕上期望看到的像素大小）
   const visualConfig = {
@@ -1197,22 +1196,18 @@ export const useVenueStore = defineStore('venue', () => {
     redo,
     canUndo,
     canRedo,
-    // BaseScale
-    baseScale,
+    // BaseScale - 从 venue 数据源读取
     visualConfig,
     initBaseScale: (currentScale: number) => {
-      if (baseScale.value === null) {
-        baseScale.value = Math.round(currentScale * 100) / 100
-        console.log('[baseScale] 基准缩放已锁定:', baseScale.value)
+      if (venue.value.baseScale === undefined || venue.value.baseScale === null) {
+        venue.value.baseScale = Math.round(currentScale * 100) / 100
+        console.log('[baseScale] 基准缩放已锁定:', venue.value.baseScale)
       }
     },
-    getBaseScale: () => baseScale.value ?? 1,
+    getBaseScale: () => venue.value.baseScale ?? 1,
     setSectionBaseScale: (scale: number) => {
-      baseScale.value = Math.round(scale * 100) / 100
-      console.log('[baseScale] 更新为:', baseScale.value)
+      venue.value.baseScale = Math.round(scale * 100) / 100
+      console.log('[baseScale] 更新为:', venue.value.baseScale)
     },
-    resetBaseScale: () => {
-      baseScale.value = null
-    }
   }
 })

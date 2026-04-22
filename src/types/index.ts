@@ -72,6 +72,7 @@ export interface VenueData {
   categories: Category[]
   sections: Section[]
   focalPoint?: Position
+  baseScale?: number | null  // 座位绘制基准缩放，随数据源持久化
 }
 
 // 扩展 Category 支持 key 字段
