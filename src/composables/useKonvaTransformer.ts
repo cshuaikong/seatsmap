@@ -360,7 +360,29 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     unifiedDragState.startScreenX = screenPos.x
     unifiedDragState.startScreenY = screenPos.y
     unifiedDragState.useDragLayer = !isRotation
-    unifiedDragState.items = selectedNodes.map(node => ({
+    // 收集所有需要拖拽的节点
+    const dragNodes = new Set<Konva.Node>(selectedNodes)
+    
+    // 如果拖拽的是 Section border，连带拖拽该 Section 的所有 content
+    selectedNodes.forEach(node => {
+      const sectionId = node.getAttr('sectionId') as string
+      const borderType = node.getAttr('borderType') as string
+      if (sectionId && borderType) {
+        nodeMap.forEach((contentNode) => {
+          if (contentNode.getAttr('sectionId') === sectionId && !dragNodes.has(contentNode)) {
+            dragNodes.add(contentNode)
+          }
+        })
+        // 同时拖拽 path 类型的线段（hitPath / activePath）
+        mainLayer?.find('.path-segment-hit, .path-segment-active').forEach((pathNode) => {
+          if (pathNode.getAttr('sectionId') === sectionId && !dragNodes.has(pathNode)) {
+            dragNodes.add(pathNode)
+          }
+        })
+      }
+    })
+    
+    unifiedDragState.items = Array.from(dragNodes).map(node => ({
       node,
       startX: node.x(),
       startY: node.y()

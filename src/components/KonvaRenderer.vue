@@ -538,16 +538,22 @@ const renderAll = () => {
     return zIndexA - zIndexB
   })
 
-  // 渲染 Section 边框（在座位排之下）
+  // 按 zIndex 顺序渲染每个 Section
   sortedSections.forEach(section => {
-    if (section.borderType && section.borderType !== 'none') {
-      renderSectionBorder(section)
+    const isFocusedSection = venueStore.focusedSectionId === section.id
+    if (isFocusedSection) {
+      // 分区编辑模式：先 border 后 content，座位在最上层可点击
+      if (section.borderType && section.borderType !== 'none') {
+        renderSectionBorder(section)
+      }
+      renderSection(section)
+    } else {
+      // 全局视图：先 content 后 border，border 在最上层可点击
+      renderSection(section)
+      if (section.borderType && section.borderType !== 'none') {
+        renderSectionBorder(section)
+      }
     }
-  })
-
-  // 渲染所有区域（只读分区 listening: false）
-  sortedSections.forEach(section => {
-    renderSection(section)
   })
 
   // 应用视口剔除
@@ -668,21 +674,16 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     const vertexHandle = new Konva.Circle({
       x: baseX + point.x,
       y: baseY + point.y,
-      radius: 2.5,  // 与边框粗细一致，保持精致
+      radius: 2 * handleScale,
       fill: '#3b82f6',
-      stroke: '#fff',
-      strokeWidth: 1.5 / stageScale,  // 描边宽度也随缩放调整
       draggable: true,
       name: 'path-vertex-handle',
-      scaleX: handleScale,  // 反向缩放，保持视觉大小恒定
-      scaleY: handleScale,
-      shadowColor: 'rgba(0,0,0,0.2)',
-      shadowBlur: 2 / stageScale,
-      shadowOffset: { x: 0, y: 1 / stageScale },
-      // 扩大点击区域，保持视觉小圆点的同时更容易命中
+      // shadowColor: 'rgba(0,0,0,0.2)',
+      // shadowBlur: 2,
+      // shadowOffset: { x: 0, y: 1 },
       hitFunc(ctx: Konva.Context) {
         const self = this as unknown as Konva.Circle
-        const hitRadius = 8 / (self.scaleX() || 1)
+        const hitRadius = 3 * handleScale
         ctx.beginPath()
         ctx.arc(0, 0, hitRadius, 0, Math.PI * 2)
         ctx.closePath()
@@ -801,7 +802,8 @@ const updatePathVertexHandlesPosition = (sectionId: string, x: number, y: number
 
 const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOtherFocused: boolean) => {
   if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
-
+        // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+  const stageScale = stage?.scaleX() || 1
   const layer = mainLayer
   const activePointIndex = venueStore.activePathSectionId === section.id ? venueStore.activePathPointIndex : null
 
@@ -811,6 +813,7 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
     const segmentData = createPathSegmentData(section.borderPathPoints!, pointIndex)
     if (!segmentData) return
 
+    const isSelected = venueStore.selectedSectionIds.includes(section.id)
     const isActive = activePointIndex === pointIndex
     const isCurveSegment = isCurvedEdge(startPoint)
 
@@ -818,11 +821,12 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
       x: section.borderX || 0,
       y: section.borderY || 0,
       data: segmentData,
-      stroke: 'rgba(0,0,0,0.001)',
-      strokeWidth: 4,
+      stroke: 'transparent',
+      strokeWidth: 1 / stageScale,
       fillEnabled: false,
-      listening: !isOtherFocused,
-      perfectDrawEnabled: false
+      listening: isSelected && !isOtherFocused,
+      perfectDrawEnabled: false,
+      hitStrokeWidth: 4 / stageScale,
     })
 
     hitPath.on('click', (e) => {
@@ -846,20 +850,20 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
 
     layer.add(hitPath)
 
-    if (!isActive) return
+    if (isActive) {
+      const activePath = new Konva.Path({
+        x: section.borderX || 0,
+        y: section.borderY || 0,
+        data: segmentData,
+        stroke: darkenColor('#77FD9F', 40),
+        strokeWidth: 2 / stageScale,
+        fillEnabled: false,
+        listening: false,
+        opacity: 1
+      })
 
-    const activePath = new Konva.Path({
-      x: section.borderX || 0,
-      y: section.borderY || 0,
-      data: segmentData,
-      stroke: '#3b82f6',
-      strokeWidth: 2,
-      fillEnabled: false,
-      listening: false,
-      opacity: isOtherFocused ? 0.3 : 0.8
-    })
-
-    layer.add(activePath)
+      layer.add(activePath)
+    }
   })
 }
 
@@ -907,31 +911,22 @@ const renderSectionBorder = (section: Section) => {
   const baseStrokeWidth = isSelected ? 2 : (isFocused ? 2 : 1.5)
   const scaledStrokeWidth = baseStrokeWidth * visualScale  // 最小 0.5 像素
 
-  // 选中状态边框用半透明蓝色填充色（让粗边框线有颜色，直观展示点击区域）
-  const strokeFillForSelected = isSelected ? '#cccccc' : fillColor
-
-  // 限制：只有无选中分区，或当前分区被选中时，才可点击（避免相邻分区误触）
-  const hasSelectedSection = venueStore.selectedSectionIds.length > 0
-  const canListen = !isOtherFocused && !isReadonly && (!hasSelectedSection || isSelected)
+  // 限制：有其他分区被聚焦时不可点击，只读分区不可点击
+  const canListen = !isOtherFocused && !isReadonly
   
   // 【调试】
   if (isSelected) {
-    console.log(`[SectionBorder-选中] ${section.name} baseStroke=${baseStrokeWidth} scaledStroke=${scaledStrokeWidth.toFixed(3)} fill=${isSelected ? strokeFillForSelected : fillColor} visualScale=${visualScale.toFixed(3)}`)
+    // console.log(`[SectionBorder-选中] ${section.name} baseStroke=${baseStrokeWidth} scaledStroke=${scaledStrokeWidth.toFixed(3)} fill=${isSelected ? strokeFillForSelected : fillColor} visualScale=${visualScale.toFixed(3)}`)
   }
   
   const commonAttrs = {
-    fill: isSelected ? strokeFillForSelected : fillColor,
+    fill: fillColor,
     stroke: isReadonly ? '#9ca3af' : strokeColor,
     strokeWidth: scaledStrokeWidth,
     hitStrokeWidth: scaledStrokeWidth,  // 点击区域和视觉边框完全重叠
     dash: [],  // 实线边框，无虚线
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
     listening: canListen,
-    // 自定义 hitFunc：只描边（stroke）不参与点击检测，fill 区域不拦截点击
-    // 这样点击分区内部时，事件会穿透到下层座位排
-    hitFunc: (ctx: Konva.Context, shape: Konva.Shape) => {
-      ctx.strokeShape(shape)
-    }
   }
 
   if (section.borderType === 'ellipse') {
@@ -1068,12 +1063,23 @@ const renderSectionBorder = (section: Section) => {
   label.setAttr('isSectionLabel', true)
   nodeMap.set('sectionLabel_' + section.id, label)
 
-  // 单击选中 + 双击检测 - 只读分区不触发，绘制模式不触发
-  if (!section.readonly) {
     let lastClickTime = 0
     let lastClickPos = { x: 0, y: 0 }
+
+    // mousedown 启动统一拖拽
+    borderNode.on('mousedown', (e) => {
+      if (isDrawingMode()) return
+      if (e.evt.button !== 0) return
+      e.cancelBubble = true
+      const pointer = stage?.getPointerPosition()
+      if (pointer) {
+        tfm?.startDragAll(pointer)
+      }
+    })
     
     borderNode.on('click', (e) => {
+      if (justDragged) { justDragged = false; return }  // 拖拽后不触发 click
+      console.log('[SectionBorder-点击] ', section.name)
       if (isDrawingMode()) return  // 绘制模式下不触发
       e.cancelBubble = true
 
@@ -1128,7 +1134,7 @@ const renderSectionBorder = (section: Section) => {
       lastClickTime = now
       lastClickPos = pos
     })
-  }
+  
 
   borderNode.on('mouseenter', () => {
     if (stage && !isDrawingMode()) {
