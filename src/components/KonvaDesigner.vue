@@ -28,13 +28,13 @@
 
       <!-- 右侧：操作按钮 -->
       <div class="toolbar-right">
-        <button class="action-btn secondary" @click="onExportData">
-          <Icon icon="lucide:download" class="btn-icon" />
-          导出
+        <button class="action-btn secondary" @click="onExportData" :class="{ success: exportStatus === 'success' }">
+          <Icon :icon="exportStatus === 'success' ? 'lucide:check' : 'lucide:download'" class="btn-icon" />
+          {{ exportStatus === 'success' ? '已导出' : '导出' }}
         </button>
-        <button class="action-btn secondary" @click="onImportData">
-          <Icon icon="lucide:upload" class="btn-icon" />
-          导入
+        <button class="action-btn secondary" @click="onImportData" :class="{ success: importStatus === 'success', error: importStatus === 'error' }">
+          <Icon :icon="importStatus === 'success' ? 'lucide:check' : importStatus === 'error' ? 'lucide:circle-x' : 'lucide:upload'" class="btn-icon" />
+          {{ importStatus === 'success' ? '已导入' : importStatus === 'error' ? '失败' : '导入' }}
         </button>
         <button class="action-btn secondary" @click="onPreview">
           <Icon icon="lucide:eye" class="btn-icon" />
@@ -44,6 +44,11 @@
           <Icon icon="lucide:check" class="btn-icon" />
           保存
         </button>
+        <!-- 导出/导入状态提示 -->
+        <Transition name="fade">
+          <span v-if="exportTip" class="export-tip">{{ exportTip }}</span>
+          <span v-else-if="importTip" class="export-tip" :class="{ error: importStatus === 'error' }">{{ importTip }}</span>
+        </Transition>
       </div>
     </div>
 
@@ -219,6 +224,16 @@ const showCategoryManager = ref(false)
 // 预览弹窗控制
 const showPreview = ref(false)
 
+// 导出状态
+const exportStatus = ref<'idle' | 'success'>('idle')
+const exportTip = ref('')
+let exportTipTimer: ReturnType<typeof setTimeout> | null = null
+
+// 导入状态
+const importStatus = ref<'idle' | 'success' | 'error'>('idle')
+const importTip = ref('')
+let importTipTimer: ReturnType<typeof setTimeout> | null = null
+
 // Renderer ref
 const rendererRef = ref<InstanceType<typeof KonvaRenderer>>()
 
@@ -393,12 +408,18 @@ const onManageCategories = () => {
 }
 
 // 导出数据到文件
-const onExportData = () => {
-  const success = exportSeatMap(venueStore.venue, `${venueStore.venue.name || 'seatmap'}.json`)
-  if (success) {
-    alert(`导出成功！共 ${totalSeats.value} 个座位`)
-  } else {
-    alert('导出失败，请查看控制台')
+const onExportData = async () => {
+  const result = await exportSeatMap(venueStore.venue, `${venueStore.venue.name || 'seatmap'}.json`)
+  if (result.success) {
+    exportStatus.value = 'success'
+    if (result.method === 'download') {
+      exportTip.value = '已自动下载到默认文件夹'
+    }
+    if (exportTipTimer) clearTimeout(exportTipTimer)
+    exportTipTimer = setTimeout(() => {
+      exportStatus.value = 'idle'
+      exportTip.value = ''
+    }, 2000)
   }
 }
 
@@ -406,15 +427,23 @@ const onExportData = () => {
 const onImportData = async () => {
   const file = await triggerImport()
   if (!file) return
-  
+
   const venue = await importSeatMap(file)
   if (venue) {
     // 使用 importVenueData 导入（会自动重置 readonly 等属性）
     venueStore.importVenueData(venue)
-    alert(`导入成功！共 ${venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)} 个座位`)
+    const seatCount = venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
+    importStatus.value = 'success'
+    importTip.value = `成功导入 ${seatCount} 个座位`
   } else {
-    alert('导入失败，请检查文件格式')
+    importStatus.value = 'error'
+    importTip.value = '文件格式错误，导入失败'
   }
+  if (importTipTimer) clearTimeout(importTipTimer)
+  importTipTimer = setTimeout(() => {
+    importStatus.value = 'idle'
+    importTip.value = ''
+  }, 3000)
 }
 
 // 打开预览
@@ -426,7 +455,6 @@ const onPreview = () => {
 const onSave = () => {
   const snapshot = venueStore.createSnapshot()
   localStorage.setItem('seatsmap-autosave', snapshot)
-  alert('已保存到本地！刷新页面会自动恢复')
 }
 
 const onCloseCategoryManager = () => {
@@ -564,6 +592,40 @@ const onDelete = () => {
 .action-btn.secondary:hover {
   background: var(--color-bg);
   border-color: var(--color-border-hover);
+}
+
+.action-btn.success {
+  background: #22a559 !important;
+  color: white !important;
+  border-color: #22a559 !important;
+}
+
+.action-btn.error {
+  background: #ef4444 !important;
+  color: white !important;
+  border-color: #ef4444 !important;
+}
+
+.export-tip {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+.export-tip.error {
+  color: #ef4444;
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .btn-icon {

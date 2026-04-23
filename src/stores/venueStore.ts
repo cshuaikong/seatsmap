@@ -948,7 +948,8 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections: normalizedSections,
-      focalPoint: data.focalPoint
+      focalPoint: data.focalPoint,
+      baseScale: data.baseScale ?? null
     }
   }
 
@@ -1083,8 +1084,8 @@ export const useVenueStore = defineStore('venue', () => {
    */
   function createSnapshot(): string {
     const data = {
-      venue: venue.value,
-      canvasImages: canvasImages.value
+      venue: JSON.parse(JSON.stringify(venue.value)),
+      canvasImages: JSON.parse(JSON.stringify(canvasImages.value))
     }
     return JSON.stringify(data)
   }

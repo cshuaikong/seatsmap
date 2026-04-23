@@ -668,7 +668,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     const vertexHandle = new Konva.Circle({
       x: baseX + point.x,
       y: baseY + point.y,
-      radius: 4,  // 从 5 改为 4，更小更精致
+      radius: 2.5,  // 与边框粗细一致，保持精致
       fill: '#3b82f6',
       stroke: '#fff',
       strokeWidth: 1.5 / stageScale,  // 描边宽度也随缩放调整
@@ -677,15 +677,25 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       scaleX: handleScale,  // 反向缩放，保持视觉大小恒定
       scaleY: handleScale,
       shadowColor: 'rgba(0,0,0,0.2)',
-      shadowBlur: 3 / stageScale,
-      shadowOffset: { x: 0, y: 1 / stageScale }
+      shadowBlur: 2 / stageScale,
+      shadowOffset: { x: 0, y: 1 / stageScale },
+      // 扩大点击区域，保持视觉小圆点的同时更容易命中
+      hitFunc(ctx: Konva.Context) {
+        const self = this as unknown as Konva.Circle
+        const hitRadius = 8 / (self.scaleX() || 1)
+        ctx.beginPath()
+        ctx.arc(0, 0, hitRadius, 0, Math.PI * 2)
+        ctx.closePath()
+        ctx.fillStrokeShape(self)
+      }
     })
-    
+
     // 确保拖拽不被拦截
     vertexHandle.listening(true)
 
     vertexHandle.setAttr('sectionId', section.id)
     vertexHandle.setAttr('vertexIndex', index)
+    vertexHandle.setAttr('_baseScale', handleScale)
 
     // 拖拽开始：记录初始位置
     let dragStartX = 0
@@ -742,7 +752,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     vertexHandle.on('mouseenter', () => {
       if (stage && !isDrawingMode()) {
         stage.container().style.cursor = 'move'
-        vertexHandle.scale({ x: 1.2, y: 1.2 })
+        vertexHandle.draw()
         layer.batchDraw()
       }
     })
@@ -750,7 +760,7 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
     vertexHandle.on('mouseleave', () => {
       if (stage) {
         stage.container().style.cursor = 'default'
-        vertexHandle.scale({ x: 1, y: 1 })
+        vertexHandle.draw()
         layer.batchDraw()
       }
     })
@@ -809,7 +819,7 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
       y: section.borderY || 0,
       data: segmentData,
       stroke: 'rgba(0,0,0,0.001)',
-      strokeWidth: 16,
+      strokeWidth: 4,
       fillEnabled: false,
       listening: !isOtherFocused,
       perfectDrawEnabled: false
@@ -842,40 +852,14 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
       x: section.borderX || 0,
       y: section.borderY || 0,
       data: segmentData,
-      stroke: '#f59e0b',
-      strokeWidth: 5,
+      stroke: '#3b82f6',
+      strokeWidth: 2,
       fillEnabled: false,
       listening: false,
-      opacity: isOtherFocused ? 0.3 : 0.95,
-      dash: isCurveSegment ? [] : [10, 6]
+      opacity: isOtherFocused ? 0.3 : 0.8
     })
 
     layer.add(activePath)
-
-    const activeStart = new Konva.Circle({
-      x: (section.borderX || 0) + startPoint.x,
-      y: (section.borderY || 0) + startPoint.y,
-      radius: 4,
-      fill: '#f59e0b',
-      stroke: '#fff',
-      strokeWidth: 1.5,
-      listening: false,
-      opacity: isOtherFocused ? 0.3 : 1
-    })
-
-    const activeEnd = new Konva.Circle({
-      x: (section.borderX || 0) + nextPoint.x,
-      y: (section.borderY || 0) + nextPoint.y,
-      radius: 3,
-      fill: '#fff',
-      stroke: '#f59e0b',
-      strokeWidth: 1.5,
-      listening: false,
-      opacity: isOtherFocused ? 0.3 : 1
-    })
-
-    layer.add(activeStart)
-    layer.add(activeEnd)
   })
 }
 
@@ -913,23 +897,41 @@ const renderSectionBorder = (section: Section) => {
 
   let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
-  // 根据填充色计算边框色（加深 40%），如果手动设置了 borderStroke 则使用手动值
-  const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'  // 默认灰色半透明
+  // 填充色：未选中保持原始填充；选中时用原始填充（内部）+ 粗边框线展示点击区域
+  const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'
   const autoStrokeColor = darkenColor(fillColor, 40)
   const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
 
-  // 只读分区：不参与交互（listening: false），使用灰色边框
   // strokeWidth 使用反向缩放，保持视觉大小恒定，但设置最小值确保始终可见
-  const baseStrokeWidth = isSelected || isFocused ? 2 : 1.5
-  const scaledStrokeWidth = Math.max(baseStrokeWidth * visualScale, 0.5)  // 最小 0.5 像素
+  // 选中状态：加粗到 6px 视觉宽度，用半透明蓝色直观展示边框线的点击区域
+  const baseStrokeWidth = isSelected ? 2 : (isFocused ? 2 : 1.5)
+  const scaledStrokeWidth = baseStrokeWidth * visualScale  // 最小 0.5 像素
+
+  // 选中状态边框用半透明蓝色填充色（让粗边框线有颜色，直观展示点击区域）
+  const strokeFillForSelected = isSelected ? '#cccccc' : fillColor
+
+  // 限制：只有无选中分区，或当前分区被选中时，才可点击（避免相邻分区误触）
+  const hasSelectedSection = venueStore.selectedSectionIds.length > 0
+  const canListen = !isOtherFocused && !isReadonly && (!hasSelectedSection || isSelected)
+  
+  // 【调试】
+  if (isSelected) {
+    console.log(`[SectionBorder-选中] ${section.name} baseStroke=${baseStrokeWidth} scaledStroke=${scaledStrokeWidth.toFixed(3)} fill=${isSelected ? strokeFillForSelected : fillColor} visualScale=${visualScale.toFixed(3)}`)
+  }
   
   const commonAttrs = {
-    fill: fillColor,
+    fill: isSelected ? strokeFillForSelected : fillColor,
     stroke: isReadonly ? '#9ca3af' : strokeColor,
     strokeWidth: scaledStrokeWidth,
+    hitStrokeWidth: scaledStrokeWidth,  // 点击区域和视觉边框完全重叠
     dash: [],  // 实线边框，无虚线
     opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
-    listening: !isOtherFocused && !isReadonly  // 只读分区不参与交互
+    listening: canListen,
+    // 自定义 hitFunc：只描边（stroke）不参与点击检测，fill 区域不拦截点击
+    // 这样点击分区内部时，事件会穿透到下层座位排
+    hitFunc: (ctx: Konva.Context, shape: Konva.Shape) => {
+      ctx.strokeShape(shape)
+    }
   }
 
   if (section.borderType === 'ellipse') {
@@ -1074,6 +1076,35 @@ const renderSectionBorder = (section: Section) => {
     borderNode.on('click', (e) => {
       if (isDrawingMode()) return  // 绘制模式下不触发
       e.cancelBubble = true
+
+      // 如果点击位置命中了多个 section border，选择距离鼠标最近的那个
+      let targetSectionId = section.id
+      const pointer = stage?.getPointerPosition()
+      if (pointer && stage) {
+        const allHits = stage.getAllIntersections(pointer)
+        const hitBorders = allHits.filter((n: Konva.Node) => n.getAttr('borderType') && n.getAttr('sectionId'))
+        if (hitBorders.length > 1) {
+          let minDist = Infinity
+          hitBorders.forEach((n: Konva.Node) => {
+            const btype = n.getAttr('borderType') as string
+            let cx = n.x()
+            let cy = n.y()
+            if (btype === 'rect') {
+              cx += (n.getAttr('width') || 0) / 2
+              cy += (n.getAttr('height') || 0) / 2
+            }
+            // pointer 是屏幕坐标，需要转换为舞台世界坐标
+            const pt = stage!.getAbsoluteTransform().copy().invert().point(pointer)
+            const dx = pt.x - cx
+            const dy = pt.y - cy
+            const d = Math.sqrt(dx * dx + dy * dy)
+            if (d < minDist) {
+              minDist = d
+              targetSectionId = n.getAttr('sectionId') as string
+            }
+          })
+        }
+      }
       
       const now = Date.now()
       const pos = stage?.getPointerPosition() || { x: 0, y: 0 }
@@ -1083,13 +1114,13 @@ const renderSectionBorder = (section: Section) => {
       // 双击检测：300ms 内且距离小于 10 像素
       if (timeDiff < 300 && dist < 10) {
         // 双击：进入分区编辑
-        console.log('[双击] 进入分区:', section.id)
-        enterSectionFocus(section.id)
+        console.log('[双击] 进入分区:', targetSectionId)
+        enterSectionFocus(targetSectionId)
         lastClickTime = 0  // 重置，避免三击触发
       } else {
         // 单击：选中分区
         const additive = e.evt.shiftKey
-        venueStore.selectSection(section.id, additive)
+        venueStore.selectSection(targetSectionId, additive)
         tfm?.updateTransformer(true)
         mainLayer?.batchDraw()
       }
@@ -1106,6 +1137,38 @@ const renderSectionBorder = (section: Section) => {
   })
   borderNode.on('mouseleave', () => {
     if (stage) stage.container().style.cursor = 'default'
+  })
+
+  // 后备同步：如果统一拖拽系统没有捕获到移动（例如点击了 stroke 外部），
+  // 原生 dragend 会触发，这里同步位置到 store
+  borderNode.on('dragend', () => {
+    if (section.readonly) return
+    isSyncingFromTransformer = true
+    const updates: any = {
+      borderX: borderNode.x(),
+      borderY: borderNode.y(),
+      rotation: borderNode.rotation()
+    }
+    const bt = section.borderType
+    const scaleX = borderNode.scaleX()
+    const scaleY = borderNode.scaleY()
+    if (bt === 'rect') {
+      const w = borderNode.getAttr('width') || section.borderWidth || 100
+      const h = borderNode.getAttr('height') || section.borderHeight || 100
+      updates.borderWidth = w * scaleX
+      updates.borderHeight = h * scaleY
+    } else if (bt === 'ellipse') {
+      const rx = borderNode.getAttr('radiusX') || section.borderRadiusX || 50
+      const ry = borderNode.getAttr('radiusY') || section.borderRadiusY || 50
+      updates.borderRadiusX = rx * scaleX
+      updates.borderRadiusY = ry * scaleY
+    }
+    venueStore.updateSectionBorder(section.id, updates)
+    borderNode.scaleX(1)
+    borderNode.scaleY(1)
+    nextTick(() => {
+      isSyncingFromTransformer = false
+    })
   })
 
   mainLayer.add(borderShape)

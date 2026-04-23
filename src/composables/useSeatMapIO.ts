@@ -31,20 +31,20 @@ export function useSeatMapIO() {
   const lastError = ref<string | null>(null)
 
   // 导出座位图数据为 JSON 文件
-  const exportSeatMap = (venue: VenueData, fileName?: string) => {
+  const exportSeatMap = async (venue: VenueData, fileName?: string): Promise<{ success: boolean; method: 'picker' | 'download' | null }> => {
     try {
       // 获取 store 中的 baseScale 和 visualConfig
       const store = useVenueStore()
       const baseScale = store.getBaseScale()
       const visualConfig = store.visualConfig
-      
+
       // 深拷贝 venue 并添加 baseScale 和 visualConfig
       const venueWithMeta = {
         ...JSON.parse(JSON.stringify(venue)),
         baseScale,
         visualConfig
       }
-      
+
       const exportData: SeatMapExportData = {
         version: '1.0',
         exportTime: new Date().toISOString(),
@@ -53,22 +53,51 @@ export function useSeatMapIO() {
 
       const jsonStr = JSON.stringify(exportData, null, 2)
       const blob = new Blob([jsonStr], { type: 'application/json' })
+      const defaultName = fileName || `seatmap-${venue.name || 'export'}-${Date.now()}.json`
+
+      // 优先使用 File System Access API，让用户选择保存位置
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: defaultName,
+            types: [
+              {
+                description: 'JSON 文件',
+                accept: { 'application/json': ['.json'] }
+              }
+            ]
+          })
+          const writable = await handle.createWritable()
+          await writable.write(blob)
+          await writable.close()
+          lastError.value = null
+          return { success: true, method: 'picker' }
+        } catch (err: any) {
+          // 用户取消选择，不算错误
+          if (err.name === 'AbortError') {
+            return { success: false, method: null }
+          }
+          // 其他错误则回退到传统下载方式
+          console.warn('File System Access API 失败，回退到传统下载:', err)
+        }
+      }
+
+      // 传统下载方式（兼容不支持 showSaveFilePicker 的浏览器）
       const url = URL.createObjectURL(blob)
-      
       const a = document.createElement('a')
       a.href = url
-      a.download = fileName || `seatmap-${venue.name || 'export'}-${Date.now()}.json`
+      a.download = defaultName
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      
+
       lastError.value = null
-      return true
+      return { success: true, method: 'download' }
     } catch (error) {
       lastError.value = error instanceof Error ? error.message : '导出失败'
       console.error('导出失败:', error)
-      return false
+      return { success: false, method: null }
     }
   }
 
