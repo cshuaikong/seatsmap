@@ -508,7 +508,8 @@ const updateRowSelectionVisuals = () => {
         })
         
         // 重新设置 sceneFunc 以更新边框颜色
-        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds))
+        const isGlobalView = !venueStore.focusedSectionId
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, isGlobalView))
       }
     })
   })
@@ -548,13 +549,14 @@ const renderAll = () => {
       if (section.borderType && section.borderType !== 'none') {
         renderSectionBorder(section)
       }
-      renderSection(section)
+      renderSection(section, false) // 焦点分区显示具体座位
     } else {
-      // 全局视图：先 border 后 content，content 在最上层可点击
+      // 全局视图或分区编辑模式下的非焦点分区：先 border 后 content，显示横条
       if (section.borderType && section.borderType !== 'none') {
         renderSectionBorder(section)
       }
-      renderSection(section)
+      const forceBarMode = !!venueStore.focusedSectionId // 分区编辑模式下非焦点分区强制横条
+      renderSection(section, forceBarMode)
     }
   })
 
@@ -1254,23 +1256,12 @@ const renderSectionOverview = (section: Section) => {
   mainLayer.add(label)
 }
 
-const renderSection = (section: Section) => {
+const renderSection = (section: Section, forceBarMode: boolean = false) => {
   if (!mainLayer) return
-
-  // 检查是否处于聚焦模式
-  const focusedSectionId = venueStore.focusedSectionId
-  const isFocusedSection = section.id === focusedSectionId
-  const isOtherSection = focusedSectionId && section.id !== focusedSectionId
-
-  // 如果是其他 section（非当前聚焦），渲染简化概览
-  if (isOtherSection) {
-    renderSectionOverview(section)
-    return
-  }
 
   // 渲染排（包含座位）
   section.rows.forEach(row => {
-    renderRow(row, section)
+    renderRow(row, section, forceBarMode)
   })
 
   // 渲染形状
@@ -1308,7 +1299,7 @@ const getImageRenderOptions = () => ({
 
 // ==================== 渲染排====================
 
-const renderRow = (row: SeatRow, section: Section) => {
+const renderRow = (row: SeatRow, section: Section, forceBarMode: boolean = false) => {
   if (!mainLayer || row.seats.length === 0) return
 
   // 使用 baseScale 计算逻辑半径，视觉大小随 stageScale 变化（跟随缩放）
@@ -1334,8 +1325,9 @@ const renderRow = (row: SeatRow, section: Section) => {
   })
 
   // 设置绘制函数
-  // 【修复】全局视图下强制使用横条模式，分区编辑模式下显示具体座位
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, isGlobalView))
+  // 全局视图或强制横条模式下使用横条渲染，否则显示具体座位
+  const shouldForceBarMode = isGlobalView || forceBarMode
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode))
   rowShape.hitFunc(createRowHitFunc())
 
   // 事件处理
