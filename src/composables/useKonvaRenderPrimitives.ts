@@ -267,8 +267,8 @@ export function createRowSceneFunc(
       context.translate(firstPos.x, firstPos.y)
       context.rotate(angle)
       context.fillStyle = '#444'
-      // 标签使用逻辑缩放：逻辑大小 = 视觉大小 / baseScale，渲染时自动随 stageScale 放大
-      const labelFontSize = 12 / baseScale
+      // 标签字体大小使用 radius（与座位编号一致），自动跟随缩放
+      const labelFontSize = radius * 1.2  // 略大于座位半径，保持可读性
       context.font = `${labelFontSize}px Inter, -apple-system, sans-serif`
       context.textAlign = 'right'
       context.textBaseline = 'middle'
