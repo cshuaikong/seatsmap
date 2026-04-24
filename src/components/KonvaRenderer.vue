@@ -550,11 +550,11 @@ const renderAll = () => {
       }
       renderSection(section)
     } else {
-      // 全局视图：先 content 后 border，border 在最上层可点击
-      renderSection(section)
+      // 全局视图：先 border 后 content，content 在最上层可点击
       if (section.borderType && section.borderType !== 'none') {
         renderSectionBorder(section)
       }
+      renderSection(section)
     }
   })
 
