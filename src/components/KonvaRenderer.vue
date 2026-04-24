@@ -509,7 +509,17 @@ const updateRowSelectionVisuals = () => {
         
         // 重新设置 sceneFunc 以更新边框颜色
         const isGlobalView = !venueStore.focusedSectionId
-        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, isGlobalView))
+        const isFocusedSection = venueStore.focusedSectionId === section.id
+        const shouldForceBarMode = isGlobalView || !isFocusedSection
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode))
+        
+        // 同步更新 listening 状态
+        if (shouldForceBarMode) {
+          rowShape.listening(false)
+        } else {
+          rowShape.listening(true)
+          rowShape.hitFunc(createRowHitFunc())
+        }
       }
     })
   })
@@ -915,8 +925,9 @@ const renderSectionBorder = (section: Section) => {
   const baseStrokeWidth = isSelected ? 2 : (isFocused ? 2 : 1.5)
   const scaledStrokeWidth = baseStrokeWidth * visualScale  // 最小 0.5 像素
 
-  // 限制：有其他分区被聚焦时不可点击，只读分区不可点击
-  const canListen = !isOtherFocused && !isReadonly
+  // 限制：有其他分区被聚焦时不可点击，只读分区不可点击，分区编辑模式下所有分区都不可点击（支持框选座位）
+  const isSectionEditMode = !!venueStore.focusedSectionId
+  const canListen = !isOtherFocused && !isReadonly && !isSectionEditMode
   
   // 【调试】
   if (isSelected) {
@@ -1328,7 +1339,13 @@ const renderRow = (row: SeatRow, section: Section, forceBarMode: boolean = false
   // 全局视图或强制横条模式下使用横条渲染，否则显示具体座位
   const shouldForceBarMode = isGlobalView || forceBarMode
   rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode))
-  rowShape.hitFunc(createRowHitFunc())
+  
+  // 横条模式下禁用事件响应（只读展示），具体座位模式下启用事件响应（可框选/点击）
+  if (shouldForceBarMode) {
+    rowShape.listening(false)
+  } else {
+    rowShape.hitFunc(createRowHitFunc())
+  }
 
   // 事件处理
   rowShape.on('mousedown', (e) => {
