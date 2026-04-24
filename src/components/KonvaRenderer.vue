@@ -348,8 +348,10 @@ onMounted(() => {
       // 【关键】用户手动缩放后，更新 baseScale 为当前缩放值
       // 但只在还没有绘制座位时才更新，绘制后锁定 baseScale
       if (venueStore.focusedSectionId) {
-        const section = venueStore.venue.sections.find(s => s.id === venueStore.focusedSectionId)
-        const hasSeats = section?.rows.some((row: SeatRow) => row.seats.length > 0)
+        // 【修复】hasSeats 应检查整个座位图，而不是单个分区
+        const hasSeats = venueStore.venue.sections.some(s =>
+          s.rows.some((row: SeatRow) => row.seats.length > 0)
+        )
         if (!hasSeats) {
           venueStore.setSectionBaseScale(scale)
           console.log('[onScaleChange] baseScale updated to:', scale)
