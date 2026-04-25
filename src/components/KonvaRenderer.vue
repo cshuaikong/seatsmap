@@ -2135,31 +2135,23 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
   })
   addPreviewElement(startDot)
 
-  const angle = Math.atan2(uy, ux) * 180 / Math.PI
-
-  // 座位预览圆：使用逻辑半径和逻辑间距
-  // Konva 会自动应用 stageScale，视觉与实际渲染的座位一致
-  const group = new Konva.Group({
-    x: startPos.x,
-    y: startPos.y,
-    rotation: angle,
-    listening: false
-  })
-
+  // 直接循环生成座位圆，直接加到预览层（不使用 Group，避免坐标叠加）
   for (let i = 0; i < count; i++) {
+    // 绝对坐标：起点 + 方向 * 间距 * 索引（与 createRowShape + offset 渲染后的全局位置一致）
+    const seatX = startPos.x + i * ux * logicalGap
+    const seatY = startPos.y + i * uy * logicalGap
     const circle = new Konva.Circle({
-      x: i * logicalGap + logicalRadius,
-      y: logicalRadius,
+      x: seatX,
+      y: seatY,
       radius: logicalRadius,
       fill: '#dbeafe',
       stroke: '#3b82f6',
       strokeWidth: 1.5 / stageScale,
       listening: false
     })
-    group.add(circle)
+    addPreviewElement(circle)
   }
 
-  addPreviewElement(group)
   overlayLayer?.batchDraw()
 }
 
