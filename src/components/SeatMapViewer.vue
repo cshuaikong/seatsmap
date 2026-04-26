@@ -446,41 +446,68 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   const stageScale = stage?.scaleX() || 1
   const store = useVenueStore()
   const configRadius = store.visualConfig?.radius || 6
+  const configGap = store.visualConfig?.gap || 18
+  const configRowGap = store.visualConfig?.rowGap || 24
   const borderWidth = store.visualConfig?.borderWidth || 2
   
-  // LOD：缩小状态渲染座位条，放大状态渲染圆形座位
+  // LOD：缩小状态渲染座位区块，放大状态渲染圆形座位
   if (stageScale < 0.5) {
-    // 座位条模式：将该排座位连成粗线
-    if (row.seats.length >= 2) {
-      const points: number[] = []
-      row.seats.forEach((seat, index) => {
-        const pos = curvedPositions[index]
-        let x = rowX + pos.x
-        let y = rowY + pos.y
+    // 座位区块模式：用矩形表示整排座位
+    if (row.seats.length > 0) {
+      const firstPos = curvedPositions[0]
+      const lastPos = curvedPositions[curvedPositions.length - 1]
+      
+      let x1 = rowX + firstPos.x
+      let y1 = rowY + firstPos.y
+      let x2 = rowX + lastPos.x
+      let y2 = rowY + lastPos.y
+      
+      // 应用旋转
+      if (rotation) {
+        const rad = rotation * Math.PI / 180
+        const relX1 = x1 - rowX
+        const relY1 = y1 - rowY
+        x1 = rowX + relX1 * Math.cos(rad) - relY1 * Math.sin(rad)
+        y1 = rowY + relX1 * Math.sin(rad) + relY1 * Math.cos(rad)
         
-        if (rotation) {
-          const rad = rotation * Math.PI / 180
-          const relX = x - rowX
-          const relY = y - rowY
-          x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
-          y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
-        }
-        
-        points.push(x, y)
+        const relX2 = x2 - rowX
+        const relY2 = y2 - rowY
+        x2 = rowX + relX2 * Math.cos(rad) - relY2 * Math.sin(rad)
+        y2 = rowY + relX2 * Math.sin(rad) + relY2 * Math.cos(rad)
+      }
+      
+      // 计算区块尺寸（座位总长度 × 行高）
+      const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
+      const angle = Math.atan2(y2 - y1, x2 - x1)
+      const blockHeight = configRowGap / stageScale  // 区块高度 = 行间距
+      
+      // 创建区块矩形（以排中心为原点）
+      const centerX = (x1 + x2) / 2
+      const centerY = (y1 + y2) / 2
+      
+      const block = new Konva.Rect({
+        x: centerX - length / 2,
+        y: centerY - blockHeight / 2,
+        width: length,
+        height: blockHeight,
+        fill: getCategoryColor(row.seats[0].categoryKey),
+        opacity: 0.4,
+        cornerRadius: 2 / stageScale,
+        listening: false  // 区块不可点击
       })
       
-      const rowLine = new Konva.Line({
-        points,
-        stroke: getCategoryColor(row.seats[0].categoryKey),
-        strokeWidth: configRadius * 2,  // 线宽 = 座位直径
-        lineCap: 'round',
-        lineJoin: 'round',
-        opacity: 0.6,
-        listening: false  // 座位条不可点击
-      })
+      // 应用旋转让区块方向与排一致
+      if (rotation) {
+        block.rotation(rotation)
+        // 旋转后需要重新计算位置（绕中心点旋转）
+        block.x(centerX)
+        block.y(centerY)
+        block.offsetX(length / 2)
+        block.offsetY(blockHeight / 2)
+      }
       
       if (layer) {
-        layer.add(rowLine)
+        layer.add(block)
       }
     }
   } else {
