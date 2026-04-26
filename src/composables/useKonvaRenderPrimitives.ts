@@ -235,7 +235,8 @@ export function createRowSceneFunc(
   selectedSeatIds: string[] = [],
   visualScale: number = 1,
   baseScale: number = 1,
-  forceBarMode: boolean = false
+  forceBarMode: boolean = false,
+  seatBorderWidth: number = 4
 ): (context: Konva.Context, shape: Konva.Shape) => void {
   return (context, shape) => {
    
@@ -330,8 +331,8 @@ export function createRowSceneFunc(
         context.save()
         const borderColor = darkenColor(color, 25)
         context.strokeStyle = borderColor
-        // 边框线宽随缩放补偿，保持视觉比例恒定
-        context.lineWidth = 2 / currentStageScale
+        // 边框线宽随缩放补偿，保持视觉比例恒定（使用参数传入的边框宽度）
+        context.lineWidth = seatBorderWidth / currentStageScale
         groupSeats.forEach((seat) => {
           const pos = curvedPositions[row.seats.indexOf(seat)]
           context.beginPath()

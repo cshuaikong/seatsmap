@@ -54,7 +54,8 @@ export const useVenueStore = defineStore('venue', () => {
   const visualConfig = {
     radius: 6,      // 期望在屏幕上看到的半径 6px
     gap: 18,        // 期望在屏幕上看到的间距 18px（= SEAT_SPACING）
-    rowGap: 24      // 期望在屏幕上看到的行距 24px（= ROW_SPACING）
+    rowGap: 24,     // 期望在屏幕上看到的行距 24px（= ROW_SPACING）
+    borderWidth: 2  // 期望在屏幕上看到的边框宽度 2px
   }
 
   // 当前激活的 path 边段（用于画布与右侧面板联动）

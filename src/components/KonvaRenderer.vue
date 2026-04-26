@@ -511,7 +511,8 @@ const updateRowSelectionVisuals = () => {
         const isGlobalView = !venueStore.focusedSectionId
         const isFocusedSection = venueStore.focusedSectionId === section.id
         const shouldForceBarMode = isGlobalView || !isFocusedSection
-        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode))
+        const { borderWidth } = venueStore.visualConfig
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, borderWidth))
         
         // 同步更新 listening 状态
         if (shouldForceBarMode) {
@@ -1338,7 +1339,8 @@ const renderRow = (row: SeatRow, section: Section, forceBarMode: boolean = false
   // 设置绘制函数
   // 全局视图或强制横条模式下使用横条渲染，否则显示具体座位
   const shouldForceBarMode = isGlobalView || forceBarMode
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode))
+  const { borderWidth } = venueStore.visualConfig
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, borderWidth))
   
   // 横条模式下禁用事件响应（只读展示），具体座位模式下启用事件响应（可框选/点击）
   if (shouldForceBarMode) {
@@ -2152,6 +2154,47 @@ const createSeatRowPreview = (startPos: Position, endPos: Position) => {
     addPreviewElement(circle)
   }
 
+  // 在行中间显示座位数量
+  const midX = startPos.x + (count - 1) / 2 * ux * logicalGap
+  const midY = startPos.y + (count - 1) / 2 * uy * logicalGap
+  
+  const textContent = `${count}`
+  const tempText = new Konva.Text({
+    text: textContent,
+    fontSize: 14 / stageScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    listening: false
+  })
+  const textWidth = tempText.measureSize(textContent).width
+  const textHeight = 14 / stageScale
+  const padding = 6 / stageScale
+  
+  const bgRect = new Konva.Rect({
+    x: midX - textWidth / 2 - padding,
+    y: midY - textHeight / 2 - padding / 2,
+    width: textWidth + padding * 2,
+    height: textHeight + padding,
+    fill: 'rgba(0, 0, 0, 0.75)',
+    cornerRadius: 3 / stageScale,
+    listening: false
+  })
+  addPreviewElement(bgRect)
+  
+  const countText = new Konva.Text({
+    x: midX,
+    y: midY,
+    text: textContent,
+    fontSize: 14 / stageScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    fill: '#ffffff',
+    align: 'center',
+    listening: false
+  })
+  countText.offsetX(textWidth / 2)
+  countText.offsetY(textHeight / 2)
+  
+  addPreviewElement(countText)
+
   overlayLayer?.batchDraw()
 }
 
@@ -2384,6 +2427,55 @@ const createMultiRowPreview = (startPos: Position, endPos: Position) => {
   })
 
   addPreviewElement(shape)
+  
+  // 在所有排的中心位置显示 排×座
+  const perpUx = Math.cos(perpAngle)
+  const perpUy = Math.sin(perpAngle)
+  const rowUx = perpUx
+  const rowUy = perpUy
+  const seatUx = Math.cos(preview.angle)
+  const seatUy = Math.sin(preview.angle)
+  
+  const centerX = preview.baseRow.start.x + (preview.rowCount - 1) / 2 * rowUx * rowSpacing + (preview.baseRow.seatCount - 1) / 2 * seatUx * logicalGap
+  const centerY = preview.baseRow.start.y + (preview.rowCount - 1) / 2 * rowUy * rowSpacing + (preview.baseRow.seatCount - 1) / 2 * seatUy * logicalGap
+  
+  const textContent = `${preview.rowCount}×${preview.baseRow.seatCount}`
+  const tempText = new Konva.Text({
+    text: textContent,
+    fontSize: 14 * visualScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    listening: false
+  })
+  const textWidth = tempText.measureSize(textContent).width
+  const textHeight = 14 * visualScale
+  const padding = 6 * visualScale
+  
+  const bgRect = new Konva.Rect({
+    x: centerX - textWidth / 2 - padding,
+    y: centerY - textHeight / 2 - padding / 2,
+    width: textWidth + padding * 2,
+    height: textHeight + padding,
+    fill: 'rgba(0, 0, 0, 0.75)',
+    cornerRadius: 3 * visualScale,
+    listening: false
+  })
+  addPreviewElement(bgRect)
+  
+  const multiText = new Konva.Text({
+    x: centerX,
+    y: centerY,
+    text: textContent,
+    fontSize: 14 * visualScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    fill: '#ffffff',
+    align: 'center',
+    listening: false
+  })
+  multiText.offsetX(textWidth / 2)
+  multiText.offsetY(textHeight / 2)
+  
+  addPreviewElement(multiText)
+  
   overlayLayer?.batchDraw()
 }
 

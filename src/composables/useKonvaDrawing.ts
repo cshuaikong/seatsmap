@@ -367,6 +367,48 @@ export function createSeatRowPreview(startPos: Position, endPos: Position) {
     addPreviewElement(circle)
   }
   
+  // 在行中间显示座位数量
+  const midX = startPos.x + (count - 1) / 2 * ux * logicalGap
+  const midY = startPos.y + (count - 1) / 2 * uy * logicalGap
+    
+  // 黑色背景
+  const textContent = `${count}`
+  const tempText = new Konva.Text({
+    text: textContent,
+    fontSize: 14 / stageScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    listening: false
+  })
+  const textWidth = tempText.measureSize(textContent).width
+  const textHeight = 14 / stageScale
+  const padding = 6 / stageScale
+    
+  const bgRect = new Konva.Rect({
+    x: midX - textWidth / 2 - padding,
+    y: midY - textHeight / 2 - padding / 2,
+    width: textWidth + padding * 2,
+    height: textHeight + padding,
+    fill: 'rgba(0, 0, 0, 0.75)',
+    cornerRadius: 3 / stageScale,
+    listening: false
+  })
+  addPreviewElement(bgRect)
+    
+  const countText = new Konva.Text({
+    x: midX,
+    y: midY,
+    text: textContent,
+    fontSize: 14 / stageScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    fill: '#ffffff',
+    align: 'center',
+    listening: false
+  })
+  countText.offsetX(textWidth / 2)
+  countText.offsetY(textHeight / 2)
+    
+  addPreviewElement(countText)
+  
   batchDrawOverlay()
 }
 
@@ -481,6 +523,47 @@ export function createMultiRowPreview(startPos: Position, endPos: Position, curr
       addPreviewElement(circle)
     }
   }
+  
+  // 在所有排的中心位置显示 排×座
+  const centerX = startPos.x + (rowCount - 1) / 2 * rowUx * logicalRowGap + (seatsPerRow - 1) / 2 * ux * logicalGap
+  const centerY = startPos.y + (rowCount - 1) / 2 * rowUy * logicalRowGap + (seatsPerRow - 1) / 2 * uy * logicalGap
+  
+  const textContent = `${rowCount}×${seatsPerRow}`
+  const tempText = new Konva.Text({
+    text: textContent,
+    fontSize: 14 * visualScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    listening: false
+  })
+  const textWidth = tempText.measureSize(textContent).width
+  const textHeight = 14 * visualScale
+  const padding = 6 * visualScale
+  
+  const bgRect = new Konva.Rect({
+    x: centerX - textWidth / 2 - padding,
+    y: centerY - textHeight / 2 - padding / 2,
+    width: textWidth + padding * 2,
+    height: textHeight + padding,
+    fill: 'rgba(0, 0, 0, 0.75)',
+    cornerRadius: 3 * visualScale,
+    listening: false
+  })
+  addPreviewElement(bgRect)
+  
+  const multiText = new Konva.Text({
+    x: centerX,
+    y: centerY,
+    text: textContent,
+    fontSize: 14 * visualScale,
+    fontFamily: 'Inter, -apple-system, sans-serif',
+    fill: '#ffffff',
+    align: 'center',
+    listening: false
+  })
+  multiText.offsetX(textWidth / 2)
+  multiText.offsetY(textHeight / 2)
+  
+  addPreviewElement(multiText)
   
   batchDrawOverlay()
 }
