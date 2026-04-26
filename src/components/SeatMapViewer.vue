@@ -259,7 +259,8 @@ const fitContentWithAnimation = () => {
     duration: 0.8,
     easing: Konva.Easings.EaseInOut,
     onFinish: () => {
-      updateLOD()
+      // 动画完成后重绘，保留当前舞台状态
+      renderSeatMap(true)
     }
   })
 }
@@ -280,7 +281,7 @@ const updateLOD = () => {
   
   // 如果当前状态与期望状态不符，重新渲染
   if (hasSeatNodes !== shouldShowCircles) {
-    renderSeatMap()  // 重新渲染以切换模式
+    renderSeatMap(true)  // 重新渲染以切换模式，保留舞台状态
     return
   }
   
@@ -307,12 +308,14 @@ const updateLOD = () => {
 }
 
 // 渲染座位图
-const renderSeatMap = () => {
+const renderSeatMap = (preserveStageState: boolean = false) => {
   if (!stage || !layer) return
 
-  // 【修复】重置 Stage 状态，避免多次重绘导致位移叠加
-  stage.scale({ x: 1, y: 1 })
-  stage.position({ x: 0, y: 0 })
+  // 【修复】只在首次渲染时重置 Stage 状态
+  if (!preserveStageState) {
+    stage.scale({ x: 1, y: 1 })
+    stage.position({ x: 0, y: 0 })
+  }
 
   layer.destroyChildren()
   seatNodes.clear() // 清空座位节点映射
