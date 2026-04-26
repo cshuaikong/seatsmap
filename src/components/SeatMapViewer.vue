@@ -33,30 +33,18 @@ const getLogicalRadius = () => {
   const store = useVenueStore()
   const configRadius = store.visualConfig?.radius || 6
   
-  // 【关键】从 seat 数据反推 baseScale
-  // 如果 store 中没有 baseScale，根据座位间距反推
-  let baseScale = store.getBaseScale()
-  if (baseScale === 1) {
-    // 尝试从第一个排的第一个座位间距反推
-    const firstSection = props.venue.sections[0]
-    const firstRow = firstSection?.rows[0]
-    if (firstRow?.seats.length >= 2) {
-      const seat0 = firstRow.seats[0]
-      const seat1 = firstRow.seats[1]
-      const dist = Math.sqrt(Math.pow(seat1.x - seat0.x, 2) + Math.pow(seat1.y - seat0.y, 2))
-      // 间距 = gap / baseScale，所以 baseScale = gap / dist
-      const gap = store.visualConfig?.gap || 18
-      baseScale = gap / dist
-      console.log('[SeatMapViewer] Inferred baseScale from seat distance:', baseScale)
-    }
+  // 2. 从 venue 数据中获取 baseScale（预览模式下使用 venue 自己的 baseScale）
+  let baseScale = (props.venue as any).baseScale
+  if (!baseScale || baseScale === 1) {
+    // 如果 venue 没有 baseScale，从 store 获取
+    baseScale = store.getBaseScale()
   }
   
-  // 2. 计算逻辑半径：和编辑器存坐标时的逻辑一致
+  // 3. 计算逻辑半径：和编辑器存坐标时的逻辑一致
   // 坐标存的是 (pos / baseScale)，半径也得 (radius / baseScale)
   const logicalRadius = configRadius / baseScale
   
-  // 【保险】限制逻辑半径的最大值，避免重叠
-  return Math.min(logicalRadius, 4)
+  return logicalRadius
 }
 
 // 计算弧形位置
