@@ -17,8 +17,6 @@
               :venue="venue"
               :selectable="true"
               v-model:selected-seat-ids="selectedSeats"
-              :width="500"
-              :height="500"
               @seat-click="onSeatClick"
               class="preview-viewer"
             />
@@ -161,6 +159,8 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 }
 
 .preview-viewer {
+  width: 100%;
+  height: 100%;
   border: none !important;
   background: white;
   border-radius: 12px;

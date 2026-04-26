@@ -797,8 +797,8 @@ defineExpose({ refresh: renderSeatMap, updateSelection })
 .seat-map-viewer {
   width: 100%;
   height: 100%;
-  background: var(--color-bg);
-  border-radius: 8px;
+  background: white;
+  border-radius: 12px;
   overflow: hidden;
 }
 </style>
