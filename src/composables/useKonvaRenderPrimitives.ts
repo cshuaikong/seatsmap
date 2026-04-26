@@ -276,10 +276,26 @@ export function createRowSceneFunc(
       context.fillText(row.label, -radius * 2.5, 0)
       context.restore()
     }
+    // LOD 多级细节渲染策略
     // 根据当前舞台缩放动态决定显示模式
-    // 当屏幕上每个座位小于阈值时，显示为横条
-    // 全局视图下强制使用横条模式
-    const displayMode = forceBarMode || currentStageScale < 0.6 ? 'bar' : 'seat'
+    // stageScale < 0.3: 隐藏座位，只显示分区轮廓（由 renderSectionBorder 处理）
+    // 0.3 <= stageScale < 0.6: 显示座位圆，不显示标签
+    // stageScale >= 0.6: 显示座位 + 标签
+    const LOD_HIDE_SEATS = 0.3    // 小于此值隐藏座位
+    const LOD_SHOW_LABELS = 0.6   // 大于此值显示标签
+    
+    // 全局视图或强制横条模式优先
+    const displayMode = forceBarMode ? 'bar' : 
+                        currentStageScale < LOD_HIDE_SEATS ? 'hidden' : 
+                        currentStageScale < LOD_SHOW_LABELS ? 'seat-only' : 'seat+label'
+    
+    // 远景：隐藏座位（分区边框由 renderSectionBorder 单独渲染）
+    if (displayMode === 'hidden') {
+      return
+    }
+    
+    // 近景：显示座位
+    const showLabels = displayMode === 'seat+label' && !forceBarMode
     
     if (displayMode === 'bar') {
       // 绘制横条表示座位排
@@ -311,41 +327,41 @@ export function createRowSceneFunc(
       
       context.restore()
     } else {
-      // 批次绘制每个颜色组的座位
-      Object.entries(colorGroups).forEach(([color, groupSeats]) => {
-        if (groupSeats.length === 0) return
+    
+    // 批次绘制每个颜色组的座位
+    Object.entries(colorGroups).forEach(([color, groupSeats]) => {
+      if (groupSeats.length === 0) return
 
-        context.beginPath()
-        context.fillStyle = color
+      context.beginPath()
+      context.fillStyle = color
 
-        // 使用计算后的弧形位置绘制
-        groupSeats.forEach((seat, index) => {
-          const pos = curvedPositions[row.seats.indexOf(seat)]
-          context.moveTo(pos.x, pos.y)
-          context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
-        })
-
-        context.fill()
-
-        // 绘制边框 - 使用加深后的颜色（seats.io 风格）
-        context.save()
-        const borderColor = darkenColor(color, 25)
-        context.strokeStyle = borderColor
-        // 边框线宽随缩放补偿，保持视觉比例恒定（使用参数传入的边框宽度）
-        context.lineWidth = seatBorderWidth / currentStageScale
-        groupSeats.forEach((seat) => {
-          const pos = curvedPositions[row.seats.indexOf(seat)]
-          context.beginPath()
-          context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
-          context.stroke()
-        })
-        context.restore()
+      // 使用计算后的弧形位置绘制
+      groupSeats.forEach((seat, index) => {
+        const pos = curvedPositions[row.seats.indexOf(seat)]
+        context.moveTo(pos.x, pos.y)
+        context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
       })
-    }
+
+      context.fill()
+
+      // 绘制边框 - 使用加深后的颜色（seats.io 风格）
+      context.save()
+      const borderColor = darkenColor(color, 25)
+      context.strokeStyle = borderColor
+      // 边框线宽随缩放补偿，保持视觉比例恒定（使用参数传入的边框宽度）
+      context.lineWidth = seatBorderWidth / currentStageScale
+      groupSeats.forEach((seat) => {
+        const pos = curvedPositions[row.seats.indexOf(seat)]
+        context.beginPath()
+        context.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
+        context.stroke()
+      })
+      context.restore()
+    })
 
     // 绘制座位标签（如果有）
-    // 【优化】根据当前舞台缩放决定是否显示标签，避免过于密集
-    if (currentStageScale >= 1.5) {  // 缩放大于 1.5 时才显示标签
+    // 【LOD】根据缩放级别决定是否显示标签
+    if (showLabels) {
       context.fillStyle = '#333333'  // 黑色字体
       // 字体大小与半径一致
       context.font = `${radius}px Inter, -apple-system, sans-serif`
@@ -377,6 +393,7 @@ export function createRowSceneFunc(
     }
 
     // 关键节点高亮已移除（不需要显示黄色/橙色圈）
+    }
   }
 }
 

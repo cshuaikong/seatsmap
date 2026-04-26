@@ -913,6 +913,19 @@ const renderSectionBorder = (section: Section) => {
   // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
   const stageScale = stage?.scaleX() || 1
   const visualScale = 1 / stageScale
+  
+  // LOD：根据缩放级别调整背景透明度
+  // stageScale < 0.3: 增强背景色，作为主要视觉元素
+  // 0.3 <= stageScale < 1.0: 正常背景色
+  // stageScale >= 1.0: 降低背景色，突出座位
+  let backgroundOpacity = 1
+  if (stageScale < 0.3) {
+    backgroundOpacity = 1  // 远景：完全显示背景
+  } else if (stageScale < 1.0) {
+    backgroundOpacity = 0.6  // 中景：半透明背景
+  } else {
+    backgroundOpacity = 0.3  // 近景：淡背景，突出座位
+  }
 
   let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
@@ -941,7 +954,7 @@ const renderSectionBorder = (section: Section) => {
     strokeWidth: scaledStrokeWidth,
     hitStrokeWidth: scaledStrokeWidth,  // 点击区域和视觉边框完全重叠
     dash: [],  // 实线边框，无虚线
-    opacity: isOtherFocused ? 0.3 : (section.borderOpacity ?? 1),
+    opacity: isOtherFocused ? 0.3 : ((section.borderOpacity ?? 1) * backgroundOpacity),
     listening: canListen,
   }
 
