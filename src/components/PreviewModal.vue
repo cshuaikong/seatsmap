@@ -162,9 +162,14 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
   width: 100%;
   height: 100%;
   border: none !important;
-  background: white;
+  background: transparent;
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  cursor: grab;
+}
+
+.preview-viewer:active {
+  cursor: grabbing;
 }
 
 .preview-footer {

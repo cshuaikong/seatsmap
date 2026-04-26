@@ -107,7 +107,7 @@ const initStage = () => {
     container: containerRef.value,
     width,
     height,
-    draggable: false // 禁用舞台拖拽，避免影响座位点击
+    draggable: true  // 允许拖拽画布
   })
 
   layer = new Konva.Layer({
@@ -271,13 +271,18 @@ const updateLOD = () => {
   const scale = stage.scaleX()
   
   // LOD 阈值（放宽，让座位更容易显示）
-  const SHOW_SEATS_THRESHOLD = 0.1   // 缩放大于 0.1 显示座位
+  const SHOW_SEATS_THRESHOLD = 0.5   // 缩放大于 0.5 显示圆形座位
   const SHOW_LABELS_THRESHOLD = 0.8  // 缩放大于 0.8 显示标签
   
-  // 更新座位可见性
-  layer.find('.seat-node').forEach(node => {
-    node.visible(scale > SHOW_SEATS_THRESHOLD)
-  })
+  // 检查是否需要切换渲染模式（座位条 vs 圆形座位）
+  const hasSeatNodes = seatNodes.size > 0
+  const shouldShowCircles = scale > SHOW_SEATS_THRESHOLD
+  
+  // 如果当前状态与期望状态不符，重新渲染
+  if (hasSeatNodes !== shouldShowCircles) {
+    renderSeatMap()  // 重新渲染以切换模式
+    return
+  }
   
   // 更新标签可见性
   layer.find('Text').forEach(textNode => {
@@ -435,103 +440,147 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 
   // 座位（直接添加到 layer，不使用 Group）
-  row.seats.forEach((seat, index) => {
-    const pos = curvedPositions[index]
-    
-    // 【修复】座位位置直接使用 pos.x, pos.y，不再减去 SEAT_RADIUS
-    // pos.x, pos.y 已经是相对于 row 原点的正确位置
-    let x = rowX + pos.x
-    let y = rowY + pos.y
-    
-    if (rotation) {
-      const rad = rotation * Math.PI / 180
-      const relX = x - rowX
-      const relY = y - rowY
-      x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
-      y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+  const stageScale = stage?.scaleX() || 1
+  const store = useVenueStore()
+  const configRadius = store.visualConfig?.radius || 6
+  const borderWidth = store.visualConfig?.borderWidth || 2
+  
+  // LOD：缩小状态渲染座位条，放大状态渲染圆形座位
+  if (stageScale < 0.5) {
+    // 座位条模式：将该排座位连成粗线
+    if (row.seats.length >= 2) {
+      const points: number[] = []
+      row.seats.forEach((seat, index) => {
+        const pos = curvedPositions[index]
+        let x = rowX + pos.x
+        let y = rowY + pos.y
+        
+        if (rotation) {
+          const rad = rotation * Math.PI / 180
+          const relX = x - rowX
+          const relY = y - rowY
+          x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
+          y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+        }
+        
+        points.push(x, y)
+      })
+      
+      const rowLine = new Konva.Line({
+        points,
+        stroke: getCategoryColor(row.seats[0].categoryKey),
+        strokeWidth: configRadius * 2,  // 线宽 = 座位直径
+        lineCap: 'round',
+        lineJoin: 'round',
+        opacity: 0.6,
+        listening: false  // 座位条不可点击
+      })
+      
+      if (layer) {
+        layer.add(rowLine)
+      }
     }
-    
-    const isSelected = props.selectedSeatIds?.includes(seat.id)
-    const color = getCategoryColor(seat.categoryKey)
-    
-    // 【修复】移除视觉恒定缩放，座位随舞台缩放
-    // 这样预览时座位大小与实际绘制一致
+  } else {
+    // 圆形座位模式
+    row.seats.forEach((seat, index) => {
+      const pos = curvedPositions[index]
+      
+      let x = rowX + pos.x
+      let y = rowY + pos.y
+      
+      if (rotation) {
+        const rad = rotation * Math.PI / 180
+        const relX = x - rowX
+        const relY = y - rowY
+        x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
+        y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+      }
+      
+      const isSelected = props.selectedSeatIds?.includes(seat.id)
+      const color = getCategoryColor(seat.categoryKey)
 
-    // 座位圆形
-    const store = useVenueStore()
-    const borderWidth = store.visualConfig?.borderWidth || 2
-    
-    const circle = new Konva.Circle({
-      x,
-      y,
-      radius: logicalRadius,
-      fill: isSelected ? '#FF5722' : color,
-      stroke: '#fff',
-      strokeWidth: borderWidth / (stage?.scaleX() || 1),  // 边框跟随缩放
-      name: 'seat-node'  // 用于 LOD 控制
+      // 座位圆形
+      const circle = new Konva.Circle({
+        x,
+        y,
+        radius: logicalRadius,
+        fill: isSelected ? '#FF5722' : color,
+        stroke: '#fff',
+        strokeWidth: borderWidth / stageScale,
+        name: 'seat-node'
+      })
+
+      // 点击事件 - 切换选择状态
+      if (props.selectable !== false) {
+        circle.on('mousedown', (e) => {
+          console.log('座位点击:', seat.id, seat.label)
+          e.cancelBubble = true
+          
+          // Seats.io 风格动画：轻微缩放
+          circle.to({
+            scaleX: 1.2,
+            scaleY: 1.2,
+            duration: 0.1,
+            easing: Konva.Easings.BackEaseOut,
+            onFinish: () => {
+              circle.to({
+                scaleX: 1,
+                scaleY: 1,
+                duration: 0.1
+              })
+            }
+          })
+          
+          const currentSelected = new Set(props.selectedSeatIds || [])
+          if (currentSelected.has(seat.id)) {
+            currentSelected.delete(seat.id)
+          } else {
+            currentSelected.add(seat.id)
+          }
+          emit('update:selectedSeatIds', Array.from(currentSelected))
+          emit('seat-click', seat, row, section)
+        })
+        
+        // 鼠标样式
+        circle.on('mouseenter', () => {
+          if (stage) {
+            stage.container().style.cursor = 'pointer'
+          }
+        })
+        circle.on('mouseleave', () => {
+          if (stage) {
+            stage.container().style.cursor = 'default'
+          }
+        })
+      }
+
+      if (layer) {
+        layer.add(circle)
+      }
+      seatNodes.set(seat.id, circle)
+      
+      // 座位标签
+      const currentStageScale = stage?.scaleX() || 1
+      if (seat.label && layer && currentStageScale >= 0.8) {
+        const fontSize = logicalRadius
+        
+        const text = new Konva.Text({
+          x: x,
+          y: y,
+          text: String(seat.label),
+          fontSize: fontSize,
+          fill: '#333',
+          align: 'center',
+          verticalAlign: 'middle',
+          listening: false,
+          name: 'seat-label'
+        })
+        text.offsetX(text.width() / 2)
+        text.offsetY(text.height() / 2)
+        layer.add(text)
+      }
     })
-
-  // 点击事件 - 切换选择状态
-    if (props.selectable !== false) {
-      // 使用 mousedown 代替 click，更可靠
-      circle.on('mousedown', (e) => {
-        console.log('座位点击:', seat.id, seat.label)
-        e.cancelBubble = true
-        const currentSelected = new Set(props.selectedSeatIds || [])
-        if (currentSelected.has(seat.id)) {
-          currentSelected.delete(seat.id)
-          console.log('取消选择:', seat.id)
-        } else {
-          currentSelected.add(seat.id)
-          console.log('选择:', seat.id)
-        }
-        emit('update:selectedSeatIds', Array.from(currentSelected))
-        emit('seat-click', seat, row, section)
-      })
-      
-      // 鼠标样式
-      circle.on('mouseenter', () => {
-        if (stage) {
-          stage.container().style.cursor = 'pointer'
-        }
-      })
-      circle.on('mouseleave', () => {
-        if (stage) {
-          stage.container().style.cursor = 'default'
-        }
-      })
-    }
-
-    if (layer) {
-      layer.add(circle)
-    }
-    seatNodes.set(seat.id, circle) // 存储节点用于后续更新
-    
-    // 【修复】座位编号在座位圆形之后添加，确保显示在上层
-    // 根据当前舞台缩放决定是否显示标签
-    const currentStageScale = stage?.scaleX() || 1
-    if (seat.label && layer && currentStageScale >= 0.8) {
-      // 字体大小等于逻辑半径，随座位一起缩放
-      const fontSize = logicalRadius
-      
-      // 精确居中：创建后计算文本宽高
-      const text = new Konva.Text({
-        x: x,
-        y: y,
-        text: String(seat.label),
-        fontSize: fontSize,
-        fill: '#333',
-        align: 'center',
-        verticalAlign: 'middle',
-        listening: false,
-        name: 'seat-label'  // 标记为座位标签，用于缩放时更新
-      })
-      // 设置 offset 让文本真正居中
-      text.offsetX(text.width() / 2)
-      text.offsetY(text.height() / 2)
-      layer.add(text)
-    }
-  })
+  }
 }
 
 // 更新座位选中状态（当 selectedSeatIds 变化时调用）
