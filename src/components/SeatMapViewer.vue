@@ -154,6 +154,7 @@ const initStage = () => {
     
     // 更新所有 label 的反向缩放
     updateLabelScale()
+    updateLOD()  // 缩放后更新 LOD
     
     layer?.batchDraw()
   })
@@ -217,39 +218,99 @@ const fitContentToView = () => {
   // 【调试】打印边界信息
   const store = useVenueStore()
   console.log('[SeatMapViewer] Content bounds:', box)
-  console.log('[SeatMapViewer] Store baseScale:', store.getBaseScale())
-  console.log('[SeatMapViewer] Store radius:', store.visualConfig?.radius)
   
-  if (box.width === 0 || box.height === 0) {
-    console.warn('[SeatMapViewer] Empty content, skipping fit')
-    return
-  }
-
-  const padding = 40
-  const containerW = props.width || stage.width() || 500
-  const containerH = props.height || stage.height() || 500
-
-  // 3. 计算缩放比 (取宽高缩小比例中更小的那个)
+  const padding = 50
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+  
   const scale = Math.min(
-    (containerW - padding * 2) / box.width,
-    (containerH - padding * 2) / box.height
+    (stageWidth - padding) / box.width,
+    (stageHeight - padding) / box.height,
+    1.5  // 最大不超过 1.5x
   )
   
-  console.log('[SeatMapViewer] Calculated scale:', scale)
-
-  // 4. 应用缩放
   stage.scale({ x: scale, y: scale })
-
-  // 5. 将内容的中心点平移到容器中心
-  const contentCenterX = box.x + box.width / 2
-  const contentCenterY = box.y + box.height / 2
-
   stage.position({
-    x: containerW / 2 - contentCenterX * scale,
-    y: containerH / 2 - contentCenterY * scale
+    x: (stageWidth - box.width * scale) / 2 - box.x * scale,
+    y: (stageHeight - box.height * scale) / 2 - box.y * scale
   })
+  
+  layer.batchDraw()
+  updateLOD()
+}
 
-  stage.batchDraw()
+// 入场动画：平滑缩放到最佳视角
+const fitContentWithAnimation = () => {
+  if (!stage || !layer) return
+  
+  if (!isInitialFit) return
+  isInitialFit = false
+  
+  layer.batchDraw()
+  const box = layer.getClientRect()
+  
+  const padding = 50
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+  
+  const targetScale = Math.min(
+    (stageWidth - padding) / box.width,
+    (stageHeight - padding) / box.height,
+    1.5
+  )
+  
+  const targetX = (stageWidth - box.width * targetScale) / 2 - box.x * targetScale
+  const targetY = (stageHeight - box.height * targetScale) / 2 - box.y * targetScale
+  
+  // 使用 Konva 动画平滑过渡
+  stage.to({
+    x: targetX,
+    y: targetY,
+    scaleX: targetScale,
+    scaleY: targetScale,
+    duration: 0.8,
+    easing: Konva.Easings.EaseInOut,
+    onFinish: () => {
+      updateLOD()
+    }
+  })
+}
+
+// LOD 多级细节渲染
+const updateLOD = () => {
+  if (!stage || !layer) return
+  
+  const scale = stage.scaleX()
+  
+  // LOD 阈值
+  const SHOW_SEATS_THRESHOLD = 0.3   // 缩放大于 0.3 显示座位
+  const SHOW_LABELS_THRESHOLD = 0.6  // 缩放大于 0.6 显示标签
+  
+  // 更新座位可见性
+  layer.find('.seat-node').forEach(node => {
+    node.visible(scale > SHOW_SEATS_THRESHOLD)
+  })
+  
+  // 更新标签可见性
+  layer.find('Text').forEach(textNode => {
+    const text = textNode as Konva.Text
+    if (text.name() === 'seat-label') {
+      text.visible(scale > SHOW_LABELS_THRESHOLD)
+    }
+  })
+  
+  // 更新分区背景透明度
+  layer.find('.section-border').forEach(node => {
+    if (scale < 0.3) {
+      node.opacity(1)
+    } else if (scale < 1.0) {
+      node.opacity(0.6)
+    } else {
+      node.opacity(0.3)
+    }
+  })
+  
+  layer.batchDraw()
 }
 
 // 渲染座位图
@@ -415,7 +476,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       radius: logicalRadius,
       fill: isSelected ? '#FF5722' : color,
       stroke: '#fff',
-      strokeWidth: 1
+      strokeWidth: 1,
+      name: 'seat-node'  // 用于 LOD 控制
     })
 
   // 点击事件 - 切换选择状态
@@ -510,7 +572,8 @@ onMounted(() => {
   renderSeatMap()
   // 使用 requestAnimationFrame 确保渲染完成
   requestAnimationFrame(() => {
-    fitContentToView()
+    // 入场动画：平滑缩放到最佳视角
+    fitContentWithAnimation()
   })
 })
 
@@ -592,7 +655,8 @@ const renderSectionBorder = (section: Section) => {
       height: section.borderHeight || 100,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1
+      strokeWidth: 1,
+      name: 'section-border'  // 用于 LOD 控制
     }))
   } else if (section.borderType === 'ellipse') {
     layer.add(new Konva.Ellipse({
@@ -602,7 +666,8 @@ const renderSectionBorder = (section: Section) => {
       radiusY: section.borderRadiusY || 50,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1
+      strokeWidth: 1,
+      name: 'section-border'
     }))
   } else if (section.borderType === 'polygon' && section.borderPoints) {
     layer.add(new Konva.Line({
@@ -612,7 +677,8 @@ const renderSectionBorder = (section: Section) => {
       closed: true,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1
+      strokeWidth: 1,
+      name: 'section-border'
     }))
   } else if (section.borderType === 'path' && section.borderPathPoints) {
     // 使用 SVG Path 渲染带弧度的路径
@@ -623,7 +689,8 @@ const renderSectionBorder = (section: Section) => {
       data: pathData,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1
+      strokeWidth: 1,
+      name: 'section-border'
     }))
   }
 

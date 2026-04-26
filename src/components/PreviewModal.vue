@@ -90,11 +90,13 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 }
 
 .preview-modal {
-  background: var(--color-bg-secondary);
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  width: 540px;  /* 500px + padding */
-  height: 600px; /* 500px + header + footer */
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 90vw;
+  max-width: 1200px;
+  height: 85vh;
+  max-height: 900px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -143,28 +145,36 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 
 .preview-content {
   flex: 1;
-  padding: 20px;
+  padding: 40px;
   overflow: auto;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: var(--color-bg);
+  position: relative;
+  /* 设计师风格网格底纹 */
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(#e2e8f0 1px, transparent 1px),
+    linear-gradient(to right, #f1f5f9 1px, transparent 1px),
+    linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
+  background-size: 20px 20px, 40px 40px, 40px 40px;
 }
 
 .preview-viewer {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: none !important;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .preview-footer {
-  padding: 12px 20px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
+  padding: 16px 24px;
+  border-top: 1px solid #f1f5f9;
+  background: white;
   min-height: 48px;
   display: flex;
   align-items: center;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
 .seat-info {
