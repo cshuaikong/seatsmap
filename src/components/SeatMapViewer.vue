@@ -282,9 +282,9 @@ const updateLOD = () => {
   
   const scale = stage.scaleX()
   
-  // LOD 阈值
-  const SHOW_SEATS_THRESHOLD = 0.3   // 缩放大于 0.3 显示座位
-  const SHOW_LABELS_THRESHOLD = 0.6  // 缩放大于 0.6 显示标签
+  // LOD 阈值（放宽，让座位更容易显示）
+  const SHOW_SEATS_THRESHOLD = 0.1   // 缩放大于 0.1 显示座位
+  const SHOW_LABELS_THRESHOLD = 0.8  // 缩放大于 0.8 显示标签
   
   // 更新座位可见性
   layer.find('.seat-node').forEach(node => {
@@ -470,13 +470,16 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     // 这样预览时座位大小与实际绘制一致
 
     // 座位圆形
+    const store = useVenueStore()
+    const borderWidth = store.visualConfig?.borderWidth || 2
+    
     const circle = new Konva.Circle({
       x,
       y,
       radius: logicalRadius,
       fill: isSelected ? '#FF5722' : color,
       stroke: '#fff',
-      strokeWidth: 1,
+      strokeWidth: borderWidth / (stage?.scaleX() || 1),  // 边框跟随缩放
       name: 'seat-node'  // 用于 LOD 控制
     })
 
@@ -545,6 +548,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
 
 // 更新座位选中状态（当 selectedSeatIds 变化时调用）
 const updateSelection = () => {
+  const store = useVenueStore()
+  const borderWidth = store.visualConfig?.borderWidth || 2
+  const currentScale = stage?.scaleX() || 1
+  
   seatNodes.forEach((circle, seatId) => {
     const isSelected = props.selectedSeatIds?.includes(seatId)
     // 从 seat 对象获取颜色
@@ -561,7 +568,7 @@ const updateSelection = () => {
     const color = getCategoryColor(categoryKey)
     circle.fill(isSelected ? '#FF5722' : color)
     circle.stroke(isSelected ? '#FF5722' : '#fff')
-    circle.strokeWidth(isSelected ? 2 : 1)
+    circle.strokeWidth(isSelected ? 3 / currentScale : borderWidth / currentScale)
   })
   layer?.batchDraw()
 }
