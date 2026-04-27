@@ -777,6 +777,15 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           // 更新 status
           seat.status = currentlySelected ? SEAT_STATUS.AVAILABLE : SEAT_STATUS.SELECTED
           
+          // 控制座位标签显隐
+          if (currentlySelected) {
+            // 取消选中 → 显示标签
+            showSeatLabel(seat.id)
+          } else {
+            // 选中 → 隐藏标签
+            hideSeatLabel(seat.id)
+          }
+          
           // 设置标志位，防止触发 watch 中的 updateSelection
           isInternalUpdate = true
           
@@ -863,10 +872,16 @@ const updateSelection = () => {
       // 应该选中，但 status 不是 SELECTED → 更新为选中状态
       seat.status = SEAT_STATUS.SELECTED
       needsRedraw.push(shape as Konva.Shape)  // 记录需要重绘
+      
+      // 隐藏座位标签（选中时不显示）
+      hideSeatLabel(seatId)
     } else if (!isSelected && seat.status === SEAT_STATUS.SELECTED) {
       // 应该取消，但 status 是 SELECTED → 恢复为未选中状态
       seat.status = SEAT_STATUS.AVAILABLE
       needsRedraw.push(shape as Konva.Shape)  // 记录需要重绘
+      
+      // 显示座位标签（取消选中时显示）
+      showSeatLabel(seatId)
     }
   })
   
@@ -875,6 +890,47 @@ const updateSelection = () => {
     shape.drawScene()
     shape.drawHit()
   })
+}
+
+// 隐藏座位标签
+const hideSeatLabel = (seatId: string) => {
+  if (!layer) return
+  const children = layer.getChildren()
+  children.forEach((child: any) => {
+    if (child.className === 'Text' && child.name() === 'seat-label') {
+      // 通过 x, y 坐标匹配座位位置（简化方案）
+      // 更好的方案是存储标签引用，但这里用坐标匹配快速实现
+      const seatData = findSeatById(seatId)
+      if (seatData && Math.abs(child.x() - seatData.x) < 0.1 && Math.abs(child.y() - seatData.y) < 0.1) {
+        child.visible(false)
+      }
+    }
+  })
+}
+
+// 显示座位标签
+const showSeatLabel = (seatId: string) => {
+  if (!layer) return
+  const children = layer.getChildren()
+  children.forEach((child: any) => {
+    if (child.className === 'Text' && child.name() === 'seat-label') {
+      const seatData = findSeatById(seatId)
+      if (seatData && Math.abs(child.x() - seatData.x) < 0.1 && Math.abs(child.y() - seatData.y) < 0.1) {
+        child.visible(true)
+      }
+    }
+  })
+}
+
+// 查找座位数据（优化版，避免三重循环）
+const findSeatById = (seatId: string): any => {
+  for (const section of props.venue.sections) {
+    for (const row of section.rows) {
+      const seat = row.seats.find(s => s.id === seatId)
+      if (seat) return seat
+    }
+  }
+  return null
 }
 
 onMounted(() => {
