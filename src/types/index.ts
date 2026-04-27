@@ -3,8 +3,22 @@ export interface Position {
   y: number
 }
 
-// 座位状态类型（新增 selected 状态）
-export type SeatStatus = 'available' | 'booked' | 'reserved' | 'disabled' | 'selected'
+// 座位状态常量定义（项目级常量）
+export const SEAT_STATUS = {
+  /** 可选 */
+  AVAILABLE: 'available' as const,
+  /** 已预订 */
+  BOOKED: 'booked' as const,
+  /** 已保留 */
+  RESERVED: 'reserved' as const,
+  /** 禁用 */
+  DISABLED: 'disabled' as const,
+  /** 选中 */
+  SELECTED: 'selected' as const,
+} as const
+
+// 座位状态类型（从常量派生）
+export type SeatStatus = typeof SEAT_STATUS[keyof typeof SEAT_STATUS]
 
 // 座位类型
 export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
@@ -199,11 +213,11 @@ export const defaultSeatMapConfig: SeatMapConfig = {
   showSeatLabels: true,
   
   statusColors: {
-    available: '#9E9E9E',
-    booked: '#F44336',
-    reserved: '#FF9800',
-    disabled: '#616161',
-    selected: '#4CAF50',  // 选中状态颜色（绿色）
+    [SEAT_STATUS.AVAILABLE]: '#9E9E9E',
+    [SEAT_STATUS.BOOKED]: '#F44336',
+    [SEAT_STATUS.RESERVED]: '#FF9800',
+    [SEAT_STATUS.DISABLED]: '#616161',
+    [SEAT_STATUS.SELECTED]: '#4CAF50',  // 选中状态颜色（绿色）
   },
   
   categoryColors: {
