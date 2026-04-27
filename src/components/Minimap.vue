@@ -41,17 +41,17 @@ const renderMinimap = () => {
   // 如果没有内容，不渲染
   if (venueBounds.width === 0 || venueBounds.height === 0) return
   
-  // 计算 Minimap 的缩放比例，让内容居中显示
-  const padding = 10 * 2  // 2倍分辨率
+  // 计算 Minimap 的缩放比例，让内容完全居中显示，不留太多空白
+  const padding = 5 * 2  // 减少内边距，2倍分辨率
   const minimapWidth = canvas.width - padding * 2
   const minimapHeight = canvas.height - padding * 2
   
-  // 计算基础缩放：让所有内容适应 Minimap
+  // 计算基础缩放：让所有内容刚好适应 Minimap（不留太多空白）
   const baseScaleX = minimapWidth / venueBounds.width
   const baseScaleY = minimapHeight / venueBounds.height
   const baseScale = Math.min(baseScaleX, baseScaleY)
   
-  // 计算内容在 Minimap 中的偏移（居中）
+  // 计算内容在 Minimap 中的偏移（完全居中）
   const contentWidth = venueBounds.width * baseScale
   const contentHeight = venueBounds.height * baseScale
   const offsetX = padding + (minimapWidth - contentWidth) / 2
