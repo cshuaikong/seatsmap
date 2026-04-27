@@ -679,60 +679,92 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
       }
       
-      const isSelected = props.selectedSeatIds?.includes(seat.id)
+      const isSelected = seat.status === SEAT_STATUS.SELECTED
       const color = getCategoryColor(seat.categoryKey)
-      const borderColor = darkenColor(color, 25)  // 边框色：填充色加深 25%
 
-      // 座位圆形
-      const circle = new Konva.Circle({
+      // 使用自定义 Shape 绘制三层同心结构（高性能）
+      const seatShape = new Konva.Shape({
         x,
         y,
-        radius: logicalRadius,
-        fill: isSelected ? '#FF5722' : color,
-        stroke: isSelected ? '#FF5722' : borderColor,  // 使用加深后的边框色
-        strokeWidth: borderWidth / baseScale,  // 使用数据表的 borderWidth 参数（2px）
-        name: 'seat-node'
+        name: 'seat-node',
+        sceneFunc: (context, shape) => {
+          const radius = logicalRadius
+          const gapWidth = 2  // 透明隔离带宽度
+          const haloWidth = 1.5  // 外轮廓环线宽
+          
+          if (isSelected) {
+            // 选中态：三层同心结构
+            
+            // 1. 外轮廓环（最外层，颜色与核心一致）
+            context.beginPath()
+            context.arc(0, 0, radius + gapWidth + haloWidth / 2, 0, Math.PI * 2)
+            context.fillStyle = color
+            context.fill()
+            
+            // 2. 中间隔离带（透明间隙，产生悬浮感）
+            context.beginPath()
+            context.arc(0, 0, radius + gapWidth / 2, 0, Math.PI * 2)
+            context.fillStyle = 'rgba(0, 0, 0, 0)'  // 透明
+            context.fill()
+            
+            // 3. 内核心（实心圆，原始分类色）
+            context.beginPath()
+            context.arc(0, 0, radius, 0, Math.PI * 2)
+            context.fillStyle = color
+            context.fill()
+            
+            // 4. 内衬标志（白色勾选图标）
+            const checkSize = radius * 0.6
+            context.beginPath()
+            context.moveTo(-checkSize * 0.4, 0)
+            context.lineTo(-checkSize * 0.1, checkSize * 0.3)
+            context.lineTo(checkSize * 0.4, -checkSize * 0.3)
+            context.strokeStyle = '#FFFFFF'
+            context.lineWidth = checkSize * 0.15
+            context.lineCap = 'round'
+            context.lineJoin = 'round'
+            context.stroke()
+          } else {
+            // 未选中态：单一半透明实心圆，无边框
+            context.beginPath()
+            context.arc(0, 0, radius, 0, Math.PI * 2)
+            context.fillStyle = color
+            context.fill()
+          }
+          
+          // Konva 要求调用 hitFunc 来生成命中区域
+          context.fillStrokeShape(shape)
+        },
+        hitFunc: (context, shape) => {
+          // 命中区域：选中时使用外轮廓，未选中时使用核心圆
+          const radius = logicalRadius
+          const gapWidth = 2
+          const haloWidth = 1.5
+          const hitRadius = isSelected ? radius + gapWidth + haloWidth / 2 : radius
+          
+          context.beginPath()
+          context.arc(0, 0, hitRadius, 0, Math.PI * 2)
+          context.fillStrokeShape(shape)
+        }
       })
 
-      // 点击事件 - 性能优化版 seats.io 风格（使用 SEAT_STATUS 常量）
+      // 点击事件 - 使用自定义 Shape（只更新 status）
       if (props.selectable !== false) {
-        circle.on('click', (e) => {
+        seatShape.on('click', (e: any) => {
           e.cancelBubble = true
           
           // 直接根据 status 判断选中状态，不依赖颜色或自定义属性
           const currentlySelected = seat.status === SEAT_STATUS.SELECTED
           
           if (currentlySelected) {
-            // 取消选中：恢复原始颜色和状态
-            circle.fill(color)
-            circle.stroke(borderColor)
-            circle.strokeWidth(borderWidth / baseScale)
-            
-            // 更新 status 为 AVAILABLE
+            // 取消选中：更新 status 为 AVAILABLE
             seat.status = SEAT_STATUS.AVAILABLE
-            
-            // 移除勾选图标
-            const checkmark = layer?.findOne(`.checkmark-${seat.id}`)
-            if (checkmark) checkmark.destroy()
           } else {
-            // 选中：seats.io 风格 + 更新 status
-            circle.fill('#4CAF50')  // 绿色
-            circle.stroke('#2E7D32')  // 深绿色边框
-            circle.strokeWidth((borderWidth + 1) / baseScale)  // 边框加粗 1px
-            
-            // 更新 status 为 SELECTED（唯一状态源）
+            // 选中：更新 status 为 SELECTED
             seat.status = SEAT_STATUS.SELECTED
-            
-            // 添加勾选图标
-            const checkmark = createCheckmark(x, y, logicalRadius)
-            checkmark.name(`checkmark-${seat.id}`)  // 添加唯一标识
-            if (layer) {
-              layer.add(checkmark)
-              checkmark.moveToTop()  // 确保在最上层
-            }
           }
           
-          // 更新选中状态
+          // 更新选中状态数组（触发 watch）
           const currentSelected = new Set(props.selectedSeatIds || [])
           if (currentlySelected) {
             currentSelected.delete(seat.id)
@@ -741,21 +773,24 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           }
           emit('update:selectedSeatIds', Array.from(currentSelected))
           emit('seat-click', seat, row, section)
+          
+          // 重绘以更新视觉（使用 sceneFunc 重新绘制）
+          layer?.batchDraw()
         })
         
         // 鼠标样式（无动画，只改光标）
-        circle.on('mouseenter', () => {
+        seatShape.on('mouseenter', () => {
           if (stage) stage.container().style.cursor = 'pointer'
         })
-        circle.on('mouseleave', () => {
+        seatShape.on('mouseleave', () => {
           if (stage) stage.container().style.cursor = 'default'
         })
       }
 
       if (layer) {
-        layer.add(circle)
+        layer.add(seatShape)
       }
-      seatNodes.set(seat.id, circle)
+      seatNodes.set(seat.id, seatShape as any)
       
       // 座位标签（使用 stageScale >= 0.8 判断显示）
       const currentStageScale = stage?.scaleX() || 1
@@ -782,81 +817,40 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 }
 
-// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 根据 status 判断
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 使用自定义 Shape 重绘
 const updateSelection = () => {
-  const store = useVenueStore()
-  const borderWidth = store.visualConfig?.borderWidth || 2
-  const baseScale = store.getBaseScale()
-  const seatLogicalRadius = getLogicalRadius()
-  
-  // 优化：预先构建座位颜色映射表（根据 status 获取颜色）
-  const seatColorMap = new Map<string, { color: string; borderColor: string; seat: any }>()
-  
-  // 辅助函数：根据 status 获取颜色（唯一的判断依据）
-  const getSeatColor = (seat: any) => {
-    if (seat.status === SEAT_STATUS.SELECTED) {
-      return { fill: '#4CAF50', stroke: '#2E7D32' }
-    }
-    const color = getCategoryColor(seat.categoryKey)
-    return { fill: color, stroke: darkenColor(color, 25) }
-  }
-  
-  props.venue.sections.forEach(section => {
-    section.rows.forEach(row => {
-      row.seats.forEach(seat => {
-        const colors = getSeatColor(seat)
-        seatColorMap.set(seat.id, { color: colors.fill, borderColor: colors.stroke, seat })
-      })
-    })
-  })
-  
   // 【优化】只更新状态发生变化的座位，根据 status 字段判断
   const currentSelectedIds = new Set(props.selectedSeatIds || [])
   
-  seatNodes.forEach((circle, seatId) => {
-    const seatData = seatColorMap.get(seatId)
-    if (!seatData) return
-    
-    const { color, borderColor, seat } = seatData
+  // 遍历所有座位节点，检查 status 是否需要同步
+  seatNodes.forEach((shape, seatId) => {
     const isSelected = currentSelectedIds.has(seatId)
+    
+    // 查找座位数据以获取 status
+    let seat: any = null
+    props.venue.sections.forEach(section => {
+      section.rows.forEach(row => {
+        const found = row.seats.find(s => s.id === seatId)
+        if (found) seat = found
+      })
+    })
+    
+    if (!seat) return
     
     // 根据 status 判断当前是否已选中（唯一的判断依据）
     const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
     
     // 只有状态不一致时才更新（数据与视图同步）
-    if (isSelected !== isCurrentlySelected) {
-      if (isSelected && seat.status !== SEAT_STATUS.SELECTED) {
-        // 应该选中，但 status 不是 SELECTED → 更新为选中状态
-        circle.fill('#4CAF50')
-        circle.stroke('#2E7D32')
-        circle.strokeWidth((borderWidth + 1) / baseScale)
-        
-        // 更新 status 字段（唯一状态源）
-        seat.status = SEAT_STATUS.SELECTED
-        
-        // 添加勾选图标（如果不存在）
-        const existingCheckmark = layer?.findOne(`.checkmark-${seatId}`)
-        if (!existingCheckmark) {
-          const checkmark = createCheckmark(circle.x(), circle.y(), seatLogicalRadius)
-          checkmark.name(`checkmark-${seatId}`)
-          layer?.add(checkmark)
-          checkmark?.moveToTop()
-        }
-      } else if (!isSelected && seat.status === SEAT_STATUS.SELECTED) {
-        // 应该取消，但 status 是 SELECTED → 恢复为未选中状态
-        circle.fill(color)
-        circle.stroke(borderColor)
-        circle.strokeWidth(borderWidth / baseScale)
-        
-        // 恢复 status 为 AVAILABLE（唯一状态源）
-        seat.status = SEAT_STATUS.AVAILABLE
-        
-        // 移除勾选图标
-        const checkmark = layer?.findOne(`.checkmark-${seatId}`)
-        if (checkmark) checkmark.destroy()
-      }
+    if (isSelected && seat.status !== SEAT_STATUS.SELECTED) {
+      // 应该选中，但 status 不是 SELECTED → 更新为选中状态
+      seat.status = SEAT_STATUS.SELECTED
+    } else if (!isSelected && seat.status === SEAT_STATUS.SELECTED) {
+      // 应该取消，但 status 是 SELECTED → 恢复为未选中状态
+      seat.status = SEAT_STATUS.AVAILABLE
     }
   })
+  
+  // 重绘所有座位（使用 sceneFunc 重新绘制）
   layer?.batchDraw()
 }
 
