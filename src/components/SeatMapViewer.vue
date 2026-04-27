@@ -494,7 +494,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       x: labelX,
       y: labelY,
       text: row.label,
-      fontSize: 12,
+      fontSize: 10,  // 减小字体：12 -> 10
       fill: '#666',
       align: 'center',
       verticalAlign: 'middle',
@@ -505,9 +505,9 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     rowLabelText.offsetX(rowLabelText.width() / 2)
     rowLabelText.offsetY(rowLabelText.height() / 2)
     
-    // 应用初始反向缩放，保持视觉大小恒定
+    // 应用初始反向缩放，排标签使用较小的缩放比例
     const stageScale = stage?.scaleX() || 1
-    const visualScale = Math.max(0.1, Math.min(10, 1 / stageScale))  // 限制范围 0.1~10
+    const visualScale = Math.max(0.1, Math.min(5, 1 / stageScale))  // 限制范围 0.1~5（比之前小）
     rowLabelText.scaleX(visualScale)
     rowLabelText.scaleY(visualScale)
     
@@ -918,17 +918,16 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
       labelY += (minY + maxY) / 2
     }
     
-    // 获取舞台缩放比例，用于适当缩放（非完全固定）
+    // 获取舞台缩放比例，分区标签使用更大的缩放基数
     const stageScale = stage?.scaleX() || 1
-    // 使用平方根缩放：放大时适当增大，但不会完全跟随缩放比例
-    // 例如：stageScale=4 时，visualScale=0.5（而不是 0.25）
-    const visualScale = 1 / Math.sqrt(stageScale)
+    // 使用更温和的平方根缩放，并增加基础大小系数 1.5
+    const visualScale = 1.5 / Math.sqrt(stageScale)
     
     const text = new Konva.Text({
       x: labelX,
       y: labelY,
       text: section.name,
-      fontSize: 10,  // 固定字体大小
+      fontSize: 12,  // 增大字体：10 -> 12
       fontStyle: 'bold',
       fill: '#666',
       align: 'center',
@@ -940,8 +939,8 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
     text.offsetX(text.width() / 2)
     text.offsetY(text.height() / 2)
     
-    // 设置缩放变换，适当放大但不会过大
-    const safeVisualScale = Math.max(0.3, Math.min(3, visualScale))  // 限制范围 0.3~3
+    // 设置缩放变换，分区标签更大一些
+    const safeVisualScale = Math.max(0.5, Math.min(4, visualScale))  // 限制范围 0.5~4（比之前大）
     text.scaleX(safeVisualScale)
     text.scaleY(safeVisualScale)
     
@@ -953,6 +952,7 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
 const updateLabelScale = () => {
   if (!stage || !layer) return
   
+  const store = useVenueStore()
   const stageScale = stage.scaleX()
   // 保护：避免 stageScale 过小导致 visualScale 过大
   const safeStageScale = Math.max(0.1, stageScale)
@@ -966,26 +966,28 @@ const updateLabelScale = () => {
     const textName = text.name()
     
     if (textName === 'seat-label') {
-      // 座位标签：字体大小等于逻辑半径，随座位一起缩放
-      if (stageScale >= 0.8) {
-        text.fontSize(logicalRadius)
-        // 不需要设置 offset，Konva 的 align 和 verticalAlign 会自动居中
+      // 座位标签：根据 relativeScale 判断是否显示，字体使用逻辑半径的一半（更合适）
+      const baseScale = store.getBaseScale()
+      const relativeScale = stageScale / baseScale
+      if (relativeScale > 1.0) {
+        const fontSize = logicalRadius * 0.8  // 字体稍小于座位半径，避免过大
+        text.fontSize(fontSize)
         text.visible(true)
       } else {
         text.visible(false)
       }
     } else if (textName === 'section-label') {
-      // 分区标签：使用平方根缩放，适当放大但不会过大
+      // 分区标签：使用更温和的平方根缩放，增加系数 1.5 使标签更大
       const safeStageScale = Math.max(0.1, stageScale)
-      const visualScale = 1 / Math.sqrt(safeStageScale)
-      const safeVisualScale = Math.max(0.3, Math.min(3, visualScale))  // 限制范围 0.3~3
+      const visualScale = 1.5 / Math.sqrt(safeStageScale)
+      const safeVisualScale = Math.max(0.5, Math.min(4, visualScale))  // 限制范围 0.5~4（更大）
       text.scaleX(safeVisualScale)
       text.scaleY(safeVisualScale)
-    } else {
-      // 排标签：使用平方根缩放，适当放大但不会过大
+    } else if (textName === 'row-label') {
+      // 排标签：使用较小的缩放，字体已经减小到 10px
       const safeStageScale = Math.max(0.1, stageScale)
-      const visualScale = 1 / Math.sqrt(safeStageScale)
-      const safeVisualScale = Math.max(0.3, Math.min(3, visualScale))  // 限制范围 0.3~3
+      const visualScale = 1 / safeStageScale
+      const safeVisualScale = Math.max(0.2, Math.min(5, visualScale))  // 限制范围 0.2~5（更小）
       text.scaleX(safeVisualScale)
       text.scaleY(safeVisualScale)
     }
