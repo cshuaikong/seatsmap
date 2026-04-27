@@ -370,9 +370,9 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
 
   // 渲染所有 section
   props.venue.sections.forEach(section => {
-    // 渲染分区边框（如果有）
-    if (section.borderType && section.borderType !== 'none') {
-      renderSectionBorder(section)
+    // 【预览模式】只渲染分区名称，不渲染边框
+    if (section.name) {
+      renderSectionLabel(section)
     }
 
     // 渲染形状
@@ -741,6 +741,70 @@ const pathPointsToSvgPath = (points: PathPoint[]): string => {
   
   path += ' Z'
   return path
+}
+
+// 渲染分区标签（仅名称，无边框）- 用于预览模式
+const renderSectionLabel = (section: Section) => {
+  if (!layer || !section.name) return
+  
+  let labelX = section.borderX || 0
+  let labelY = section.borderY || 0
+  
+  // 根据不同类型计算中心点
+  if (section.borderType === 'rect') {
+    labelX += (section.borderWidth || 100) / 2
+    labelY += (section.borderHeight || 100) / 2
+  } else if (section.borderType === 'ellipse') {
+    labelX += (section.borderRadiusX || 50) / 2
+    labelY += (section.borderRadiusY || 50) / 2
+  } else if (section.borderType === 'polygon' && section.borderPoints) {
+    // 计算多边形中心
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (let i = 0; i < section.borderPoints.length; i += 2) {
+      minX = Math.min(minX, section.borderPoints[i])
+      minY = Math.min(minY, section.borderPoints[i + 1])
+      maxX = Math.max(maxX, section.borderPoints[i])
+      maxY = Math.max(maxY, section.borderPoints[i + 1])
+    }
+    labelX += (minX + maxX) / 2
+    labelY += (minY + maxY) / 2
+  } else if (section.borderType === 'path' && section.borderPathPoints) {
+    // 计算路径中心
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    section.borderPathPoints.forEach(p => {
+      minX = Math.min(minX, p.x)
+      minY = Math.min(minY, p.y)
+      maxX = Math.max(maxX, p.x)
+      maxY = Math.max(maxY, p.y)
+    })
+    labelX += (minX + maxX) / 2
+    labelY += (minY + maxY) / 2
+  }
+  
+  // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+  const stageScale = stage?.scaleX() || 1
+  const visualScale = 1 / stageScale
+  
+  const text = new Konva.Text({
+    x: labelX,
+    y: labelY,
+    text: section.name,
+    fontSize: 10,  // 固定字体大小
+    fontStyle: 'bold',
+    fill: '#666',
+    align: 'center',
+    verticalAlign: 'middle'
+  })
+  
+  // 居中显示
+  text.offsetX(text.width() / 2)
+  text.offsetY(text.height() / 2)
+  
+  // 设置缩放变换，保持视觉大小恒定
+  text.scaleX(visualScale)
+  text.scaleY(visualScale)
+  
+  layer.add(text)
 }
 
 // 渲染分区边框
