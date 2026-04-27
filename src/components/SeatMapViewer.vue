@@ -738,6 +738,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           const haloWidth = 1
           const hitRadius = isSelected ? r + gapWidth + haloWidth / 2 : r
           
+          // 简单的圆形命中区域
           context.beginPath()
           context.arc(0, 0, hitRadius, 0, Math.PI * 2)
           context.fillStrokeShape(shape)
@@ -747,6 +748,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       // 点击事件 - 使用自定义 Shape（性能优化：只重绘单个座位）
       if (props.selectable !== false) {
         seatShape.on('click', (e: any) => {
+          console.log('[SeatMapViewer] 座位被点击:', seat.id, '当前状态:', seat.status)
           e.cancelBubble = true
           
           // 直接根据 status 判断选中状态，不依赖颜色或自定义属性
@@ -754,6 +756,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           
           // 更新 status
           seat.status = currentlySelected ? SEAT_STATUS.AVAILABLE : SEAT_STATUS.SELECTED
+          console.log('[SeatMapViewer] 状态更新为:', seat.status)
           
           // 更新选中状态数组（触发 watch）
           const currentSelected = new Set(props.selectedSeatIds || [])
