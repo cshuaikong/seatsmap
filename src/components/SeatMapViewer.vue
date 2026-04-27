@@ -692,7 +692,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           const gapWidth = 1  // 透明隔离带宽度（1px）
           const haloWidth = 1  // 外轮廓环线宽（1px）
           
-          if (isSelected) {
+          // 【关键修复】每次都读取最新的 seat.status，而非闭包捕获的 isSelected
+          const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
+          
+          if (isCurrentlySelected) {
             // 选中态：三层同心结构
             
             // 1. 内核心（实心圆，原始分类色）
@@ -736,7 +739,9 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           const r = logicalRadius
           const gapWidth = 1
           const haloWidth = 1
-          const hitRadius = isSelected ? r + gapWidth + haloWidth / 2 : r
+          // 【关键修复】读取最新的 seat.status
+          const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
+          const hitRadius = isCurrentlySelected ? r + gapWidth + haloWidth / 2 : r
           
           // 简单的圆形命中区域
           context.beginPath()
