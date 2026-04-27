@@ -124,6 +124,16 @@ const getCategoryColor = (categoryKey: string | number): string => {
   return category?.color || '#9E9E9E'
 }
 
+// 颜色加深函数（加深 25%）
+const darkenColor = (color: string, percent: number): string => {
+  const num = parseInt(color.replace('#', ''), 16)
+  const amt = Math.round(2.55 * percent)
+  const R = Math.max((num >> 16) - amt, 0)
+  const G = Math.max((num >> 8 & 0x00FF) - amt, 0)
+  const B = Math.max((num & 0x0000FF) - amt, 0)
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1)
+}
+
 // 初始化舞台
 const initStage = () => {
   if (!containerRef.value) return
@@ -558,6 +568,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       
       const isSelected = props.selectedSeatIds?.includes(seat.id)
       const color = getCategoryColor(seat.categoryKey)
+      const borderColor = darkenColor(color, 25)  // 边框色：填充色加深 25%
 
       // 座位圆形
       const circle = new Konva.Circle({
@@ -565,8 +576,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         y,
         radius: logicalRadius,
         fill: isSelected ? '#FF5722' : color,
-        stroke: '#fff',
-        strokeWidth: borderWidth / baseScale,  // 边框宽度使用 baseScale 归一化
+        stroke: isSelected ? '#FF5722' : borderColor,  // 使用加深后的边框色
+        strokeWidth: (borderWidth * 2) / baseScale,  // 边框宽度加倍（2px -> 4px 视觉效果）
         name: 'seat-node'
       })
 
@@ -662,9 +673,10 @@ const updateSelection = () => {
       }
     }
     const color = getCategoryColor(categoryKey)
+    const borderColor = darkenColor(color, 25)  // 边框色：填充色加深 25%
     circle.fill(isSelected ? '#FF5722' : color)
-    circle.stroke(isSelected ? '#FF5722' : '#fff')
-    circle.strokeWidth(isSelected ? 3 / currentScale : borderWidth / currentScale)
+    circle.stroke(isSelected ? '#FF5722' : borderColor)  // 使用加深后的边框色
+    circle.strokeWidth(isSelected ? 3 / currentScale : (borderWidth * 2) / currentScale)  // 边框宽度加倍
   })
   layer?.batchDraw()
 }
