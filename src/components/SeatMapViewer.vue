@@ -265,44 +265,64 @@ const fitContentWithAnimation = () => {
   })
 }
 
-// LOD 多级细节渲染
+// LOD 多级细节渲染（基于 baseScale 的智能切换）
 const updateLOD = () => {
   if (!stage || !layer) return
   
-  const scale = stage.scaleX()
+  const currentScale = stage.scaleX()
+  const store = useVenueStore()
+  const baseScale = store.getBaseScale()
   
-  // LOD 阈值（放宽，让座位更容易显示）
-  const SHOW_SEATS_THRESHOLD = 0.5   // 缩放大于 0.5 显示圆形座位
-  const SHOW_LABELS_THRESHOLD = 0.8  // 缩放大于 0.8 显示标签
+  // 【核心】基于 baseScale 计算 LOD 阈值
+  // baseScale 是首次绘制时的标准缩放，以此为基准计算相对缩放比例
+  const relativeScale = currentScale / baseScale
   
-  // 检查是否需要切换渲染模式（座位条 vs 圆形座位）
+  // LOD 三级阈值（相对于 baseScale）
+  const SHOW_BLOCKS_THRESHOLD = 0.3    // 相对缩放 > 0.3 显示座位条
+  const SHOW_SEATS_THRESHOLD = 0.7     // 相对缩放 > 0.7 显示圆形座位
+  const SHOW_LABELS_THRESHOLD = 1.0    // 相对缩放 > 1.0 显示座位标签
+  
+  // 检查当前渲染级别是否需要切换
   const hasSeatNodes = seatNodes.size > 0
-  const shouldShowCircles = scale > SHOW_SEATS_THRESHOLD
+  const shouldShowCircles = relativeScale > SHOW_SEATS_THRESHOLD
+  const shouldShowBlocks = relativeScale > SHOW_BLOCKS_THRESHOLD && !shouldShowCircles
   
-  // 如果当前状态与期望状态不符，重新渲染
+  // 【优化】如果级别不匹配，重新渲染（保留舞台状态）
   if (hasSeatNodes !== shouldShowCircles) {
     renderSeatMap(true)  // 重新渲染以切换模式，保留舞台状态
     return
   }
   
-  // 更新标签可见性
+  // 更新标签可见性（根据 LOD 级别控制）
   layer.find('Text').forEach(textNode => {
     const text = textNode as Konva.Text
-    if (text.name() === 'seat-label') {
-      text.visible(scale > SHOW_LABELS_THRESHOLD)
+    const textName = text.name()
+    
+    if (textName === 'seat-label') {
+      // 座位标签：只在 Level 2 且相对缩放 > 1.0 时显示
+      text.visible(relativeScale > 1.0)
+    } else if (textName === 'row-label') {
+      // 排标签：在 Level 1 和 Level 2 显示（relativeScale >= 0.3）
+      text.visible(relativeScale >= 0.3)
     }
   })
   
-  // 更新分区背景透明度
+  // 更新分区背景透明度（缩小级别时更明显）
   layer.find('.section-border').forEach(node => {
-    if (scale < 0.3) {
+    if (relativeScale < SHOW_BLOCKS_THRESHOLD) {
+      // Level 0: 只显示分区，分区色块完全不透明
       node.opacity(1)
-    } else if (scale < 1.0) {
-      node.opacity(0.6)
+    } else if (relativeScale < SHOW_SEATS_THRESHOLD) {
+      // Level 1: 显示座位条，分区色块半透明
+      node.opacity(0.5)
     } else {
-      node.opacity(0.3)
+      // Level 2: 显示座位，分区色块淡化为背景
+      node.opacity(0.2)
     }
   })
+  
+  // 【调试】打印当前 LOD 级别
+  console.log(`[LOD] relativeScale=${relativeScale.toFixed(2)}, baseScale=${baseScale}, currentScale=${currentScale.toFixed(2)}, level=${relativeScale < SHOW_BLOCKS_THRESHOLD ? 0 : relativeScale < SHOW_SEATS_THRESHOLD ? 1 : 2}`)
   
   layer.batchDraw()
 }
@@ -399,6 +419,12 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   // 排标签
   const logicalRadius = getLogicalRadius()
   
+  // 【关键】提前计算 relativeScale，用于 LOD 判断
+  const stageScale = stage?.scaleX() || 1
+  const store = useVenueStore()
+  const baseScale = store.getBaseScale()
+  const relativeScale = stageScale / baseScale
+  
   // 【调试】打印第一排的信息
   if (row.seats.length > 1) {
     const seat0 = row.seats[0]
@@ -408,8 +434,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, storeBaseScale=${store.getBaseScale()}`)
   }
   
-  // 【修复】排标签精确定位
-  if (row.label && row.seats.length > 0) {
+  // 【修复】排标签精确定位 - 只在 Level 1 和 Level 2 显示
+  if (relativeScale >= 0.3 && row.label && row.seats.length > 0) {
     const firstPos = curvedPositions[0]
     // 标签位置：第一个座位左侧，垂直居中
     const labelOffsetX = logicalRadius * 2.5  // 座位左侧偏移
@@ -434,7 +460,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       fill: '#666',
       align: 'center',
       verticalAlign: 'middle',
-      listening: false
+      listening: false,
+      name: 'row-label'  // 添加 name 用于 LOD 控制
     })
     // 设置 offset 让文本居中
     rowLabelText.offsetX(rowLabelText.width() / 2)
@@ -443,15 +470,19 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 
   // 座位（直接添加到 layer，不使用 Group）
-  const stageScale = stage?.scaleX() || 1
-  const store = useVenueStore()
   const configRadius = store.visualConfig?.radius || 6
   const configGap = store.visualConfig?.gap || 18
   const configRowGap = store.visualConfig?.rowGap || 24
   const borderWidth = store.visualConfig?.borderWidth || 2
   
-  // LOD：缩小状态渲染座位区块，放大状态渲染圆形座位
-  if (stageScale < 0.5) {
+  // Level 0: 只显示分区色块和分区名，不渲染座位
+  if (relativeScale < 0.3) {
+    // 分区色块已在 renderSectionBorder 中渲染
+    return
+  }
+  
+  // Level 1: 座位区块模式 - 用矩形表示整排座位
+  if (relativeScale < 0.7) {
     // 座位区块模式：用矩形表示整排座位
     if (row.seats.length > 0) {
       const firstPos = curvedPositions[0]
@@ -479,7 +510,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       // 计算区块尺寸（座位总长度 × 行高）
       const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
       const angle = Math.atan2(y2 - y1, x2 - x1)
-      const blockHeight = configRowGap / stageScale  // 区块高度 = 行间距
+      const blockHeight = configRowGap / baseScale  // 区块高度使用 baseScale 归一化
       
       // 创建区块矩形（以排中心为原点）
       const centerX = (x1 + x2) / 2
@@ -492,7 +523,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         height: blockHeight,
         fill: getCategoryColor(row.seats[0].categoryKey),
         opacity: 0.4,
-        cornerRadius: 2 / stageScale,
+        cornerRadius: 2 / baseScale,  // 圆角使用 baseScale 归一化
         listening: false  // 区块不可点击
       })
       
@@ -511,7 +542,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       }
     }
   } else {
-    // 圆形座位模式
+    // Level 2: 圆形座位模式（详细视图）
     row.seats.forEach((seat, index) => {
       const pos = curvedPositions[index]
       
@@ -536,7 +567,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         radius: logicalRadius,
         fill: isSelected ? '#FF5722' : color,
         stroke: '#fff',
-        strokeWidth: borderWidth / stageScale,
+        strokeWidth: borderWidth / baseScale,  // 边框宽度使用 baseScale 归一化
         name: 'seat-node'
       })
 
@@ -589,9 +620,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       }
       seatNodes.set(seat.id, circle)
       
-      // 座位标签
-      const currentStageScale = stage?.scaleX() || 1
-      if (seat.label && layer && currentStageScale >= 0.8) {
+      // 座位标签（只在 Level 2 且相对缩放 > 1.0 时显示）
+      if (seat.label && layer && relativeScale > 1.0) {
         const fontSize = logicalRadius
         
         const text = new Konva.Text({
@@ -603,7 +633,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           align: 'center',
           verticalAlign: 'middle',
           listening: false,
-          name: 'seat-label'
+          name: 'seat-label'  // 添加 name 用于 LOD 控制
         })
         text.offsetX(text.width() / 2)
         text.offsetY(text.height() / 2)
