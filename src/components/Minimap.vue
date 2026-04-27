@@ -47,13 +47,13 @@ const renderMinimap = () => {
   const minimapHeight = canvas.height - padding * 2
   
   // 计算基础缩放：让所有内容刚好适应 Minimap（不留太多空白）
-  const baseScaleX = minimapWidth / venueBounds.width
-  const baseScaleY = minimapHeight / venueBounds.height
-  const baseScale = Math.min(baseScaleX, baseScaleY)
+  const minimapScaleX = minimapWidth / venueBounds.width
+  const minimapScaleY = minimapHeight / venueBounds.height
+  const minimapScale = Math.min(minimapScaleX, minimapScaleY)
   
   // 计算内容在 Minimap 中的偏移（完全居中）
-  const contentWidth = venueBounds.width * baseScale
-  const contentHeight = venueBounds.height * baseScale
+  const contentWidth = venueBounds.width * minimapScale
+  const contentHeight = venueBounds.height * minimapScale
   const offsetX = padding + (minimapWidth - contentWidth) / 2
   const offsetY = padding + (minimapHeight - contentHeight) / 2
   
@@ -70,29 +70,29 @@ const renderMinimap = () => {
       ctx.strokeStyle = section.borderStroke || '#808080'
       ctx.lineWidth = 1 * 2
       
-      const baseX = offsetX + ((section.borderX || 0) - venueBounds.x) * baseScale
-      const baseY = offsetY + ((section.borderY || 0) - venueBounds.y) * baseScale
+      const baseX = offsetX + ((section.borderX || 0) - venueBounds.x) * minimapScale
+      const baseY = offsetY + ((section.borderY || 0) - venueBounds.y) * minimapScale
       
       if (section.borderType === 'rect') {
         ctx.fillRect(
           baseX,
           baseY,
-          (section.borderWidth || 100) * baseScale,
-          (section.borderHeight || 100) * baseScale
+          (section.borderWidth || 100) * minimapScale,
+          (section.borderHeight || 100) * minimapScale
         )
         ctx.strokeRect(
           baseX,
           baseY,
-          (section.borderWidth || 100) * baseScale,
-          (section.borderHeight || 100) * baseScale
+          (section.borderWidth || 100) * minimapScale,
+          (section.borderHeight || 100) * minimapScale
         )
       } else if (section.borderType === 'ellipse') {
         ctx.beginPath()
         ctx.ellipse(
-          baseX + (section.borderRadiusX || 50) * baseScale,
-          baseY + (section.borderRadiusY || 50) * baseScale,
-          (section.borderRadiusX || 50) * baseScale,
-          (section.borderRadiusY || 50) * baseScale,
+          baseX + (section.borderRadiusX || 50) * minimapScale,
+          baseY + (section.borderRadiusY || 50) * minimapScale,
+          (section.borderRadiusX || 50) * minimapScale,
+          (section.borderRadiusY || 50) * minimapScale,
           0,
           0,
           Math.PI * 2
@@ -102,8 +102,8 @@ const renderMinimap = () => {
       } else if (section.borderType === 'polygon' && section.borderPoints) {
         ctx.beginPath()
         section.borderPoints.forEach((point: number, index: number) => {
-          const x = baseX + point * baseScale
-          const y = baseY + (section.borderPoints![index + 1]) * baseScale
+          const x = baseX + point * minimapScale
+          const y = baseY + (section.borderPoints![index + 1]) * minimapScale
           if (index === 0) {
             ctx.moveTo(x, y)
           } else if (index % 2 === 0) {
@@ -116,8 +116,8 @@ const renderMinimap = () => {
       } else if (section.borderType === 'path' && section.borderPathPoints) {
         ctx.beginPath()
         section.borderPathPoints.forEach((point: any, index: number) => {
-          const x = baseX + point.x * baseScale
-          const y = baseY + point.y * baseScale
+          const x = baseX + point.x * minimapScale
+          const y = baseY + point.y * minimapScale
           if (index === 0) {
             ctx.moveTo(x, y)
           } else {
@@ -136,8 +136,8 @@ const renderMinimap = () => {
   selectedSeats.forEach((seat: { x: number; y: number }) => {
     ctx.beginPath()
     ctx.arc(
-      offsetX + (seat.x - venueBounds.x) * baseScale,
-      offsetY + (seat.y - venueBounds.y) * baseScale,
+      offsetX + (seat.x - venueBounds.x) * minimapScale,
+      offsetY + (seat.y - venueBounds.y) * minimapScale,
       3 * 2,  // 2倍分辨率
       0,
       Math.PI * 2
@@ -152,10 +152,10 @@ const renderMinimap = () => {
   const viewportWorldH = stageState.height / stageState.scale
   
   // 计算视口在 Minimap 中的位置和大小
-  const viewportX = offsetX + (viewportWorldX - venueBounds.x) * baseScale
-  const viewportY = offsetY + (viewportWorldY - venueBounds.y) * baseScale
-  const viewportW = viewportWorldW * baseScale
-  const viewportH = viewportWorldH * baseScale
+  const viewportX = offsetX + (viewportWorldX - venueBounds.x) * minimapScale
+  const viewportY = offsetY + (viewportWorldY - venueBounds.y) * minimapScale
+  const viewportW = viewportWorldW * minimapScale
+  const viewportH = viewportWorldH * minimapScale
   
   // 5. 绘制视口外的灰色蒙层（半透明，覆盖在图形上）
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
