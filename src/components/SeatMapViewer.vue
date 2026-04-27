@@ -577,7 +577,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         radius: logicalRadius,
         fill: isSelected ? '#FF5722' : color,
         stroke: isSelected ? '#FF5722' : borderColor,  // 使用加深后的边框色
-        strokeWidth: (borderWidth * 2) / baseScale,  // 边框宽度加倍（2px -> 4px 视觉效果）
+        strokeWidth: borderWidth / baseScale,  // 使用数据表的 borderWidth 参数（2px）
         name: 'seat-node'
       })
 
@@ -676,7 +676,7 @@ const updateSelection = () => {
     const borderColor = darkenColor(color, 25)  // 边框色：填充色加深 25%
     circle.fill(isSelected ? '#FF5722' : color)
     circle.stroke(isSelected ? '#FF5722' : borderColor)  // 使用加深后的边框色
-    circle.strokeWidth(isSelected ? 3 / currentScale : (borderWidth * 2) / currentScale)  // 边框宽度加倍
+    circle.strokeWidth(isSelected ? 3 / currentScale : borderWidth / currentScale)  // 使用数据表的 borderWidth 参数
   })
   layer?.batchDraw()
 }
