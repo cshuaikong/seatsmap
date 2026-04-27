@@ -352,6 +352,7 @@ const updateLOD = () => {
   const needsRender = (shouldShowCircles || shouldShowBlocks) && !hasSeatNodes
   
   if (needsRender || (hasSeatNodes && !shouldShowCircles && !shouldShowBlocks)) {
+    console.log(`[LOD] 触发重新渲染: needsRender=${needsRender}, hasSeatNodes=${hasSeatNodes}, shouldShowCircles=${shouldShowCircles}, shouldShowBlocks=${shouldShowBlocks}`)
     renderSeatMap(true)  // 重新渲染以切换模式，保留舞台状态
     return
   }
@@ -451,7 +452,7 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
   const viewportBottom = viewportTop + stageHeight / stageScale
   
   // 视口扩展边距（预加载周边座位，【修复】增大边距避免误裁剪）
-  const padding = 1000 / stageScale  // 从 500 增加到 1000
+  const padding = 2000 / stageScale  // 从 1000 增加到 2000，避免放大时座位被裁剪
   const viewLeft = viewportLeft - padding
   const viewTop = viewportTop - padding
   const viewRight = viewportRight + padding
