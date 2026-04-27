@@ -57,33 +57,11 @@ const renderMinimap = () => {
   const offsetX = padding + (minimapWidth - contentWidth) / 2
   const offsetY = padding + (minimapHeight - contentHeight) / 2
   
-  // 绘制灰色背景（蒙层）
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  // 1. 先绘制白色背景
+  ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   
-  // 计算视口在世界坐标中的位置和大小
-  const viewportWorldX = -stageState.position.x / stageState.scale
-  const viewportWorldY = -stageState.position.y / stageState.scale
-  const viewportWorldW = stageState.width / stageState.scale
-  const viewportWorldH = stageState.height / stageState.scale
-  
-  // 计算视口在 Minimap 中的位置和大小
-  const viewportX = offsetX + (viewportWorldX - venueBounds.x) * baseScale
-  const viewportY = offsetY + (viewportWorldY - venueBounds.y) * baseScale
-  const viewportW = viewportWorldW * baseScale
-  const viewportH = viewportWorldH * baseScale
-  
-  // 使用裁剪区域，只在视口内绘制内容（视口外保持灰色蒙层）
-  ctx.save()
-  ctx.beginPath()
-  ctx.rect(viewportX, viewportY, viewportW, viewportH)
-  ctx.clip()
-  
-  // 绘制白色背景（视口内）
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(viewportX, viewportY, viewportW, viewportH)
-  
-  // 绘制分区轮廓（在视口裁剪区域内）
+  // 2. 绘制分区轮廓（完整显示，固定不动）
   if (props.venue?.sections) {
     props.venue.sections.forEach((section: any) => {
       if (!section.borderType || section.borderType === 'none') return
@@ -153,7 +131,7 @@ const renderMinimap = () => {
     })
   }
   
-  // 绘制已选座位（红色圆点）
+  // 3. 绘制已选座位（红色圆点）
   ctx.fillStyle = '#ef4444'
   selectedSeats.forEach((seat: { x: number; y: number }) => {
     ctx.beginPath()
@@ -167,9 +145,31 @@ const renderMinimap = () => {
     ctx.fill()
   })
   
-  ctx.restore()  // 恢复裁剪区域
+  // 4. 计算视口在世界坐标中的位置和大小
+  const viewportWorldX = -stageState.position.x / stageState.scale
+  const viewportWorldY = -stageState.position.y / stageState.scale
+  const viewportWorldW = stageState.width / stageState.scale
+  const viewportWorldH = stageState.height / stageState.scale
   
-  // 绘制视口边框（蓝色，在裁剪区域外）
+  // 计算视口在 Minimap 中的位置和大小
+  const viewportX = offsetX + (viewportWorldX - venueBounds.x) * baseScale
+  const viewportY = offsetY + (viewportWorldY - venueBounds.y) * baseScale
+  const viewportW = viewportWorldW * baseScale
+  const viewportH = viewportWorldH * baseScale
+  
+  // 5. 绘制视口外的灰色蒙层（半透明，仍能看到图形）
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  
+  // 上方蒙层
+  ctx.fillRect(0, 0, canvas.width, viewportY)
+  // 下方蒙层
+  ctx.fillRect(0, viewportY + viewportH, canvas.width, canvas.height - viewportY - viewportH)
+  // 左侧蒙层
+  ctx.fillRect(0, viewportY, viewportX, viewportH)
+  // 右侧蒙层
+  ctx.fillRect(viewportX + viewportW, viewportY, canvas.width - viewportX - viewportW, viewportH)
+  
+  // 6. 绘制视口边框（蓝色）
   ctx.strokeStyle = '#3b82f6'
   ctx.lineWidth = 3 * 2
   ctx.strokeRect(viewportX, viewportY, viewportW, viewportH)
