@@ -688,46 +688,42 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         y,
         name: 'seat-node',
         sceneFunc: (context, shape) => {
-          const radius = logicalRadius
-          const gapWidth = 2  // 透明隔离带宽度
-          const haloWidth = 1.5  // 外轮廓环线宽
+          const r = logicalRadius  // 内核心半径（如 6px）
+          const gapWidth = 2  // 透明隔离带宽度（2px）
+          const haloWidth = 1.5  // 外轮廓环线宽（1.5px）
           
           if (isSelected) {
             // 选中态：三层同心结构
             
-            // 1. 外轮廓环（最外层，颜色与核心一致）
+            // 1. 内核心（实心圆，原始分类色）
             context.beginPath()
-            context.arc(0, 0, radius + gapWidth + haloWidth / 2, 0, Math.PI * 2)
+            context.arc(0, 0, r, 0, Math.PI * 2)
             context.fillStyle = color
             context.fill()
             
-            // 2. 中间隔离带（透明间隙，产生悬浮感）
+            // 2. 中间隔离带（透明间隙）+ 外轮廓环（同色描边）
+            // 外环的半径 = r + gapWidth + haloWidth/2
             context.beginPath()
-            context.arc(0, 0, radius + gapWidth / 2, 0, Math.PI * 2)
-            context.fillStyle = 'rgba(0, 0, 0, 0)'  // 透明
-            context.fill()
+            context.arc(0, 0, r + gapWidth + haloWidth / 2, 0, Math.PI * 2)
+            context.strokeStyle = color
+            context.lineWidth = haloWidth
+            context.stroke()
             
-            // 3. 内核心（实心圆，原始分类色）
-            context.beginPath()
-            context.arc(0, 0, radius, 0, Math.PI * 2)
-            context.fillStyle = color
-            context.fill()
-            
-            // 4. 内衬标志（白色勾选图标）
-            const checkSize = radius * 0.6
+            // 3. 内衬标志（白色勾选图标）
+            const checkSize = r * 0.8
             context.beginPath()
             context.moveTo(-checkSize * 0.4, 0)
             context.lineTo(-checkSize * 0.1, checkSize * 0.3)
             context.lineTo(checkSize * 0.4, -checkSize * 0.3)
             context.strokeStyle = '#FFFFFF'
-            context.lineWidth = checkSize * 0.15
+            context.lineWidth = Math.max(1, checkSize * 0.15)
             context.lineCap = 'round'
             context.lineJoin = 'round'
             context.stroke()
           } else {
             // 未选中态：单一半透明实心圆，无边框
             context.beginPath()
-            context.arc(0, 0, radius, 0, Math.PI * 2)
+            context.arc(0, 0, r, 0, Math.PI * 2)
             context.fillStyle = color
             context.fill()
           }
@@ -737,10 +733,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         },
         hitFunc: (context, shape) => {
           // 命中区域：选中时使用外轮廓，未选中时使用核心圆
-          const radius = logicalRadius
+          const r = logicalRadius
           const gapWidth = 2
           const haloWidth = 1.5
-          const hitRadius = isSelected ? radius + gapWidth + haloWidth / 2 : radius
+          const hitRadius = isSelected ? r + gapWidth + haloWidth / 2 : r
           
           context.beginPath()
           context.arc(0, 0, hitRadius, 0, Math.PI * 2)
