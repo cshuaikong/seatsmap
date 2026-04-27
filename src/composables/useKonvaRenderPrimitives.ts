@@ -276,56 +276,87 @@ export function createRowSceneFunc(
       context.fillText(row.label, -radius * 2.5, 0)
       context.restore()
     }
-    // LOD 多级细节渲染策略
-    // 根据当前舞台缩放动态决定显示模式
-    // stageScale < 0.3: 隐藏座位，只显示分区轮廓（由 renderSectionBorder 处理）
-    // 0.3 <= stageScale < 0.6: 显示座位圆，不显示标签
-    // stageScale >= 0.6: 显示座位 + 标签
-    const LOD_HIDE_SEATS = 0.3    // 小于此值隐藏座位
-    const LOD_SHOW_LABELS = 0.6   // 大于此值显示标签
+    // LOD 多级细节渲染策略（基于 baseScale 的相对缩放）
+    // relativeScale < 0.3: 隐藏座位，只显示分区轮廓
+    // 0.3 <= relativeScale < 0.7: 显示座位条（连续线条）
+    // relativeScale >= 0.7: 显示座位圆 + 标签
+    const store = (shape as any).getStage()?.$store
+    const baseScale = store?.getBaseScale?.() || 1
+    const relativeScale = currentStageScale / baseScale
     
-    // 全局视图或强制横条模式优先
+    const LOD_SHOW_BARS = 0.3      // 相对缩放 > 0.3 显示座位条
+    const LOD_SHOW_SEATS = 0.7     // 相对缩放 > 0.7 显示圆形座位
+    
+    // 全局视图或强制横条模式：使用座位条模式（连续线条）
     const displayMode = forceBarMode ? 'bar' : 
-                        currentStageScale < LOD_HIDE_SEATS ? 'hidden' : 
-                        currentStageScale < LOD_SHOW_LABELS ? 'seat-only' : 'seat+label'
+                        relativeScale < LOD_SHOW_BARS ? 'hidden' : 
+                        relativeScale < LOD_SHOW_SEATS ? 'bar' : 
+                        'seat+label'
     
     // 远景：隐藏座位（分区边框由 renderSectionBorder 单独渲染）
     if (displayMode === 'hidden') {
       return
     }
     
-    // 近景：显示座位
+    // 近景：显示座位或座位条
     const showLabels = displayMode === 'seat+label' && !forceBarMode
     
     if (displayMode === 'bar') {
-      // 绘制横条表示座位排
-      const firstPos = curvedPositions[0]
-      const lastPos = curvedPositions[curvedPositions.length - 1]
-      const rowLength = Math.sqrt(
-        Math.pow(lastPos.x - firstPos.x, 2) + Math.pow(lastPos.y - firstPos.y, 2)
-      )
-      const rowAngle = Math.atan2(lastPos.y - firstPos.y, lastPos.x - firstPos.x)
+      // 【优化】绘制连续线条座位条（与预览模态框保持一致）
+      const stageScale = shape.getStage()?.scaleX() || 1
+      const store = (shape as any).getStage()?.$store
+      const baseScale = store?.getBaseScale?.() || 1
+      const configRadius = store?.visualConfig?.radius || 6
       
-      // 横条高度 = 座位直径
-      const barHeight = radius * 2
+      // 线条宽度 = 座位直径（使用 baseScale 归一化）
+      const lineWidth = (configRadius * 2) / baseScale
       
-      context.save()
-      context.translate(firstPos.x, firstPos.y)
-      context.rotate(rowAngle)
+      // 提取所有座位位置作为连续线条的路径点
+      const points: number[] = []
+      curvedPositions.forEach(pos => {
+        points.push(pos.x, pos.y)
+      })
       
-      // 绘制横条背景（圆角）
-      context.fillStyle = '#9E9E9E'
-      const cornerRadius = Math.min(4 / currentStageScale, barHeight / 4)
-      context.beginPath()
-      context.roundRect(0, -barHeight / 2, rowLength, barHeight, cornerRadius)
-      context.fill()
-      
-      // 绘制横条边框（圆角，使用逻辑缩放保持视觉大小恒定）
-      context.strokeStyle = '#757575'
-      context.lineWidth = 1 / currentStageScale  // 反向缩放，保持1px视觉大小
-      context.stroke()
-      
-      context.restore()
+      if (points.length >= 4) {
+        // 使用座位排的颜色（从第一个座位的 categoryKey 获取）
+        const firstSeat = row.seats[0]
+        const categoryKey = firstSeat?.categoryKey
+        const category = store?.venue?.categories?.find((c: any) => c.key === categoryKey)
+        const lineColor = category?.color || '#9E9E9E'
+        
+        context.save()
+        context.strokeStyle = lineColor
+        context.lineWidth = lineWidth
+        context.globalAlpha = 0.4
+        context.lineCap = 'round'  // 圆角端点
+        context.lineJoin = 'round'  // 圆角连接（自动处理转折处）
+        
+        // 绘制连续线条（支持弧度和转折）
+        context.beginPath()
+        context.moveTo(points[0], points[1])
+        
+        // 使用二次贝塞尔曲线平滑（模拟 tension: 0.3）
+        if (points.length >= 6) {
+          for (let i = 2; i < points.length - 2; i += 2) {
+            const xc = (points[i] + points[i + 2]) / 2
+            const yc = (points[i + 1] + points[i + 3]) / 2
+            context.quadraticCurveTo(points[i], points[i + 1], xc, yc)
+          }
+          // 最后一段
+          context.quadraticCurveTo(
+            points[points.length - 2],
+            points[points.length - 1],
+            points[points.length - 2],
+            points[points.length - 1]
+          )
+        } else {
+          // 只有两个点，直接画直线
+          context.lineTo(points[2], points[3])
+        }
+        
+        context.stroke()
+        context.restore()
+      }
     } else {
     
     // 批次绘制每个颜色组的座位
