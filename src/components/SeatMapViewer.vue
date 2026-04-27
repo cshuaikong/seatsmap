@@ -26,6 +26,7 @@ const containerRef = ref<HTMLDivElement>()
 let stage: Konva.Stage | null = null
 let layer: Konva.Layer | null = null
 let seatNodes: Map<string, Konva.Circle> = new Map() // 存储座位节点用于更新状态
+let seatLabels: Map<string, Konva.Text> = new Map() // 存储座位标签节点
 let isInitialFit = true // 标记是否是初始自适应
 
 // 【修复】座位半径基于 baseScale 计算，与编辑器一致
@@ -404,6 +405,7 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
 
   layer.destroyChildren()
   seatNodes.clear() // 清空座位节点映射
+  seatLabels.clear() // 清空座位标签映射
   
   const store = useVenueStore()
   const baseScale = store.getBaseScale()
@@ -838,6 +840,9 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         text.offsetY(text.height() / 2)
         layer.add(text)
         text.moveToTop()  // 确保座位标签在最上层
+        
+        // 存储标签引用
+        seatLabels.set(seat.id, text)
       }
     })
   }
@@ -892,34 +897,20 @@ const updateSelection = () => {
   })
 }
 
-// 隐藏座位标签
+// 隐藏座位标签（使用存储的引用）
 const hideSeatLabel = (seatId: string) => {
-  if (!layer) return
-  const children = layer.getChildren()
-  children.forEach((child: any) => {
-    if (child.className === 'Text' && child.name() === 'seat-label') {
-      // 通过 x, y 坐标匹配座位位置（简化方案）
-      // 更好的方案是存储标签引用，但这里用坐标匹配快速实现
-      const seatData = findSeatById(seatId)
-      if (seatData && Math.abs(child.x() - seatData.x) < 0.1 && Math.abs(child.y() - seatData.y) < 0.1) {
-        child.visible(false)
-      }
-    }
-  })
+  const label = seatLabels.get(seatId)
+  if (label) {
+    label.visible(false)
+  }
 }
 
-// 显示座位标签
+// 显示座位标签（使用存储的引用）
 const showSeatLabel = (seatId: string) => {
-  if (!layer) return
-  const children = layer.getChildren()
-  children.forEach((child: any) => {
-    if (child.className === 'Text' && child.name() === 'seat-label') {
-      const seatData = findSeatById(seatId)
-      if (seatData && Math.abs(child.x() - seatData.x) < 0.1 && Math.abs(child.y() - seatData.y) < 0.1) {
-        child.visible(true)
-      }
-    }
-  })
+  const label = seatLabels.get(seatId)
+  if (label) {
+    label.visible(true)
+  }
 }
 
 // 查找座位数据（优化版，避免三重循环）
