@@ -761,7 +761,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         }
       })
 
-      // 点击事件 - 使用自定义 Shape（性能优化：只重绘单个座位）
+      // 点击事件 - 使用自定义 Shape（性能优化：直接重绘，不经过 watch）
       if (props.selectable !== false) {
         seatShape.on('click', (e: any) => {
           e.cancelBubble = true
@@ -772,7 +772,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           // 更新 status
           seat.status = currentlySelected ? SEAT_STATUS.AVAILABLE : SEAT_STATUS.SELECTED
           
-          // 更新选中状态数组（触发 watch）
+          // 设置标志位，防止触发 watch 中的 updateSelection
+          isInternalUpdate = true
+          
+          // 更新选中状态数组（通知父组件，但不触发自己的 watch）
           const currentSelected = new Set(props.selectedSeatIds || [])
           if (currentlySelected) {
             currentSelected.delete(seat.id)
@@ -782,8 +785,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           emit('update:selectedSeatIds', Array.from(currentSelected))
           emit('seat-click', seat, row, section)
           
-          // 性能优化：使用 layer.draw() 而非 shape.drawScene()
-          // drawScene() 在某些情况下可能有延迟，layer.draw() 更可靠
+          // 直接重绘当前座位（不经过 updateSelection）
           layer?.draw()
         })
         
@@ -880,8 +882,17 @@ onMounted(() => {
   })
 })
 
-// 监听选中状态变化，更新座位颜色
+// 监听选中状态变化，更新座位颜色（仅外部修改时触发）
+let isInternalUpdate = false  // 标志位：是否为内部点击触发
+
 watch(() => props.selectedSeatIds, () => {
+  // 如果是内部点击触发的更新，跳过（点击事件已经重绘了）
+  if (isInternalUpdate) {
+    isInternalUpdate = false
+    return
+  }
+  
+  // 外部修改（如全选按钮），需要同步 status 和重绘
   updateSelection()
 }, { deep: true })
 
