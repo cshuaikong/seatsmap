@@ -61,7 +61,7 @@ const renderMinimap = () => {
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
   
-  // 2. 绘制分区轮廓（完整显示，固定不动）
+  // 2. 绘制分区轮廓（完整显示，固定大小，带透明度）
   if (props.venue?.sections) {
     props.venue.sections.forEach((section: any) => {
       if (!section.borderType || section.borderType === 'none') return
@@ -157,7 +157,7 @@ const renderMinimap = () => {
   const viewportW = viewportWorldW * baseScale
   const viewportH = viewportWorldH * baseScale
   
-  // 5. 绘制视口外的灰色蒙层（半透明，仍能看到图形）
+  // 5. 绘制视口外的灰色蒙层（半透明，覆盖在图形上）
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
   
   // 上方蒙层
