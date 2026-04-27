@@ -689,8 +689,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         name: 'seat-node',
         sceneFunc: (context, shape) => {
           const r = logicalRadius  // 内核心半径（如 6px）
-          const gapWidth = 2  // 透明隔离带宽度（2px）
-          const haloWidth = 1.5  // 外轮廓环线宽（1.5px）
+          const gapWidth = 1  // 透明隔离带宽度（1px）
+          const haloWidth = 1  // 外轮廓环线宽（1px）
           
           if (isSelected) {
             // 选中态：三层同心结构
@@ -734,8 +734,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         hitFunc: (context, shape) => {
           // 命中区域：选中时使用外轮廓，未选中时使用核心圆
           const r = logicalRadius
-          const gapWidth = 2
-          const haloWidth = 1.5
+          const gapWidth = 1
+          const haloWidth = 1
           const hitRadius = isSelected ? r + gapWidth + haloWidth / 2 : r
           
           context.beginPath()
