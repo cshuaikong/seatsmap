@@ -774,11 +774,12 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 }
 
-// 更新座位选中状态（当 selectedSeatIds 变化时调用）- seats.io 风格
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 性能优化版
 const updateSelection = () => {
   const store = useVenueStore()
   const borderWidth = store.visualConfig?.borderWidth || 2
   const baseScale = store.getBaseScale()
+  const seatLogicalRadius = getLogicalRadius()
   
   // 优化：预先构建座位颜色映射表
   const seatColorMap = new Map<string, string>()
@@ -792,38 +793,43 @@ const updateSelection = () => {
     })
   })
   
-  // 遍历所有座位节点
+  // 【优化】只更新状态发生变化的座位，而非所有座位
+  const currentSelectedIds = new Set(props.selectedSeatIds || [])
+  
   seatNodes.forEach((circle, seatId) => {
-    const isSelected = props.selectedSeatIds?.includes(seatId)
-    const colors = seatColorMap.get(seatId)?.split('|') || ['#9E9E9E', '#7E7E7E']
-    const color = colors[0]
-    const borderColor = colors[1]
+    const isSelected = currentSelectedIds.has(seatId)
+    const isCurrentlySelected = circle.fill() === '#4CAF50'  // 检查当前实际状态
     
-    if (isSelected) {
-      // seats.io 风格选中状态
-      circle.fill('#4CAF50')
-      circle.stroke('#2E7D32')
-      circle.strokeWidth((borderWidth + 1) / baseScale)
+    // 只有状态发生变化时才更新
+    if (isSelected !== isCurrentlySelected) {
+      const colors = seatColorMap.get(seatId)?.split('|') || ['#9E9E9E', '#7E7E7E']
+      const color = colors[0]
+      const borderColor = colors[1]
       
-      // 添加勾选图标（如果不存在）
-      const existingCheckmark = circle.getParent()?.findOne('.checkmark')
-      if (!existingCheckmark) {
-        const seatLogicalRadius = getLogicalRadius()
-        const checkmark = createCheckmark(circle.x(), circle.y(), seatLogicalRadius)
-        if (layer) {
-          layer.add(checkmark)
-          checkmark.moveToTop()
+      if (isSelected) {
+        // 选中状态
+        circle.fill('#4CAF50')
+        circle.stroke('#2E7D32')
+        circle.strokeWidth((borderWidth + 1) / baseScale)
+        
+        // 添加勾选图标（如果不存在）
+        const existingCheckmark = layer?.findOne(`.checkmark-${seatId}`)
+        if (!existingCheckmark) {
+          const checkmark = createCheckmark(circle.x(), circle.y(), seatLogicalRadius)
+          checkmark.name(`checkmark-${seatId}`)
+          layer?.add(checkmark)
+          checkmark?.moveToTop()
         }
+      } else {
+        // 取消选中
+        circle.fill(color)
+        circle.stroke(borderColor)
+        circle.strokeWidth(borderWidth / baseScale)
+        
+        // 移除勾选图标
+        const checkmark = layer?.findOne(`.checkmark-${seatId}`)
+        if (checkmark) checkmark.destroy()
       }
-    } else {
-      // 未选中状态
-      circle.fill(color)
-      circle.stroke(borderColor)
-      circle.strokeWidth(borderWidth / baseScale)
-      
-      // 移除勾选图标（如果存在）
-      const checkmark = circle.getParent()?.findOne('.checkmark')
-      if (checkmark) checkmark.destroy()
     }
   })
   layer?.batchDraw()
