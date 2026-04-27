@@ -688,9 +688,11 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         y,
         name: 'seat-node',
         sceneFunc: (context, shape) => {
-          const r = logicalRadius  // 内核心半径（如 6px）
-          const gapWidth = 1  // 透明隔离带宽度（1px）
-          const haloWidth = 1  // 外轮廓环线宽（1px）
+          const r = logicalRadius  // 内核心半径（已归一化）
+          
+          // 【归一化】间隙和线宽需要除以 baseScale，确保视觉一致
+          const gapWidth = 1 / baseScale  // 透明隔离带宽度（1px 视觉）
+          const haloWidth = 1 / baseScale  // 外轮廓环线宽（1px 视觉）
           
           // 【关键修复】每次都读取最新的 seat.status，而非闭包捕获的 isSelected
           const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
@@ -713,13 +715,14 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             context.stroke()
             
             // 3. 内衬标志（白色勾选图标）
-            const checkSize = r * 0.8
+            // 【归一化】勾选图标大小基于 r，但线宽需要归一化
+            const checkSize = r * 0.6  // 缩小到 0.6，更精致
             context.beginPath()
             context.moveTo(-checkSize * 0.4, 0)
             context.lineTo(-checkSize * 0.1, checkSize * 0.3)
             context.lineTo(checkSize * 0.4, -checkSize * 0.3)
             context.strokeStyle = '#FFFFFF'
-            context.lineWidth = Math.max(1, checkSize * 0.15)
+            context.lineWidth = Math.max(0.5 / baseScale, checkSize * 0.2)  // 归一化线宽，最小 0.5px
             context.lineCap = 'round'
             context.lineJoin = 'round'
             context.stroke()
