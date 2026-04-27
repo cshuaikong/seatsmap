@@ -48,7 +48,7 @@ const getLogicalRadius = () => {
 }
 
 // 渲染座位条（使用线条，支持弧度和转折）
-const renderSeatLine = (points: number[], row: SeatRow, opacity: number) => {
+const renderSeatLine = (points: number[], row: SeatRow, opacity: number, isSegment: boolean = false) => {
   if (!layer || points.length < 4) return  // 至少需要 2 个点（4 个坐标）
   
   const stageScale = stage?.scaleX() || 1
@@ -59,9 +59,18 @@ const renderSeatLine = (points: number[], row: SeatRow, opacity: number) => {
   // 线条宽度 = 座位直径（使用 baseScale 归一化）
   const strokeWidth = (configRadius * 2) / baseScale
   
+  // 【优化】如果是多段转折模式，缩短线条避免端点重叠
+  let adjustedPoints = points
+  if (isSegment && points.length >= 4) {
+    adjustedPoints = shortenLineEndpoints(points, strokeWidth * 0.4)
+  }
+  
+  // 【优化】使用座位排的颜色（从座位的 categoryKey 获取）
+  const lineColor = row.seats.length > 0 ? getCategoryColor(row.seats[0].categoryKey) : '#9E9E9E'
+  
   const line = new Konva.Line({
-    points: points,
-    stroke: getCategoryColor(row.seats[0].categoryKey),
+    points: adjustedPoints,
+    stroke: lineColor,
     strokeWidth: strokeWidth,
     opacity: opacity,
     lineCap: 'round',  // 圆角端点
@@ -71,6 +80,38 @@ const renderSeatLine = (points: number[], row: SeatRow, opacity: number) => {
   })
   
   layer.add(line)
+}
+
+// 缩短线条端点，避免转折处重叠
+const shortenLineEndpoints = (points: number[], shortenDistance: number): number[] => {
+  if (points.length < 4) return points
+  
+  const result = [...points]
+  
+  // 缩短起点：将第一个点向第二个点方向移动
+  const x1 = result[0], y1 = result[1]
+  const x2 = result[2], y2 = result[3]
+  const dx = x2 - x1, dy = y2 - y1
+  const dist = Math.sqrt(dx * dx + dy * dy)
+  if (dist > shortenDistance) {
+    const ratio = shortenDistance / dist
+    result[0] = x1 + dx * ratio
+    result[1] = y1 + dy * ratio
+  }
+  
+  // 缩短终点：将最后一个点向倒数第二个点方向移动
+  const len = result.length
+  const xn = result[len - 2], yn = result[len - 1]
+  const xn1 = result[len - 4], yn1 = result[len - 3]
+  const dxn = xn - xn1, dyn = yn - yn1
+  const distn = Math.sqrt(dxn * dxn + dyn * dyn)
+  if (distn > shortenDistance) {
+    const ratio = shortenDistance / distn
+    result[len - 2] = xn - dxn * ratio
+    result[len - 1] = yn - dyn * ratio
+  }
+  
+  return result
 }
 
 // 计算弧形位置
@@ -527,8 +568,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             segmentPositions.push(rowX + pos.x, rowY + pos.y)
           }
           
-          // 绘制线条座位条
-          renderSeatLine(segmentPositions, row, 0.4)
+          // 绘制线条座位条（多段模式，需要缩短端点避免重叠）
+          renderSeatLine(segmentPositions, row, 0.4, true)
         }
       } else {
         // 单段模式（直线或弧形）
@@ -552,9 +593,9 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             rotatedPoints.push(newX, newY)
           }
           
-          renderSeatLine(rotatedPoints, row, 0.4)
+          renderSeatLine(rotatedPoints, row, 0.4, false)
         } else {
-          renderSeatLine(linePoints, row, 0.4)
+          renderSeatLine(linePoints, row, 0.4, false)
         }
       }
     }
