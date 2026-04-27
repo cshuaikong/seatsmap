@@ -1300,8 +1300,28 @@ defineExpose({
     height: stage?.height() || 0
   }),
   getVenueBounds: () => {
-    // 计算所有内容的边界
-    return layer?.getClientRect() || { x: 0, y: 0, width: 0, height: 0 }
+    // 【关键】使用固定的内容边界，不受缩放影响
+    // 计算所有图形元素的原始坐标边界（舞台坐标）
+    if (!layer) return { x: 0, y: 0, width: 0, height: 0 }
+    
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    
+    layer.getChildren().forEach((child: any) => {
+      const rect = child.getClientRect({ skipTransform: true, skipShadow: true, skipStroke: true })
+      minX = Math.min(minX, rect.x)
+      minY = Math.min(minY, rect.y)
+      maxX = Math.max(maxX, rect.x + rect.width)
+      maxY = Math.max(maxY, rect.y + rect.height)
+    })
+    
+    if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 }
+    
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    }
   },
   getSelectedSeats: () => {
     // 返回已选座位的坐标
