@@ -370,9 +370,9 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
 
   // 渲染所有 section
   props.venue.sections.forEach(section => {
-    // 【预览模式】只渲染分区名称，不渲染边框
-    if (section.name) {
-      renderSectionLabel(section)
+    // 【预览模式】渲染分区填充色块，但边框宽度为0
+    if (section.borderType && section.borderType !== 'none') {
+      renderSectionBorder(section, true)  // 传入 previewMode=true
     }
 
     // 渲染形状
@@ -808,11 +808,13 @@ const renderSectionLabel = (section: Section) => {
 }
 
 // 渲染分区边框
-const renderSectionBorder = (section: Section) => {
+const renderSectionBorder = (section: Section, previewMode: boolean = false) => {
   if (!layer || !section.borderType || section.borderType === 'none') return
 
   const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'
   const strokeColor = section.borderStroke || '#808080'
+  // 预览模式：边框宽度为 0；编辑模式：边框宽度为 1
+  const strokeWidth = previewMode ? 0 : 1
 
   if (section.borderType === 'rect') {
     layer.add(new Konva.Rect({
@@ -822,7 +824,7 @@ const renderSectionBorder = (section: Section) => {
       height: section.borderHeight || 100,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1,
+      strokeWidth: strokeWidth,
       name: 'section-border'  // 用于 LOD 控制
     }))
   } else if (section.borderType === 'ellipse') {
@@ -833,7 +835,7 @@ const renderSectionBorder = (section: Section) => {
       radiusY: section.borderRadiusY || 50,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1,
+      strokeWidth: strokeWidth,
       name: 'section-border'
     }))
   } else if (section.borderType === 'polygon' && section.borderPoints) {
@@ -844,7 +846,7 @@ const renderSectionBorder = (section: Section) => {
       closed: true,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1,
+      strokeWidth: strokeWidth,
       name: 'section-border'
     }))
   } else if (section.borderType === 'path' && section.borderPathPoints) {
@@ -856,7 +858,7 @@ const renderSectionBorder = (section: Section) => {
       data: pathData,
       fill: fillColor,
       stroke: strokeColor,
-      strokeWidth: 1,
+      strokeWidth: strokeWidth,
       name: 'section-border'
     }))
   }
