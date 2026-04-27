@@ -365,6 +365,32 @@ const updateLOD = () => {
   layer.batchDraw()
 }
 
+// 创建勾选图标（seats.io 风格）
+const createCheckmark = (x: number, y: number, size: number): Konva.Group => {
+  const group = new Konva.Group({
+    x,
+    y,
+    name: 'checkmark'
+  })
+  
+  // 白色勾选路径
+  const checkmark = new Konva.Line({
+    points: [
+      -size * 0.4, 0,
+      -size * 0.1, size * 0.3,
+      size * 0.4, -size * 0.3
+    ],
+    stroke: '#FFFFFF',
+    strokeWidth: size * 0.15,
+    lineCap: 'round',
+    lineJoin: 'round',
+    listening: false
+  })
+  
+  group.add(checkmark)
+  return group
+}
+
 // 渲染座位图（支持大规模座位优化）
 const renderSeatMap = (preserveStageState: boolean = false) => {
   if (!stage || !layer) return
@@ -667,24 +693,49 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         name: 'seat-node'
       })
 
-      // 点击事件 - 切换选择状态（优化：移除动画，直接更新颜色）
+      // 点击事件 - seats.io 风格选中效果
       if (props.selectable !== false) {
         circle.on('click', (e) => {
           e.cancelBubble = true
           
-          // 直接切换颜色，不使用动画（性能优化）
           const currentlySelected = circle.fill() === '#FF5722'
+          
+          // seats.io 风格：轻微缩放动画
+          circle.to({
+            scaleX: 1.15,
+            scaleY: 1.15,
+            duration: 0.08,
+            easing: Konva.Easings.BackEaseOut,
+            onFinish: () => {
+              circle.to({
+                scaleX: 1,
+                scaleY: 1,
+                duration: 0.08
+              })
+            }
+          })
           
           if (currentlySelected) {
             // 取消选中：恢复原始颜色
             circle.fill(color)
             circle.stroke(borderColor)
-            circle.strokeWidth(borderWidth / baseScale)  // 使用 baseScale 保持一致
+            circle.strokeWidth(borderWidth / baseScale)
+            
+            // 移除勾选图标
+            const checkmark = circle.getParent()?.findOne('.checkmark')
+            if (checkmark) checkmark.destroy()
           } else {
-            // 选中：变为橙色，但保持边框宽度不变
-            circle.fill('#FF5722')
-            circle.stroke('#FF5722')
-            circle.strokeWidth(borderWidth / baseScale)  // 使用 baseScale 保持一致
+            // 选中：seats.io 风格
+            circle.fill('#4CAF50')  // 绿色（而非橙色）
+            circle.stroke('#2E7D32')  // 深绿色边框
+            circle.strokeWidth((borderWidth + 1) / baseScale)  // 边框加粗 1px
+            
+            // 添加勾选图标
+            const checkmark = createCheckmark(x, y, logicalRadius)
+            if (layer) {
+              layer.add(checkmark)
+              checkmark.moveToTop()  // 确保在最上层
+            }
           }
           
           // 更新选中状态
@@ -698,12 +749,32 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           emit('seat-click', seat, row, section)
         })
         
-        // 鼠标样式（优化：使用 tap 事件减少监听器）
+        // seats.io 风格悬停效果
         circle.on('mouseenter', () => {
-          if (stage) stage.container().style.cursor = 'pointer'
+          if (stage) {
+            stage.container().style.cursor = 'pointer'
+            // 轻微放大
+            if (circle.fill() !== '#FF5722' && circle.fill() !== '#4CAF50') {
+              circle.to({
+                scaleX: 1.1,
+                scaleY: 1.1,
+                duration: 0.1
+              })
+            }
+          }
         })
         circle.on('mouseleave', () => {
-          if (stage) stage.container().style.cursor = 'default'
+          if (stage) {
+            stage.container().style.cursor = 'default'
+            // 恢复大小
+            if (circle.fill() !== '#FF5722' && circle.fill() !== '#4CAF50') {
+              circle.to({
+                scaleX: 1,
+                scaleY: 1,
+                duration: 0.1
+              })
+            }
+          }
         })
       }
 
@@ -737,13 +808,13 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 }
 
-// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 优化性能
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）- seats.io 风格
 const updateSelection = () => {
   const store = useVenueStore()
   const borderWidth = store.visualConfig?.borderWidth || 2
-  const baseScale = store.getBaseScale()  // 【修复】使用 baseScale 而非 currentScale
+  const baseScale = store.getBaseScale()
   
-  // 优化：预先构建座位颜色映射表，避免三重循环查找（O(n³) -> O(n)）
+  // 优化：预先构建座位颜色映射表
   const seatColorMap = new Map<string, string>()
   props.venue.sections.forEach(section => {
     section.rows.forEach(row => {
@@ -755,16 +826,39 @@ const updateSelection = () => {
     })
   })
   
-  // 遍历所有座位节点，只更新状态变化的座位
+  // 遍历所有座位节点
   seatNodes.forEach((circle, seatId) => {
     const isSelected = props.selectedSeatIds?.includes(seatId)
     const colors = seatColorMap.get(seatId)?.split('|') || ['#9E9E9E', '#7E7E7E']
     const color = colors[0]
     const borderColor = colors[1]
     
-    circle.fill(isSelected ? '#FF5722' : color)
-    circle.stroke(isSelected ? '#FF5722' : borderColor)
-    circle.strokeWidth(borderWidth / baseScale)  // 【修复】使用 baseScale 保持一致性
+    if (isSelected) {
+      // seats.io 风格选中状态
+      circle.fill('#4CAF50')
+      circle.stroke('#2E7D32')
+      circle.strokeWidth((borderWidth + 1) / baseScale)
+      
+      // 添加勾选图标（如果不存在）
+      const existingCheckmark = circle.getParent()?.findOne('.checkmark')
+      if (!existingCheckmark) {
+        const seatLogicalRadius = getLogicalRadius()
+        const checkmark = createCheckmark(circle.x(), circle.y(), seatLogicalRadius)
+        if (layer) {
+          layer.add(checkmark)
+          checkmark.moveToTop()
+        }
+      }
+    } else {
+      // 未选中状态
+      circle.fill(color)
+      circle.stroke(borderColor)
+      circle.strokeWidth(borderWidth / baseScale)
+      
+      // 移除勾选图标（如果存在）
+      const checkmark = circle.getParent()?.findOne('.checkmark')
+      if (checkmark) checkmark.destroy()
+    }
   })
   layer?.batchDraw()
 }
