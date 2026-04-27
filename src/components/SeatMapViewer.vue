@@ -716,13 +716,13 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             
             // 3. 内衬标志（白色勾选图标）
             // 【归一化】勾选图标大小基于 r，但线宽需要归一化
-            const checkSize = r * 0.6  // 缩小到 0.6，更精致
+            const checkSize = r * 0.75  // 从 0.6 增加到 0.75，更清晰可见
             context.beginPath()
             context.moveTo(-checkSize * 0.4, 0)
             context.lineTo(-checkSize * 0.1, checkSize * 0.3)
             context.lineTo(checkSize * 0.4, -checkSize * 0.3)
             context.strokeStyle = '#FFFFFF'
-            context.lineWidth = Math.max(0.5 / baseScale, checkSize * 0.2)  // 归一化线宽，最小 0.5px
+            context.lineWidth = Math.max(0.8 / baseScale, checkSize * 0.25)  // 从 0.2 增加到 0.25，更粗
             context.lineCap = 'round'
             context.lineJoin = 'round'
             context.stroke()
@@ -764,7 +764,6 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       // 点击事件 - 使用自定义 Shape（性能优化：只重绘单个座位）
       if (props.selectable !== false) {
         seatShape.on('click', (e: any) => {
-          console.log('[SeatMapViewer] 座位被点击:', seat.id, '当前状态:', seat.status)
           e.cancelBubble = true
           
           // 直接根据 status 判断选中状态，不依赖颜色或自定义属性
@@ -772,7 +771,6 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           
           // 更新 status
           seat.status = currentlySelected ? SEAT_STATUS.AVAILABLE : SEAT_STATUS.SELECTED
-          console.log('[SeatMapViewer] 状态更新为:', seat.status)
           
           // 更新选中状态数组（触发 watch）
           const currentSelected = new Set(props.selectedSeatIds || [])
@@ -784,9 +782,9 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           emit('update:selectedSeatIds', Array.from(currentSelected))
           emit('seat-click', seat, row, section)
           
-          // 性能优化：只重绘当前座位，而非整个 layer
-          seatShape.drawScene()
-          seatShape.drawHit()
+          // 性能优化：使用 layer.draw() 而非 shape.drawScene()
+          // drawScene() 在某些情况下可能有延迟，layer.draw() 更可靠
+          layer?.draw()
         })
         
         // 鼠标样式（无动画，只改光标）
