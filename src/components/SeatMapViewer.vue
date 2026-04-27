@@ -744,7 +744,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         }
       })
 
-      // 点击事件 - 使用自定义 Shape（只更新 status）
+      // 点击事件 - 使用自定义 Shape（性能优化：只重绘单个座位）
       if (props.selectable !== false) {
         seatShape.on('click', (e: any) => {
           e.cancelBubble = true
@@ -752,13 +752,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           // 直接根据 status 判断选中状态，不依赖颜色或自定义属性
           const currentlySelected = seat.status === SEAT_STATUS.SELECTED
           
-          if (currentlySelected) {
-            // 取消选中：更新 status 为 AVAILABLE
-            seat.status = SEAT_STATUS.AVAILABLE
-          } else {
-            // 选中：更新 status 为 SELECTED
-            seat.status = SEAT_STATUS.SELECTED
-          }
+          // 更新 status
+          seat.status = currentlySelected ? SEAT_STATUS.AVAILABLE : SEAT_STATUS.SELECTED
           
           // 更新选中状态数组（触发 watch）
           const currentSelected = new Set(props.selectedSeatIds || [])
@@ -770,8 +765,9 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           emit('update:selectedSeatIds', Array.from(currentSelected))
           emit('seat-click', seat, row, section)
           
-          // 重绘以更新视觉（使用 sceneFunc 重新绘制）
-          layer?.batchDraw()
+          // 性能优化：只重绘当前座位，而非整个 layer
+          seatShape.drawScene()
+          seatShape.drawHit()
         })
         
         // 鼠标样式（无动画，只改光标）
@@ -813,10 +809,11 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 }
 
-// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 使用自定义 Shape 重绘
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 性能优化版：只重绘变化的座位
 const updateSelection = () => {
   // 【优化】只更新状态发生变化的座位，根据 status 字段判断
   const currentSelectedIds = new Set(props.selectedSeatIds || [])
+  const needsRedraw: Konva.Shape[] = []  // 记录需要重绘的座位
   
   // 遍历所有座位节点，检查 status 是否需要同步
   seatNodes.forEach((shape, seatId) => {
@@ -840,14 +837,19 @@ const updateSelection = () => {
     if (isSelected && seat.status !== SEAT_STATUS.SELECTED) {
       // 应该选中，但 status 不是 SELECTED → 更新为选中状态
       seat.status = SEAT_STATUS.SELECTED
+      needsRedraw.push(shape as Konva.Shape)  // 记录需要重绘
     } else if (!isSelected && seat.status === SEAT_STATUS.SELECTED) {
       // 应该取消，但 status 是 SELECTED → 恢复为未选中状态
       seat.status = SEAT_STATUS.AVAILABLE
+      needsRedraw.push(shape as Konva.Shape)  // 记录需要重绘
     }
   })
   
-  // 重绘所有座位（使用 sceneFunc 重新绘制）
-  layer?.batchDraw()
+  // 性能优化：只重绘实际变化的座位，而非整个 layer
+  needsRedraw.forEach(shape => {
+    shape.drawScene()
+    shape.drawHit()
+  })
 }
 
 onMounted(() => {
