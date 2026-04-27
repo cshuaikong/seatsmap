@@ -716,29 +716,29 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             
             // 3. 内衬标志（白色勾选图标）
             // 【归一化】勾选图标大小基于 r，但线宽需要归一化
-            const checkSize = r * 0.75  // 从 0.6 增加到 0.75，更清晰可见
+            const checkSize = r * 1.2  // 从 0.75 增加到 1.2，更大更清晰
             context.beginPath()
             context.moveTo(-checkSize * 0.4, 0)
             context.lineTo(-checkSize * 0.1, checkSize * 0.3)
             context.lineTo(checkSize * 0.4, -checkSize * 0.3)
             context.strokeStyle = '#FFFFFF'
-            context.lineWidth = Math.max(0.8 / baseScale, checkSize * 0.25)  // 从 0.2 增加到 0.25，更粗
+            context.lineWidth = Math.max(1 / baseScale, checkSize * 0.3)  // 从 0.25 增加到 0.3，更粗
             context.lineCap = 'round'
             context.lineJoin = 'round'
             context.stroke()
           } else {
-            // 未选中态：实心圆 + 边框
+            // 未选中态：实心圆 + 边框（与正常座位一致）
             context.beginPath()
             context.arc(0, 0, r, 0, Math.PI * 2)
             context.fillStyle = color
             context.fill()
             
-            // 绘制边框（填充色加深 25%）
+            // 绘制边框（填充色加深 25%，宽度使用 borderWidth）
             const borderColor = darkenColor(color, 25)
             context.beginPath()
             context.arc(0, 0, r, 0, Math.PI * 2)
             context.strokeStyle = borderColor
-            context.lineWidth = borderWidth / baseScale
+            context.lineWidth = borderWidth / baseScale  // 使用配置的 borderWidth
             context.stroke()
           }
           
@@ -803,9 +803,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       }
       seatNodes.set(seat.id, seatShape as any)
       
-      // 座位标签（使用 stageScale >= 0.8 判断显示）
+      // 座位标签（使用 stageScale >= 0.8 判断显示，选中时隐藏）
       const currentStageScale = stage?.scaleX() || 1
-      if (seat.label && layer && currentStageScale >= 0.8) {
+      const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
+      if (seat.label && layer && currentStageScale >= 0.8 && !isCurrentlySelected) {
         const fontSize = logicalRadius  // 字体大小等于座位半径，更清晰
         
         const text = new Konva.Text({
