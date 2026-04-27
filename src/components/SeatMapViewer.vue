@@ -918,9 +918,11 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
       labelY += (minY + maxY) / 2
     }
     
-    // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
+    // 获取舞台缩放比例，用于适当缩放（非完全固定）
     const stageScale = stage?.scaleX() || 1
-    const visualScale = 1 / stageScale
+    // 使用平方根缩放：放大时适当增大，但不会完全跟随缩放比例
+    // 例如：stageScale=4 时，visualScale=0.5（而不是 0.25）
+    const visualScale = 1 / Math.sqrt(stageScale)
     
     const text = new Konva.Text({
       x: labelX,
@@ -930,16 +932,18 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
       fontStyle: 'bold',
       fill: '#666',
       align: 'center',
-      verticalAlign: 'middle'
+      verticalAlign: 'middle',
+      name: 'section-label'  // 添加 name 用于识别
     })
     
     // 居中显示
     text.offsetX(text.width() / 2)
     text.offsetY(text.height() / 2)
     
-    // 设置缩放变换，保持视觉大小恒定
-    text.scaleX(visualScale)
-    text.scaleY(visualScale)
+    // 设置缩放变换，适当放大但不会过大
+    const safeVisualScale = Math.max(0.3, Math.min(3, visualScale))  // 限制范围 0.3~3
+    text.scaleX(safeVisualScale)
+    text.scaleY(safeVisualScale)
     
     layer.add(text)
   }
@@ -970,10 +974,18 @@ const updateLabelScale = () => {
       } else {
         text.visible(false)
       }
+    } else if (textName === 'section-label') {
+      // 分区标签：使用平方根缩放，适当放大但不会过大
+      const safeStageScale = Math.max(0.1, stageScale)
+      const visualScale = 1 / Math.sqrt(safeStageScale)
+      const safeVisualScale = Math.max(0.3, Math.min(3, visualScale))  // 限制范围 0.3~3
+      text.scaleX(safeVisualScale)
+      text.scaleY(safeVisualScale)
     } else {
-      // 分区/排标签：应用反向缩放保持视觉大小恒定
-      // 限制缩放范围，避免极端情况
-      const safeVisualScale = Math.max(0.1, Math.min(10, visualScale))
+      // 排标签：使用平方根缩放，适当放大但不会过大
+      const safeStageScale = Math.max(0.1, stageScale)
+      const visualScale = 1 / Math.sqrt(safeStageScale)
+      const safeVisualScale = Math.max(0.3, Math.min(3, visualScale))  // 限制范围 0.3~3
       text.scaleX(safeVisualScale)
       text.scaleY(safeVisualScale)
     }
