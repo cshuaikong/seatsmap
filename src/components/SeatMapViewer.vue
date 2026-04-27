@@ -640,7 +640,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       // 座位标签（使用 stageScale >= 0.8 判断显示）
       const currentStageScale = stage?.scaleX() || 1
       if (seat.label && layer && currentStageScale >= 0.8) {
-        const fontSize = logicalRadius * 0.8
+        const fontSize = logicalRadius  // 字体大小等于座位半径，更清晰
         
         const text = new Konva.Text({
           x: x,
@@ -971,9 +971,9 @@ const updateLabelScale = () => {
     const textName = text.name()
     
     if (textName === 'seat-label') {
-      // 座位标签：当 stageScale >= 0.8 时显示，字体使用逻辑半径的 0.8 倍
+      // 座位标签：当 stageScale >= 0.8 时显示，字体使用逻辑半径（与座位大小一致）
       if (stageScale >= 0.8) {
-        const fontSize = logicalRadius * 0.8  // 字体稍小于座位半径，避免过大
+        const fontSize = logicalRadius  // 字体大小等于座位半径
         text.fontSize(fontSize)
         text.visible(true)
       } else {
