@@ -393,8 +393,8 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
   const viewportRight = viewportLeft + stageWidth / stageScale
   const viewportBottom = viewportTop + stageHeight / stageScale
   
-  // 视口扩展边距（预加载周边座位）
-  const padding = 500 / stageScale
+  // 视口扩展边距（预加载周边座位，【修复】增大边距避免误裁剪）
+  const padding = 1000 / stageScale  // 从 500 增加到 1000
   const viewLeft = viewportLeft - padding
   const viewTop = viewportTop - padding
   const viewRight = viewportRight + padding
@@ -459,15 +459,18 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
       const seatRadius = store.visualConfig?.radius || 6
       const logicalRadius = seatRadius / baseScale
       
-      // 计算排的包围盒（简化：使用第一个和最后一个座位）
+      // 计算排的包围盒（【修复】遍历所有座位，而非只取首尾）
       if (row.seats.length > 0) {
-        const firstSeat = row.seats[0]
-        const lastSeat = row.seats[row.seats.length - 1]
+        let rowMinX = Infinity, rowMinY = Infinity
+        let rowMaxX = -Infinity, rowMaxY = -Infinity
         
-        let rowMinX = Math.min(firstSeat.x, lastSeat.x) - logicalRadius
-        let rowMinY = Math.min(firstSeat.y, lastSeat.y) - logicalRadius
-        let rowMaxX = Math.max(firstSeat.x, lastSeat.x) + logicalRadius
-        let rowMaxY = Math.max(firstSeat.y, lastSeat.y) + logicalRadius
+        // 遍历所有座位计算精确包围盒
+        row.seats.forEach(seat => {
+          rowMinX = Math.min(rowMinX, seat.x - logicalRadius)
+          rowMinY = Math.min(rowMinY, seat.y - logicalRadius)
+          rowMaxX = Math.max(rowMaxX, seat.x + logicalRadius)
+          rowMaxY = Math.max(rowMaxY, seat.y + logicalRadius)
+        })
         
         // 应用旋转（如果有）
         if (row.rotation) {
