@@ -77,6 +77,12 @@ onMounted(async () => {
       console.log('已同步 visualConfig:', (data as any).visualConfig)
     }
     
+    // 【关键】同步 baseScale 到 venue
+    if (data.baseScale) {
+      data.baseScale = (data as any).baseScale
+      console.log('已设置 baseScale:', data.baseScale)
+    }
+    
     demoVenue.value = data
     loading.value = false
   } catch (err) {
