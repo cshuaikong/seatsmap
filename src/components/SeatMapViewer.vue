@@ -162,6 +162,22 @@ const initStage = () => {
     const oldScale = stage!.scaleX()
     const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
     
+    // 【限制】最小缩放为 1.0，小于 1 时使用回弹动画
+    if (newScale < 1.0) {
+      stage!.to({
+        scaleX: 1.0,
+        scaleY: 1.0,
+        duration: 0.3,
+        easing: Konva.Easings.BackEaseOut,
+        onFinish: () => {
+          updateLabelScale()
+          updateLOD()
+          layer?.batchDraw()
+        }
+      })
+      return
+    }
+    
     // 获取鼠标位置
     const pointer = stage!.getPointerPosition()!
     
@@ -263,6 +279,9 @@ const fitContentToView = () => {
     y: (stageHeight - box.height * scale) / 2 - box.y * scale
   })
   
+  // 更新标签缩放和可见性
+  updateLabelScale()
+  
   layer.batchDraw()
   updateLOD()
 }
@@ -299,8 +318,9 @@ const fitContentWithAnimation = () => {
     duration: 0.8,
     easing: Konva.Easings.EaseInOut,
     onFinish: () => {
-      // 动画完成后重绘，保留当前舞台状态
-      renderSeatMap(true)
+      // 动画完成后更新 LOD 和标签缩放
+      updateLOD()  // 先更新 LOD，可能触发重新渲染
+      updateLabelScale()
     }
   })
 }
@@ -327,8 +347,11 @@ const updateLOD = () => {
   const shouldShowCircles = relativeScale > SHOW_SEATS_THRESHOLD
   const shouldShowBlocks = relativeScale > SHOW_BLOCKS_THRESHOLD && !shouldShowCircles
   
-  // 【优化】如果级别不匹配，重新渲染（保留舞台状态）
-  if (hasSeatNodes !== shouldShowCircles) {
+  // 【修复】如果级别不匹配，重新渲染（保留舞台状态）
+  // 需要检查：是否应该显示座位条或圆形座位，但当前没有渲染任何座位
+  const needsRender = (shouldShowCircles || shouldShowBlocks) && !hasSeatNodes
+  
+  if (needsRender || (hasSeatNodes && !shouldShowCircles && !shouldShowBlocks)) {
     renderSeatMap(true)  // 重新渲染以切换模式，保留舞台状态
     return
   }
@@ -347,19 +370,24 @@ const updateLOD = () => {
     }
   })
   
-  // 更新分区背景透明度（缩小级别时更明显）
+  // 【优化】分区背景透明度随缩放动态调整（从 stageScale=1 到 baseScale 渐变）
   layer.find('.section-border').forEach(node => {
-    if (relativeScale < SHOW_BLOCKS_THRESHOLD) {
-      // Level 0: 只显示分区，分区色块完全不透明
-      node.opacity(1)
-    } else if (relativeScale < SHOW_SEATS_THRESHOLD) {
-      // Level 1: 显示座位条，分区色块半透明
-      node.opacity(0.5)
-    } else {
-      // Level 2: 显示座位，分区色块淡化为背景
-      node.opacity(0.2)
+    const currentScale = stage?.scaleX() || 1
+    const baseScale = store.getBaseScale()
+    
+    // stageScale < 1: 完全不透明 (1.0)
+    // 1 <= stageScale < baseScale: 从 1.0 渐变到 0.4
+    // stageScale >= baseScale: 保持最低透明度 0.4
+    let opacity = 1.0
+    if (currentScale >= baseScale) {
+      opacity = 0.4
+    } else if (currentScale >= 1.0) {
+      // 线性插值：从 1.0 降到 0.4
+      opacity = 1.0 - (currentScale - 1.0) / (baseScale - 1.0) * 0.6
     }
+    node.opacity(opacity)
   })
+
   
   // 【调试】打印当前 LOD 级别
   console.log(`[LOD] relativeScale=${relativeScale.toFixed(2)}, baseScale=${baseScale}, currentScale=${currentScale.toFixed(2)}, level=${relativeScale < SHOW_BLOCKS_THRESHOLD ? 0 : relativeScale < SHOW_SEATS_THRESHOLD ? 1 : 2}`)
@@ -926,6 +954,19 @@ const findSeatById = (seatId: string): any => {
 
 onMounted(() => {
   initStage()
+  
+  // 【关键】初次渲染前，确保 baseScale 已初始化
+  const store = useVenueStore()
+  const venueBaseScale = (props.venue as any).baseScale
+  if (!venueBaseScale || venueBaseScale === 1) {
+    // 如果 venue 没有 baseScale，使用当前 stageScale 初始化
+    const currentStageScale = stage?.scaleX() || 1
+    store.initBaseScale(currentStageScale)
+    console.log('[SeatMapViewer] 初始化 baseScale:', currentStageScale)
+  } else {
+    console.log('[SeatMapViewer] 使用 venue.baseScale:', venueBaseScale)
+  }
+  
   // 先渲染，再自适应
   renderSeatMap()
   // 使用 requestAnimationFrame 确保渲染完成
@@ -1174,7 +1215,7 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
       text: section.name,
       fontSize: 10,  // 减小字体：12 -> 10（与排标签一致）
       fontStyle: 'bold',
-      fill: '#666',
+      fill: 'rgba(102, 102, 102, 0.6)',  // 添加透明度，让标签更柔和
       align: 'center',
       verticalAlign: 'middle',
       name: 'section-label'  // 添加 name 用于识别
@@ -1189,8 +1230,8 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
     text.scaleX(safeVisualScale)
     text.scaleY(safeVisualScale)
     
-    // 低缩放层级时隐藏分区标签（stageScale < 0.5 时不显示）
-    text.visible(stageScale >= 0.5)
+    // 低缩放层级时隐藏分区标签（stageScale < 1.0 时不显示）
+    text.visible(stageScale >= 1.0)
     
     layer.add(text)
   }
@@ -1223,8 +1264,8 @@ const updateLabelScale = () => {
         text.visible(false)
       }
     } else if (textName === 'section-label') {
-      // 分区标签：低缩放层级时隐藏（stageScale < 0.5），使用更温和的缩放
-      if (stageScale < 0.5) {
+      // 分区标签：低缩放层级时隐藏（stageScale < 1.0），使用更温和的缩放
+      if (stageScale < 1.0) {
         text.visible(false)
       } else {
         text.visible(true)
