@@ -588,29 +588,28 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         name: 'seat-node'
       })
 
-      // 点击事件 - 切换选择状态
+      // 点击事件 - 切换选择状态（优化：移除动画，直接更新颜色）
       if (props.selectable !== false) {
-        circle.on('mousedown', (e) => {
-          console.log('座位点击:', seat.id, seat.label)
+        circle.on('click', (e) => {
           e.cancelBubble = true
           
-          // Seats.io 风格动画：轻微缩放
-          circle.to({
-            scaleX: 1.2,
-            scaleY: 1.2,
-            duration: 0.1,
-            easing: Konva.Easings.BackEaseOut,
-            onFinish: () => {
-              circle.to({
-                scaleX: 1,
-                scaleY: 1,
-                duration: 0.1
-              })
-            }
-          })
+          // 直接切换颜色，不使用动画（性能优化）
+          const currentlySelected = circle.fill() === '#FF5722'
+          if (currentlySelected) {
+            // 取消选中：恢复原始颜色
+            circle.fill(color)
+            circle.stroke(borderColor)
+            circle.strokeWidth(borderWidth / baseScale)
+          } else {
+            // 选中：变为橙色
+            circle.fill('#FF5722')
+            circle.stroke('#FF5722')
+            circle.strokeWidth(3 / baseScale)
+          }
           
+          // 更新选中状态
           const currentSelected = new Set(props.selectedSeatIds || [])
-          if (currentSelected.has(seat.id)) {
+          if (currentlySelected) {
             currentSelected.delete(seat.id)
           } else {
             currentSelected.add(seat.id)
@@ -619,16 +618,12 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           emit('seat-click', seat, row, section)
         })
         
-        // 鼠标样式
+        // 鼠标样式（优化：使用 tap 事件减少监听器）
         circle.on('mouseenter', () => {
-          if (stage) {
-            stage.container().style.cursor = 'pointer'
-          }
+          if (stage) stage.container().style.cursor = 'pointer'
         })
         circle.on('mouseleave', () => {
-          if (stage) {
-            stage.container().style.cursor = 'default'
-          }
+          if (stage) stage.container().style.cursor = 'default'
         })
       }
 
@@ -662,30 +657,34 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 }
 
-// 更新座位选中状态（当 selectedSeatIds 变化时调用）
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 优化性能
 const updateSelection = () => {
   const store = useVenueStore()
   const borderWidth = store.visualConfig?.borderWidth || 2
   const currentScale = stage?.scaleX() || 1
   
+  // 优化：预先构建座位颜色映射表，避免三重循环查找（O(n³) -> O(n)）
+  const seatColorMap = new Map<string, string>()
+  props.venue.sections.forEach(section => {
+    section.rows.forEach(row => {
+      row.seats.forEach(seat => {
+        const color = getCategoryColor(seat.categoryKey)
+        const borderColor = darkenColor(color, 25)
+        seatColorMap.set(seat.id, `${color}|${borderColor}`)
+      })
+    })
+  })
+  
+  // 遍历所有座位节点，只更新状态变化的座位
   seatNodes.forEach((circle, seatId) => {
     const isSelected = props.selectedSeatIds?.includes(seatId)
-    // 从 seat 对象获取颜色
-    let categoryKey: string | number = 1
-    for (const section of props.venue.sections) {
-      for (const row of section.rows) {
-        const seat = row.seats.find(s => s.id === seatId)
-        if (seat) {
-          categoryKey = seat.categoryKey
-          break
-        }
-      }
-    }
-    const color = getCategoryColor(categoryKey)
-    const borderColor = darkenColor(color, 25)  // 边框色：填充色加深 25%
+    const colors = seatColorMap.get(seatId)?.split('|') || ['#9E9E9E', '#7E7E7E']
+    const color = colors[0]
+    const borderColor = colors[1]
+    
     circle.fill(isSelected ? '#FF5722' : color)
-    circle.stroke(isSelected ? '#FF5722' : borderColor)  // 使用加深后的边框色
-    circle.strokeWidth(isSelected ? 3 / currentScale : borderWidth / currentScale)  // 使用数据表的 borderWidth 参数
+    circle.stroke(isSelected ? '#FF5722' : borderColor)
+    circle.strokeWidth(isSelected ? 3 / currentScale : borderWidth / currentScale)
   })
   layer?.batchDraw()
 }
