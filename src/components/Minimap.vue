@@ -207,7 +207,7 @@ onUnmounted(() => {
 <style scoped>
 .minimap {
   position: absolute;
-  bottom: 16px;
+  top: 16px;
   right: 16px;
   width: 100%;
   max-width: 200px;
@@ -227,7 +227,7 @@ canvas {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .minimap {
-    bottom: 8px;
+    top: 8px;
     right: 8px;
     max-width: 150px;
     border-radius: 6px;

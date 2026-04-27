@@ -173,7 +173,7 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 /* Minimap 容器定位 */
 .minimap-container {
   position: absolute;
-  bottom: 16px;
+  top: 16px;
   right: 16px;
 }
 
@@ -251,7 +251,7 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
   }
   
   .minimap-container {
-    bottom: 8px;
+    top: 8px;
     right: 8px;
   }
 }
