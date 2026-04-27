@@ -365,7 +365,7 @@ const updateLOD = () => {
   layer.batchDraw()
 }
 
-// 渲染座位图
+// 渲染座位图（支持大规模座位优化）
 const renderSeatMap = (preserveStageState: boolean = false) => {
   if (!stage || !layer) return
 
@@ -377,6 +377,28 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
 
   layer.destroyChildren()
   seatNodes.clear() // 清空座位节点映射
+  
+  const store = useVenueStore()
+  const baseScale = store.getBaseScale()
+  
+  // 【优化】计算视口范围，只渲染可见区域的座位（针对 10 万+座位）
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+  const stageScale = stage.scaleX()
+  const stagePos = stage.position()
+  
+  // 视口在逻辑坐标系中的范围
+  const viewportLeft = -stagePos.x / stageScale
+  const viewportTop = -stagePos.y / stageScale
+  const viewportRight = viewportLeft + stageWidth / stageScale
+  const viewportBottom = viewportTop + stageHeight / stageScale
+  
+  // 视口扩展边距（预加载周边座位）
+  const padding = 500 / stageScale
+  const viewLeft = viewportLeft - padding
+  const viewTop = viewportTop - padding
+  const viewRight = viewportRight + padding
+  const viewBottom = viewportBottom + padding
 
   // 渲染所有 section
   props.venue.sections.forEach(section => {
@@ -429,8 +451,62 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
       }))
     })
 
-    // 使用 Group 渲染排和座位
+    // 使用 Group 渲染排和座位（【优化】添加视口裁剪）
     section.rows.forEach(row => {
+      // 【优化】视口裁剪：只渲染可见区域内的排（针对 10 万+座位）
+      const rowX = row.x || 0
+      const rowY = row.y || 0
+      const seatRadius = store.visualConfig?.radius || 6
+      const logicalRadius = seatRadius / baseScale
+      
+      // 计算排的包围盒（简化：使用第一个和最后一个座位）
+      if (row.seats.length > 0) {
+        const firstSeat = row.seats[0]
+        const lastSeat = row.seats[row.seats.length - 1]
+        
+        let rowMinX = Math.min(firstSeat.x, lastSeat.x) - logicalRadius
+        let rowMinY = Math.min(firstSeat.y, lastSeat.y) - logicalRadius
+        let rowMaxX = Math.max(firstSeat.x, lastSeat.x) + logicalRadius
+        let rowMaxY = Math.max(firstSeat.y, lastSeat.y) + logicalRadius
+        
+        // 应用旋转（如果有）
+        if (row.rotation) {
+          const rad = row.rotation * Math.PI / 180
+          const cos = Math.cos(rad)
+          const sin = Math.sin(rad)
+          const corners = [
+            [rowMinX - rowX, rowMinY - rowY],
+            [rowMaxX - rowX, rowMinY - rowY],
+            [rowMinX - rowX, rowMaxY - rowY],
+            [rowMaxX - rowX, rowMaxY - rowY]
+          ]
+          let rotMinX = Infinity, rotMinY = Infinity, rotMaxX = -Infinity, rotMaxY = -Infinity
+          corners.forEach(([cx, cy]) => {
+            const rx = cx * cos - cy * sin
+            const ry = cx * sin + cy * cos
+            rotMinX = Math.min(rotMinX, rx)
+            rotMinY = Math.min(rotMinY, ry)
+            rotMaxX = Math.max(rotMaxX, rx)
+            rotMaxY = Math.max(rotMaxY, ry)
+          })
+          rowMinX = rowX + rotMinX
+          rowMinY = rowY + rotMinY
+          rowMaxX = rowX + rotMaxX
+          rowMaxY = rowY + rotMaxY
+        } else {
+          rowMinX += rowX
+          rowMinY += rowY
+          rowMaxX += rowX
+          rowMaxY += rowY
+        }
+        
+        // 视口裁剪判断：排的包围盒与视口无交集则跳过
+        if (rowMaxX < viewLeft || rowMinX > viewRight || 
+            rowMaxY < viewTop || rowMinY > viewBottom) {
+          return  // 跳过视口外的排（性能优化关键）
+        }
+      }
+      
       renderRowGroup(row, section)
     })
   })
