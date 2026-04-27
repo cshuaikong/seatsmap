@@ -29,36 +29,41 @@ let seatNodes: Map<string, Konva.Circle> = new Map() // 存储座位节点用于
 let seatLabels: Map<string, Konva.Text> = new Map() // 存储座位标签节点
 let isInitialFit = true // 标记是否是初始自适应
 
+// 【统一配置获取】从 venue 数据或 store 获取配置参数，确保一致性
+const getRenderConfig = () => {
+  const store = useVenueStore()
+  
+  // 优先使用 venue 数据中的 baseScale，其次从 store 获取
+  const baseScale = (props.venue as any).baseScale || store.getBaseScale()
+  
+  // 从 venue 数据或 store 获取 visualConfig
+  const visualConfig = (props.venue as any).visualConfig || store.visualConfig
+  
+  return {
+    baseScale,
+    radius: visualConfig?.radius || 6,
+    gap: visualConfig?.gap || 18,
+    rowGap: visualConfig?.rowGap || 24,
+    borderWidth: visualConfig?.borderWidth || 2
+  }
+}
+
 // 【修复】座位半径基于 baseScale 计算，与编辑器一致
 const getLogicalRadius = () => {
-  // 1. 优先从 store 获取配置（与编辑器实时同步）
-  const store = useVenueStore()
-  const configRadius = store.visualConfig?.radius || 6
-  
-  // 2. 从 venue 数据中获取 baseScale（预览模式下使用 venue 自己的 baseScale）
-  let baseScale = (props.venue as any).baseScale
-  if (!baseScale || baseScale === 1) {
-    // 如果 venue 没有 baseScale，从 store 获取
-    baseScale = store.getBaseScale()
-  }
-  
-  // 3. 计算逻辑半径：和编辑器存坐标时的逻辑一致
+  const config = getRenderConfig()
+  // 计算逻辑半径：和编辑器存坐标时的逻辑一致
   // 坐标存的是 (pos / baseScale)，半径也得 (radius / baseScale)
-  const logicalRadius = configRadius / baseScale
-  
-  return logicalRadius
+  return config.radius / config.baseScale
 }
 
 // 渲染座位条（使用连续线条，支持弧度和转折）
 const renderSeatLine = (points: number[], row: SeatRow, opacity: number) => {
   if (!layer || points.length < 4) return  // 至少需要 2 个点（4 个坐标）
   
-  const store = useVenueStore()
-  const baseScale = store.getBaseScale()
-  const configRadius = store.visualConfig?.radius || 6
+  const config = getRenderConfig()
   
   // 线条宽度 = 座位直径（使用 baseScale 归一化）
-  const strokeWidth = (configRadius * 2) / baseScale
+  const strokeWidth = (config.radius * 2) / config.baseScale
   
   // 使用座位排的颜色（从座位的 categoryKey 获取）
   const lineColor = row.seats.length > 0 ? getCategoryColor(row.seats[0].categoryKey) : '#9E9E9E'
@@ -330,8 +335,8 @@ const updateLOD = () => {
   if (!stage || !layer) return
   
   const currentScale = stage.scaleX()
-  const store = useVenueStore()
-  const baseScale = store.getBaseScale()
+  const config = getRenderConfig()
+  const baseScale = config.baseScale
   
   // 【核心】基于 baseScale 计算 LOD 阈值
   // baseScale 是首次绘制时的标准缩放，以此为基准计算相对缩放比例
@@ -374,7 +379,8 @@ const updateLOD = () => {
   // 【优化】分区背景透明度随缩放动态调整（从 stageScale=1 到 baseScale 渐变）
   layer.find('.section-border').forEach(node => {
     const currentScale = stage?.scaleX() || 1
-    const baseScale = store.getBaseScale()
+    const config = getRenderConfig()
+    const baseScale = config.baseScale
     
     // stageScale < 1: 完全不透明 (1.0)
     // 1 <= stageScale < baseScale: 从 1.0 渐变到 0.4
@@ -436,8 +442,8 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
   seatNodes.clear() // 清空座位节点映射
   seatLabels.clear() // 清空座位标签映射
   
-  const store = useVenueStore()
-  const baseScale = store.getBaseScale()
+  const config = getRenderConfig()
+  const baseScale = config.baseScale
   
   // 【优化】计算视口范围，只渲染可见区域的座位（针对 10 万+座位）
   const stageWidth = stage.width()
@@ -514,7 +520,7 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
       // 【优化】视口裁剪：只渲染可见区域内的排（针对 10 万+座位）
       const rowX = row.x || 0
       const rowY = row.y || 0
-      const seatRadius = store.visualConfig?.radius || 6
+      const seatRadius = config.radius
       const logicalRadius = seatRadius / baseScale
       
       // 计算排的包围盒（【修复】遍历所有座位，而非只取首尾）
@@ -596,18 +602,16 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   
   // 【关键】提前计算 relativeScale，用于 LOD 判断
   const stageScale = stage?.scaleX() || 1
-  const store = useVenueStore()
-  // 【修复】优先使用 venue 数据中的 baseScale，其次从 store 获取
-  const baseScale = (props.venue as any).baseScale || store.getBaseScale()
-  const relativeScale = stageScale / baseScale
+  const config = getRenderConfig()
+  const relativeScale = stageScale / config.baseScale
   
   // 【调试】打印第一排的信息
   if (row.seats.length > 1) {
     const seat0 = row.seats[0]
     const seat1 = row.seats[1]
     const dist = Math.sqrt(Math.pow(seat1.x - seat0.x, 2) + Math.pow(seat1.y - seat0.y, 2))
-    const store = useVenueStore()
-    console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, storeBaseScale=${store.getBaseScale()}`)
+    const config = getRenderConfig()
+    console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, baseScale=${config.baseScale}`)
   }
   
   // 【修复】排标签精确定位 - 只在 Level 2 显示（圆形座位模式）
@@ -653,10 +657,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 
   // 座位（直接添加到 layer，不使用 Group）
-  const configRadius = store.visualConfig?.radius || 6
-  const configGap = store.visualConfig?.gap || 18
-  const configRowGap = store.visualConfig?.rowGap || 24
-  const borderWidth = store.visualConfig?.borderWidth || 2
+  // 使用统一的配置获取函数
+  const { radius: configRadius, gap: configGap, rowGap: configRowGap, borderWidth, baseScale } = config
   
   // Level 0: 只显示分区色块和分区名，不渲染座位
   if (relativeScale < 0.3) {
