@@ -1307,11 +1307,23 @@ defineExpose({
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     
     layer.getChildren().forEach((child: any) => {
-      const rect = child.getClientRect({ skipTransform: true, skipShadow: true, skipStroke: true })
-      minX = Math.min(minX, rect.x)
-      minY = Math.min(minY, rect.y)
-      maxX = Math.max(maxX, rect.x + rect.width)
-      maxY = Math.max(maxY, rect.y + rect.height)
+      // 直接读取节点的 x, y, width, height 属性（不受缩放影响）
+      const x = child.x()
+      const y = child.y()
+      const width = child.width ? child.width() : 0
+      const height = child.height ? child.height() : 0
+      
+      // 对于没有 width/height 的节点（如 Circle），使用半径计算
+      const radius = child.radius ? child.radius() : 0
+      const nodeMinX = radius > 0 ? x - radius : x
+      const nodeMinY = radius > 0 ? y - radius : y
+      const nodeMaxX = radius > 0 ? x + radius : x + width
+      const nodeMaxY = radius > 0 ? y + radius : y + height
+      
+      minX = Math.min(minX, nodeMinX)
+      minY = Math.min(minY, nodeMinY)
+      maxX = Math.max(maxX, nodeMaxX)
+      maxY = Math.max(maxY, nodeMaxY)
     })
     
     if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 }
