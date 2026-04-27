@@ -724,11 +724,19 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             context.lineJoin = 'round'
             context.stroke()
           } else {
-            // 未选中态：单一半透明实心圆，无边框
+            // 未选中态：实心圆 + 边框
             context.beginPath()
             context.arc(0, 0, r, 0, Math.PI * 2)
             context.fillStyle = color
             context.fill()
+            
+            // 绘制边框（填充色加深 25%）
+            const borderColor = darkenColor(color, 25)
+            context.beginPath()
+            context.arc(0, 0, r, 0, Math.PI * 2)
+            context.strokeStyle = borderColor
+            context.lineWidth = borderWidth / baseScale
+            context.stroke()
           }
           
           // Konva 要求调用 hitFunc 来生成命中区域
