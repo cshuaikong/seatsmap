@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>测试静态文件</title>
+</head>
+<body>
+  <h1>测试静态文件访问</h1>
+  <button onclick="testFetch()">测试加载 JSON</button>
+  <pre id="result"></pre>
+
+  <script>
+    async function testFetch() {
+      const result = document.getElementById('result')
+      try {
+        result.textContent = '正在加载...'
+        const response = await fetch('/分区座位 全.json')
+        result.textContent = `状态: ${response.status}\n`
+        const data = await response.json()
+        result.textContent += `数据大小: ${JSON.stringify(data).length} 字符\n`
+        result.textContent += `数据类型: ${typeof data}\n`
+        result.textContent += `数据 keys: ${Object.keys(data).join(', ')}\n`
+      } catch (err) {
+        result.textContent = `错误: ${err.message}`
+      }
+    }
+  </script>
+</body>
+</html>

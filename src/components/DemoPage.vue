@@ -27,12 +27,13 @@
         <button class="btn-retry" @click="reload">重新加载</button>
       </div>
 
-      <!-- 座位图预览 -->
-      <PreviewModal 
+      <!-- 座位图 -->
+      <SeatMapViewer
         v-else-if="demoVenue"
-        :visible="true"
         :venue="demoVenue"
-        @close="$router.push('/designer')"
+        :selectable="true"
+        v-model:selected-seat-ids="selectedSeats"
+        class="demo-viewer"
       />
     </main>
   </div>
@@ -40,28 +41,40 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import PreviewModal from './PreviewModal.vue'
+import SeatMapViewer from './SeatMapViewer.vue'
 import type { VenueData } from '../types'
 
 const demoVenue = ref<VenueData | null>(null)
+const selectedSeats = ref<string[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
 // 从 JSON 文件加载数据
 onMounted(async () => {
   try {
+    console.log('开始加载座位图数据...')
     // 使用分区座位数据
-    const response = await fetch('/static/分区座位 全.json')
+    const response = await fetch('/分区座位 全.json')
+    console.log('响应状态:', response.status)
+    
     if (!response.ok) {
-      throw new Error('数据加载失败')
+      throw new Error(`HTTP 错误: ${response.status} ${response.statusText}`)
     }
-    const data = await response.json()
+    
+    const jsonData = await response.json()
+    console.log('JSON 数据 keys:', Object.keys(jsonData))
+    
+    // 数据结构是 { version, exportTime, venue }，需要提取 venue
+    const data = jsonData.venue || jsonData
+    console.log('座位图数据:', data)
+    console.log('座位图数据 keys:', Object.keys(data))
+    
     demoVenue.value = data
     loading.value = false
   } catch (err) {
+    console.error('加载座位图数据失败:', err)
     error.value = err instanceof Error ? err.message : '未知错误'
     loading.value = false
-    console.error('加载座位图数据失败:', err)
   }
 })
 
@@ -136,12 +149,10 @@ const reload = () => {
   overflow: hidden;
 }
 
-/* 让 PreviewModal 占满整个内容区 */
-.demo-content :deep(.preview-modal) {
+/* SeatMapViewer 占满整个内容区 */
+.demo-viewer {
   width: 100%;
   height: 100%;
-  border-radius: 0;
-  box-shadow: none;
 }
 
 /* 加载状态 */
