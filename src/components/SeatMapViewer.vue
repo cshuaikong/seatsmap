@@ -690,9 +690,14 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         sceneFunc: (context, shape) => {
           const r = logicalRadius  // 内核心半径（已归一化）
           
-          // 【归一化】间隙和线宽需要除以 baseScale，确保视觉一致
+          // 统一边框宽度（与未选中态一致）
+          const borderLineWidth = borderWidth / baseScale
+          
+          // 【归一化】间隙需要除以 baseScale，确保视觉一致
           const gapWidth = 1 / baseScale  // 透明隔离带宽度（1px 视觉）
-          const haloWidth = 1 / baseScale  // 外轮廓环线宽（1px 视觉）
+          
+          // 统一使用边框颜色函数
+          const borderColor = darkenColor(color, 50)
           
           // 【关键修复】每次都读取最新的 seat.status，而非闭包捕获的 isSelected
           const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
@@ -706,12 +711,12 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             context.fillStyle = color
             context.fill()
             
-            // 2. 中间隔离带（透明间隙）+ 外轮廓环（同色描边）
-            // 外环的半径 = r + gapWidth + haloWidth/2
+            // 2. 中间隔离带（透明间隙）+ 外轮廓环（使用统一的 borderColor 和 borderLineWidth）
+            // 外环的半径 = r + gapWidth + borderLineWidth/2
             context.beginPath()
-            context.arc(0, 0, r + gapWidth + haloWidth / 2, 0, Math.PI * 2)
-            context.strokeStyle = color
-            context.lineWidth = haloWidth
+            context.arc(0, 0, r + gapWidth + borderLineWidth / 2, 0, Math.PI * 2)
+            context.strokeStyle = borderColor  // 使用统一的边框颜色
+            context.lineWidth = borderLineWidth  // 使用统一的边框宽度
             context.stroke()
             
             // 3. 内衬标志（白色勾选图标）
@@ -749,10 +754,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           // 命中区域：选中时使用外轮廓，未选中时使用核心圆
           const r = logicalRadius
           const gapWidth = 1
-          const haloWidth = 1
+          const borderLineWidth = borderWidth / baseScale  // 使用统一的边框宽度
           // 【关键修复】读取最新的 seat.status
           const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
-          const hitRadius = isCurrentlySelected ? r + gapWidth + haloWidth / 2 : r
+          const hitRadius = isCurrentlySelected ? r + gapWidth + borderLineWidth / 2 : r
           
           // 简单的圆形命中区域
           context.beginPath()
