@@ -42,6 +42,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import SeatMapViewer from './SeatMapViewer.vue'
+import { useVenueStore } from '../stores/venueStore'
 import type { VenueData } from '../types'
 
 const demoVenue = ref<VenueData | null>(null)
@@ -68,6 +69,13 @@ onMounted(async () => {
     const data = jsonData.venue || jsonData
     console.log('座位图数据:', data)
     console.log('座位图数据 keys:', Object.keys(data))
+    
+    // 【关键】同步 visualConfig 到 store
+    const store = useVenueStore()
+    if ((data as any).visualConfig) {
+      store.visualConfig = (data as any).visualConfig
+      console.log('已同步 visualConfig:', (data as any).visualConfig)
+    }
     
     demoVenue.value = data
     loading.value = false
