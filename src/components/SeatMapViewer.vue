@@ -733,8 +733,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             context.fillStyle = color
             context.fill()
             
-            // 绘制边框（填充色加深 25%，宽度使用 borderWidth）
-            const borderColor = darkenColor(color, 25)
+            // 绘制边框（填充色加深 50%，更明显的边框）
+            const borderColor = darkenColor(color, 50)
             context.beginPath()
             context.arc(0, 0, r, 0, Math.PI * 2)
             context.strokeStyle = borderColor
