@@ -674,18 +674,17 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           
           // 直接切换颜色，不使用动画（性能优化）
           const currentlySelected = circle.fill() === '#FF5722'
-          const currentStageScale = stage?.scaleX() || 1
           
           if (currentlySelected) {
             // 取消选中：恢复原始颜色
             circle.fill(color)
             circle.stroke(borderColor)
-            circle.strokeWidth(borderWidth / currentStageScale)  // 使用当前舞台缩放归一化
+            circle.strokeWidth(borderWidth / baseScale)  // 使用 baseScale 保持一致
           } else {
             // 选中：变为橙色，但保持边框宽度不变
             circle.fill('#FF5722')
             circle.stroke('#FF5722')
-            circle.strokeWidth(borderWidth / currentStageScale)  // 使用当前舞台缩放归一化
+            circle.strokeWidth(borderWidth / baseScale)  // 使用 baseScale 保持一致
           }
           
           // 更新选中状态
@@ -742,7 +741,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
 const updateSelection = () => {
   const store = useVenueStore()
   const borderWidth = store.visualConfig?.borderWidth || 2
-  const currentScale = stage?.scaleX() || 1
+  const baseScale = store.getBaseScale()  // 【修复】使用 baseScale 而非 currentScale
   
   // 优化：预先构建座位颜色映射表，避免三重循环查找（O(n³) -> O(n)）
   const seatColorMap = new Map<string, string>()
@@ -765,7 +764,7 @@ const updateSelection = () => {
     
     circle.fill(isSelected ? '#FF5722' : color)
     circle.stroke(isSelected ? '#FF5722' : borderColor)
-    circle.strokeWidth(borderWidth / currentScale)  // 保持边框宽度一致，不随选中状态变化
+    circle.strokeWidth(borderWidth / baseScale)  // 【修复】使用 baseScale 保持一致性
   })
   layer?.batchDraw()
 }
