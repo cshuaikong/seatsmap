@@ -918,16 +918,16 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
       labelY += (minY + maxY) / 2
     }
     
-    // 获取舞台缩放比例，分区标签使用更大的缩放基数
+    // 获取舞台缩放比例，分区标签使用更温和的缩放
     const stageScale = stage?.scaleX() || 1
-    // 使用更温和的平方根缩放，并增加基础大小系数 1.5
-    const visualScale = 1.5 / Math.sqrt(stageScale)
+    // 使用更温和的平方根缩放，系数 1.2（比之前 1.5 小）
+    const visualScale = 1.2 / Math.sqrt(stageScale)
     
     const text = new Konva.Text({
       x: labelX,
       y: labelY,
       text: section.name,
-      fontSize: 12,  // 增大字体：10 -> 12
+      fontSize: 10,  // 减小字体：12 -> 10（与排标签一致）
       fontStyle: 'bold',
       fill: '#666',
       align: 'center',
@@ -939,10 +939,13 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
     text.offsetX(text.width() / 2)
     text.offsetY(text.height() / 2)
     
-    // 设置缩放变换，分区标签更大一些
-    const safeVisualScale = Math.max(0.5, Math.min(4, visualScale))  // 限制范围 0.5~4（比之前大）
+    // 设置缩放变换，分区标签更低调一些
+    const safeVisualScale = Math.max(0.3, Math.min(2.5, visualScale))  // 限制范围 0.3~2.5（比之前小）
     text.scaleX(safeVisualScale)
     text.scaleY(safeVisualScale)
+    
+    // 低缩放层级时隐藏分区标签（stageScale < 0.5 时不显示）
+    text.visible(stageScale >= 0.5)
     
     layer.add(text)
   }
@@ -966,10 +969,8 @@ const updateLabelScale = () => {
     const textName = text.name()
     
     if (textName === 'seat-label') {
-      // 座位标签：根据 relativeScale 判断是否显示，字体使用逻辑半径的一半（更合适）
-      const baseScale = store.getBaseScale()
-      const relativeScale = stageScale / baseScale
-      if (relativeScale > 1.0) {
+      // 座位标签：当 stageScale >= 0.8 时显示，字体使用逻辑半径的 0.8 倍
+      if (stageScale >= 0.8) {
         const fontSize = logicalRadius * 0.8  // 字体稍小于座位半径，避免过大
         text.fontSize(fontSize)
         text.visible(true)
@@ -977,12 +978,17 @@ const updateLabelScale = () => {
         text.visible(false)
       }
     } else if (textName === 'section-label') {
-      // 分区标签：使用更温和的平方根缩放，增加系数 1.5 使标签更大
-      const safeStageScale = Math.max(0.1, stageScale)
-      const visualScale = 1.5 / Math.sqrt(safeStageScale)
-      const safeVisualScale = Math.max(0.5, Math.min(4, visualScale))  // 限制范围 0.5~4（更大）
-      text.scaleX(safeVisualScale)
-      text.scaleY(safeVisualScale)
+      // 分区标签：低缩放层级时隐藏（stageScale < 0.5），使用更温和的缩放
+      if (stageScale < 0.5) {
+        text.visible(false)
+      } else {
+        text.visible(true)
+        const safeStageScale = Math.max(0.1, stageScale)
+        const visualScale = 1.2 / Math.sqrt(safeStageScale)  // 系数 1.2（更低调）
+        const safeVisualScale = Math.max(0.3, Math.min(2.5, visualScale))  // 范围 0.3~2.5（更小）
+        text.scaleX(safeVisualScale)
+        text.scaleY(safeVisualScale)
+      }
     } else if (textName === 'row-label') {
       // 排标签：使用较小的缩放，字体已经减小到 10px
       const safeStageScale = Math.max(0.1, stageScale)
