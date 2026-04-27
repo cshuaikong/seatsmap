@@ -693,29 +693,38 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         name: 'seat-node'
       })
 
-      // 点击事件 - 性能优化版 seats.io 风格（记录选中状态）
+      // 点击事件 - 性能优化版 seats.io 风格（联动 status 字段）
       if (props.selectable !== false) {
         circle.on('click', (e) => {
           e.cancelBubble = true
           
           const currentlySelected = (circle as any)._isSelected === true
+          const currentStatus = seat.status  // 保存原始状态
           
           if (currentlySelected) {
-            // 取消选中：恢复原始颜色
+            // 取消选中：恢复原始颜色和状态
             circle.fill(color)
             circle.stroke(borderColor)
             circle.strokeWidth(borderWidth / baseScale)
-            ;(circle as any)._isSelected = false  // 记录状态
+            ;(circle as any)._isSelected = false
+            
+            // 恢复 status（如果之前是 selected，恢复为 available）
+            if (currentStatus === 'selected') {
+              seat.status = 'available'
+            }
             
             // 移除勾选图标
             const checkmark = layer?.findOne(`.checkmark-${seat.id}`)
             if (checkmark) checkmark.destroy()
           } else {
-            // 选中：seats.io 风格（无动画，直接切换）
+            // 选中：seats.io 风格 + 更新 status
             circle.fill('#4CAF50')  // 绿色
             circle.stroke('#2E7D32')  // 深绿色边框
             circle.strokeWidth((borderWidth + 1) / baseScale)  // 边框加粗 1px
-            ;(circle as any)._isSelected = true  // 记录状态
+            ;(circle as any)._isSelected = true
+            
+            // 更新 status 为 selected（选中状态）
+            seat.status = 'selected'
             
             // 添加勾选图标
             const checkmark = createCheckmark(x, y, logicalRadius)
@@ -776,43 +785,57 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
 }
 
-// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 性能优化版
+// 更新座位选中状态（当 selectedSeatIds 变化时调用）- 联动 status 字段
 const updateSelection = () => {
   const store = useVenueStore()
   const borderWidth = store.visualConfig?.borderWidth || 2
   const baseScale = store.getBaseScale()
   const seatLogicalRadius = getLogicalRadius()
   
-  // 优化：预先构建座位颜色映射表
-  const seatColorMap = new Map<string, string>()
+  // 优化：预先构建座位颜色映射表（根据 status 获取颜色）
+  const seatColorMap = new Map<string, { color: string; borderColor: string; seat: any }>()
+  
+  // 辅助函数：根据 status 获取颜色
+  const getSeatColor = (seat: any) => {
+    if (seat.status === 'selected') {
+      return { fill: '#4CAF50', stroke: '#2E7D32' }
+    }
+    const color = getCategoryColor(seat.categoryKey)
+    return { fill: color, stroke: darkenColor(color, 25) }
+  }
+  
   props.venue.sections.forEach(section => {
     section.rows.forEach(row => {
       row.seats.forEach(seat => {
-        const color = getCategoryColor(seat.categoryKey)
-        const borderColor = darkenColor(color, 25)
-        seatColorMap.set(seat.id, `${color}|${borderColor}`)
+        const colors = getSeatColor(seat)
+        seatColorMap.set(seat.id, { color: colors.fill, borderColor: colors.stroke, seat })
       })
     })
   })
   
-  // 【优化】只更新状态发生变化的座位，而非所有座位
+  // 【优化】只更新状态发生变化的座位，同步 status 字段
   const currentSelectedIds = new Set(props.selectedSeatIds || [])
   
   seatNodes.forEach((circle, seatId) => {
     const isSelected = currentSelectedIds.has(seatId)
-    const isCurrentlySelected = (circle as any)._isSelected === true  // 使用记录的状态
+    const isCurrentlySelected = (circle as any)._isSelected === true
     
     // 只有状态发生变化时才更新
     if (isSelected !== isCurrentlySelected) {
-      const colors = seatColorMap.get(seatId)?.split('|') || ['#9E9E9E', '#7E7E7E']
-      const color = colors[0]
-      const borderColor = colors[1]
+      const seatData = seatColorMap.get(seatId)
+      if (!seatData) return
+      
+      const { color, borderColor, seat } = seatData
       
       if (isSelected) {
-        // 选中状态
+        // 选中状态：更新颜色 + status
         circle.fill('#4CAF50')
         circle.stroke('#2E7D32')
         circle.strokeWidth((borderWidth + 1) / baseScale)
+        ;(circle as any)._isSelected = true
+        
+        // 更新 status 字段
+        seat.status = 'selected'
         
         // 添加勾选图标（如果不存在）
         const existingCheckmark = layer?.findOne(`.checkmark-${seatId}`)
@@ -823,10 +846,16 @@ const updateSelection = () => {
           checkmark?.moveToTop()
         }
       } else {
-        // 取消选中
+        // 取消选中：恢复颜色 + status
         circle.fill(color)
         circle.stroke(borderColor)
         circle.strokeWidth(borderWidth / baseScale)
+        ;(circle as any)._isSelected = false
+        
+        // 恢复 status（如果是 selected，恢复为 available）
+        if (seat.status === 'selected') {
+          seat.status = 'available'
+        }
         
         // 移除勾选图标
         const checkmark = layer?.findOne(`.checkmark-${seatId}`)

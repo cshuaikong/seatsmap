@@ -3,8 +3,8 @@ export interface Position {
   y: number
 }
 
-// 座位状态类型
-export type SeatStatus = 'available' | 'booked' | 'reserved' | 'disabled'
+// 座位状态类型（新增 selected 状态）
+export type SeatStatus = 'available' | 'booked' | 'reserved' | 'disabled' | 'selected'
 
 // 座位类型
 export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
@@ -203,6 +203,7 @@ export const defaultSeatMapConfig: SeatMapConfig = {
     booked: '#F44336',
     reserved: '#FF9800',
     disabled: '#616161',
+    selected: '#4CAF50',  // 选中状态颜色（绿色）
   },
   
   categoryColors: {
