@@ -1,0 +1,3103 @@
+{
+  "version": "1.0",
+  "exportTime": "2026-04-24T09:13:05.671Z",
+  "venue": {
+    "id": "b60259waty8z8q7zfm4nu",
+    "name": "未命名座位图",
+    "venueType": "SIMPLE",
+    "categories": [
+      {
+        "key": 1,
+        "label": "普通区",
+        "color": "#A5D6A7",
+        "accessible": false
+      },
+      {
+        "key": 2,
+        "label": "VIP区",
+        "color": "#FF8A80",
+        "accessible": false
+      },
+      {
+        "key": 3,
+        "label": "轮椅区",
+        "color": "#90CAF9",
+        "accessible": true
+      }
+    ],
+    "sections": [
+      {
+        "name": "106区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 314.5419631444811,
+        "borderY": 365.06552603168177,
+        "borderPathPoints": [
+          {
+            "x": -83.49114383719288,
+            "y": -167.06534281296834,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 55.74176831224139,
+            "y": -167.14897639808726,
+            "type": "arc",
+            "arcDepth": 0.15
+          },
+          {
+            "x": 130.4539844273071,
+            "y": -137.6973214867964,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 178.20761765305008,
+            "y": -70.96088046555701,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 184.7797817214108,
+            "y": -37.22191012198044,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 184.982837033617,
+            "y": 33.29578242187961,
+            "type": "arc",
+            "arcDepth": 0.25
+          },
+          {
+            "x": 105.5674868344488,
+            "y": 166.16378008208102,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 54.13294301372463,
+            "y": 177.9133784328617,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -81.69102242154696,
+            "y": 177.64502039432074,
+            "type": "arc",
+            "arcDepth": 0.15
+          },
+          {
+            "x": -153.05379233849453,
+            "y": 145.25527611467288,
+            "type": "arc",
+            "arcDepth": 0.15
+          },
+          {
+            "x": -203.35065128509132,
+            "y": 52.102389483900254,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -203.28183915291152,
+            "y": -45.568534633304864,
+            "type": "arc",
+            "arcDepth": 0.15
+          },
+          {
+            "x": -165.34015845605444,
+            "y": -123.07703768346875,
+            "type": "arc",
+            "arcDepth": 0.15
+          }
+        ],
+        "borderFill": "#dbdbdb",
+        "id": "wll15y7typsa0n92pnnpn",
+        "borderStroke": "#ffffff",
+        "borderOpacity": 1,
+        "rotation": 0,
+        "zIndex": -5,
+        "readonly": true,
+        "shapes": [],
+        "texts": [],
+        "areas": []
+      },
+      {
+        "name": "Stage",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 307.96673446963155,
+        "borderY": 368.85556073393644,
+        "borderPathPoints": [
+          {
+            "x": -45.17346976817845,
+            "y": -56.817952561039704,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 43.753494810984705,
+            "y": -55.65929504209299,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 47.22946736782495,
+            "y": -87.2327124333919,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": 87.08025715322532,
+            "y": -78.25244809248892,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 74.88868994045998,
+            "y": -51.670854840003926,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": 87.75895338155937,
+            "y": -31.621626701208697,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 87.93457877605584,
+            "y": 35.074051093189155,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": 70.84638820378132,
+            "y": 52.573135469940155,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 85.42754030172131,
+            "y": 79.12389003633831,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": 54.959461291100524,
+            "y": 86.3056515174132,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 51.69502425424827,
+            "y": 55.40231423521209,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -51.91709004568128,
+            "y": 56.196820634513415,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -52.352348317261544,
+            "y": 86.88252878092436,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": -87.82589745105577,
+            "y": 81.65942952196082,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -72.59185794574537,
+            "y": 51.19135051133998,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": -88.06319731091355,
+            "y": 33.99864878391827,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -87.84162954638407,
+            "y": -32.12990159452772,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": -73.1208857681656,
+            "y": -52.80904166392986,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -88.19212344586546,
+            "y": -80.14756582347849,
+            "type": "arc",
+            "arcDepth": 0.2
+          },
+          {
+            "x": -46.07802223865406,
+            "y": -87.31604850062507,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f7d4d4",
+        "id": "93uorlbzrhumjv2ywvb5",
+        "borderStroke": "#f7f7f7",
+        "readonly": true,
+        "shapes": [],
+        "texts": [],
+        "areas": []
+      },
+      {
+        "name": "425区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 139.3554608299916,
+        "borderY": 295.3989415807001,
+        "borderPathPoints": [
+          {
+            "x": -16.14232639435191,
+            "y": 15.512820629669648,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 0.7643998571141708,
+            "y": 20.00929037740002,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 15.332961839760458,
+            "y": -12.725009386076863,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 0.0449646974773259,
+            "y": -22.797101620992805,
+            "type": "arc",
+            "arcDepth": -0.1
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "d46ljzlkazhrs7rtewbu9",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "426区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 161.0434233842873,
+        "borderY": 261.1909836604523,
+        "borderPathPoints": [
+          {
+            "x": -4.3765540255338635,
+            "y": 18.964925475441987,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 19.904382612209957,
+            "y": -5.6757287421202705,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 4.91613039526149,
+            "y": -22.20238369380786,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -20.443958981937612,
+            "y": 8.913186960486087,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "nbfifs8knx4vjqtqvsoyj",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "427区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 189.99685254745626,
+        "borderY": 235.45157410567396,
+        "borderPathPoints": [
+          {
+            "x": -22.729564604812083,
+            "y": 1.663920297826735,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 9.515874147475955,
+            "y": -21.11818316846376,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 21.945401411726635,
+            "y": 2.14847613140833,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -6.9792414569834875,
+            "y": 18.00677453819148,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "c5ibzq5417r2np00khp0ds",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "428区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 228.42616697484607,
+        "borderY": 221.76836269110325,
+        "borderPathPoints": [
+          {
+            "x": -26.83017485835785,
+            "y": -8.02675591330376,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 17.4656262928369,
+            "y": -16.648086338704076,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 22.965440529730188,
+            "y": 9.513192193545166,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -13.600891964209097,
+            "y": 15.16165005846264,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#86b4fd",
+        "id": "b94jwkgg38qn41vr8blijo",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "429区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 267.26632116032937,
+        "borderY": 218.03337061324834,
+        "borderPathPoints": [
+          {
+            "x": -18.235689360696,
+            "y": -13.034897088150927,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.627392410339667,
+            "y": -13.298228342457008,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 17.577361224930826,
+            "y": 13.034897088150956,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -12.969064274574407,
+            "y": 13.298228342457037,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#86b4fd",
+        "id": "flopnxc7dxur9nxxux9vpd",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff",
+        "rotation": 0
+      },
+      {
+        "name": "401区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 306.5307895457733,
+        "borderY": 217.96753779967185,
+        "borderPathPoints": [
+          {
+            "x": -23.04148475178198,
+            "y": -13.232395528880517,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 23.133827365997263,
+            "y": -13.245771485066541,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 20.133794692159427,
+            "y": 13.112068158749992,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -19.313868467995576,
+            "y": 13.089391644704904,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#86b4fd",
+        "id": "owmdt681dmf8hm2fbwz8u",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "402区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 346.49212051610647,
+        "borderY": 218.10843123980575,
+        "borderPathPoints": [
+          {
+            "x": -13.997646243241206,
+            "y": -13.23274451799847,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 18.169856547119537,
+            "y": -13.284852386270956,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 12.412157085369074,
+            "y": 13.084798688038319,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -17.03597251989578,
+            "y": 13.034897088150927,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#86b4fd",
+        "id": "b9yvi22hv6qzctqvp2coao",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff",
+        "rotation": 0
+      },
+      {
+        "name": "403区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 383.97905258379546,
+        "borderY": 221.31726935319776,
+        "borderPathPoints": [
+          {
+            "x": -16.435159853597327,
+            "y": -16.476341937809735,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -22.621617344685205,
+            "y": 9.88321285402941,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 13.722099495950886,
+            "y": 15.265470810875996,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 25.835337194030558,
+            "y": -7.907679568058995,
+            "type": "arc",
+            "arcDepth": -0.1
+          }
+        ],
+        "borderFill": "#86b4fd",
+        "id": "b83khiicgape5q6x5vm6ab",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "404区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 422.0592931030587,
+        "borderY": 235.52941514684943,
+        "borderPathPoints": [
+          {
+            "x": -8.294934510641497,
+            "y": -21.06650034448637,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 22.251490988863793,
+            "y": 0.7899937629182716,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 8.031603256335472,
+            "y": 18.43318780142559,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -21.9881597345576,
+            "y": 1.8433187801425674,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "ds8kqkrtz2hfu9k8ymt6s7",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "405区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 451.3462404904696,
+        "borderY": 260.6101808655058,
+        "borderPathPoints": [
+          {
+            "x": -5.239127262490626,
+            "y": -21.807878276492147,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 19.649572797581584,
+            "y": 8.588257218164983,
+            "type": "arc",
+            "arcDepth": 0
+          },
+          {
+            "x": 4.596058828363425,
+            "y": 19.603322643166337,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -19.199925822808552,
+            "y": -5.620587184662924,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "es2fyyp6bwsnet4w8wbfim",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "406区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 473.199083464439,
+        "borderY": 294.91824504068836,
+        "borderPathPoints": [
+          {
+            "x": -0.22482348738645896,
+            "y": -22.48234873865175,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 15.962467604442736,
+            "y": 15.647714722101568,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 0.13489409243192085,
+            "y": 19.604608100104258,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -15.872538209488084,
+            "y": -12.769974083554189,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "igr6q26gtnrfmq2tiga7r",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "407区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 484.00442262253927,
+        "borderY": 333.86191068312223,
+        "borderPathPoints": [
+          {
+            "x": 5.939374834304203,
+            "y": -20.10883046087997,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 10.170452120625896,
+            "y": 18.630313176949187,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -6.072306808515123,
+            "y": 18.795235359689627,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -9.542196413380907,
+            "y": -15.903660688968216,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "1lv51c4qft2yqqmkh9flxl",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "408区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 486.217596732636,
+        "borderY": 370.35916106220077,
+        "borderPathPoints": [
+          {
+            "x": 8.336288225746273,
+            "y": -15.027716079689924,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 8.457859595480784,
+            "y": 15.135117170860326,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -8.35893726103069,
+            "y": 15.135117170860326,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -8.35893726103069,
+            "y": -14.937272501960194,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "285nqakx7axgujz1ikgde",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "409区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 484.19820867586634,
+        "borderY": 406.9348054343828,
+        "borderPathPoints": [
+          {
+            "x": 10.724544992884773,
+            "y": -18.095570393268815,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 6.058540060337975,
+            "y": 19.51575807454475,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -10.023114662033663,
+            "y": 15.942057025128804,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -6.454877194526318,
+            "y": -18.125359106581072,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "gxzjzqx4x4ug964hx3clbq",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "410区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 473.6400025272437,
+        "borderY": 445.77632375697317,
+        "borderPathPoints": [
+          {
+            "x": 16.025815643474516,
+            "y": -15.299907617811868,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 0.05583907889712236,
+            "y": 22.782344190026492,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -16.025815643474516,
+            "y": 12.50795367295575,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -0.3603983624657303,
+            "y": -19.990390245170317,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "vwm71who00ofqwwbrreqhj",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "411区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 451.7973312642095,
+        "borderY": 480.0702704199716,
+        "borderPathPoints": [
+          {
+            "x": 19.735717559212333,
+            "y": -8.434093224095932,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -5.1259755124125945,
+            "y": 21.628019486582957,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -19.154961125331226,
+            "y": 5.800445974572142,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 3.9905041755084767,
+            "y": -18.855624164299797,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "2uxy8bmeymnpotucrbw2a",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "413区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 422.1945887331853,
+        "borderY": 505.27379203908004,
+        "borderPathPoints": [
+          {
+            "x": 22.140194782709557,
+            "y": -1.116781577942504,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -8.713377764204608,
+            "y": 20.792399378204323,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -21.637643072635456,
+            "y": -2.456919471473441,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 8.06874690063438,
+            "y": -17.64514893149112,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#ffb3b3",
+        "id": "75qr9e7ukcaa9htnmupbo",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "414区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 384.10759746802205,
+        "borderY": 519.3327015130828,
+        "borderPathPoints": [
+          {
+            "x": 26.201384606464046,
+            "y": 7.627768444385538,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -16.87455609404202,
+            "y": 16.888444192861357,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -22.768888806490622,
+            "y": -9.534710555481752,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 13.539288988784165,
+            "y": -15.102981519883144,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#c789fb",
+        "id": "p5gvek12qk58av5zv3gqi",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "415区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 346.40772064417484,
+        "borderY": 523.0139201042546,
+        "borderPathPoints": [
+          {
+            "x": 17.77774423749827,
+            "y": 13.287761944979252,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -14.972405429422452,
+            "y": 13.24843132462047,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -17.295964947643995,
+            "y": -12.909998092122464,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 12.280028228753508,
+            "y": -12.986275776566288,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#c789fb",
+        "id": "y3zuj42yq0e2lhtj6ucwxi",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "416区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 306.21482422842803,
+        "borderY": 523.2243096288767,
+        "borderPathPoints": [
+          {
+            "x": 22.43928709774184,
+            "y": 13.049377520932353,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -23.015585362994784,
+            "y": 12.948211114489482,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -19.244890520285878,
+            "y": -13.174656360849838,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 19.964325679922695,
+            "y": -12.994797570940591,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#c789fb",
+        "id": "55evvsamxxc6rarrbhi5ip",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "417区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 266.85748168682414,
+        "borderY": 522.9811393808868,
+        "borderPathPoints": [
+          {
+            "x": 17.226355839762675,
+            "y": -13.122183540824096,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.540976632552542,
+            "y": 13.12218354082404,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -17.43846085858064,
+            "y": 12.999380698782716,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -12.591712291301405,
+            "y": -13.122183540824096,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#c789fb",
+        "id": "53otf8r78ruqk3g8mp1qnk",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "418区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 228.69147126064004,
+        "borderY": 519.4074383314709,
+        "borderPathPoints": [
+          {
+            "x": 22.44730971664376,
+            "y": -9.77183880699664,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 17.756827089285366,
+            "y": 16.472528274651495,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -26.35604523944238,
+            "y": 7.984988282288668,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -13.848091566486687,
+            "y": -14.685677749943522,
+            "type": "arc",
+            "arcDepth": -0.05
+          }
+        ],
+        "borderFill": "#c789fb",
+        "id": "i31jy9lharf0xebr16qjjxn",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "419区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 190.26937018137914,
+        "borderY": 505.56466528521054,
+        "borderPathPoints": [
+          {
+            "x": 20.96989982350604,
+            "y": -2.657004850931571,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 9.033816493167308,
+            "y": 20.724637837266243,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -22.359717745531782,
+            "y": -0.04087699770667541,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -7.643998571141594,
+            "y": -18.026755988627997,
+            "type": "arc",
+            "arcDepth": -0.05
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "j7ttou1jcquc192z9hja",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "420区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 160.8379318325987,
+        "borderY": 480.09829571397415,
+        "borderPathPoints": [
+          {
+            "x": 19.98885187854671,
+            "y": 5.804533674342792,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 4.946116722503376,
+            "y": 22.318840747825163,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -20.070605873959977,
+            "y": -9.074693490873983,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -4.864362727090111,
+            "y": -19.048680931293973,
+            "type": "arc",
+            "arcDepth": -0.05
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "epcvrdq75vpvex94b7krla",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "421区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 138.7951833978723,
+        "borderY": 445.61668899867493,
+        "borderPathPoints": [
+          {
+            "x": 15.742711513466105,
+            "y": 12.904969523914303,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 0.47295699825863835,
+            "y": 22.22897891815603,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -16.283233797190263,
+            "y": -15.202189229741919,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 0.06756528546551976,
+            "y": -19.931759212328302,
+            "type": "arc",
+            "arcDepth": -0.05
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "2c5osdty54rczomllkem8k",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "422区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 128.10765676878987,
+        "borderY": 407.15120493713556,
+        "borderPathPoints": [
+          {
+            "x": 9.840368329079297,
+            "y": 16.338399017888605,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -6.0173760026694225,
+            "y": 20.696137331949387,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -10.219249426659857,
+            "y": -18.208844432957562,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 5.990178055492038,
+            "y": -18.419409810226625,
+            "type": "arc",
+            "arcDepth": -0.05
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "0vu3chr7pwjgkerbnq9zi8",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "423区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 125.55466894985749,
+        "borderY": 370.54791454901846,
+        "borderPathPoints": [
+          {
+            "x": 8.558265764947592,
+            "y": 15.440787184311034,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -8.199177690893848,
+            "y": 15.440787184311034,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -8.43856974026302,
+            "y": -15.440787184311034,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 8.079481666209247,
+            "y": -15.440787184311034,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "i5z6xevqfndup7ymxjydm",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "424区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 128.0084374558914,
+        "borderY": 333.02321081040213,
+        "borderPathPoints": [
+          {
+            "x": 5.8651052095445095,
+            "y": 18.253643764398703,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -10.89233824629693,
+            "y": 17.774859665660358,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -5.625713160175337,
+            "y": -20.049084134667453,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 10.652946196927786,
+            "y": -15.979419295391665,
+            "type": "arc",
+            "arcDepth": -0.05
+          }
+        ],
+        "borderFill": "#f97b82",
+        "id": "impwr7mmuhcwufrm8a9ba",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "101区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 306.91255156978394,
+        "borderY": 262.0448094870109,
+        "borderPathPoints": [
+          {
+            "x": -13.749535592233258,
+            "y": -14.864362802414348,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -13.724574940637467,
+            "y": 15.846888940749409,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.06418554531922,
+            "y": 15.73093042508168,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 12.973410010501652,
+            "y": -14.936810623815859,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f5f9ff",
+        "id": "runyjwmn7zyz1hp0njwzp",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff",
+        "rotation": 0
+      },
+      {
+        "name": "102区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 334.3995962758747,
+        "borderY": 261.22726953287815,
+        "borderPathPoints": [
+          {
+            "x": -12.209479458715236,
+            "y": -14.001492067040687,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.481517632092334,
+            "y": -13.970276905155629,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 10.46210611722455,
+            "y": 16.31239026990545,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -12.163508081215696,
+            "y": 16.38316422241826,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f5f9ff",
+        "id": "v8l6b6ydai44uhq5ol80p",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "103区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 365.5648652325869,
+        "borderY": 263.25556721772136,
+        "borderPathPoints": [
+          {
+            "x": -12.455221201213078,
+            "y": -15.557785327146973,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 18.824696501513188,
+            "y": -13.260707820435272,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 11.231032777246298,
+            "y": 14.400263749882697,
+            "type": "arc",
+            "arcDepth": 0
+          },
+          {
+            "x": -15.9547117337043,
+            "y": 14.263854944313664,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f7e73b",
+        "id": "r4ynduynxvs1z8b6luirui",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "104区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 395.8710713322894,
+        "borderY": 270.9445304863402,
+        "borderPathPoints": [
+          {
+            "x": -9.3076923778018,
+            "y": -20.009290377399992,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 21.628019486582957,
+            "y": -5.2608696048444585,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 5.440728394753705,
+            "y": 18.1207730833533,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -16.670161075600674,
+            "y": 7.065510905420069,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f7e73b",
+        "id": "gvg94gzoug4sweplg92qg",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "105区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 421.6068678982937,
+        "borderY": 288.5933499795406,
+        "borderPathPoints": [
+          {
+            "x": -1.675956905972214,
+            "y": -20.80639183267948,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 21.215161809745894,
+            "y": 2.575250855518277,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -2.0955316859468667,
+            "y": 17.626474003793476,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -18.36673773377106,
+            "y": 1.9466828689076578,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "asjjafcry1owsv7vgiccq",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "107区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 438.95154376286916,
+        "borderY": 313.4866387586491,
+        "borderPathPoints": [
+          {
+            "x": 6.662950626182237,
+            "y": -19.171311924413885,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 18.926049938174117,
+            "y": 8.134522543621244,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -8.216276539034482,
+            "y": 15.492382130816338,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -17.37272402532176,
+            "y": -4.455592750023698,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "n9s9ry945x94mnqilin2w",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "108区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 445.98725700001984,
+        "borderY": 341.5982426970718,
+        "borderPathPoints": [
+          {
+            "x": 12.553560217101676,
+            "y": -16.217558099246048,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 14.8383501675101,
+            "y": 11.976960328045323,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -11.959798816755665,
+            "y": 11.98820100270757,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -14.147373591573626,
+            "y": -8.95206249775407,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "095z72yy51ts5hqtekcdkll",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "109区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 444.46268351665776,
+        "borderY": 373.63560790974924,
+        "borderPathPoints": [
+          {
+            "x": -10.221278767943716,
+            "y": -17.76672662809881,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 16.47506515568398,
+            "y": -17.770048443030305,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 16.47506515568398,
+            "y": 11.367075522262326,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -10.455925008461179,
+            "y": 11.37918232522901,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -10.455925008461179,
+            "y": 11.043678351343999,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#e0f0e5",
+        "id": "wrv1sv6i51s3sdacq04hk6",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "110区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 445.81801801286394,
+        "borderY": 400.3182873223091,
+        "borderPathPoints": [
+          {
+            "x": 14.772228322234128,
+            "y": -13.083096185596105,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 12.561000797908036,
+            "y": 16.39993747208524,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -14.587959361873573,
+            "y": 10.257638793401611,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -11.663835758121422,
+            "y": -13.047122147645894,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "jyoq8uh7blifpgkvot9108",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "111区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 438.07736784121363,
+        "borderY": 429.18862307517304,
+        "borderPathPoints": [
+          {
+            "x": -7.868233844594727,
+            "y": -15.71108628969074,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 19.442152015998545,
+            "y": -8.604294430056825,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 5.431619492720188,
+            "y": 20.228975400458012,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -17.005537664124063,
+            "y": 4.086405319289497,
+            "type": "arc",
+            "arcDepth": -0.1
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "3p0jqd35sra28td5dkdti5",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "112区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 421.0606987267389,
+        "borderY": 453.1599024685335,
+        "borderPathPoints": [
+          {
+            "x": 20.47937585102636,
+            "y": -1.0219249426659758,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -0.6131549655996196,
+            "y": 20.397621855613068,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -17.781494002388172,
+            "y": -1.3819594778647115,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -1.7795815885115758,
+            "y": -17.383730209836983,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "e4xmlnw65bh7b73roh8j1l",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "113区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 396.453668238358,
+        "borderY": 470.70407570294395,
+        "borderPathPoints": [
+          {
+            "x": 20.573629424250782,
+            "y": 5.506570765439903,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": -8.614573896853756,
+            "y": 19.830411284130093,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -16.18188586899197,
+            "y": -8.00648632766405,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": 4.2228303415949995,
+            "y": -17.330495721905777,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "ucd9bjbajpz0n5i29aa1l",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "114区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 366.3929351529447,
+        "borderY": 478.23296579398584,
+        "borderPathPoints": [
+          {
+            "x": 18.115950055415453,
+            "y": 12.967206355455232,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -14.68345425544203,
+            "y": 15.255536888770905,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -14.608175466025784,
+            "y": -13.323382510018234,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 11.784902246575484,
+            "y": -14.797870782107793,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#3bf7af",
+        "id": "ceb4x221jdelansi0cdwki",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "115区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 336.79509542039875,
+        "borderY": 462.9866569427485,
+        "borderPathPoints": [
+          {
+            "x": -14.145893826359611,
+            "y": -29.706377035355217,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.191105368136448,
+            "y": -29.650423938770416,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.090764380010228,
+            "y": 30.569851320874022,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -14.16542556654207,
+            "y": 30.66211491369245,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "6ganvcpwhc39tzlnq5gt1g",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "116区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 308.67741107631156,
+        "borderY": 457.04538153567756,
+        "borderPathPoints": [
+          {
+            "x": -16.334840633811552,
+            "y": -23.547472492494137,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 10.489724345085165,
+            "y": -23.547472492494137,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 10.735444119229555,
+            "y": -23.547472492494137,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 10.566900289104183,
+            "y": 36.34559629750959,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -16.317247329112604,
+            "y": 36.38446949467374,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "3muajusl9fcn2d0t36yyc",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "117区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 276.1853811028424,
+        "borderY": 462.7690278069584,
+        "borderPathPoints": [
+          {
+            "x": -14.13861635521846,
+            "y": -28.995947370653766,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.456966562506068,
+            "y": -29.184278043264555,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.282654754340228,
+            "y": 30.619786604257172,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -13.819450122674425,
+            "y": 30.605137372667514,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "klbqeepcblfm92b8nz3kxf",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "118区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 245.0644146848512,
+        "borderY": 478.2206964480589,
+        "borderPathPoints": [
+          {
+            "x": -9.466867406871472,
+            "y": -13.819450122674368,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 13.076147805887643,
+            "y": -13.909519909653511,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 12.948933579513806,
+            "y": 14.254708394254749,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -17.301516295316816,
+            "y": 12.73130444372373,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "sjltcvz3lgjdrijhtjzlng",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "119区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 216.60940518028926,
+        "borderY": 469.84197472013824,
+        "borderPathPoints": [
+          {
+            "x": -4.526527686137342,
+            "y": -16.152561655332306,
+            "type": "arc",
+            "arcDepth": -0.15
+          },
+          {
+            "x": 15.999579750569438,
+            "y": -6.566363635536334,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 8.106685308183046,
+            "y": 19.804251356903478,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": -20.620360616116557,
+            "y": 5.440728394753705,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "q993sv4lyjrw0ta4fv1wkr",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "119区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 191.45889793179774,
+        "borderY": 452.97559647806713,
+        "borderPathPoints": [
+          {
+            "x": 0.8705165431605906,
+            "y": -17.682367282949542,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": 17.39960774472013,
+            "y": -0.9729294339694547,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 1.1463912328918013,
+            "y": 20.174586299506814,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": -20.457138764273964,
+            "y": -0.9249238271081026,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "7tarh4ogbeclv54fqhgzr",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "120区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 174.48382534016616,
+        "borderY": 428.87316968930816,
+        "borderPathPoints": [
+          {
+            "x": 7.181761481074886,
+            "y": -16.213370616366035,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": 16.322185184261116,
+            "y": 3.373251604747338,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -5.005470123173438,
+            "y": 20.5659533321691,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": -18.49847654216265,
+            "y": -7.725834320550234,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "x1vrrz50n3oqd64mgte0sc",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "121区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 166.32273274803558,
+        "borderY": 400.1461237650086,
+        "borderPathPoints": [
+          {
+            "x": 14.037079258464559,
+            "y": 9.902125678451739,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 12.376479477926551,
+            "y": -11.931168874177956,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -15.12522493741534,
+            "y": -12.078417036353244,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -12.078417036353244,
+            "y": 16.213370616366035,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "rgba(59,130,246,0.08)",
+        "id": "9tow0p99j4sel12dj84fdg",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "121区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 164.9551851212351,
+        "borderY": 370.2982228623666,
+        "borderPathPoints": [
+          {
+            "x": -14.428509580341938,
+            "y": -13.111096099430824,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 14.317955061438624,
+            "y": -12.83537727988488,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 14.34782619503045,
+            "y": 13.930193245492717,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -14.266072199617156,
+            "y": 13.816425224844124,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#e4e7e5",
+        "id": "0rxsimyf9tcw9bl8jdpte",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "122区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 166.5738454377011,
+        "borderY": 340.93689943515477,
+        "borderPathPoints": [
+          {
+            "x": -12.14046831887191,
+            "y": -16.3916760803624,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 15.16536614916322,
+            "y": -9.360832474820427,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 13.039762268417974,
+            "y": 12.477331048754365,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -16.064660098709282,
+            "y": 12.222222314285204,
+            "type": "arc",
+            "arcDepth": 0.1
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "rzj24bpaoqfzebh1mso3mf",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "123区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 173.17914535367578,
+        "borderY": 313.0874159812335,
+        "borderPathPoints": [
+          {
+            "x": 15.682363722954733,
+            "y": -2.9945870460159654,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": 8.814887387096121,
+            "y": 15.300835912353875,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -18.41356430815253,
+            "y": 8.34889079867338,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": -6.82698911868502,
+            "y": -19.169225276311977,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "xi2cu23ggudschruuuyjn",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "124区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 191.04604460754337,
+        "borderY": 288.3421513949903,
+        "borderPathPoints": [
+          {
+            "x": -0.002582129200675354,
+            "y": 17.886073566502375,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 17.572577756779765,
+            "y": 0.4496009827093417,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 1.9761092905497435,
+            "y": -19.956694152741704,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -21.700843955762053,
+            "y": 2.293644261074121,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "uwn6crtwptl4s24nv8zye",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "125区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 217.2078118243002,
+        "borderY": 270.7264627115768,
+        "borderPathPoints": [
+          {
+            "x": -20.374775455330365,
+            "y": -5.043633772737849,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 8.408398428255737,
+            "y": -20.13069506058875,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 17.260334640845002,
+            "y": 6.562808059638087,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -4.288740355907038,
+            "y": 15.039074459761025,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "h4fa6zf0fddhdn7jvdcu0p",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "126区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 247.7276700878296,
+        "borderY": 262.9604398179214,
+        "borderPathPoints": [
+          {
+            "x": -18.824920245847863,
+            "y": -13.003340863461347,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 14.037079258464587,
+            "y": -15.436134554317135,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 15.778112344785768,
+            "y": 14.417930246097342,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -11.20792514180394,
+            "y": 13.982901204939196,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#77fd9f",
+        "id": "2scaez0zuhgfbh3ugume3l",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "127区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 277.3675752029814,
+        "borderY": 262.8304110082761,
+        "borderPathPoints": [
+          {
+            "x": -12.755378408099034,
+            "y": -15.527305140497532,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.42895963775453,
+            "y": -15.646203557107867,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 13.711533195529455,
+            "y": 15.060384958797897,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -10.83766976314206,
+            "y": 14.996734265705243,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#f5f9ff",
+        "id": "shndq45afrc6uafefepjgn",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "127区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 285.94404868186996,
+        "borderY": 294.07834060992866,
+        "borderPathPoints": [
+          {
+            "x": -19.157348750767255,
+            "y": -12.508234579538737,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 18.863888966062063,
+            "y": -12.54666007576094,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 19.066963159569752,
+            "y": 13.298228342457037,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -19.179651761879995,
+            "y": 13.279015594345935,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#e8f0fd",
+        "id": "zndonmj42lc0uo9ugldw",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "102区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 325.24623838705236,
+        "borderY": 294.07834060992866,
+        "borderPathPoints": [
+          {
+            "x": -18.696519055731642,
+            "y": -12.467095977544204,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 19.324718661097677,
+            "y": -12.425957375549615,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 19.429581744121606,
+            "y": 13.196738390356813,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -18.636261994933307,
+            "y": 13.320154196340468,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#e8f0fd",
+        "id": "phhl52h4x1ooxoqyhd8yt9",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "105区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 400.2254925896748,
+        "borderY": 311.7424293392923,
+        "borderPathPoints": [
+          {
+            "x": -0.642995173925442,
+            "y": -18.99308821441292,
+            "type": "arc",
+            "arcDepth": 0.05
+          },
+          {
+            "x": 17.163025027086746,
+            "y": -1.7806020201011847,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -3.6106652074274166,
+            "y": 16.025418180910947,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -12.909364645733774,
+            "y": 4.748272053603273,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "vryde3ehdhk12xhamhi7c",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "106区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 412.83809023205845,
+        "borderY": 343.3646022518306,
+        "borderPathPoints": [
+          {
+            "x": 7.320252749304984,
+            "y": -29.4458815546368,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 15.827573512010758,
+            "y": -6.6937446311212625,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 15.9114884680057,
+            "y": 25.531245770044734,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -11.672835465107994,
+            "y": 25.554936399600763,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -12.068524802908257,
+            "y": -2.736851253118573,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": -15.23403950531042,
+            "y": -12.629084698125325,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "jjfqua9uiecyu46a6nhsxe",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "107区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 412.5882375422557,
+        "borderY": 395.9182702009084,
+        "borderPathPoints": [
+          {
+            "x": -11.154360572242183,
+            "y": -23.52133315259431,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 16.317760058500085,
+            "y": -23.559369551917257,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 16.028095678763407,
+            "y": 2.22076024464792,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 7.048499906926054,
+            "y": 31.187198218316723,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -15.834986092272231,
+            "y": 14.096999813852165,
+            "type": "arc",
+            "arcDepth": -0.05
+          },
+          {
+            "x": -12.069349155695306,
+            "y": -0.6758835527189149,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "tdc3uwwrd0ssp54vzxhoj",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "108区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 400.01197572202113,
+        "borderY": 428.5537903179086,
+        "borderPathPoints": [
+          {
+            "x": 17.5971110690038,
+            "y": 1.7379862784201237,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 0.2172482848025652,
+            "y": 19.98684220183145,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -12.81764880334839,
+            "y": -5.793287594733783,
+            "type": "arc",
+            "arcDepth": -0.15
+          },
+          {
+            "x": -4.402068697028426,
+            "y": -15.188583691168219,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "78wyfly73xamza7c8t5ej",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "109区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 212.61894488158316,
+        "borderY": 428.3953856588387,
+        "borderPathPoints": [
+          {
+            "x": 3.883314782130725,
+            "y": -16.187291091829195,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": 14.063456737963179,
+            "y": -4.897411644076783,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 1.1036789380792413,
+            "y": 20.602006844146274,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": -17.863247997801466,
+            "y": 1.4715719174390074,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "s0di9y4rqkpiyozlq49ehp",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "110区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 199.7426906039917,
+        "borderY": 396.5113274476599,
+        "borderPathPoints": [
+          {
+            "x": 15.38819039602285,
+            "y": 13.441506823820532,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 11.527313353272348,
+            "y": 5.684341886080802e-14,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 11.281593579127986,
+            "y": -24.40270838625696,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -16.10553709641593,
+            "y": -24.362690633157058,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -15.61501312393625,
+            "y": 7.030843605542032,
+            "type": "arc",
+            "arcDepth": -0.15
+          },
+          {
+            "x": -7.276105591781828,
+            "y": 29.92196232126014,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "frfehesl29ht6ysd7n29kb",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "111区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 197.16500697848116,
+        "borderY": 343.9466920610109,
+        "borderPathPoints": [
+          {
+            "x": -4.570211851593115,
+            "y": -30.511604837778805,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 17.62795999900203,
+            "y": -13.318903110357098,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": 14.14589382635964,
+            "y": 25.636712196079486,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -13.53159439099872,
+            "y": 25.636712196079486,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -13.057748147408915,
+            "y": -7.442916444023069,
+            "type": "arc",
+            "arcDepth": 0.1
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "y6xc7yapznsh9vibefsop",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      },
+      {
+        "name": "112区",
+        "rows": [],
+        "x": 0,
+        "y": 0,
+        "borderType": "path",
+        "borderX": 211.80056636036866,
+        "borderY": 311.802868704806,
+        "borderPathPoints": [
+          {
+            "x": 15.002270425051279,
+            "y": 3.322412775274472,
+            "type": "arc",
+            "arcDepth": -0.1
+          },
+          {
+            "x": 4.080546296065279,
+            "y": 16.213370616366035,
+            "type": "line",
+            "arcDepth": 0
+          },
+          {
+            "x": -17.253851257578702,
+            "y": -0.9201694683907249,
+            "type": "arc",
+            "arcDepth": 0.1
+          },
+          {
+            "x": 0.07472922816324967,
+            "y": -19.39851244631052,
+            "type": "line",
+            "arcDepth": 0
+          }
+        ],
+        "borderFill": "#03a800",
+        "id": "5bzvi1h4tghx38cmunyqt",
+        "readonly": false,
+        "shapes": [],
+        "texts": [],
+        "areas": [],
+        "borderStroke": "#ffffff"
+      }
+    ],
+    "baseScale": 3.22,
+    "visualConfig": {
+      "radius": 6,
+      "gap": 18,
+      "rowGap": 24
+    }
+  }
+}

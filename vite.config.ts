@@ -7,5 +7,6 @@ export default defineConfig({
     alias: {
       '@': '/src'
     }
-  }
+  },
+  publicDir: 'static'  // 设置静态资源目录
 })

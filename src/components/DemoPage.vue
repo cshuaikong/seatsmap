@@ -15,7 +15,21 @@
 
     <!-- 主内容区 -->
     <main class="demo-content">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>正在加载座位图数据...</p>
+      </div>
+
+      <!-- 错误状态 -->
+      <div v-else-if="error" class="error-state">
+        <p class="error-message">{{ error }}</p>
+        <button class="btn-retry" @click="reload">重新加载</button>
+      </div>
+
+      <!-- 座位图预览 -->
       <PreviewModal 
+        v-else-if="demoVenue"
         :visible="true"
         :venue="demoVenue"
         @close="$router.push('/designer')"
@@ -25,114 +39,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import PreviewModal from './PreviewModal.vue'
 import type { VenueData } from '../types'
 
-// 演示用的座位图数据
-const demoVenue = ref<VenueData>({
-  id: 'demo-venue',
-  name: '演示场馆',
-  venueType: 'WITH_SECTIONS',
-  sections: [
-    {
-      id: 'section-1',
-      name: 'A区',
-      borderType: 'rect',
-      borderX: 100,
-      borderY: 100,
-      borderWidth: 400,
-      borderHeight: 300,
-      borderFill: 'rgba(232, 93, 76, 0.1)',
-      borderStroke: '#e85d4c',
-      rows: [
-        {
-          id: 'row-1',
-          label: 'A1',
-          seats: Array.from({ length: 20 }, (_, i) => ({
-            id: `seat-1-${i}`,
-            label: `${i + 1}`,
-            x: 120 + i * 25,
-            y: 150,
-            categoryKey: 'cat-1',
-            status: 'available',
-            objectType: 'seat' as const
-          }))
-        },
-        {
-          id: 'row-2',
-          label: 'A2',
-          seats: Array.from({ length: 20 }, (_, i) => ({
-            id: `seat-2-${i}`,
-            label: `${i + 1}`,
-            x: 120 + i * 25,
-            y: 200,
-            categoryKey: 'cat-1',
-            status: 'available',
-            objectType: 'seat' as const
-          }))
-        },
-        {
-          id: 'row-3',
-          label: 'A3',
-          seats: Array.from({ length: 20 }, (_, i) => ({
-            id: `seat-3-${i}`,
-            label: `${i + 1}`,
-            x: 120 + i * 25,
-            y: 250,
-            categoryKey: 'cat-1',
-            status: 'available',
-            objectType: 'seat' as const
-          }))
-        }
-      ]
-    },
-    {
-      id: 'section-2',
-      name: 'B区',
-      borderType: 'rect',
-      borderX: 550,
-      borderY: 100,
-      borderWidth: 400,
-      borderHeight: 300,
-      borderFill: 'rgba(34, 165, 89, 0.1)',
-      borderStroke: '#22a559',
-      rows: [
-        {
-          id: 'row-4',
-          label: 'B1',
-          seats: Array.from({ length: 20 }, (_, i) => ({
-            id: `seat-4-${i}`,
-            label: `${i + 1}`,
-            x: 570 + i * 25,
-            y: 150,
-            categoryKey: 'cat-2',
-            status: 'available',
-            objectType: 'seat' as const
-          }))
-        },
-        {
-          id: 'row-5',
-          label: 'B2',
-          seats: Array.from({ length: 20 }, (_, i) => ({
-            id: `seat-5-${i}`,
-            label: `${i + 1}`,
-            x: 570 + i * 25,
-            y: 200,
-            categoryKey: 'cat-2',
-            status: 'available',
-            objectType: 'seat' as const
-          }))
-        }
-      ]
+const demoVenue = ref<VenueData | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+// 从 JSON 文件加载数据
+onMounted(async () => {
+  try {
+    // 使用分区座位数据
+    const response = await fetch('/static/分区座位 全.json')
+    if (!response.ok) {
+      throw new Error('数据加载失败')
     }
-  ],
-  categories: [
-    { key: 'cat-1', label: 'VIP区', color: '#e85d4c' },
-    { key: 'cat-2', label: '普通区', color: '#22a559' }
-  ],
-  baseScale: 1
+    const data = await response.json()
+    demoVenue.value = data
+    loading.value = false
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '未知错误'
+    loading.value = false
+    console.error('加载座位图数据失败:', err)
+  }
 })
+
+// 重新加载
+const reload = () => {
+  window.location.reload()
+}
 </script>
 
 <style scoped>
@@ -206,5 +142,63 @@ const demoVenue = ref<VenueData>({
   height: 100%;
   border-radius: 0;
   box-shadow: none;
+}
+
+/* 加载状态 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(232, 93, 76, 0.2);
+  border-top-color: #e85d4c;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  font-size: 14px;
+  color: #5c5854;
+}
+
+/* 错误状态 */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.error-message {
+  font-size: 14px;
+  color: #ef4444;
+}
+
+.btn-retry {
+  padding: 8px 16px;
+  background: #e85d4c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-retry:hover {
+  background: #f06b5a;
 }
 </style>
