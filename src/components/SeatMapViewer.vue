@@ -597,7 +597,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   // 【关键】提前计算 relativeScale，用于 LOD 判断
   const stageScale = stage?.scaleX() || 1
   const store = useVenueStore()
-  const baseScale = store.getBaseScale()
+  // 【修复】优先使用 venue 数据中的 baseScale，其次从 store 获取
+  const baseScale = (props.venue as any).baseScale || store.getBaseScale()
   const relativeScale = stageScale / baseScale
   
   // 【调试】打印第一排的信息
