@@ -680,10 +680,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             circle.stroke(borderColor)
             circle.strokeWidth(borderWidth / baseScale)
           } else {
-            // 选中：变为橙色
+            // 选中：变为橙色，但保持边框宽度不变
             circle.fill('#FF5722')
             circle.stroke('#FF5722')
-            circle.strokeWidth(3 / baseScale)
+            circle.strokeWidth(borderWidth / baseScale)  // 保持相同宽度
           }
           
           // 更新选中状态
@@ -763,7 +763,7 @@ const updateSelection = () => {
     
     circle.fill(isSelected ? '#FF5722' : color)
     circle.stroke(isSelected ? '#FF5722' : borderColor)
-    circle.strokeWidth(isSelected ? 3 / currentScale : borderWidth / currentScale)
+    circle.strokeWidth(borderWidth / currentScale)  // 保持边框宽度一致，不随选中状态变化
   })
   layer?.batchDraw()
 }
