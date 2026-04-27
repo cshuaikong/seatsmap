@@ -47,6 +47,32 @@ const getLogicalRadius = () => {
   return logicalRadius
 }
 
+// 渲染座位条（使用线条，支持弧度和转折）
+const renderSeatLine = (points: number[], row: SeatRow, opacity: number) => {
+  if (!layer || points.length < 4) return  // 至少需要 2 个点（4 个坐标）
+  
+  const stageScale = stage?.scaleX() || 1
+  const store = useVenueStore()
+  const baseScale = store.getBaseScale()
+  const configRadius = store.visualConfig?.radius || 6
+  
+  // 线条宽度 = 座位直径（使用 baseScale 归一化）
+  const strokeWidth = (configRadius * 2) / baseScale
+  
+  const line = new Konva.Line({
+    points: points,
+    stroke: getCategoryColor(row.seats[0].categoryKey),
+    strokeWidth: strokeWidth,
+    opacity: opacity,
+    lineCap: 'round',  // 圆角端点
+    lineJoin: 'round',  // 圆角连接
+    tension: 0.5,  // 平滑曲线（弧形效果更好）
+    listening: false  // 不可点击
+  })
+  
+  layer.add(line)
+}
+
 // 计算弧形位置
 const calculateCurvedPositions = (seats: Seat[], curve: number): Array<{ x: number; y: number }> => {
   if (!curve || curve === 0 || seats.length < 2) {
@@ -302,8 +328,8 @@ const updateLOD = () => {
       // 座位标签：只在 Level 2 且相对缩放 > 1.0 时显示
       text.visible(relativeScale > 1.0)
     } else if (textName === 'row-label') {
-      // 排标签：在 Level 1 和 Level 2 显示（relativeScale >= 0.3）
-      text.visible(relativeScale >= 0.3)
+      // 排标签：只在 Level 2 显示（圆形座位模式）
+      text.visible(relativeScale >= 0.7)
     }
   })
   
@@ -434,8 +460,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, storeBaseScale=${store.getBaseScale()}`)
   }
   
-  // 【修复】排标签精确定位 - 只在 Level 1 和 Level 2 显示
-  if (relativeScale >= 0.3 && row.label && row.seats.length > 0) {
+  // 【修复】排标签精确定位 - 只在 Level 2 显示（圆形座位模式）
+  if (relativeScale >= 0.7 && row.label && row.seats.length > 0) {
     const firstPos = curvedPositions[0]
     // 标签位置：第一个座位左侧，垂直居中
     const labelOffsetX = logicalRadius * 2.5  // 座位左侧偏移
@@ -481,64 +507,55 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     return
   }
   
-  // Level 1: 座位区块模式 - 用矩形表示整排座位
+  // Level 1: 座位条模式 - 使用线条表示整排座位（支持弧度和转折）
   if (relativeScale < 0.7) {
-    // 座位区块模式：用矩形表示整排座位
     if (row.seats.length > 0) {
-      const firstPos = curvedPositions[0]
-      const lastPos = curvedPositions[curvedPositions.length - 1]
+      // 检查是否有转折（多段座位排）
+      const hasSegments = row.segmentIndices && row.segmentIndices.length > 0
       
-      let x1 = rowX + firstPos.x
-      let y1 = rowY + firstPos.y
-      let x2 = rowX + lastPos.x
-      let y2 = rowY + lastPos.y
-      
-      // 应用旋转
-      if (rotation) {
-        const rad = rotation * Math.PI / 180
-        const relX1 = x1 - rowX
-        const relY1 = y1 - rowY
-        x1 = rowX + relX1 * Math.cos(rad) - relY1 * Math.sin(rad)
-        y1 = rowY + relX1 * Math.sin(rad) + relY1 * Math.cos(rad)
+      if (hasSegments) {
+        // 多段转折模式：每段绘制一条线
+        const segments = row.segmentIndices!
+        for (let i = 0; i < segments.length; i++) {
+          const startIndex = segments[i]
+          const endIndex = i < segments.length - 1 ? segments[i + 1] : row.seats.length
+          
+          // 提取该段的座位位置
+          const segmentPositions = []
+          for (let j = startIndex; j < endIndex; j++) {
+            const pos = curvedPositions[j]
+            segmentPositions.push(rowX + pos.x, rowY + pos.y)
+          }
+          
+          // 绘制线条座位条
+          renderSeatLine(segmentPositions, row, 0.4)
+        }
+      } else {
+        // 单段模式（直线或弧形）
+        const linePoints: number[] = []
         
-        const relX2 = x2 - rowX
-        const relY2 = y2 - rowY
-        x2 = rowX + relX2 * Math.cos(rad) - relY2 * Math.sin(rad)
-        y2 = rowY + relX2 * Math.sin(rad) + relY2 * Math.cos(rad)
-      }
-      
-      // 计算区块尺寸（座位总长度 × 行高）
-      const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2))
-      const angle = Math.atan2(y2 - y1, x2 - x1)
-      const blockHeight = configRowGap / baseScale  // 区块高度使用 baseScale 归一化
-      
-      // 创建区块矩形（以排中心为原点）
-      const centerX = (x1 + x2) / 2
-      const centerY = (y1 + y2) / 2
-      
-      const block = new Konva.Rect({
-        x: centerX - length / 2,
-        y: centerY - blockHeight / 2,
-        width: length,
-        height: blockHeight,
-        fill: getCategoryColor(row.seats[0].categoryKey),
-        opacity: 0.4,
-        cornerRadius: 2 / baseScale,  // 圆角使用 baseScale 归一化
-        listening: false  // 区块不可点击
-      })
-      
-      // 应用旋转让区块方向与排一致
-      if (rotation) {
-        block.rotation(rotation)
-        // 旋转后需要重新计算位置（绕中心点旋转）
-        block.x(centerX)
-        block.y(centerY)
-        block.offsetX(length / 2)
-        block.offsetY(blockHeight / 2)
-      }
-      
-      if (layer) {
-        layer.add(block)
+        // 提取所有座位位置作为线条路径点
+        curvedPositions.forEach(pos => {
+          linePoints.push(rowX + pos.x, rowY + pos.y)
+        })
+        
+        // 应用旋转（如果有）
+        if (rotation) {
+          const rad = rotation * Math.PI / 180
+          const rotatedPoints: number[] = []
+          
+          for (let i = 0; i < linePoints.length; i += 2) {
+            const relX = linePoints[i] - rowX
+            const relY = linePoints[i + 1] - rowY
+            const newX = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
+            const newY = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+            rotatedPoints.push(newX, newY)
+          }
+          
+          renderSeatLine(rotatedPoints, row, 0.4)
+        } else {
+          renderSeatLine(linePoints, row, 0.4)
+        }
       }
     }
   } else {
