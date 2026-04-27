@@ -15,6 +15,9 @@ const props = defineProps<{
 const containerRef = ref<HTMLDivElement>()
 const canvasRef = ref<HTMLCanvasElement>()
 
+// 缓存 venueBounds，只在第一次计算，避免缩放时跳动
+let cachedVenueBounds: { x: number; y: number; width: number; height: number } | null = null
+
 // 响应式尺寸：根据容器宽度计算，最大 200px
 const minimapSize = computed(() => {
   const containerWidth = containerRef.value?.clientWidth || 200
@@ -35,11 +38,17 @@ const renderMinimap = () => {
   
   // 获取舞台状态
   const stageState = props.seatMapViewer.getStageState()
-  const venueBounds = props.seatMapViewer.getVenueBounds()
+  
+  // 【关键】使用缓存的 venueBounds，只在第一次计算，避免缩放时跳动
+  if (!cachedVenueBounds) {
+    cachedVenueBounds = props.seatMapViewer.getVenueBounds()
+  }
+  const venueBounds = cachedVenueBounds
+  
   const selectedSeats = props.seatMapViewer.getSelectedSeats()
   
   // 如果没有内容，不渲染
-  if (venueBounds.width === 0 || venueBounds.height === 0) return
+  if (!venueBounds || venueBounds.width === 0 || venueBounds.height === 0) return
   
   // 计算 Minimap 的缩放比例，让内容完全居中显示，不留太多空白
   const padding = 5 * 2  // 减少内边距，2倍分辨率
@@ -47,13 +56,13 @@ const renderMinimap = () => {
   const minimapHeight = canvas.height - padding * 2
   
   // 计算基础缩放：让所有内容刚好适应 Minimap（不留太多空白）
-  const minimapScaleX = minimapWidth / venueBounds.width
-  const minimapScaleY = minimapHeight / venueBounds.height
+  const minimapScaleX = minimapWidth / venueBounds!.width
+  const minimapScaleY = minimapHeight / venueBounds!.height
   const minimapScale = Math.min(minimapScaleX, minimapScaleY)
   
   // 计算内容在 Minimap 中的偏移（完全居中）
-  const contentWidth = venueBounds.width * minimapScale
-  const contentHeight = venueBounds.height * minimapScale
+  const contentWidth = venueBounds!.width * minimapScale
+  const contentHeight = venueBounds!.height * minimapScale
   const offsetX = padding + (minimapWidth - contentWidth) / 2
   const offsetY = padding + (minimapHeight - contentHeight) / 2
   
@@ -70,8 +79,8 @@ const renderMinimap = () => {
       ctx.strokeStyle = section.borderStroke || '#808080'
       ctx.lineWidth = 1 * 2
       
-      const baseX = offsetX + ((section.borderX || 0) - venueBounds.x) * minimapScale
-      const baseY = offsetY + ((section.borderY || 0) - venueBounds.y) * minimapScale
+      const baseX = offsetX + ((section.borderX || 0) - venueBounds!.x) * minimapScale
+      const baseY = offsetY + ((section.borderY || 0) - venueBounds!.y) * minimapScale
       
       if (section.borderType === 'rect') {
         ctx.fillRect(
@@ -136,8 +145,8 @@ const renderMinimap = () => {
   selectedSeats.forEach((seat: { x: number; y: number }) => {
     ctx.beginPath()
     ctx.arc(
-      offsetX + (seat.x - venueBounds.x) * minimapScale,
-      offsetY + (seat.y - venueBounds.y) * minimapScale,
+      offsetX + (seat.x - venueBounds!.x) * minimapScale,
+      offsetY + (seat.y - venueBounds!.y) * minimapScale,
       3 * 2,  // 2倍分辨率
       0,
       Math.PI * 2
@@ -152,8 +161,8 @@ const renderMinimap = () => {
   const viewportWorldH = stageState.height / stageState.scale
   
   // 计算视口在 Minimap 中的位置和大小
-  const viewportX = offsetX + (viewportWorldX - venueBounds.x) * minimapScale
-  const viewportY = offsetY + (viewportWorldY - venueBounds.y) * minimapScale
+  const viewportX = offsetX + (viewportWorldX - venueBounds!.x) * minimapScale
+  const viewportY = offsetY + (viewportWorldY - venueBounds!.y) * minimapScale
   const viewportW = viewportWorldW * minimapScale
   const viewportH = viewportWorldH * minimapScale
   
