@@ -693,27 +693,12 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         name: 'seat-node'
       })
 
-      // 点击事件 - seats.io 风格选中效果
+      // 点击事件 - 性能优化版 seats.io 风格
       if (props.selectable !== false) {
         circle.on('click', (e) => {
           e.cancelBubble = true
           
-          const currentlySelected = circle.fill() === '#FF5722'
-          
-          // seats.io 风格：轻微缩放动画
-          circle.to({
-            scaleX: 1.15,
-            scaleY: 1.15,
-            duration: 0.08,
-            easing: Konva.Easings.BackEaseOut,
-            onFinish: () => {
-              circle.to({
-                scaleX: 1,
-                scaleY: 1,
-                duration: 0.08
-              })
-            }
-          })
+          const currentlySelected = circle.fill() === '#4CAF50'
           
           if (currentlySelected) {
             // 取消选中：恢复原始颜色
@@ -722,16 +707,17 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             circle.strokeWidth(borderWidth / baseScale)
             
             // 移除勾选图标
-            const checkmark = circle.getParent()?.findOne('.checkmark')
+            const checkmark = layer?.findOne(`.checkmark-${seat.id}`)
             if (checkmark) checkmark.destroy()
           } else {
-            // 选中：seats.io 风格
-            circle.fill('#4CAF50')  // 绿色（而非橙色）
+            // 选中：seats.io 风格（无动画，直接切换）
+            circle.fill('#4CAF50')  // 绿色
             circle.stroke('#2E7D32')  // 深绿色边框
             circle.strokeWidth((borderWidth + 1) / baseScale)  // 边框加粗 1px
             
             // 添加勾选图标
             const checkmark = createCheckmark(x, y, logicalRadius)
+            checkmark.name(`checkmark-${seat.id}`)  // 添加唯一标识
             if (layer) {
               layer.add(checkmark)
               checkmark.moveToTop()  // 确保在最上层
@@ -749,32 +735,12 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           emit('seat-click', seat, row, section)
         })
         
-        // seats.io 风格悬停效果
+        // 鼠标样式（无动画，只改光标）
         circle.on('mouseenter', () => {
-          if (stage) {
-            stage.container().style.cursor = 'pointer'
-            // 轻微放大
-            if (circle.fill() !== '#FF5722' && circle.fill() !== '#4CAF50') {
-              circle.to({
-                scaleX: 1.1,
-                scaleY: 1.1,
-                duration: 0.1
-              })
-            }
-          }
+          if (stage) stage.container().style.cursor = 'pointer'
         })
         circle.on('mouseleave', () => {
-          if (stage) {
-            stage.container().style.cursor = 'default'
-            // 恢复大小
-            if (circle.fill() !== '#FF5722' && circle.fill() !== '#4CAF50') {
-              circle.to({
-                scaleX: 1,
-                scaleY: 1,
-                duration: 0.1
-              })
-            }
-          }
+          if (stage) stage.container().style.cursor = 'default'
         })
       }
 
