@@ -41,13 +41,49 @@ const renderMinimap = () => {
   // 如果没有内容，不渲染
   if (venueBounds.width === 0 || venueBounds.height === 0) return
   
-  // 计算缩放比例
+  // 计算 Minimap 的缩放比例，让内容居中显示
   const padding = 10 * 2  // 2倍分辨率
-  const scaleX = (canvas.width - padding * 2) / venueBounds.width
-  const scaleY = (canvas.height - padding * 2) / venueBounds.height
-  const scale = Math.min(scaleX, scaleY)
+  const minimapWidth = canvas.width - padding * 2
+  const minimapHeight = canvas.height - padding * 2
   
-  // 绘制分区轮廓
+  // 计算基础缩放：让所有内容适应 Minimap
+  const baseScaleX = minimapWidth / venueBounds.width
+  const baseScaleY = minimapHeight / venueBounds.height
+  const baseScale = Math.min(baseScaleX, baseScaleY)
+  
+  // 计算内容在 Minimap 中的偏移（居中）
+  const contentWidth = venueBounds.width * baseScale
+  const contentHeight = venueBounds.height * baseScale
+  const offsetX = padding + (minimapWidth - contentWidth) / 2
+  const offsetY = padding + (minimapHeight - contentHeight) / 2
+  
+  // 绘制灰色背景（蒙层）
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  
+  // 计算视口在世界坐标中的位置和大小
+  const viewportWorldX = -stageState.position.x / stageState.scale
+  const viewportWorldY = -stageState.position.y / stageState.scale
+  const viewportWorldW = stageState.width / stageState.scale
+  const viewportWorldH = stageState.height / stageState.scale
+  
+  // 计算视口在 Minimap 中的位置和大小
+  const viewportX = offsetX + (viewportWorldX - venueBounds.x) * baseScale
+  const viewportY = offsetY + (viewportWorldY - venueBounds.y) * baseScale
+  const viewportW = viewportWorldW * baseScale
+  const viewportH = viewportWorldH * baseScale
+  
+  // 使用裁剪区域，只在视口内绘制内容（视口外保持灰色蒙层）
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(viewportX, viewportY, viewportW, viewportH)
+  ctx.clip()
+  
+  // 绘制白色背景（视口内）
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(viewportX, viewportY, viewportW, viewportH)
+  
+  // 绘制分区轮廓（在视口裁剪区域内）
   if (props.venue?.sections) {
     props.venue.sections.forEach((section: any) => {
       if (!section.borderType || section.borderType === 'none') return
@@ -56,29 +92,29 @@ const renderMinimap = () => {
       ctx.strokeStyle = section.borderStroke || '#808080'
       ctx.lineWidth = 1 * 2
       
-      const baseX = padding + ((section.borderX || 0) - venueBounds.x) * scale
-      const baseY = padding + ((section.borderY || 0) - venueBounds.y) * scale
+      const baseX = offsetX + ((section.borderX || 0) - venueBounds.x) * baseScale
+      const baseY = offsetY + ((section.borderY || 0) - venueBounds.y) * baseScale
       
       if (section.borderType === 'rect') {
         ctx.fillRect(
           baseX,
           baseY,
-          (section.borderWidth || 100) * scale,
-          (section.borderHeight || 100) * scale
+          (section.borderWidth || 100) * baseScale,
+          (section.borderHeight || 100) * baseScale
         )
         ctx.strokeRect(
           baseX,
           baseY,
-          (section.borderWidth || 100) * scale,
-          (section.borderHeight || 100) * scale
+          (section.borderWidth || 100) * baseScale,
+          (section.borderHeight || 100) * baseScale
         )
       } else if (section.borderType === 'ellipse') {
         ctx.beginPath()
         ctx.ellipse(
-          baseX + (section.borderRadiusX || 50) * scale,
-          baseY + (section.borderRadiusY || 50) * scale,
-          (section.borderRadiusX || 50) * scale,
-          (section.borderRadiusY || 50) * scale,
+          baseX + (section.borderRadiusX || 50) * baseScale,
+          baseY + (section.borderRadiusY || 50) * baseScale,
+          (section.borderRadiusX || 50) * baseScale,
+          (section.borderRadiusY || 50) * baseScale,
           0,
           0,
           Math.PI * 2
@@ -88,8 +124,8 @@ const renderMinimap = () => {
       } else if (section.borderType === 'polygon' && section.borderPoints) {
         ctx.beginPath()
         section.borderPoints.forEach((point: number, index: number) => {
-          const x = baseX + point * scale
-          const y = baseY + (section.borderPoints![index + 1]) * scale
+          const x = baseX + point * baseScale
+          const y = baseY + (section.borderPoints![index + 1]) * baseScale
           if (index === 0) {
             ctx.moveTo(x, y)
           } else if (index % 2 === 0) {
@@ -102,8 +138,8 @@ const renderMinimap = () => {
       } else if (section.borderType === 'path' && section.borderPathPoints) {
         ctx.beginPath()
         section.borderPathPoints.forEach((point: any, index: number) => {
-          const x = baseX + point.x * scale
-          const y = baseY + point.y * scale
+          const x = baseX + point.x * baseScale
+          const y = baseY + point.y * baseScale
           if (index === 0) {
             ctx.moveTo(x, y)
           } else {
@@ -122,8 +158,8 @@ const renderMinimap = () => {
   selectedSeats.forEach((seat: { x: number; y: number }) => {
     ctx.beginPath()
     ctx.arc(
-      padding + (seat.x - venueBounds.x) * scale,
-      padding + (seat.y - venueBounds.y) * scale,
+      offsetX + (seat.x - venueBounds.x) * baseScale,
+      offsetY + (seat.y - venueBounds.y) * baseScale,
       3 * 2,  // 2倍分辨率
       0,
       Math.PI * 2
@@ -131,27 +167,12 @@ const renderMinimap = () => {
     ctx.fill()
   })
   
-  // 绘制视口矩形（蓝色半透明）
-  const viewportX = -stageState.position.x / stageState.scale
-  const viewportY = -stageState.position.y / stageState.scale
-  const viewportW = stageState.width / stageState.scale
-  const viewportH = stageState.height / stageState.scale
+  ctx.restore()  // 恢复裁剪区域
   
+  // 绘制视口边框（蓝色，在裁剪区域外）
   ctx.strokeStyle = '#3b82f6'
-  ctx.lineWidth = 2 * 2  // 2倍分辨率
-  ctx.fillStyle = 'rgba(59, 130, 246, 0.1)'
-  ctx.fillRect(
-    padding + (viewportX - venueBounds.x) * scale,
-    padding + (viewportY - venueBounds.y) * scale,
-    viewportW * scale,
-    viewportH * scale
-  )
-  ctx.strokeRect(
-    padding + (viewportX - venueBounds.x) * scale,
-    padding + (viewportY - venueBounds.y) * scale,
-    viewportW * scale,
-    viewportH * scale
-  )
+  ctx.lineWidth = 3 * 2
+  ctx.strokeRect(viewportX, viewportY, viewportW, viewportH)
 }
 
 // 监听舞台变化
