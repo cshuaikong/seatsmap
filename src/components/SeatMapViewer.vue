@@ -674,16 +674,18 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           
           // 直接切换颜色，不使用动画（性能优化）
           const currentlySelected = circle.fill() === '#FF5722'
+          const currentStageScale = stage?.scaleX() || 1
+          
           if (currentlySelected) {
             // 取消选中：恢复原始颜色
             circle.fill(color)
             circle.stroke(borderColor)
-            circle.strokeWidth(borderWidth / baseScale)
+            circle.strokeWidth(borderWidth / currentStageScale)  // 使用当前舞台缩放归一化
           } else {
             // 选中：变为橙色，但保持边框宽度不变
             circle.fill('#FF5722')
             circle.stroke('#FF5722')
-            circle.strokeWidth(borderWidth / baseScale)  // 保持相同宽度
+            circle.strokeWidth(borderWidth / currentStageScale)  // 使用当前舞台缩放归一化
           }
           
           // 更新选中状态
