@@ -303,13 +303,8 @@ export function createRowSceneFunc(
     
     if (displayMode === 'bar') {
       // 【优化】绘制连续线条座位条（与预览模态框保持一致）
-      const stageScale = shape.getStage()?.scaleX() || 1
-      const store = (shape as any).getStage()?.$store
-      const baseScale = store?.getBaseScale?.() || 1
-      const configRadius = store?.visualConfig?.radius || 6
-      
-      // 线条宽度 = 座位直径（使用 baseScale 归一化）
-      const lineWidth = (configRadius * 2) / baseScale
+      // seatRadius 已经是逻辑半径（调用端已处理 baseScale），直接使用
+      const lineWidth = seatRadius * 2  // 线条宽度 = 座位直径（逻辑尺寸）
       
       // 提取所有座位位置作为连续线条的路径点
       const points: number[] = []
@@ -321,6 +316,7 @@ export function createRowSceneFunc(
         // 使用座位排的颜色（从第一个座位的 categoryKey 获取）
         const firstSeat = row.seats[0]
         const categoryKey = firstSeat?.categoryKey
+        const store = (shape as any).getStage()?.$store
         const category = store?.venue?.categories?.find((c: any) => c.key === categoryKey)
         const lineColor = category?.color || '#9E9E9E'
         
