@@ -693,18 +693,19 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         name: 'seat-node'
       })
 
-      // 点击事件 - 性能优化版 seats.io 风格
+      // 点击事件 - 性能优化版 seats.io 风格（记录选中状态）
       if (props.selectable !== false) {
         circle.on('click', (e) => {
           e.cancelBubble = true
           
-          const currentlySelected = circle.fill() === '#4CAF50'
+          const currentlySelected = (circle as any)._isSelected === true
           
           if (currentlySelected) {
             // 取消选中：恢复原始颜色
             circle.fill(color)
             circle.stroke(borderColor)
             circle.strokeWidth(borderWidth / baseScale)
+            ;(circle as any)._isSelected = false  // 记录状态
             
             // 移除勾选图标
             const checkmark = layer?.findOne(`.checkmark-${seat.id}`)
@@ -714,6 +715,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
             circle.fill('#4CAF50')  // 绿色
             circle.stroke('#2E7D32')  // 深绿色边框
             circle.strokeWidth((borderWidth + 1) / baseScale)  // 边框加粗 1px
+            ;(circle as any)._isSelected = true  // 记录状态
             
             // 添加勾选图标
             const checkmark = createCheckmark(x, y, logicalRadius)
@@ -798,7 +800,7 @@ const updateSelection = () => {
   
   seatNodes.forEach((circle, seatId) => {
     const isSelected = currentSelectedIds.has(seatId)
-    const isCurrentlySelected = circle.fill() === '#4CAF50'  // 检查当前实际状态
+    const isCurrentlySelected = (circle as any)._isSelected === true  // 使用记录的状态
     
     // 只有状态发生变化时才更新
     if (isSelected !== isCurrentlySelected) {
