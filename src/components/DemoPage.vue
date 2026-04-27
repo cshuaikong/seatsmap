@@ -7,6 +7,10 @@
         <span class="version">v1.0</span>
       </div>
       <div class="header-right">
+        <!-- 已选座位计数（移动端显示） -->
+        <div v-if="selectedSeats.length > 0" class="selected-badge">
+          已选 {{ selectedSeats.length }} 个
+        </div>
         <button class="btn-back" @click="$router.push('/designer')">
           返回编辑器
         </button>
@@ -28,27 +32,96 @@
       </div>
 
       <!-- 座位图 -->
-      <SeatMapViewer
-        v-else-if="demoVenue"
-        :venue="demoVenue"
-        :selectable="true"
-        v-model:selected-seat-ids="selectedSeats"
-        class="demo-viewer"
-      />
+      <div v-else-if="demoVenue" class="viewer-wrapper">
+        <SeatMapViewer
+          ref="seatMapViewerRef"
+          :venue="demoVenue"
+          :selectable="true"
+          v-model:selected-seat-ids="selectedSeats"
+          class="demo-viewer"
+        />
+        
+        <!-- Minimap 小地图 -->
+        <Minimap 
+          v-if="seatMapViewerRef" 
+          :seat-map-viewer="seatMapViewerRef"
+          :venue="demoVenue"
+          class="minimap-container"
+        />
+      </div>
     </main>
+
+    <!-- 底部选中座位列表 -->
+    <Transition name="slide-up">
+      <div v-if="selectedSeats.length > 0" class="selected-seats-panel">
+        <div class="panel-header">
+          <h3>已选座位 ({{ selectedSeats.length }})</h3>
+          <button class="btn-clear" @click="selectedSeats = []">清空</button>
+        </div>
+        <div class="seats-list">
+          <div 
+            v-for="seatInfo in selectedSeatDetails" 
+            :key="seatInfo.id"
+            class="seat-item"
+          >
+            <span class="seat-label">{{ seatInfo.label }}</span>
+            <span class="seat-category" :style="{ background: seatInfo.color }">
+              {{ seatInfo.category }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import SeatMapViewer from './SeatMapViewer.vue'
+import Minimap from './Minimap.vue'
 import { useVenueStore } from '../stores/venueStore'
-import type { VenueData } from '../types'
+import type { VenueData, Seat, SeatRow, Section } from '../types'
 
+const seatMapViewerRef = ref<InstanceType<typeof SeatMapViewer>>()
 const demoVenue = ref<VenueData | null>(null)
 const selectedSeats = ref<string[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+
+// 计算属性：获取选中座位的详细信息
+const selectedSeatDetails = computed(() => {
+  if (!demoVenue.value) return []
+  
+  const details: Array<{
+    id: string
+    label: string
+    category: string
+    color: string
+  }> = []
+  
+  // 遍历所有分区和排，查找选中的座位
+  demoVenue.value.sections.forEach(section => {
+    section.rows?.forEach(row => {
+      row.seats?.forEach(seat => {
+        if (selectedSeats.value.includes(seat.id)) {
+          // 查找座位的 category
+          const category = demoVenue.value!.categories.find(
+            cat => cat.key === seat.categoryKey
+          )
+          
+          details.push({
+            id: seat.id,
+            label: `${section.name || '分区'} - ${row.label}排${seat.label}座`,
+            category: category?.label || '未知',
+            color: category?.color || '#999'
+          })
+        }
+      })
+    })
+  })
+  
+  return details
+})
 
 // 从 JSON 文件加载数据
 onMounted(async () => {
@@ -157,21 +230,42 @@ const reload = () => {
   border-color: rgba(45, 42, 38, 0.3);
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 已选座位徽章 */
+.selected-badge {
+  padding: 6px 12px;
+  background: #e85d4c;
+  color: white;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 座位图容器 */
 .demo-content {
   flex: 1;
-  padding: 40px;
-  overflow: auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
   position: relative;
-  /* 设计师风格网格底纹 */
-  background-color: #f8fafc;
-  background-image: 
-    radial-gradient(#e2e8f0 1px, transparent 1px),
-    linear-gradient(to right, #f1f5f9 1px, transparent 1px),
-    linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
-  background-size: 20px 20px, 40px 40px, 40px 40px;
+  overflow: hidden;
+}
+
+/* 座位图容器 */
+.viewer-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Minimap 容器定位 */
+.minimap-container {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 10;
 }
 
 /* SeatMapViewer 样式，与 PreviewModal 一致 */
@@ -180,8 +274,6 @@ const reload = () => {
   height: 100%;
   border: none !important;
   background: transparent;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   cursor: grab;
 }
 
@@ -245,5 +337,151 @@ const reload = () => {
 
 .btn-retry:hover {
   background: #f06b5a;
+}
+
+/* 底部选中座位列表面板 */
+.selected-seats-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid rgba(45, 42, 38, 0.08);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+}
+
+.panel-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(45, 42, 38, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d2a26;
+}
+
+.btn-clear {
+  padding: 6px 12px;
+  background: transparent;
+  color: #e85d4c;
+  border: 1px solid #e85d4c;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear:hover {
+  background: #e85d4c;
+  color: white;
+}
+
+.seats-list {
+  padding: 16px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-height: calc(40vh - 60px);
+}
+
+.seat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #faf9f7;
+  border-radius: 6px;
+  border: 1px solid rgba(45, 42, 38, 0.08);
+}
+
+.seat-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #2d2a26;
+}
+
+.seat-category {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
+
+/* 滑入动画 */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+/* 响应式布局 - 手机端 */
+@media (max-width: 768px) {
+  .demo-header {
+    padding: 0 16px;
+    height: 56px;
+  }
+  
+  .logo {
+    font-size: 18px;
+  }
+  
+  .version {
+    display: none;
+  }
+  
+  .btn-back {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .selected-badge {
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  
+  .minimap-container {
+    top: 8px;
+    right: 8px;
+  }
+  
+  .selected-seats-panel {
+    max-height: 50vh;
+  }
+  
+  .panel-header {
+    padding: 12px 16px;
+  }
+  
+  .seats-list {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  
+  .seat-item {
+    padding: 6px 10px;
+  }
+  
+  .seat-label {
+    font-size: 13px;
+  }
+  
+  .seat-category {
+    font-size: 11px;
+  }
 }
 </style>
