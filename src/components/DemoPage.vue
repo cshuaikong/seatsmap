@@ -145,14 +145,34 @@ const reload = () => {
 
 .demo-content {
   flex: 1;
+  padding: 40px;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   position: relative;
-  overflow: hidden;
+  /* 设计师风格网格底纹 */
+  background-color: #f8fafc;
+  background-image: 
+    radial-gradient(#e2e8f0 1px, transparent 1px),
+    linear-gradient(to right, #f1f5f9 1px, transparent 1px),
+    linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
+  background-size: 20px 20px, 40px 40px, 40px 40px;
 }
 
-/* SeatMapViewer 占满整个内容区 */
+/* SeatMapViewer 样式，与 PreviewModal 一致 */
 .demo-viewer {
   width: 100%;
   height: 100%;
+  border: none !important;
+  background: transparent;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  cursor: grab;
+}
+
+.demo-viewer:active {
+  cursor: grabbing;
 }
 
 /* 加载状态 */
