@@ -14,11 +14,20 @@
           <!-- 预览内容 -->
           <div class="preview-content" v-if="visible">
             <SeatMapViewer
+              ref="seatMapViewerRef"
               :venue="venue"
               :selectable="true"
               v-model:selected-seat-ids="selectedSeats"
               @seat-click="onSeatClick"
               class="preview-viewer"
+            />
+            
+            <!-- Minimap 小地图 -->
+            <Minimap 
+              v-if="seatMapViewerRef" 
+              :seat-map-viewer="seatMapViewerRef"
+              :venue="venue"
+              class="minimap-container"
             />
           </div>
 
@@ -38,7 +47,10 @@
 import { ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import SeatMapViewer from './SeatMapViewer.vue'
+import Minimap from './Minimap.vue'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
+
+const seatMapViewerRef = ref<InstanceType<typeof SeatMapViewer>>()
 
 const props = defineProps<{
   visible: boolean
@@ -158,6 +170,13 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
   background-size: 20px 20px, 40px 40px, 40px 40px;
 }
 
+/* Minimap 容器定位 */
+.minimap-container {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+}
+
 .preview-viewer {
   width: 100%;
   height: 100%;
@@ -223,5 +242,17 @@ const onSeatClick = (seat: Seat, row: SeatRow, section: Section) => {
 .preview-fade-leave-to .preview-modal {
   transform: scale(0.95);
   opacity: 0;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .preview-content {
+    padding: 20px;
+  }
+  
+  .minimap-container {
+    bottom: 8px;
+    right: 8px;
+  }
 }
 </style>

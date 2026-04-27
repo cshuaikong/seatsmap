@@ -1289,7 +1289,31 @@ const updateLabelScale = () => {
   layer.batchDraw()
 }
 
-defineExpose({ refresh: renderSeatMap, updateSelection })
+defineExpose({ 
+  refresh: renderSeatMap, 
+  updateSelection,
+  // 新增：获取舞台状态供 Minimap 使用
+  getStageState: () => ({
+    scale: stage?.scaleX() || 1,
+    position: stage?.position() || { x: 0, y: 0 },
+    width: stage?.width() || 0,
+    height: stage?.height() || 0
+  }),
+  getVenueBounds: () => {
+    // 计算所有内容的边界
+    return layer?.getClientRect() || { x: 0, y: 0, width: 0, height: 0 }
+  },
+  getSelectedSeats: () => {
+    // 返回已选座位的坐标
+    const selected: Array<{ x: number; y: number }> = []
+    seatNodes.forEach((node, id) => {
+      if (props.selectedSeatIds?.includes(id)) {
+        selected.push({ x: node.x(), y: node.y() })
+      }
+    })
+    return selected
+  }
+})
 </script>
 
 <style scoped>
