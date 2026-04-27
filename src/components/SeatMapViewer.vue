@@ -637,9 +637,10 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       }
       seatNodes.set(seat.id, circle)
       
-      // 座位标签（只在 Level 2 且相对缩放 > 1.0 时显示）
-      if (seat.label && layer && relativeScale > 1.0) {
-        const fontSize = logicalRadius
+      // 座位标签（使用 stageScale >= 0.8 判断显示）
+      const currentStageScale = stage?.scaleX() || 1
+      if (seat.label && layer && currentStageScale >= 0.8) {
+        const fontSize = logicalRadius * 0.8
         
         const text = new Konva.Text({
           x: x,
@@ -655,6 +656,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         text.offsetX(text.width() / 2)
         text.offsetY(text.height() / 2)
         layer.add(text)
+        text.moveToTop()  // 确保座位标签在最上层
       }
     })
   }
