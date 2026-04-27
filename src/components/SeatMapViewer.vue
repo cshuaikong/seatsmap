@@ -504,6 +504,13 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
     // 设置 offset 让文本居中
     rowLabelText.offsetX(rowLabelText.width() / 2)
     rowLabelText.offsetY(rowLabelText.height() / 2)
+    
+    // 应用初始反向缩放，保持视觉大小恒定
+    const stageScale = stage?.scaleX() || 1
+    const visualScale = Math.max(0.1, Math.min(10, 1 / stageScale))  // 限制范围 0.1~10
+    rowLabelText.scaleX(visualScale)
+    rowLabelText.scaleY(visualScale)
+    
     layer.add(rowLabelText)
   }
 
@@ -943,7 +950,9 @@ const updateLabelScale = () => {
   if (!stage || !layer) return
   
   const stageScale = stage.scaleX()
-  const visualScale = 1 / stageScale
+  // 保护：避免 stageScale 过小导致 visualScale 过大
+  const safeStageScale = Math.max(0.1, stageScale)
+  const visualScale = 1 / safeStageScale
   
   // 获取逻辑半径用于计算座位标签字体大小
   const logicalRadius = getLogicalRadius()
@@ -963,8 +972,10 @@ const updateLabelScale = () => {
       }
     } else {
       // 分区/排标签：应用反向缩放保持视觉大小恒定
-      text.scaleX(visualScale)
-      text.scaleY(visualScale)
+      // 限制缩放范围，避免极端情况
+      const safeVisualScale = Math.max(0.1, Math.min(10, visualScale))
+      text.scaleX(safeVisualScale)
+      text.scaleY(safeVisualScale)
     }
   })
   
