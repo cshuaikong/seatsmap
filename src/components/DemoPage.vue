@@ -64,7 +64,11 @@
             :key="seatInfo.id"
             class="seat-item"
           >
-            <span class="seat-label">{{ seatInfo.label }}</span>
+            <div class="seat-info">
+              <span class="seat-section">{{ seatInfo.section }}</span>
+              <span class="seat-row">{{ seatInfo.row }}</span>
+              <span class="seat-label">{{ seatInfo.label }}</span>
+            </div>
             <span class="seat-category" :style="{ background: seatInfo.color }">
               {{ seatInfo.category }}
             </span>
@@ -95,6 +99,8 @@ const selectedSeatDetails = computed(() => {
   const details: Array<{
     id: string
     label: string
+    row: string  // 添加排信息
+    section: string  // 添加分区信息
     category: string
     color: string
   }> = []
@@ -111,8 +117,10 @@ const selectedSeatDetails = computed(() => {
           
           details.push({
             id: seat.id,
-            label: `${section.name || '分区'} - ${row.label}排${seat.label}座`,
-            category: category?.label || '未知',
+            label: seat.label || '无编号',
+            row: row.label || '无排号',
+            section: section.name || '未命名分区',
+            category: category?.label || '未分类',
             color: category?.color || '#999'
           })
         }
@@ -397,16 +405,39 @@ const reload = () => {
 .seat-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
   background: #faf9f7;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid rgba(45, 42, 38, 0.08);
+  min-width: 200px;
+}
+
+.seat-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.seat-section {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.seat-row {
+  font-size: 12px;
+  color: #888;
+  padding: 2px 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
 }
 
 .seat-label {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: #2d2a26;
 }
 
