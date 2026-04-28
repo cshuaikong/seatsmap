@@ -566,8 +566,8 @@ const updateLOD = () => {
   
   // LOD 三级阈值（相对于 baseScale）
   const SHOW_BLOCKS_THRESHOLD = 0.3    // 相对缩放 > 0.3 显示座位条
-  const SHOW_SEATS_THRESHOLD = 0.7     // 相对缩放 > 0.7 显示圆形座位
-  const SHOW_LABELS_THRESHOLD = 1.0    // 相对缩放 > 1.0 显示座位标签
+  const SHOW_SEATS_THRESHOLD = 2.0     // 相对缩放 > 2.0 显示圆形座位（提高阈值，延迟渲染）
+  const SHOW_LABELS_THRESHOLD = 2.5    // 相对缩放 > 2.5 显示座位标签
   
   // 检查当前渲染级别是否需要切换
   const hasSeatNodes = seatNodes.size > 0
@@ -590,11 +590,11 @@ const updateLOD = () => {
     const textName = text.name()
     
     if (textName === 'seat-label') {
-      // 座位标签：只在 Level 2 且相对缩放 > 1.0 时显示
-      text.visible(relativeScale > 1.0)
+      // 座位标签：只在 Level 2 且相对缩放 > 2.5 时显示
+      text.visible(relativeScale > 2.5)
     } else if (textName === 'row-label') {
       // 排标签：只在 Level 2 显示（圆形座位模式）
-      text.visible(relativeScale >= 0.7)
+      text.visible(relativeScale >= 2.0)
     }
   })
   
@@ -844,7 +844,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
   
   // 【修复】排标签精确定位 - 只在 Level 2 显示（圆形座位模式）
-  if (relativeScale >= 0.7 && row.label && row.seats.length > 0) {
+  if (relativeScale >= 2.0 && row.label && row.seats.length > 0) {
     const firstPos = curvedPositions[0]
     // 标签位置：第一个座位左侧，垂直居中
     const labelOffsetX = logicalRadius * 2.5  // 座位左侧偏移
@@ -896,7 +896,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
   
   // Level 1: 座位条模式 - 使用线条表示整排座位（支持弧度和转折）
-  if (relativeScale < 0.7) {
+  if (relativeScale < 2.0) {
     if (row.seats.length > 0) {
       // 【优化】统一处理：提取所有座位位置作为一根连续线条的路径点
       const linePoints: number[] = []
