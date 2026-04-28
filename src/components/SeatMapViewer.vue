@@ -230,8 +230,10 @@ const initStage = () => {
       const currentDistance = getDistance(touches[0], touches[1])
       const scale = (currentDistance / initialDistance) * initialScale
       
-      // 限制缩放范围
-      const newScale = Math.max(1.0, Math.min(5.0, scale))
+      // 限制缩放范围（与 useKonvaViewport 保持一致）
+      const MIN_SCALE = 0.001  // 最小缩放 0.1%
+      const MAX_SCALE = 500    // 最大缩放 500x
+      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale))
       
       // 计算双指中心点
       const centerX = (touches[0].clientX + touches[1].clientX) / 2
