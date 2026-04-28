@@ -244,18 +244,26 @@ const initStage = () => {
       // 4. 限制范围
       const finalScale = Math.max(0.001, Math.min(500, newScale))
       
-      // 5. 计算双指中心点
+      // 5. 计算双指中心点（相对于 stage 容器）
       const rect = stage!.container().getBoundingClientRect()
       const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
       const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
       
-      // 6. 应用缩放
+      // 6. 计算中心点对应的舞台坐标（使用当前缩放）
+      const oldScale = stage!.scaleX()
+      const pointOnStage = {
+        x: (centerX - stage!.x()) / oldScale,
+        y: (centerY - stage!.y()) / oldScale
+      }
+      
+      // 7. 应用新缩放
       stage!.scale({ x: finalScale, y: finalScale })
       
-      // 7. 调整位置，使中心点不动
-      const stageX = centerX - (centerX - stage!.x()) / initialScale * finalScale
-      const stageY = centerY - (centerY - stage!.y()) / initialScale * finalScale
-      stage!.position({ x: stageX, y: stageY })
+      // 8. 调整位置，使中心点在缩放后保持在同一位置
+      stage!.position({
+        x: centerX - pointOnStage.x * finalScale,
+        y: centerY - pointOnStage.y * finalScale
+      })
       
       // 8. 重绘
       updateLabelScale()
