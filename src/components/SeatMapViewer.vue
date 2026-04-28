@@ -802,7 +802,8 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
 
       // 点击事件 - 使用自定义 Shape（性能优化：直接重绘，不经过 watch）
       if (props.selectable !== false) {
-        seatShape.on('click', (e: any) => {
+        // 提取点击处理逻辑，同时用于 click 和 tap 事件
+        const handleSeatClick = (e: any) => {
           e.cancelBubble = true
           
           // 直接根据 status 判断选中状态，不依赖颜色或自定义属性
@@ -835,7 +836,11 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
           
           // 直接重绘当前座位（不经过 updateSelection）
           layer?.draw()
-        })
+        }
+        
+        // 同时绑定 click（PC）和 tap（移动端）事件
+        seatShape.on('click', handleSeatClick)
+        seatShape.on('tap', handleSeatClick)
         
         // 鼠标样式（无动画，只改光标）
         seatShape.on('mouseenter', () => {
