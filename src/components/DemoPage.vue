@@ -575,12 +575,12 @@ const reload = () => {
   display: flex;
   align-items: stretch;
   position: relative;
-  padding: 10px 12px 10px 12px;
+  padding: 10px 10px 10px 10px;
   background: #faf9f7;
   border-radius: 8px;
   border: 1px solid rgba(45, 42, 38, 0.08);
-  min-width: 150px;
-  max-width: 200px;
+  min-width: 120px;
+  max-width: 160px;
 }
 
 /* 左上角分类标签 */
@@ -603,6 +603,8 @@ const reload = () => {
   flex-direction: column;
   gap: 4px;
   margin-top: 6px;  /* 给分类标签留空间 */
+  align-items: center;  /* 左右居中 */
+  text-align: center;   /* 文字居中 */
 }
 
 .seat-location {
