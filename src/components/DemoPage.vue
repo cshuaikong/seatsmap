@@ -117,12 +117,11 @@ const selectedSeatDetails = computed(() => {
     price: number  // 添加价格
   }> = []
   
-  // 分类价格映射（模拟数据）
+  // 分类价格映射（根据实际数据调整）
   const categoryPrices: Record<string, number> = {
-    'VIP': 880,
-    '普通席': 380,
-    '特价席': 180,
-    '无障碍': 280,
+    '普通区': 380,    // key: 1
+    'VIP区': 880,     // key: 2
+    '轮椅区': 280,    // key: 3
   }
   
   // 遍历所有分区和排，查找选中的座位
@@ -136,6 +135,7 @@ const selectedSeatDetails = computed(() => {
           )
           
           const categoryName = category?.label || '未分类'
+          const price = categoryPrices[categoryName] || 0
           
           details.push({
             id: seat.id,
@@ -144,7 +144,7 @@ const selectedSeatDetails = computed(() => {
             section: section.name || '未命名分区',
             category: categoryName,
             color: category?.color || '#999',
-            price: categoryPrices[categoryName] || 0
+            price: price
           })
         }
       })
