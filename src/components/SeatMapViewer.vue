@@ -350,10 +350,11 @@ const initStage = () => {
     }
   })
   
-  // 手机端：单指拖拽画布（仅在非双指缩放时）
+  // 手机端：单指拖拽画布（仅在非双指缩放时）- 性能优化
   let isTouchDragging = false
   let touchDragStart: { x: number; y: number } | null = null
   let stageStartPos: { x: number; y: number } | null = null
+  let dragRafId: number | null = null  // requestAnimationFrame ID
   
   stage.on('touchstart', (e) => {
     const touches = e.evt.touches
@@ -383,18 +384,30 @@ const initStage = () => {
     
     e.evt.preventDefault()
     
-    const dx = touches[0].clientX - touchDragStart.x
-    const dy = touches[0].clientY - touchDragStart.y
+    // 使用 requestAnimationFrame 节流，避免高频重绘
+    if (dragRafId) return
     
-    stage!.position({
-      x: stageStartPos.x + dx,
-      y: stageStartPos.y + dy
+    dragRafId = requestAnimationFrame(() => {
+      const dx = touches[0].clientX - touchDragStart!.x
+      const dy = touches[0].clientY - touchDragStart!.y
+      
+      stage!.position({
+        x: stageStartPos!.x + dx,
+        y: stageStartPos!.y + dy
+      })
+      
+      layer?.batchDraw()
+      dragRafId = null
     })
-    
-    layer?.batchDraw()
   })
   
   stage.on('touchend', (e) => {
+    // 清除未完成的动画帧
+    if (dragRafId) {
+      cancelAnimationFrame(dragRafId)
+      dragRafId = null
+    }
+    
     // 当所有手指都离开时，结束拖拽
     if (e.evt.touches.length === 0) {
       isTouchDragging = false
