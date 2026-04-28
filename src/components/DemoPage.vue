@@ -11,9 +11,6 @@
         <div v-if="selectedSeats.length > 0" class="selected-badge">
           已选 {{ selectedSeats.length }} 个
         </div>
-        <button class="btn-back" @click="$router.push('/designer')">
-          返回编辑器
-        </button>
       </div>
     </header>
 
@@ -490,13 +487,13 @@ const reload = () => {
   
   .panel-footer {
     padding: 12px 16px;
-    flex-direction: column;
+    flex-direction: row;  /* 改为横向布局 */
     gap: 12px;
   }
   
   .price-info {
-    width: 100%;
-    justify-content: center;
+    width: auto;  /* 不再占满宽度 */
+    justify-content: flex-start;  /* 左对齐 */
   }
   
   .price-label {
@@ -504,13 +501,14 @@ const reload = () => {
   }
   
   .price-value {
-    font-size: 22px;
+    font-size: 20px;  /* 稍微缩小 */
   }
   
   .btn-pay {
-    width: 100%;
-    padding: 14px;
-    font-size: 15px;
+    width: auto;  /* 改为自适应宽度 */
+    padding: 10px 24px;  /* 调整内边距 */
+    font-size: 14px;
+    white-space: nowrap;  /* 不换行 */
   }
 }
 
