@@ -208,10 +208,11 @@ const initStage = () => {
     layer?.batchDraw()
   })
 
-  // 手机端：双指缩放（Pinch Zoom）- 性能优化版
+  // 手机端：双指缩放（Pinch Zoom）- 高灵敏度版
   let initialScale = 1
   let initialDistance = 0
   let stageOffset = { left: 0, top: 0 }
+  let lastScale = 1  // 记录上一次的缩放比例
   
   stage.on('touchstart', (e) => {
     const touches = e.evt.touches
@@ -224,12 +225,10 @@ const initStage = () => {
       
       // 记录初始状态
       initialScale = stage!.scaleX()
+      lastScale = initialScale
       initialDistance = getDistance(touches[0], touches[1])
     }
   })
-  
-  // 使用 requestAnimationFrame 节流
-  let rafId: number | null = null
   
   stage.on('touchmove', (e) => {
     const touches = e.evt.touches
@@ -237,57 +236,46 @@ const initStage = () => {
     
     e.evt.preventDefault()
     
-    // 使用 requestAnimationFrame 节流，避免频繁重绘
-    if (rafId) return
+    // 计算当前双指距离
+    const currentDistance = getDistance(touches[0], touches[1])
     
-    rafId = requestAnimationFrame(() => {
-      // 计算当前双指距离
-      const currentDistance = getDistance(touches[0], touches[1])
-      
-      // 计算缩放比例
-      const scaleRatio = currentDistance / initialDistance
-      const newScale = initialScale * scaleRatio
-      
-      // 限制缩放范围
-      const MIN_SCALE = 0.001
-      const MAX_SCALE = 500
-      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale))
-      
-      // 使用缓存的偏移量计算中心点（避免重复调用 getBoundingClientRect）
-      const centerX = (touches[0].clientX + touches[1].clientX) / 2 - stageOffset.left
-      const centerY = (touches[0].clientY + touches[1].clientY) / 2 - stageOffset.top
-      
-      // 计算中心点对应的舞台坐标
-      const oldScale = stage!.scaleX()
-      const pointBefore = {
-        x: (centerX - stage!.x()) / oldScale,
-        y: (centerY - stage!.y()) / oldScale
-      }
-      
-      // 应用新缩放
-      stage!.scale({ x: clampedScale, y: clampedScale })
-      
-      // 调整位置，使中心点保持不变
-      stage!.position({
-        x: centerX - pointBefore.x * clampedScale,
-        y: centerY - pointBefore.y * clampedScale
-      })
-      
-      // 更新显示
-      updateLabelScale()
-      updateLOD()
-      layer?.batchDraw()
-      
-      rafId = null
-    })
-  })
-  
-  stage.on('touchend', (e) => {
-    // 清除未完成的动画帧
-    if (rafId) {
-      cancelAnimationFrame(rafId)
-      rafId = null
+    // 计算缩放比例（基于初始状态，避免累积误差）
+    const scaleRatio = currentDistance / initialDistance
+    const newScale = initialScale * scaleRatio
+    
+    // 限制缩放范围
+    const MIN_SCALE = 0.001
+    const MAX_SCALE = 500
+    const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale))
+    
+    // 如果缩放没有变化，跳过（避免不必要的重绘）
+    if (Math.abs(clampedScale - lastScale) < 0.001) return
+    lastScale = clampedScale
+    
+    // 使用缓存的偏移量计算中心点
+    const centerX = (touches[0].clientX + touches[1].clientX) / 2 - stageOffset.left
+    const centerY = (touches[0].clientY + touches[1].clientY) / 2 - stageOffset.top
+    
+    // 计算中心点对应的舞台坐标
+    const oldScale = stage!.scaleX()
+    const pointBefore = {
+      x: (centerX - stage!.x()) / oldScale,
+      y: (centerY - stage!.y()) / oldScale
     }
+    
+    // 应用新缩放
+    stage!.scale({ x: clampedScale, y: clampedScale })
+    
+    // 调整位置，使中心点保持不变
+    stage!.position({
+      x: centerX - pointBefore.x * clampedScale,
+      y: centerY - pointBefore.y * clampedScale
+    })
+    
+    // 更新显示
+    updateLabelScale()
+    updateLOD()
+    layer?.batchDraw()
   })
   
   // 手机端：双击放大（Double Tap）
