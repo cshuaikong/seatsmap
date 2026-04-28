@@ -565,12 +565,13 @@ const updateLOD = () => {
   const relativeScale = currentScale / baseScale
   
   // LOD 三级阈值（基于 baseScale 的倍数）
-  // Level 0: relativeScale < 1.0 → 分区色块
-  // Level 1: 1.0 <= relativeScale < 2.0 → 座位条
-  // Level 2: relativeScale >= 2.0 → 圆形座位
-  const SHOW_BLOCKS_THRESHOLD = 1.0    // 相对缩放 < 1.0: 只显示分区色块
-  const SHOW_SEATS_THRESHOLD = 2.0     // 相对缩放 >= 2.0: 显示圆形座位
-  const SHOW_LABELS_THRESHOLD = 2.5    // 相对缩放 >= 2.5: 显示座位标签
+  // 假设 baseScale = 1.0（座位正常显示的目标缩放值）
+  // Level 0: relativeScale < 2/3 → 分区色块（缩小太多）
+  // Level 1: 2/3 <= relativeScale < 1.0 → 座位条（接近正常大小）
+  // Level 2: relativeScale >= 1.0 → 圆形座位（正常或放大）
+  const SHOW_BLOCKS_THRESHOLD = 2/3      // 相对缩放 < 0.67: 只显示分区色块
+  const SHOW_SEATS_THRESHOLD = 1.0       // 相对缩放 >= 1.0: 显示圆形座位
+  const SHOW_LABELS_THRESHOLD = 1.5      // 相对缩放 >= 1.5: 显示座位标签
   
   // 检查当前渲染级别是否需要切换
   const hasSeatNodes = seatNodes.size > 0
@@ -593,11 +594,11 @@ const updateLOD = () => {
     const textName = text.name()
     
     if (textName === 'seat-label') {
-      // 座位标签：只在 Level 2 且相对缩放 > 2.5 时显示
-      text.visible(relativeScale > 2.5)
+      // 座位标签：只在 Level 2 且相对缩放 > 1.5 时显示
+      text.visible(relativeScale > 1.5)
     } else if (textName === 'row-label') {
       // 排标签：只在 Level 2 显示（圆形座位模式）
-      text.visible(relativeScale >= 2.0)
+      text.visible(relativeScale >= 1.0)
     }
   })
   
@@ -847,7 +848,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   }
   
   // 【修复】排标签精确定位 - 只在 Level 2 显示（圆形座位模式）
-  if (relativeScale >= 2.0 && row.label && row.seats.length > 0) {
+  if (relativeScale >= 1.0 && row.label && row.seats.length > 0) {
     const firstPos = curvedPositions[0]
     // 标签位置：第一个座位左侧，垂直居中
     const labelOffsetX = logicalRadius * 2.5  // 座位左侧偏移
@@ -893,13 +894,13 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   const { radius: configRadius, gap: configGap, rowGap: configRowGap, borderWidth, baseScale } = config
   
   // Level 0: 只显示分区色块和分区名，不渲染座位
-  if (relativeScale < 1.0) {
+  if (relativeScale < 2/3) {
     // 分区色块已在 renderSectionBorder 中渲染
     return
   }
   
   // Level 1: 座位条模式 - 使用线条表示整排座位（支持弧度和转折）
-  if (relativeScale < 2.0) {
+  if (relativeScale < 1.0) {
     if (row.seats.length > 0) {
       // 【优化】统一处理：提取所有座位位置作为一根连续线条的路径点
       const linePoints: number[] = []
