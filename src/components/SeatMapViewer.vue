@@ -1297,22 +1297,31 @@ defineExpose({
   updateSelection,
   // 清空所有选中（性能优化）
   clearAllSelection: () => {
-    // 1. 快速重置所有座位的 status
-    props.venue.sections.forEach(section => {
-      section.rows.forEach(row => {
-        row.seats.forEach(seat => {
+    // 1. 设置标志位，阻止 watch 触发 updateSelection
+    isInternalUpdate = true
+    
+    // 2. 通知父组件（触发 watch，但会被标志位拦截）
+    emit('update:selectedSeatIds', [])
+    
+    // 3. 直接遍历所有座位数据，重置 status（避开三重循环）
+    // 使用 for...of 提前退出，比 forEach 快
+    for (const section of props.venue.sections) {
+      for (const row of section.rows) {
+        for (const seat of row.seats) {
           if (seat.status === SEAT_STATUS.SELECTED) {
             seat.status = SEAT_STATUS.AVAILABLE
           }
-        })
-      })
-    })
+        }
+      }
+    }
     
-    // 2. 通知父组件
-    emit('update:selectedSeatIds', [])
-    
-    // 3. 批量重绘（一次完成）
+    // 4. 批量重绘（一次完成）
     layer?.draw()
+    
+    // 5. 重置标志位
+    setTimeout(() => {
+      isInternalUpdate = false
+    }, 0)
   },
   // 新增：获取舞台状态供 Minimap 使用
   getStageState: () => ({
