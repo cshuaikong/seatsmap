@@ -64,10 +64,10 @@
             :key="seatInfo.id"
             class="seat-item"
           >
-            <div class="seat-info">
-              <span class="seat-section">{{ seatInfo.section }}</span>
-              <span class="seat-row">{{ seatInfo.row }}</span>
-              <span class="seat-label">{{ seatInfo.label }}</span>
+            <div class="seat-location">
+              <span class="seat-full-label">
+                {{ seatInfo.section }}-{{ seatInfo.row }}-{{ seatInfo.label }}
+              </span>
             </div>
             <span class="seat-category" :style="{ background: seatInfo.color }">
               {{ seatInfo.category }}
@@ -393,6 +393,39 @@ const reload = () => {
   color: white;
 }
 
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .selected-seats-panel {
+    max-height: 50vh;
+  }
+  
+  .panel-header {
+    padding: 12px 16px;
+  }
+  
+  .panel-header h3 {
+    font-size: 15px;
+  }
+  
+  .seats-list {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  
+  .seat-item {
+    padding: 10px 12px;
+  }
+  
+  .seat-full-label {
+    font-size: 13px;
+  }
+  
+  .seat-category {
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+}
+
 .seats-list {
   padding: 16px 24px;
   overflow-y: auto;
@@ -406,39 +439,38 @@ const reload = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   padding: 10px 14px;
   background: #faf9f7;
   border-radius: 8px;
   border: 1px solid rgba(45, 42, 38, 0.08);
-  min-width: 200px;
+  min-width: 0;
 }
 
-.seat-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.seat-location {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.seat-section {
-  font-size: 12px;
-  color: #666;
-  font-weight: 500;
-}
-
-.seat-row {
-  font-size: 12px;
-  color: #888;
-  padding: 2px 6px;
-  background: #f0f0f0;
-  border-radius: 3px;
-}
-
-.seat-label {
+.seat-full-label {
   font-size: 14px;
   font-weight: 600;
   color: #2d2a26;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.seat-category {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: white;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .seat-category {
