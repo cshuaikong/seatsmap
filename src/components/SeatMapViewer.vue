@@ -809,7 +809,7 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
         }
       }
       
-      renderRowGroup(row, section)
+      renderRowGroup(row, section, { viewLeft, viewTop, viewRight, viewBottom })
     })
   })
 
@@ -822,7 +822,7 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
 }
 
 // 渲染排 Group
-const renderRowGroup = (row: SeatRow, section: Section) => {
+const renderRowGroup = (row: SeatRow, section: Section, viewport?: { viewLeft: number, viewTop: number, viewRight: number, viewBottom: number }) => {
   if (!layer) return
 
   const rowX = row.x || 0
@@ -933,7 +933,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
       }
     }
   } else {
-    // Level 2: 圆形座位模式（详细视图）
+    // Level 2: 圆形座位模式（详细视图）- 添加座位级视口剔除
     row.seats.forEach((seat, index) => {
       const pos = curvedPositions[index]
       
@@ -946,6 +946,16 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
         const relY = y - rowY
         x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
         y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+      }
+      
+      // 【性能优化】座位级视口剔除：只渲染视口内的座位
+      if (viewport) {
+        const { viewLeft, viewTop, viewRight, viewBottom } = viewport
+        const seatRadius = logicalRadius
+        if (x + seatRadius < viewLeft || x - seatRadius > viewRight ||
+            y + seatRadius < viewTop || y - seatRadius > viewBottom) {
+          return  // 座位在视口外，跳过渲染
+        }
       }
       
       const isSelected = seat.status === SEAT_STATUS.SELECTED
