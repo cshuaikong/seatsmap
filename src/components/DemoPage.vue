@@ -122,10 +122,20 @@ const selectedSeatDetails = computed(() => {
     section.rows?.forEach(row => {
       row.seats?.forEach(seat => {
         if (selectedSeats.value.includes(seat.id)) {
-          // 查找座位的 category
+          // 查找座位的 category（类型兼容：string vs number）
           const category = demoVenue.value!.categories.find(
-            cat => cat.key === seat.categoryKey
+            cat => String(cat.key) === String(seat.categoryKey)
           )
+          
+          console.log('[座位价格调试]', {
+            seatId: seat.id,
+            categoryKey: seat.categoryKey,
+            categoryKeyType: typeof seat.categoryKey,
+            categoryFound: category,
+            categoryLabel: category?.label,
+            categoryPrice: category?.price,
+            finalPrice: category?.price ?? 0
+          })
           
           const categoryName = category?.label || '未分类'
           // 从分类数据中读取价格，如果未设置则默认为 0
