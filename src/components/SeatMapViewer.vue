@@ -152,7 +152,7 @@ const initStage = () => {
     container: containerRef.value,
     width,
     height,
-    draggable: true  // 允许拖拽画布
+    draggable: false  // 禁用 Konva 默认拖拽，手动控制（避免和双指缩放冲突）
   })
 
   layer = new Konva.Layer({
@@ -211,11 +211,13 @@ const initStage = () => {
   // 手机端：双指缩放（Pinch Zoom）- 简化版
   let initialDistance = 0
   let initialScale = 1
+  let isPinching = false  // 标记是否正在进行双指缩放
   
   stage.on('touchstart', (e) => {
     const touches = e.evt.touches
     if (touches.length === 2) {
       e.evt.preventDefault()
+      isPinching = true  // 开始双指缩放
       
       // 记录初始双指距离和当前缩放
       initialDistance = getDistance(touches[0], touches[1])
@@ -225,39 +227,48 @@ const initStage = () => {
   
   stage.on('touchmove', (e) => {
     const touches = e.evt.touches
-    if (touches.length !== 2) return
     
-    e.evt.preventDefault()
-    
-    // 1. 计算当前双指距离
-    const currentDistance = getDistance(touches[0], touches[1])
-    
-    // 2. 计算缩放比例 = 当前距离 / 初始距离
-    const scale = currentDistance / initialDistance
-    
-    // 3. 新缩放 = 初始缩放 × 缩放比例
-    const newScale = initialScale * scale
-    
-    // 4. 限制范围
-    const finalScale = Math.max(0.001, Math.min(500, newScale))
-    
-    // 5. 计算双指中心点
-    const rect = stage!.container().getBoundingClientRect()
-    const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
-    const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
-    
-    // 6. 应用缩放
-    stage!.scale({ x: finalScale, y: finalScale })
-    
-    // 7. 调整位置，使中心点不动
-    const stageX = centerX - (centerX - stage!.x()) / initialScale * finalScale
-    const stageY = centerY - (centerY - stage!.y()) / initialScale * finalScale
-    stage!.position({ x: stageX, y: stageY })
-    
-    // 8. 重绘
-    updateLabelScale()
-    updateLOD()
-    layer?.batchDraw()
+    // 双指缩放
+    if (touches.length === 2) {
+      e.evt.preventDefault()
+      
+      // 1. 计算当前双指距离
+      const currentDistance = getDistance(touches[0], touches[1])
+      
+      // 2. 计算缩放比例 = 当前距离 / 初始距离
+      const scale = currentDistance / initialDistance
+      
+      // 3. 新缩放 = 初始缩放 × 缩放比例
+      const newScale = initialScale * scale
+      
+      // 4. 限制范围
+      const finalScale = Math.max(0.001, Math.min(500, newScale))
+      
+      // 5. 计算双指中心点
+      const rect = stage!.container().getBoundingClientRect()
+      const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
+      const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+      
+      // 6. 应用缩放
+      stage!.scale({ x: finalScale, y: finalScale })
+      
+      // 7. 调整位置，使中心点不动
+      const stageX = centerX - (centerX - stage!.x()) / initialScale * finalScale
+      const stageY = centerY - (centerY - stage!.y()) / initialScale * finalScale
+      stage!.position({ x: stageX, y: stageY })
+      
+      // 8. 重绘
+      updateLabelScale()
+      updateLOD()
+      layer?.batchDraw()
+    }
+  })
+  
+  stage.on('touchend', (e) => {
+    // 当手指数量变为 1 或 0 时，结束双指缩放
+    if (e.evt.touches.length < 2) {
+      isPinching = false
+    }
   })
   
   // 手机端：双击放大（Double Tap）
@@ -328,6 +339,59 @@ const initStage = () => {
       // 更新最后一次点击
       lastTapTime = now
       lastTapPosition = { x: tapX, y: tapY }
+    }
+  })
+  
+  // 手机端：单指拖拽画布（仅在非双指缩放时）
+  let isTouchDragging = false
+  let touchDragStart: { x: number; y: number } | null = null
+  let stageStartPos: { x: number; y: number } | null = null
+  
+  stage.on('touchstart', (e) => {
+    const touches = e.evt.touches
+    if (touches.length === 1 && !isPinching) {
+      // 单指触摸，且不在双指缩放中 -> 启动拖拽
+      isTouchDragging = true
+      touchDragStart = {
+        x: touches[0].clientX,
+        y: touches[0].clientY
+      }
+      stageStartPos = {
+        x: stage!.x(),
+        y: stage!.y()
+      }
+    }
+  })
+  
+  stage.on('touchmove', (e) => {
+    if (!isTouchDragging || !touchDragStart || !stageStartPos) return
+    
+    const touches = e.evt.touches
+    if (touches.length !== 1) {
+      // 如果变成多指，取消拖拽
+      isTouchDragging = false
+      return
+    }
+    
+    e.evt.preventDefault()
+    
+    const dx = touches[0].clientX - touchDragStart.x
+    const dy = touches[0].clientY - touchDragStart.y
+    
+    stage!.position({
+      x: stageStartPos.x + dx,
+      y: stageStartPos.y + dy
+    })
+    
+    layer?.batchDraw()
+  })
+  
+  stage.on('touchend', (e) => {
+    // 当所有手指都离开时，结束拖拽
+    if (e.evt.touches.length === 0) {
+      isTouchDragging = false
+      touchDragStart = null
+      stageStartPos = null
     }
   })
 
