@@ -56,7 +56,7 @@
       <div v-if="selectedSeats.length > 0" class="selected-seats-panel">
         <div class="panel-header">
           <h3>已选座位 ({{ selectedSeats.length }})</h3>
-          <button class="btn-clear" @click="selectedSeats = []">清空</button>
+          <button class="btn-clear" @click="clearSelectedSeats">清空</button>
         </div>
         <div class="seats-list">
           <div 
@@ -127,16 +127,6 @@ const selectedSeatDetails = computed(() => {
             cat => String(cat.key) === String(seat.categoryKey)
           )
           
-          console.log('[座位价格调试]', {
-            seatId: seat.id,
-            categoryKey: seat.categoryKey,
-            categoryKeyType: typeof seat.categoryKey,
-            categoryFound: category,
-            categoryLabel: category?.label,
-            categoryPrice: category?.price,
-            finalPrice: category?.price ?? 0
-          })
-          
           const categoryName = category?.label || '未分类'
           // 从分类数据中读取价格，如果未设置则默认为 0
           const price = category?.price ?? 0
@@ -173,6 +163,17 @@ const handlePayment = () => {
 总价：￥${total}
 
 （这是演示功能，实际支付需要接入支付系统）`)
+}
+
+// 清空选中座位（性能优化）
+const clearSelectedSeats = () => {
+  // 调用 SeatMapViewer 的高效清空方法
+  if (seatMapViewerRef.value?.clearAllSelection) {
+    seatMapViewerRef.value.clearAllSelection()
+  }
+  
+  // 快速清空数组
+  selectedSeats.value = []
 }
 
 // 从 JSON 文件加载数据

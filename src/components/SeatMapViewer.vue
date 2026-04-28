@@ -1295,6 +1295,25 @@ const updateLabelScale = () => {
 defineExpose({ 
   refresh: renderSeatMap, 
   updateSelection,
+  // 清空所有选中（性能优化）
+  clearAllSelection: () => {
+    // 1. 快速重置所有座位的 status
+    props.venue.sections.forEach(section => {
+      section.rows.forEach(row => {
+        row.seats.forEach(seat => {
+          if (seat.status === SEAT_STATUS.SELECTED) {
+            seat.status = SEAT_STATUS.AVAILABLE
+          }
+        })
+      })
+    })
+    
+    // 2. 通知父组件
+    emit('update:selectedSeatIds', [])
+    
+    // 3. 批量重绘（一次完成）
+    layer?.draw()
+  },
   // 新增：获取舞台状态供 Minimap 使用
   getStageState: () => ({
     scale: stage?.scaleX() || 1,
