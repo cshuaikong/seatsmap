@@ -64,14 +64,20 @@
             :key="seatInfo.id"
             class="seat-item"
           >
-            <div class="seat-location">
-              <span class="seat-full-label">
-                {{ seatInfo.section }}-{{ seatInfo.row }}-{{ seatInfo.label }}
-              </span>
-            </div>
-            <span class="seat-category" :style="{ background: seatInfo.color }">
+            <!-- 左上角分类标签 -->
+            <span class="seat-category-badge" :style="{ background: seatInfo.color }">
               {{ seatInfo.category }}
             </span>
+            
+            <!-- 座位信息 -->
+            <div class="seat-info">
+              <div class="seat-location">
+                {{ seatInfo.section }}-{{ seatInfo.row }}-{{ seatInfo.label }}
+              </div>
+              <div class="seat-price">
+                ￥{{ seatInfo.price }}
+              </div>
+            </div>
           </div>
         </div>
         
@@ -465,9 +471,17 @@ const reload = () => {
     font-size: 13px;
   }
   
-  .seat-category {
-    font-size: 11px;
+  .seat-category-badge {
+    font-size: 10px;
     padding: 3px 8px;
+  }
+  
+  .seat-location {
+    font-size: 13px;
+  }
+  
+  .seat-price {
+    font-size: 15px;
   }
   
   .panel-footer {
@@ -557,48 +571,49 @@ const reload = () => {
 
 .seat-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
+  align-items: stretch;
+  position: relative;
+  padding: 12px 14px 12px 14px;
   background: #faf9f7;
   border-radius: 8px;
   border: 1px solid rgba(45, 42, 38, 0.08);
-  min-width: 0;
+  min-width: 180px;
+}
+
+/* 左上角分类标签 */
+.seat-category-badge {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  padding: 4px 10px;
+  border-radius: 8px 0 8px 0;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.seat-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;  /* 给分类标签留空间 */
 }
 
 .seat-location {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.seat-full-label {
   font-size: 14px;
   font-weight: 600;
   color: #2d2a26;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
 }
 
-.seat-category {
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 12px;
-  color: white;
-  font-weight: 500;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.seat-category {
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: white;
+.seat-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e74c3c;
 }
 
 /* 滑入动画 */
