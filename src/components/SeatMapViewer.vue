@@ -152,12 +152,20 @@ const initStage = () => {
 
   const width = props.width || containerRef.value.clientWidth || 800
   const height = props.height || containerRef.value.clientHeight || 600
+  
+  // 【移动端优化】检测设备类型，降低移动端渲染像素比
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                   ('ontouchstart' in window && window.innerWidth < 1024)
+  
+  // 电脑使用设备像素比，手机限制为 1（减少 2-4 倍渲染压力）
+  const pixelRatio = isMobile ? 1 : window.devicePixelRatio || 1
 
   stage = new Konva.Stage({
     container: containerRef.value,
     width,
     height,
-    draggable: false  // 禁用 Konva 默认拖拽，手动控制（避免和双指缩放冲突）
+    draggable: false,  // 禁用 Konva 默认拖拽，手动控制（避免和双指缩放冲突）
+    pixelRatio  // 【性能优化】移动端降低像素比
   })
 
   layer = new Konva.Layer({
