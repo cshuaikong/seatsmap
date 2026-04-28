@@ -208,10 +208,11 @@ const initStage = () => {
     layer?.batchDraw()
   })
 
-  // 手机端：双指缩放（Pinch Zoom）- 简化版
+  // 手机端：双指缩放（Pinch Zoom）- 简化版 + 节流优化
   let initialDistance = 0
   let initialScale = 1
   let isPinching = false  // 标记是否正在进行双指缩放
+  let pinchRafId: number | null = null  // requestAnimationFrame ID
   
   stage.on('touchstart', (e) => {
     const touches = e.evt.touches
@@ -232,47 +233,60 @@ const initStage = () => {
     if (touches.length === 2) {
       e.evt.preventDefault()
       
-      // 1. 计算当前双指距离
-      const currentDistance = getDistance(touches[0], touches[1])
+      // 使用 requestAnimationFrame 节流，避免高频重绘
+      if (pinchRafId) return
       
-      // 2. 计算缩放比例 = 当前距离 / 初始距离
-      const scale = currentDistance / initialDistance
-      
-      // 3. 新缩放 = 初始缩放 × 缩放比例
-      const newScale = initialScale * scale
-      
-      // 4. 限制范围
-      const finalScale = Math.max(0.001, Math.min(500, newScale))
-      
-      // 5. 计算双指中心点（相对于 stage 容器）
-      const rect = stage!.container().getBoundingClientRect()
-      const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
-      const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
-      
-      // 6. 计算中心点对应的舞台坐标（使用当前缩放）
-      const oldScale = stage!.scaleX()
-      const pointOnStage = {
-        x: (centerX - stage!.x()) / oldScale,
-        y: (centerY - stage!.y()) / oldScale
-      }
-      
-      // 7. 应用新缩放
-      stage!.scale({ x: finalScale, y: finalScale })
-      
-      // 8. 调整位置，使中心点在缩放后保持在同一位置
-      stage!.position({
-        x: centerX - pointOnStage.x * finalScale,
-        y: centerY - pointOnStage.y * finalScale
+      pinchRafId = requestAnimationFrame(() => {
+        // 1. 计算当前双指距离
+        const currentDistance = getDistance(touches[0], touches[1])
+        
+        // 2. 计算缩放比例 = 当前距离 / 初始距离
+        const scale = currentDistance / initialDistance
+        
+        // 3. 新缩放 = 初始缩放 × 缩放比例
+        const newScale = initialScale * scale
+        
+        // 4. 限制范围
+        const finalScale = Math.max(0.001, Math.min(500, newScale))
+        
+        // 5. 计算双指中心点（相对于 stage 容器）
+        const rect = stage!.container().getBoundingClientRect()
+        const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
+        const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+        
+        // 6. 计算中心点对应的舞台坐标（使用当前缩放）
+        const oldScale = stage!.scaleX()
+        const pointOnStage = {
+          x: (centerX - stage!.x()) / oldScale,
+          y: (centerY - stage!.y()) / oldScale
+        }
+        
+        // 7. 应用新缩放
+        stage!.scale({ x: finalScale, y: finalScale })
+        
+        // 8. 调整位置，使中心点在缩放后保持在同一位置
+        stage!.position({
+          x: centerX - pointOnStage.x * finalScale,
+          y: centerY - pointOnStage.y * finalScale
+        })
+        
+        // 9. 重绘
+        updateLabelScale()
+        updateLOD()
+        layer?.batchDraw()
+        
+        pinchRafId = null
       })
-      
-      // 8. 重绘
-      updateLabelScale()
-      updateLOD()
-      layer?.batchDraw()
     }
   })
   
   stage.on('touchend', (e) => {
+    // 清除未完成的动画帧
+    if (pinchRafId) {
+      cancelAnimationFrame(pinchRafId)
+      pinchRafId = null
+    }
+    
     // 当手指数量变为 1 或 0 时，结束双指缩放
     if (e.evt.touches.length < 2) {
       isPinching = false
