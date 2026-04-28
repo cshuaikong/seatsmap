@@ -1101,6 +1101,10 @@ const renderRowGroup = (row: SeatRow, section: Section, viewport?: { viewLeft: n
       }
       seatNodes.set(seat.id, seatShape as any)
       
+      // 【性能优化】禁用座位标签渲染，提升性能
+      // 座位标签在放大时会创建大量 Konva.Text 对象，严重影响性能
+      // 如果需要显示座位编号，建议使用 hover 提示或其他方式
+      /*
       // 座位标签（使用 stageScale >= 0.8 判断显示，选中时隐藏）
       const currentStageScale = stage?.scaleX() || 1
       const isCurrentlySelected = seat.status === SEAT_STATUS.SELECTED
@@ -1126,6 +1130,7 @@ const renderRowGroup = (row: SeatRow, section: Section, viewport?: { viewLeft: n
         // 存储标签引用
         seatLabels.set(seat.id, text)
       }
+      */
     })
   }
 }
