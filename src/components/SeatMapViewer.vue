@@ -208,35 +208,39 @@ const initStage = () => {
     layer?.batchDraw()
   })
 
-  // 手机端：双指缩放（Pinch Zoom）
+  // 手机端：双指缩放（Pinch Zoom）- 性能优化版
   let initialScale = 1
   let initialDistance = 0
-  let lastTouchCenter: { x: number; y: number } | null = null
+  let stageOffset = { left: 0, top: 0 }
   
   stage.on('touchstart', (e) => {
     const touches = e.evt.touches
     if (touches.length === 2) {
-      // 双指触摸开始，阻止默认行为
       e.evt.preventDefault()
+      
+      // 缓存 stage 偏移量（只计算一次）
+      const rect = stage!.container().getBoundingClientRect()
+      stageOffset = { left: rect.left, top: rect.top }
       
       // 记录初始状态
       initialScale = stage!.scaleX()
       initialDistance = getDistance(touches[0], touches[1])
-      
-      // 计算初始中心点（相对于 stage 容器）
-      const rect = stage!.container().getBoundingClientRect()
-      lastTouchCenter = {
-        x: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
-        y: (touches[0].clientY + touches[1].clientY) / 2 - rect.top
-      }
     }
   })
   
+  // 使用 requestAnimationFrame 节流
+  let rafId: number | null = null
+  
   stage.on('touchmove', (e) => {
     const touches = e.evt.touches
-    if (touches.length === 2) {
-      e.evt.preventDefault()
-      
+    if (touches.length !== 2) return
+    
+    e.evt.preventDefault()
+    
+    // 使用 requestAnimationFrame 节流，避免频繁重绘
+    if (rafId) return
+    
+    rafId = requestAnimationFrame(() => {
       // 计算当前双指距离
       const currentDistance = getDistance(touches[0], touches[1])
       
@@ -249,10 +253,9 @@ const initStage = () => {
       const MAX_SCALE = 500
       const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale))
       
-      // 计算双指中心点（相对于 stage 容器）
-      const rect = stage!.container().getBoundingClientRect()
-      const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
-      const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+      // 使用缓存的偏移量计算中心点（避免重复调用 getBoundingClientRect）
+      const centerX = (touches[0].clientX + touches[1].clientX) / 2 - stageOffset.left
+      const centerY = (touches[0].clientY + touches[1].clientY) / 2 - stageOffset.top
       
       // 计算中心点对应的舞台坐标
       const oldScale = stage!.scaleX()
@@ -275,7 +278,15 @@ const initStage = () => {
       updateLOD()
       layer?.batchDraw()
       
-      lastTouchCenter = { x: centerX, y: centerY }
+      rafId = null
+    })
+  })
+  
+  stage.on('touchend', (e) => {
+    // 清除未完成的动画帧
+    if (rafId) {
+      cancelAnimationFrame(rafId)
+      rafId = null
     }
   })
   
