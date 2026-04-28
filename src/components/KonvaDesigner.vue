@@ -171,19 +171,7 @@ const chartName = ref('高性能座位图编辑器')
 
 // 页面加载时自动恢复本地数据
 onMounted(async () => {
-  // 1. 优先从 localStorage 恢复（如果有）
-  const saved = localStorage.getItem('seatsmap-autosave')
-  if (saved) {
-    try {
-      venueStore.restoreSnapshot(saved)
-      console.log('[自动恢复] 已从本地存储恢复数据')
-      return  // 有本地保存数据，直接使用
-    } catch (error) {
-      console.error('[自动恢复] 恢复失败:', error)
-    }
-  }
-  
-  // 2. 如果没有本地数据，从 JSON 文件加载（临时数据来源）
+  // 每次打开都从 JSON 文件恢复数据（不使用 localStorage）
   try {
     console.log('[初始化] 从 JSON 文件加载数据...')
     const response = await fetch('/static/分区座位 全.json')
@@ -200,15 +188,15 @@ onMounted(async () => {
           venue: venueData
         })
         venueStore.restoreSnapshot(snapshot)
-        console.log('[初始化] 已从 JSON 文件加载数据')
+        console.log('[初始化] ✅ 已从 JSON 文件恢复数据')
       } else {
-        console.warn('[初始化] JSON 数据格式不正确')
+        console.error('[初始化] ❌ JSON 数据格式不正确')
       }
     } else {
-      console.warn('[初始化] JSON 文件不存在，使用默认数据')
+      console.error('[初始化] ❌ JSON 文件不存在')
     }
   } catch (error) {
-    console.warn('[初始化] 加载 JSON 文件失败:', error)
+    console.error('[初始化] ❌ 加载 JSON 文件失败:', error)
   }
   
   // 定期更新缩放显示
@@ -486,10 +474,7 @@ const onSave = async () => {
   try {
     const snapshot = venueStore.createSnapshot()
     
-    // 1. 仍然保存到 localStorage（作为备份）
-    localStorage.setItem('seatsmap-autosave', snapshot)
-    
-    // 2. 尝试使用 File System Access API 保存到本地文件（仅开发环境）
+    // 尝试使用 File System Access API 保存到本地文件（仅开发环境）
     if ('showSaveFilePicker' in window) {
       try {
         // 提示用户选择保存位置（首次需要手动选择）
@@ -508,7 +493,6 @@ const onSave = async () => {
         await writable.close()
         
         console.log('✅ 数据已保存到本地文件')
-        alert('保存成功！\n数据已更新到：分区座位 全.json')
         return
       } catch (err: any) {
         // 用户取消选择，回退到下载方式
@@ -520,7 +504,7 @@ const onSave = async () => {
       }
     }
     
-    // 3. 回退方案：下载 JSON 文件
+    // 回退方案：下载 JSON 文件
     const blob = new Blob([snapshot], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -532,7 +516,6 @@ const onSave = async () => {
     URL.revokeObjectURL(url)
     
     console.log('✅ 数据已下载')
-    alert('保存成功！\n文件已下载，请替换 static/分区座位 全.json')
   } catch (error) {
     console.error('保存失败:', error)
     alert('保存失败：' + (error instanceof Error ? error.message : '未知错误'))
