@@ -208,17 +208,27 @@ const initStage = () => {
     layer?.batchDraw()
   })
 
-  // 手机端：双指缩放（pinch）
+  // 手机端：双指缩放（Pinch Zoom）
   let initialScale = 1
   let initialDistance = 0
+  let lastTouchCenter: { x: number; y: number } | null = null
   
   stage.on('touchstart', (e) => {
     const touches = e.evt.touches
     if (touches.length === 2) {
-      // 双指触摸开始
+      // 双指触摸开始，阻止默认行为
       e.evt.preventDefault()
+      
+      // 记录初始状态
       initialScale = stage!.scaleX()
       initialDistance = getDistance(touches[0], touches[1])
+      
+      // 计算初始中心点（相对于 stage 容器）
+      const rect = stage!.container().getBoundingClientRect()
+      lastTouchCenter = {
+        x: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
+        y: (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+      }
     }
   })
   
@@ -227,73 +237,117 @@ const initStage = () => {
     if (touches.length === 2) {
       e.evt.preventDefault()
       
+      // 计算当前双指距离
       const currentDistance = getDistance(touches[0], touches[1])
-      const scale = (currentDistance / initialDistance) * initialScale
       
-      // 限制缩放范围（与 useKonvaViewport 保持一致）
-      const MIN_SCALE = 0.001  // 最小缩放 0.1%
-      const MAX_SCALE = 500    // 最大缩放 500x
-      const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale))
+      // 计算缩放比例
+      const scaleRatio = currentDistance / initialDistance
+      const newScale = initialScale * scaleRatio
       
-      // 计算双指中心点
-      const centerX = (touches[0].clientX + touches[1].clientX) / 2
-      const centerY = (touches[0].clientY + touches[1].clientY) / 2
+      // 限制缩放范围
+      const MIN_SCALE = 0.001
+      const MAX_SCALE = 500
+      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale))
       
+      // 计算双指中心点（相对于 stage 容器）
+      const rect = stage!.container().getBoundingClientRect()
+      const centerX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left
+      const centerY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+      
+      // 计算中心点对应的舞台坐标
       const oldScale = stage!.scaleX()
-      const pointer = { x: centerX, y: centerY }
-      
-      const mousePointTo = {
-        x: (pointer.x - stage!.x()) / oldScale,
-        y: (pointer.y - stage!.y()) / oldScale
+      const pointBefore = {
+        x: (centerX - stage!.x()) / oldScale,
+        y: (centerY - stage!.y()) / oldScale
       }
       
-      stage!.scale({ x: newScale, y: newScale })
+      // 应用新缩放
+      stage!.scale({ x: clampedScale, y: clampedScale })
+      
+      // 调整位置，使中心点保持不变
       stage!.position({
-        x: pointer.x - mousePointTo.x * newScale,
-        y: pointer.y - mousePointTo.y * newScale
+        x: centerX - pointBefore.x * clampedScale,
+        y: centerY - pointBefore.y * clampedScale
       })
       
+      // 更新显示
       updateLabelScale()
       updateLOD()
       layer?.batchDraw()
+      
+      lastTouchCenter = { x: centerX, y: centerY }
     }
   })
   
-  // 手机端：双击放大
+  // 手机端：双击放大（Double Tap）
   let lastTapTime = 0
-  stage.on('dbltap', (e) => {
-    e.evt.preventDefault()
+  let lastTapPosition: { x: number; y: number } | null = null
+  
+  stage.on('touchend', (e) => {
+    const now = Date.now()
+    const touches = e.evt.changedTouches
     
-    const currentScale = stage!.scaleX()
-    const targetScale = currentScale > 1.5 ? 1.0 : 2.5
-    
-    const pointer = stage!.getPointerPosition()!
-    const oldScale = currentScale
-    
-    const mousePointTo = {
-      x: (pointer.x - stage!.x()) / oldScale,
-      y: (pointer.y - stage!.y()) / oldScale
-    }
-    
-    // 动画过渡
-    stage!.to({
-      scaleX: targetScale,
-      scaleY: targetScale,
-      duration: 0.3,
-      easing: Konva.Easings.EaseOut,
-      onUpdate: () => {
-        const newScale = stage!.scaleX()
-        stage!.position({
-          x: pointer.x - mousePointTo.x * newScale,
-          y: pointer.y - mousePointTo.y * newScale
-        })
-        updateLabelScale()
-        updateLOD()
-      },
-      onFinish: () => {
-        layer?.batchDraw()
+    if (touches.length === 1) {
+      // 计算点击位置（相对于 stage 容器）
+      const rect = stage!.container().getBoundingClientRect()
+      const tapX = touches[0].clientX - rect.left
+      const tapY = touches[0].clientY - rect.top
+      
+      // 判断是否为双击（300ms 内，位置相近）
+      if (lastTapTime && (now - lastTapTime) < 300) {
+        if (lastTapPosition) {
+          const dx = tapX - lastTapPosition.x
+          const dy = tapY - lastTapPosition.y
+          const distance = Math.sqrt(dx * dx + dy * dy)
+          
+          // 如果两次点击位置相近（小于 30px），认为是双击
+          if (distance < 30) {
+            e.evt.preventDefault()
+            
+            const currentScale = stage!.scaleX()
+            const targetScale = currentScale > 1.5 ? 1.0 : 2.5
+            
+            const pointer = stage!.getPointerPosition()
+            if (!pointer) return
+            
+            const oldScale = currentScale
+            const pointBefore = {
+              x: (pointer.x - stage!.x()) / oldScale,
+              y: (pointer.y - stage!.y()) / oldScale
+            }
+            
+            // 动画过渡
+            stage!.to({
+              scaleX: targetScale,
+              scaleY: targetScale,
+              duration: 0.3,
+              easing: Konva.Easings.EaseOut,
+              onUpdate: () => {
+                const newScale = stage!.scaleX()
+                stage!.position({
+                  x: pointer.x - pointBefore.x * newScale,
+                  y: pointer.y - pointBefore.y * newScale
+                })
+                updateLabelScale()
+                updateLOD()
+              },
+              onFinish: () => {
+                layer?.batchDraw()
+              }
+            })
+            
+            // 重置
+            lastTapTime = 0
+            lastTapPosition = null
+            return
+          }
+        }
       }
-    })
+      
+      // 更新最后一次点击
+      lastTapTime = now
+      lastTapPosition = { x: tapX, y: tapY }
+    }
   })
 
   // 画布拖拽
