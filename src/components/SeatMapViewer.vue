@@ -208,6 +208,92 @@ const initStage = () => {
     layer?.batchDraw()
   })
 
+  // 手机端：双指缩放（pinch）
+  let initialScale = 1
+  let initialDistance = 0
+  
+  stage.on('touchstart', (e) => {
+    const touches = e.evt.touches
+    if (touches.length === 2) {
+      // 双指触摸开始
+      e.evt.preventDefault()
+      initialScale = stage!.scaleX()
+      initialDistance = getDistance(touches[0], touches[1])
+    }
+  })
+  
+  stage.on('touchmove', (e) => {
+    const touches = e.evt.touches
+    if (touches.length === 2) {
+      e.evt.preventDefault()
+      
+      const currentDistance = getDistance(touches[0], touches[1])
+      const scale = (currentDistance / initialDistance) * initialScale
+      
+      // 限制缩放范围
+      const newScale = Math.max(1.0, Math.min(5.0, scale))
+      
+      // 计算双指中心点
+      const centerX = (touches[0].clientX + touches[1].clientX) / 2
+      const centerY = (touches[0].clientY + touches[1].clientY) / 2
+      
+      const oldScale = stage!.scaleX()
+      const pointer = { x: centerX, y: centerY }
+      
+      const mousePointTo = {
+        x: (pointer.x - stage!.x()) / oldScale,
+        y: (pointer.y - stage!.y()) / oldScale
+      }
+      
+      stage!.scale({ x: newScale, y: newScale })
+      stage!.position({
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale
+      })
+      
+      updateLabelScale()
+      updateLOD()
+      layer?.batchDraw()
+    }
+  })
+  
+  // 手机端：双击放大
+  let lastTapTime = 0
+  stage.on('dbltap', (e) => {
+    e.evt.preventDefault()
+    
+    const currentScale = stage!.scaleX()
+    const targetScale = currentScale > 1.5 ? 1.0 : 2.5
+    
+    const pointer = stage!.getPointerPosition()!
+    const oldScale = currentScale
+    
+    const mousePointTo = {
+      x: (pointer.x - stage!.x()) / oldScale,
+      y: (pointer.y - stage!.y()) / oldScale
+    }
+    
+    // 动画过渡
+    stage!.to({
+      scaleX: targetScale,
+      scaleY: targetScale,
+      duration: 0.3,
+      easing: Konva.Easings.EaseOut,
+      onUpdate: () => {
+        const newScale = stage!.scaleX()
+        stage!.position({
+          x: pointer.x - mousePointTo.x * newScale,
+          y: pointer.y - mousePointTo.y * newScale
+        })
+        updateLabelScale()
+        updateLOD()
+      },
+      onFinish: () => {
+        layer?.batchDraw()
+      }
+    })
+  })
+
   // 画布拖拽
   let isDragging = false
   let lastPos: { x: number; y: number } | null = null
@@ -426,6 +512,13 @@ const createCheckmark = (x: number, y: number, size: number): Konva.Group => {
   
   group.add(checkmark)
   return group
+}
+
+// 计算两个触摸点之间的距离
+const getDistance = (touch1: Touch, touch2: Touch): number => {
+  const dx = touch2.clientX - touch1.clientX
+  const dy = touch2.clientY - touch1.clientY
+  return Math.sqrt(dx * dx + dy * dy)
 }
 
 // 渲染座位图（支持大规模座位优化）
