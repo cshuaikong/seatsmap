@@ -10,19 +10,22 @@
         "key": 1,
         "label": "普通区",
         "color": "#A5D6A7",
-        "accessible": false
+        "accessible": false,
+        "price": 380
       },
       {
         "key": 2,
         "label": "VIP区",
         "color": "#FF8A80",
-        "accessible": false
+        "accessible": false,
+        "price": 880
       },
       {
         "key": 3,
         "label": "轮椅区",
         "color": "#90CAF9",
-        "accessible": true
+        "accessible": true,
+        "price": 280
       }
     ],
     "sections": [

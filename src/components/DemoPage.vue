@@ -117,13 +117,6 @@ const selectedSeatDetails = computed(() => {
     price: number  // 添加价格
   }> = []
   
-  // 分类价格映射（根据实际数据调整）
-  const categoryPrices: Record<string, number> = {
-    '普通区': 380,    // key: 1
-    'VIP区': 880,     // key: 2
-    '轮椅区': 280,    // key: 3
-  }
-  
   // 遍历所有分区和排，查找选中的座位
   demoVenue.value.sections.forEach(section => {
     section.rows?.forEach(row => {
@@ -135,7 +128,8 @@ const selectedSeatDetails = computed(() => {
           )
           
           const categoryName = category?.label || '未分类'
-          const price = categoryPrices[categoryName] || 0
+          // 从分类数据中读取价格，如果未设置则默认为 0
+          const price = category?.price ?? 0
           
           details.push({
             id: seat.id,

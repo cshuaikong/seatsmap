@@ -95,6 +95,7 @@ export interface Category {
   label: string
   color: string
   accessible?: boolean
+  price?: number  // 分类价格（单位：元）
 }
 
 // 扩展 Row 支持更多属性
