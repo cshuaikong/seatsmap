@@ -471,17 +471,21 @@ const reload = () => {
     font-size: 13px;
   }
   
+  .seat-item {
+    padding: 8px 10px;
+  }
+  
   .seat-category-badge {
-    font-size: 10px;
-    padding: 3px 8px;
+    font-size: 9px;
+    padding: 2px 6px;
   }
   
   .seat-location {
-    font-size: 13px;
+    font-size: 12px;
   }
   
   .seat-price {
-    font-size: 15px;
+    font-size: 13px;
   }
   
   .panel-footer {
@@ -573,36 +577,38 @@ const reload = () => {
   display: flex;
   align-items: stretch;
   position: relative;
-  padding: 12px 14px 12px 14px;
+  padding: 10px 12px 10px 12px;
   background: #faf9f7;
   border-radius: 8px;
   border: 1px solid rgba(45, 42, 38, 0.08);
-  min-width: 180px;
+  min-width: 150px;
+  max-width: 200px;
 }
 
 /* 左上角分类标签 */
 .seat-category-badge {
   position: absolute;
-  top: -1px;
-  left: -1px;
-  padding: 4px 10px;
+  top: 0;
+  left: 0;
+  padding: 3px 8px;
   border-radius: 8px 0 8px 0;
   color: white;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
+  line-height: 1;
 }
 
 .seat-info {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;  /* 给分类标签留空间 */
+  gap: 4px;
+  margin-top: 6px;  /* 给分类标签留空间 */
 }
 
 .seat-location {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #2d2a26;
   white-space: nowrap;
@@ -611,7 +617,7 @@ const reload = () => {
 }
 
 .seat-price {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #e74c3c;
 }
