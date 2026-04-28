@@ -74,6 +74,17 @@
             </span>
           </div>
         </div>
+        
+        <!-- 总价和支付按钮 -->
+        <div class="panel-footer">
+          <div class="price-info">
+            <span class="price-label">合计</span>
+            <span class="price-value">￥{{ totalPrice }}</span>
+          </div>
+          <button class="btn-pay" @click="handlePayment">
+            立即支付
+          </button>
+        </div>
       </div>
     </Transition>
   </div>
@@ -103,7 +114,16 @@ const selectedSeatDetails = computed(() => {
     section: string  // 添加分区信息
     category: string
     color: string
+    price: number  // 添加价格
   }> = []
+  
+  // 分类价格映射（模拟数据）
+  const categoryPrices: Record<string, number> = {
+    'VIP': 880,
+    '普通席': 380,
+    '特价席': 180,
+    '无障碍': 280,
+  }
   
   // 遍历所有分区和排，查找选中的座位
   demoVenue.value.sections.forEach(section => {
@@ -115,13 +135,16 @@ const selectedSeatDetails = computed(() => {
             cat => cat.key === seat.categoryKey
           )
           
+          const categoryName = category?.label || '未分类'
+          
           details.push({
             id: seat.id,
             label: seat.label || '无编号',
             row: row.label || '无排号',
             section: section.name || '未命名分区',
-            category: category?.label || '未分类',
-            color: category?.color || '#999'
+            category: categoryName,
+            color: category?.color || '#999',
+            price: categoryPrices[categoryName] || 0
           })
         }
       })
@@ -130,6 +153,23 @@ const selectedSeatDetails = computed(() => {
   
   return details
 })
+
+// 计算总价
+const totalPrice = computed(() => {
+  return selectedSeatDetails.value.reduce((sum, seat) => sum + seat.price, 0)
+})
+
+// 处理支付
+const handlePayment = () => {
+  const seatCount = selectedSeats.value.length
+  const total = totalPrice.value
+  
+  alert(`订单信息：
+座位数：${seatCount} 个
+总价：￥${total}
+
+（这是演示功能，实际支付需要接入支付系统）`)
+}
 
 // 从 JSON 文件加载数据
 onMounted(async () => {
@@ -424,6 +464,31 @@ const reload = () => {
     font-size: 11px;
     padding: 3px 8px;
   }
+  
+  .panel-footer {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .price-info {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .price-label {
+    font-size: 13px;
+  }
+  
+  .price-value {
+    font-size: 22px;
+  }
+  
+  .btn-pay {
+    width: 100%;
+    padding: 14px;
+    font-size: 15px;
+  }
 }
 
 .seats-list {
@@ -432,7 +497,57 @@ const reload = () => {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  max-height: calc(40vh - 60px);
+  max-height: calc(40vh - 120px);  /* 减去 footer 高度 */
+}
+
+/* 底部总价和支付 */
+.panel-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(45, 42, 38, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: white;
+}
+
+.price-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.price-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.price-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #e74c3c;
+}
+
+.btn-pay {
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-pay:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.btn-pay:active {
+  transform: translateY(0);
 }
 
 .seat-item {
