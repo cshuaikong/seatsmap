@@ -690,8 +690,10 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
   const viewportRight = viewportLeft + stageWidth / stageScale
   const viewportBottom = viewportTop + stageHeight / stageScale
   
-  // 视口扩展边距（预加载周边座位，【修复】增大边距避免误裁剪）
-  const padding = 2000 / stageScale  // 从 1000 增加到 2000，避免放大时座位被裁剪
+  // 视口扩展边距（预加载周边座位）
+  // 【修复】放大时需要更大的 padding，避免座位被误剔除
+  // 使用 stageScale * 系数，确保放大时 padding 足够大
+  const padding = 500 * stageScale  // 放大 5 倍时 padding = 2500，缩小 0.5 倍时 padding = 250
   const viewLeft = viewportLeft - padding
   const viewTop = viewportTop - padding
   const viewRight = viewportRight + padding
