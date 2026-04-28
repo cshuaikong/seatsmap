@@ -564,15 +564,18 @@ const updateLOD = () => {
   // baseScale 是首次绘制时的标准缩放，以此为基准计算相对缩放比例
   const relativeScale = currentScale / baseScale
   
-  // LOD 三级阈值（相对于 baseScale）
-  const SHOW_BLOCKS_THRESHOLD = 0.3    // 相对缩放 > 0.3 显示座位条
-  const SHOW_SEATS_THRESHOLD = 2.0     // 相对缩放 > 2.0 显示圆形座位（提高阈值，延迟渲染）
-  const SHOW_LABELS_THRESHOLD = 2.5    // 相对缩放 > 2.5 显示座位标签
+  // LOD 三级阈值（基于 baseScale 的倍数）
+  // Level 0: relativeScale < 1.0 → 分区色块
+  // Level 1: 1.0 <= relativeScale < 2.0 → 座位条
+  // Level 2: relativeScale >= 2.0 → 圆形座位
+  const SHOW_BLOCKS_THRESHOLD = 1.0    // 相对缩放 < 1.0: 只显示分区色块
+  const SHOW_SEATS_THRESHOLD = 2.0     // 相对缩放 >= 2.0: 显示圆形座位
+  const SHOW_LABELS_THRESHOLD = 2.5    // 相对缩放 >= 2.5: 显示座位标签
   
   // 检查当前渲染级别是否需要切换
   const hasSeatNodes = seatNodes.size > 0
-  const shouldShowCircles = relativeScale > SHOW_SEATS_THRESHOLD
-  const shouldShowBlocks = relativeScale > SHOW_BLOCKS_THRESHOLD && !shouldShowCircles
+  const shouldShowCircles = relativeScale >= SHOW_SEATS_THRESHOLD
+  const shouldShowBlocks = relativeScale >= SHOW_BLOCKS_THRESHOLD && !shouldShowCircles
   
   // 【修复】如果级别不匹配，重新渲染（保留舞台状态）
   // 需要检查：是否应该显示座位条或圆形座位，但当前没有渲染任何座位
@@ -890,7 +893,7 @@ const renderRowGroup = (row: SeatRow, section: Section) => {
   const { radius: configRadius, gap: configGap, rowGap: configRowGap, borderWidth, baseScale } = config
   
   // Level 0: 只显示分区色块和分区名，不渲染座位
-  if (relativeScale < 0.3) {
+  if (relativeScale < 1.0) {
     // 分区色块已在 renderSectionBorder 中渲染
     return
   }
