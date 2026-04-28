@@ -1,0 +1,12 @@
+name = "seatsmap"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "dist"
+
+# 构建配置
+[build]
+command = "npm run build"
+
+# 路由配置（如果需要自定义域名）
+# [[routes]]
+# pattern = "seatsmap.yourdomain.com"
+# zone_name = "yourdomain.com"
