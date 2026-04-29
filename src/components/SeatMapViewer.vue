@@ -34,6 +34,12 @@ let seatNodes: Map<string, Konva.Circle> = new Map() // 存储座位节点用于
 let seatLabels: Map<string, Konva.Text> = new Map() // 存储座位标签节点
 let isInitialFit = true // 标记是否是初始自适应
 
+// 【性能优化】节点缓存数组：替换 layer.find() 遍历，O(1) 访问
+const sectionBorderNodes: Konva.Node[] = []
+const sectionLabelNodes: Konva.Text[] = []
+const rowLabelNodes: Konva.Text[] = []
+let lodRafId: number | null = null  // LOD 切换防抖
+
 // 【统一配置获取】从 venue 数据或 store 获取配置参数，确保一致性
 const getRenderConfig = () => {
   const store = useVenueStore()
@@ -501,7 +507,6 @@ const fitContentToView = () => {
   
   // 【调试】打印边界信息
   const store = useVenueStore()
-  console.log('[SeatMapViewer] Content bounds:', box)
   
   const padding = 50
   const stageWidth = stage.width()
@@ -524,6 +529,7 @@ const fitContentToView = () => {
   
   layer.batchDraw()
   updateLOD()
+  initialFitDone = true
 }
 
 // 入场动画：平滑缩放到最佳视角
@@ -561,86 +567,80 @@ const fitContentWithAnimation = () => {
       // 动画完成后更新 LOD 和标签缩放
       updateLOD()  // 先更新 LOD，可能触发重新渲染
       updateLabelScale()
+      initialFitDone = true
     }
   })
 }
 
+
+// 【性能优化】渲染完成后一次性扫描填充缓存（后续 updateLOD/updateLabelScale 不再遍历 layer）
+const populateCaches = () => {
+  if (!layer) return
+  sectionBorderNodes.length = 0
+  sectionLabelNodes.length = 0
+  rowLabelNodes.length = 0
+
+  layer.getChildren().forEach(node => {
+    const name = node.name()
+    if (name === 'section-border') {
+      sectionBorderNodes.push(node)
+    } else if (name === 'section-label') {
+      sectionLabelNodes.push(node as any)
+    } else if (name === 'row-label') {
+      rowLabelNodes.push(node as any)
+    }
+  })
+}
+
+// 记录初始 fit 完成时间，防止 fitContentToView 后的 updateLOD 立即移除座位
+let initialFitDone = false
 // LOD 多级细节渲染（基于 baseScale 的智能切换）
 const updateLOD = () => {
   if (!stage || !layer) return
-  
+
+  // 初始 fit 未完成时跳过 LOD，避免 fitContentToView 缩放后立即移除刚渲染的座位
+  if (!initialFitDone) return
+
   const currentScale = stage.scaleX()
   const config = getRenderConfig()
   const baseScale = config.baseScale
-  
-  // 【核心】基于 baseScale 计算 LOD 阈值
-  // baseScale 是首次绘制时的标准缩放，以此为基准计算相对缩放比例
   const relativeScale = currentScale / baseScale
-  
-  // LOD 三级阈值（基于 baseScale 的倍数）
-  // 假设 baseScale = 1.0（座位正常显示的目标缩放值）
-  // Level 0: relativeScale < 2/3 → 分区色块（缩小太多）
-  // Level 1: 2/3 <= relativeScale < 1.0 → 座位条（接近正常大小）
-  // Level 2: relativeScale >= 1.0 → 圆形座位（正常或放大）
-  const SHOW_BLOCKS_THRESHOLD = 2/3      // 相对缩放 < 0.67: 只显示分区色块
-  const SHOW_SEATS_THRESHOLD = 1.0       // 相对缩放 >= 1.0: 显示圆形座位
-  const SHOW_LABELS_THRESHOLD = 1.5      // 相对缩放 >= 1.5: 显示座位标签
-  
-  // 检查当前渲染级别是否需要切换
+
+  const SHOW_BLOCKS_THRESHOLD = 2/3
+  const SHOW_SEATS_THRESHOLD = 1.0
+
   const hasSeatNodes = seatNodes.size > 0
   const shouldShowCircles = relativeScale >= SHOW_SEATS_THRESHOLD
   const shouldShowBlocks = relativeScale >= SHOW_BLOCKS_THRESHOLD && !shouldShowCircles
-  
-  // 【修复】如果级别不匹配，重新渲染（保留舞台状态）
-  // 需要检查：是否应该显示座位条或圆形座位，但当前没有渲染任何座位
+
   const needsRender = (shouldShowCircles || shouldShowBlocks) && !hasSeatNodes
-  
+
   if (needsRender || (hasSeatNodes && !shouldShowCircles && !shouldShowBlocks)) {
-    console.log(`[LOD] 触发重新渲染: needsRender=${needsRender}, hasSeatNodes=${hasSeatNodes}, shouldShowCircles=${shouldShowCircles}, shouldShowBlocks=${shouldShowBlocks}`)
-    renderSeatMap(true)  // 重新渲染以切换模式，保留舞台状态
+    // 【性能优化】LOD 级别切换加防抖，避免频繁全量重绘
+    if (lodRafId) cancelAnimationFrame(lodRafId)
+    lodRafId = requestAnimationFrame(() => {
+      renderSeatMap(true)
+    })
     return
   }
-  
-  // 更新标签可见性（根据 LOD 级别控制）
-  layer.find('Text').forEach(textNode => {
-    const text = textNode as Konva.Text
-    const textName = text.name()
-    
-    if (textName === 'seat-label') {
-      // 座位标签：只在 Level 2 且相对缩放 > 1.5 时显示
-      text.visible(relativeScale > 1.5)
-    } else if (textName === 'row-label') {
-      // 排标签：只在 Level 2 显示（圆形座位模式）
-      text.visible(relativeScale >= 1.0)
-    }
+
+  // 【性能优化】使用缓存数组替代 layer.find()，O(1) 遍历
+  rowLabelNodes.forEach(text => {
+    text.visible(relativeScale >= 1.0)
   })
-  
-  // 【优化】分区背景透明度随缩放动态调整（从 stageScale=1 到 baseScale 渐变）
-  layer.find('.section-border').forEach(node => {
-    const currentScale = stage?.scaleX() || 1
-    const config = getRenderConfig()
-    const baseScale = config.baseScale
-    
-    // stageScale < 1: 完全不透明 (1.0)
-    // 1 <= stageScale < baseScale: 从 1.0 渐变到 0.4
-    // stageScale >= baseScale: 保持最低透明度 0.4
+
+  sectionBorderNodes.forEach(node => {
     let opacity = 1.0
     if (currentScale >= baseScale) {
       opacity = 0.4
     } else if (currentScale >= 1.0) {
-      // 线性插值：从 1.0 降到 0.4
       opacity = 1.0 - (currentScale - 1.0) / (baseScale - 1.0) * 0.6
     }
     node.opacity(opacity)
   })
 
-  
-  // 【调试】打印当前 LOD 级别
-  console.log(`[LOD] relativeScale=${relativeScale.toFixed(2)}, baseScale=${baseScale}, currentScale=${currentScale.toFixed(2)}, level=${relativeScale < SHOW_BLOCKS_THRESHOLD ? 0 : relativeScale < SHOW_SEATS_THRESHOLD ? 1 : 2}`)
-  
   layer.batchDraw()
 }
-
 // 创建勾选图标（seats.io 风格）
 const createCheckmark = (x: number, y: number, size: number): Konva.Group => {
   const group = new Konva.Group({
@@ -687,7 +687,12 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
   layer.destroyChildren()
   seatNodes.clear() // 清空座位节点映射
   seatLabels.clear() // 清空座位标签映射
-  
+
+  // 【性能优化】清空缓存数组（重建时会重新注册）
+  sectionBorderNodes.length = 0
+  sectionLabelNodes.length = 0
+  rowLabelNodes.length = 0
+
   const config = getRenderConfig()
   const baseScale = config.baseScale
   
@@ -828,6 +833,9 @@ const renderSeatMap = (preserveStageState: boolean = false) => {
 
   layer.batchDraw()
   
+  // 【性能优化】填充节点缓存
+  populateCaches()
+  
   // 【修复】渲染完成后自适应缩放
   requestAnimationFrame(() => {
     fitContentToView()
@@ -859,7 +867,6 @@ const renderRowGroup = (row: SeatRow, section: Section, viewport?: { viewLeft: n
     const seat1 = row.seats[1]
     const dist = Math.sqrt(Math.pow(seat1.x - seat0.x, 2) + Math.pow(seat1.y - seat0.y, 2))
     const config = getRenderConfig()
-    console.log(`[SeatMapViewer] Row ${row.label}: seats=${row.seats.length}, logicalRadius=${logicalRadius.toFixed(2)}, seatDist=${dist.toFixed(2)}, overlap=${(logicalRadius * 2 > dist).toString()}, baseScale=${config.baseScale}`)
   }
   
   // 【修复】排标签精确定位 - 只在 Level 2 显示（圆形座位模式）
@@ -1509,52 +1516,29 @@ const renderSectionBorder = (section: Section, previewMode: boolean = false) => 
   }
 }
 
-// 更新所有 label 的缩放
+// 【性能优化】更新所有 label 的缩放（使用缓存替代 layer.find()）
 const updateLabelScale = () => {
   if (!stage || !layer) return
   
-  const store = useVenueStore()
   const stageScale = stage.scaleX()
-  // 保护：避免 stageScale 过小导致 visualScale 过大
-  const safeStageScale = Math.max(0.1, stageScale)
-  const visualScale = 1 / safeStageScale
   
-  // 获取逻辑半径用于计算座位标签字体大小
-  const logicalRadius = getLogicalRadius()
-  
-  layer.find('Text').forEach((textNode) => {
-    const text = textNode as Konva.Text
-    const textName = text.name()
-    
-    if (textName === 'seat-label') {
-      // 座位标签：当 stageScale >= 0.8 时显示，字体使用逻辑半径（与座位大小一致）
-      if (stageScale >= 0.8) {
-        const fontSize = logicalRadius  // 字体大小等于座位半径
-        text.fontSize(fontSize)
-        text.visible(true)
-      } else {
-        text.visible(false)
-      }
-    } else if (textName === 'section-label') {
-      // 分区标签：低缩放层级时隐藏（stageScale < 1.0），使用更温和的缩放
-      if (stageScale < 1.0) {
-        text.visible(false)
-      } else {
-        text.visible(true)
-        const safeStageScale = Math.max(0.1, stageScale)
-        const visualScale = 1.2 / Math.sqrt(safeStageScale)  // 系数 1.2（更低调）
-        const safeVisualScale = Math.max(0.3, Math.min(2.5, visualScale))  // 范围 0.3~2.5（更小）
-        text.scaleX(safeVisualScale)
-        text.scaleY(safeVisualScale)
-      }
-    } else if (textName === 'row-label') {
-      // 排标签：使用较小的缩放，字体已经减小到 10px
-      const safeStageScale = Math.max(0.1, stageScale)
-      const visualScale = 1 / safeStageScale
-      const safeVisualScale = Math.max(0.2, Math.min(5, visualScale))  // 限制范围 0.2~5（更小）
+  sectionLabelNodes.forEach(text => {
+    if (stageScale < 1.0) {
+      text.visible(false)
+    } else {
+      text.visible(true)
+      const vs = 1.2 / Math.sqrt(Math.max(0.1, stageScale))
+      const safeVisualScale = Math.max(0.3, Math.min(2.5, vs))
       text.scaleX(safeVisualScale)
       text.scaleY(safeVisualScale)
     }
+  })
+  
+  rowLabelNodes.forEach(text => {
+    const vs = 1 / Math.max(0.1, stageScale)
+    const safeVisualScale = Math.max(0.2, Math.min(5, vs))
+    text.scaleX(safeVisualScale)
+    text.scaleY(safeVisualScale)
   })
   
   layer.batchDraw()
