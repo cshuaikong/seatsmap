@@ -46,3 +46,17 @@
 - 在样式上尽量还原
 - 在功能上100%复刻操作逻辑
 - 有不确定的及时询问我，我补充逻辑或资料
+
+## Agent skills
+
+### Issue tracker
+
+Issues 托管在 GitHub Issues，使用 `gh` CLI 操作。See `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+默认标签体系: `needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`。See `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+单上下文布局 — `CONTEXT.md` + `docs/adr/` 在仓库根目录。See `docs/agents/domain.md`。

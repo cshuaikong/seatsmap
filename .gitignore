@@ -51,3 +51,8 @@ Thumbs.db
 
 # Qoder
 .qoder/
+
+# Skills (installed by npx skills, symlinked to 40+ agent dirs)
+skills/
+skills-lock.json
+.*/skills/
