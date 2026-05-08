@@ -14,6 +14,9 @@ export class LeaferEngine {
   private _downClient = { x: 0, y: 0 }
   private _startViewX = 0
   private _startViewY = 0
+  private _targetX = 0
+  private _targetY = 0
+  private _dragRafId = 0
 
   // 双指缩放
   private _pinching = false
@@ -87,15 +90,26 @@ export class LeaferEngine {
         this._dragStarted = true
       }
 
-      const dx = e.clientX - this._downClient.x
-      const dy = e.clientY - this._downClient.y
-      this.leafer.x = this._startViewX + dx
-      this.leafer.y = this._startViewY + dy
+      // RAF 节流：同一帧内多次 pointermove 只取最后一次位置，减少无效的属性写入和重绘调度
+      this._targetX = this._startViewX + (e.clientX - this._downClient.x)
+      this._targetY = this._startViewY + (e.clientY - this._downClient.y)
+
+      if (!this._dragRafId) {
+        this._dragRafId = requestAnimationFrame(() => {
+          this.leafer.x = this._targetX
+          this.leafer.y = this._targetY
+          this._dragRafId = 0
+        })
+      }
     }
 
     this._boundPointerUp = () => {
       this._pointerDown = false
       this._dragStarted = false
+      if (this._dragRafId) {
+        cancelAnimationFrame(this._dragRafId)
+        this._dragRafId = 0
+      }
     }
 
     // —— 双指缩放（移动端 pinch-to-zoom） ——
@@ -206,6 +220,11 @@ export class LeaferEngine {
   destroy(): void {
     if (this._destroyed) return
     this._destroyed = true
+
+    if (this._dragRafId) {
+      cancelAnimationFrame(this._dragRafId)
+      this._dragRafId = 0
+    }
 
     if (this._canvas) {
       if (this._boundWheel) {
