@@ -11,7 +11,12 @@
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",
+    "@leafer-in/view": "^2.1.0",
+    "@leafer-in/viewport": "^2.1.0",
+    "@leafer-ui/core": "^2.1.0",
+    "@leafer-ui/draw": "^2.1.0",
     "konva": "^10.2.0",
+    "leafer-ui": "^2.1.0",
     "pinia": "^2.1.0",
     "vue": "^3.4.0",
     "vue-router": "^4.6.4"

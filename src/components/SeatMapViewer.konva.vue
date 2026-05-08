@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
+import { SEAT_STATUS } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { LeaferEngine } from '../viewer/LeaferEngine'
 import { SectionRenderer } from '../viewer/SectionRenderer'
@@ -31,10 +32,9 @@ let engine: LeaferEngine | null = null
 let seatRenderer: SeatRenderer | null = null
 let labelRenderer: LabelRenderer | null = null
 let selectionManager: SelectionManager | null = null
-let sectionLayers: any[] = []
 let currentScale = 1
-let isInitialFit = true
 
+/** 获取渲染配置 */
 const getRenderConfig = () => {
   const store = useVenueStore()
   const baseScale = (props.venue as any).baseScale || store.getBaseScale?.() || 1
@@ -49,31 +49,19 @@ const getRenderConfig = () => {
   }
 }
 
+/** 获取分类颜色（封装 venue 引用） */
 const resolveCategoryColor = (key: string | number): string => {
   return getCategoryColor(key, props.venue.categories)
 }
 
-/** 重建分区图层 */
-const rebuildSectionLayers = () => {
-  if (!engine) return
-  const leafer = engine.leafer
-  sectionLayers.forEach(layer => leafer.remove(layer))
-  sectionLayers = []
-
-  props.venue.sections.forEach(section => {
-    const sectionGroup = SectionRenderer.render(section)
-    sectionLayers.push(sectionGroup)
-    leafer.add(sectionGroup)
-  })
-}
-
-/** 创建/重建座位渲染器 */
-const createSeatRenderer = () => {
-  if (seatRenderer) {
-    engine?.leafer.remove(seatRenderer.rootGroup)
-  }
+/** 全量渲染/刷新 */
+const renderAll = () => {
+  if (!engine || engine.destroyed) return
 
   const config = getRenderConfig()
+  labelRenderer?.clear()
+
+  // 重新创建 seatRenderer
   seatRenderer = new SeatRenderer(
     props.venue,
     config,
@@ -89,26 +77,23 @@ const createSeatRenderer = () => {
   )
   seatRenderer.render()
   seatRenderer.updateLOD(currentScale)
-  engine?.leafer.add(seatRenderer.rootGroup)
-  selectionManager?.setRenderer(seatRenderer)
+
+  // 渲染分区内容（边框/形状/文本/区域）
+  props.venue.sections.forEach(section => {
+    const sectionGroup = SectionRenderer.render(section)
+    engine!.leafer.add(sectionGroup)
+  })
+
+  // 添加座位层
+  engine.leafer.add(seatRenderer.rootGroup)
+
+  // 初始 fit
+  nextTick(() => {
+    engine?.fitContent(50)
+  })
 }
 
-/** 全量渲染/刷新 */
-const renderAll = () => {
-  if (!engine || engine.destroyed) return
-
-  labelRenderer?.clear()
-  rebuildSectionLayers()
-  createSeatRenderer()
-
-  if (isInitialFit) {
-    isInitialFit = false
-    nextTick(() => {
-      engine?.fitContent(50)
-    })
-  }
-}
-
+/** 更新 LOD + 标签 */
 const updateViewState = (scale?: number) => {
   if (scale !== undefined) currentScale = scale
   seatRenderer?.updateLOD(currentScale)
@@ -118,38 +103,47 @@ const updateViewState = (scale?: number) => {
 onMounted(() => {
   if (!containerRef.value) return
 
+  // 初始化 Leafer 引擎
   const width = props.width || containerRef.value.clientWidth || 800
   const height = props.height || containerRef.value.clientHeight || 600
   engine = new LeaferEngine(containerRef.value, { width, height })
 
+  // 初始化标签渲染器
   labelRenderer = new LabelRenderer()
 
-  // 先创建临时 seatRenderer（仅供 selectionManager 构造依赖）
+  // 先创建空的 seatRenderer（selectionManager 需要引用它）
+  // 实际在 renderAll 中重建
   const config = getRenderConfig()
   seatRenderer = new SeatRenderer(
     props.venue, config, resolveCategoryColor, darkenColor
   )
 
+  // 初始化选中管理器
   selectionManager = new SelectionManager(
     seatRenderer,
     props.venue.sections,
     (ids) => emit('update:selectedSeatIds', ids)
   )
 
+  // 缩放变化 → 更新 LOD + 标签
   engine.onZoomChange((scale) => {
     updateViewState(scale)
   })
 
+  // 首次渲染
   renderAll()
 })
 
+// 外部选中列表变化
 watch(() => props.selectedSeatIds, (newIds) => {
   if (!selectionManager || selectionManager.internalUpdate) return
   selectionManager.syncExternalSelection(newIds || [])
 }, { deep: true })
 
+// venue sections 变化 → 重绘
 watch(() => props.venue.sections, (newSections, oldSections) => {
   if (newSections !== oldSections || newSections?.length !== oldSections?.length) {
+    engine?.leafer.clear()
     renderAll()
   }
 })
@@ -160,13 +154,14 @@ onUnmounted(() => {
   seatRenderer = null
   labelRenderer = null
   selectionManager = null
-  sectionLayers = []
 })
+
+// ========== Expose API ==========
 
 const getStageState = () => {
   const leafer = engine?.leafer
   return {
-    scale: engine?.scale ?? currentScale,
+    scale: currentScale,
     position: { x: (leafer as any)?.x ?? 0, y: (leafer as any)?.y ?? 0 },
     width: (leafer as any)?.width ?? 0,
     height: (leafer as any)?.height ?? 0,
@@ -176,17 +171,17 @@ const getStageState = () => {
 const getVenueBounds = () => {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
 
-  // 从渲染后的 seatMap 读取世界坐标（Ellipse 的 x/y 是渲染时的世界坐标），
-  // 与旧 Konva 版从 child.x()/child.y() 读取的逻辑一致，保证与分区边框坐标系对齐。
-  if (seatRenderer) {
-    const r = getRenderConfig().radius / getRenderConfig().baseScale
-    seatRenderer.seatMap.forEach(el => {
-      minX = Math.min(minX, (el.x ?? 0) - r)
-      minY = Math.min(minY, (el.y ?? 0) - r)
-      maxX = Math.max(maxX, (el.x ?? 0) + r)
-      maxY = Math.max(maxY, (el.y ?? 0) + r)
+  props.venue.sections.forEach(section => {
+    section.rows.forEach(row => {
+      row.seats.forEach(seat => {
+        const r = getRenderConfig().radius / getRenderConfig().baseScale
+        minX = Math.min(minX, seat.x - r)
+        minY = Math.min(minY, seat.y - r)
+        maxX = Math.max(maxX, seat.x + r)
+        maxY = Math.max(maxY, seat.y + r)
+      })
     })
-  }
+  })
 
   if (minX === Infinity) return { x: 0, y: 0, width: 0, height: 0 }
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
@@ -220,7 +215,5 @@ defineExpose({
   background: white;
   border-radius: 12px;
   overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
 }
 </style>
