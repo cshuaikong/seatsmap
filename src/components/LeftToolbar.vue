@@ -166,10 +166,9 @@
 
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { DrawingToolMode as ToolMode } from '../composables/useKonvaDrawing'
+import type { ToolMode } from '../composables/useKonvaDrawing'
 
-// Props
-const props = defineProps<{
+defineProps<{
   modelValue: ToolMode
 }>()
 

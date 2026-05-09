@@ -6,13 +6,18 @@ import { pathPointsToSvgPath } from './geometry'
  * 渲染分区边框、形状、文本和区域对象。
  * 所有元素添加到传入的 group 中。
  */
+export interface SectionRenderOptions {
+  /** 是否允许交互（编辑器模式需设为 true） */
+  interactive?: boolean
+}
+
 export class SectionRenderer {
   /**
    * 渲染分区的所有非座位内容（边框 + 形状 + 文本 + 区域）
    * 返回包含边框等的 Group
    */
-  static render(section: Section): Group {
-    const group = new Group({ id: `section-${section.id}`, hittable: false })
+  static render(section: Section, options: SectionRenderOptions = {}): Group {
+    const group = new Group({ id: `section-${section.id}`, hittable: options.interactive ?? false })
 
     // 1. 边框
     if (section.borderType && section.borderType !== 'none') {

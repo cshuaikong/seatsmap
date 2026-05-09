@@ -221,18 +221,33 @@ export class SeatRenderer {
     return result
   }
 
-  /** 更新 LOD 可见性 */
+  /** 更新 LOD 可见性 + 动态线宽补偿 */
   updateLOD(currentScale: number): void {
-    const { baseScale } = this.config
+    const { baseScale, radius } = this.config
     const relativeScale = currentScale / baseScale
 
-    // 降低阈值：fitContent 后 scale 可能只有 0.2~0.3，确保初始就能看到座位条
-    const showLevel1 = relativeScale >= 0.15 && relativeScale < 0.6
-    const showLevel2 = relativeScale >= 0.6
+    // Level 1 (座位条): relativeScale < 0.5  即 zoom < 50% 设计比例
+    // Level 2 (圆形座): relativeScale >= 0.5 即 zoom >= 50% 设计比例
+    const showLevel1 = relativeScale < 0.5
+    const showLevel2 = !showLevel1
+
+    const baseLineWidth = (radius * 2) / baseScale
+    const MIN_SCREEN_PX = 1.5
 
     this.rowLODMap.forEach(({ lineGroup, circleGroup }) => {
       lineGroup.visible = showLevel1
       circleGroup.visible = showLevel2
+
+      if (showLevel1) {
+        const line = lineGroup.children[0]
+        if (line) {
+          const scaleForCalc = Math.max(currentScale, 0.01)
+          const adjusted = Math.max(baseLineWidth, MIN_SCREEN_PX / scaleForCalc)
+          if (line.strokeWidth !== adjusted) {
+            line.strokeWidth = adjusted
+          }
+        }
+      }
     })
   }
 

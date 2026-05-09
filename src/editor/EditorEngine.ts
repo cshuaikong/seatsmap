@@ -1,10 +1,22 @@
-import { Leafer, ZoomEvent, PointerEvent as LeaferPointer } from 'leafer-ui'
+import { Leafer, Group, ZoomEvent, PointerEvent as LeaferPointer } from 'leafer-ui'
 import '@leafer-in/view'
+import '@leafer-in/editor'
+import { Editor } from '@leafer-in/editor'
 
 const DRAG_THRESHOLD = 3
 
-export class LeaferEngine {
+export interface EditorEngineOptions {
+  container: HTMLElement
+  width?: number
+  height?: number
+  editorConfig?: Record<string, any>
+}
+
+export class EditorEngine {
   readonly leafer: Leafer
+  readonly editor: Editor
+  readonly previewGroup: Group
+
   private _destroyed = false
   private _canvas: HTMLCanvasElement | null = null
 
@@ -19,7 +31,7 @@ export class LeaferEngine {
   private _pinching = false
   private _pinchStartDist = 0
   private _pinchStartScale = 1
-  // 绑定的事件引用
+
   private _boundWheel: ((e: WheelEvent) => void) | null = null
   private _boundPointerDown: ((e: PointerEvent) => void) | null = null
   private _boundPointerMove: ((e: PointerEvent) => void) | null = null
@@ -29,16 +41,20 @@ export class LeaferEngine {
   private _boundTouchEnd: ((e: TouchEvent) => void) | null = null
   private _doubleTapOff: (() => void) | null = null
 
-  constructor(container: HTMLElement, config?: Record<string, any>) {
-    const width = container.clientWidth || 800
-    const height = container.clientHeight || 600
+  constructor(options: EditorEngineOptions) {
+    const { container, editorConfig } = options
+    const width = options.width || container.clientWidth || 800
+    const height = options.height || container.clientHeight || 600
 
-    this.leafer = new Leafer({
-      view: container,
-      width,
-      height,
-      ...config,
-    })
+    this.leafer = new Leafer({ view: container, width, height })
+
+    // 预览层（最顶层，用于绘制工具预览）
+    this.previewGroup = new Group({ id: 'preview-layer' })
+    this.leafer.add(this.previewGroup)
+
+    // Editor 插件实例
+    this.editor = new Editor(editorConfig)
+    this.leafer.add(this.editor)
 
     this.leafer.waitViewReady(() => {
       this._canvas = this.leafer.canvas.view as HTMLCanvasElement
@@ -51,9 +67,7 @@ export class LeaferEngine {
   private _setupManualEvents(): void {
     if (!this._canvas) return
 
-    // 防止浏览器手势（移动端滚动、缩放）拦截触摸事件
     this._canvas.style.touchAction = 'none'
-    // 消除移动端 tap 高亮闪烁
     ;(this._canvas.style as any).webkitTapHighlightColor = 'transparent'
 
     // —— 桌面端滚轮缩放 ——
@@ -67,7 +81,7 @@ export class LeaferEngine {
       this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
     }
 
-    // —— 单指拖拽（PC + 移动端） ——
+    // —— 单指拖拽 ——
     this._boundPointerDown = (e: PointerEvent) => {
       if (this._pinching) return
       this._pointerDown = true
@@ -79,14 +93,12 @@ export class LeaferEngine {
 
     this._boundPointerMove = (e: PointerEvent) => {
       if (!this._pointerDown || this._pinching) return
-
       if (!this._dragStarted) {
         const dx = e.clientX - this._downClient.x
         const dy = e.clientY - this._downClient.y
         if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return
         this._dragStarted = true
       }
-
       const dx = e.clientX - this._downClient.x
       const dy = e.clientY - this._downClient.y
       this.leafer.x = this._startViewX + dx
@@ -98,7 +110,7 @@ export class LeaferEngine {
       this._dragStarted = false
     }
 
-    // —— 双指缩放（移动端 pinch-to-zoom） ——
+    // —— 双指缩放 ——
     this._boundTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         this._pinching = true
@@ -115,7 +127,6 @@ export class LeaferEngine {
     this._boundTouchMove = (e: TouchEvent) => {
       if (!this._pinching || e.touches.length !== 2) return
       e.preventDefault()
-
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -126,9 +137,7 @@ export class LeaferEngine {
         clientY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
       })
       if (!local) return
-
-      const currentScale = this.scale
-      const changeScale = targetScale / currentScale
+      const changeScale = targetScale / this.scale
       this.leafer.scaleOfWorld(local, changeScale)
       this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
     }
@@ -144,7 +153,7 @@ export class LeaferEngine {
       }
     }
 
-    // —— 双击缩放（移动端） ——
+    // —— 双击缩放 ——
     this._doubleTapOff = this.leafer.on_(LeaferPointer.DOUBLE_TAP, (e: any) => {
       const local = this.leafer.interaction?.getLocal({ clientX: e.clientX ?? e.x, clientY: e.clientY ?? e.y })
       if (!local) return
@@ -181,7 +190,14 @@ export class LeaferEngine {
         const l: any = this.leafer
         if (l.zoom) {
           l.zoom('fit', padding, undefined, true)
+          // viewport 插件的 zoom('fit') 可能不触发 ZoomEvent.END，手动 emit
+          setTimeout(() => {
+            this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
+            resolve()
+          }, 350)
+          return
         }
+        this._manualFitContent(padding)
         setTimeout(resolve, 350)
       }
       if (this.leafer.viewReady) {
@@ -190,6 +206,63 @@ export class LeaferEngine {
         this.leafer.waitViewReady(doFit)
       }
     })
+  }
+
+  private _manualFitContent(padding: number): void {
+    try {
+      const bounds = this._getContentBounds()
+      if (!bounds || bounds.width === 0 || bounds.height === 0) return
+
+      const viewW = this.leafer.width ?? 800
+      const viewH = this.leafer.height ?? 600
+      const availW = viewW - padding * 2
+      const availH = viewH - padding * 2
+      const scaleW = availW / bounds.width
+      const scaleH = availH / bounds.height
+      const newScale = Math.min(scaleW, scaleH, 2)
+
+      const contentCX = bounds.x + bounds.width / 2
+      const contentCY = bounds.y + bounds.height / 2
+
+      this.leafer.scaleOfWorld(
+        { x: contentCX, y: contentCY },
+        newScale / (this.scale || 1)
+      )
+
+      // 平移使内容居中
+      const newCX = viewW / 2
+      const newCY = viewH / 2
+      this.leafer.x = newCX - contentCX * newScale
+      this.leafer.y = newCY - contentCY * newScale
+      ;(this.leafer as any).__updateViewPort?.()
+
+      this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
+    } catch (e) {
+      console.warn('[EditorEngine] _manualFitContent error:', e)
+    }
+  }
+
+  private _getContentBounds(): { x: number; y: number; width: number; height: number } | null {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    const collectBounds = (node: any) => {
+      if (!node || node === this.previewGroup || node === this.editor) return
+      const w = node.width ?? 0
+      const h = node.height ?? 0
+      if (w > 0 && h > 0) {
+        const x = node.x ?? 0
+        const y = node.y ?? 0
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x + w)
+        maxY = Math.max(maxY, y + h)
+      }
+      if (node.children) {
+        node.children.forEach((c: any) => collectBounds(c))
+      }
+    }
+    ;(this.leafer as any).tree?.children?.forEach((c: any) => collectBounds(c))
+    if (minX === Infinity) return null
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
   }
 
   onZoomChange(handler: (scale: number) => void): void {

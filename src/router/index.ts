@@ -4,7 +4,12 @@ import type { RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/designer'
+    redirect: '/editor'
+  },
+  {
+    path: '/editor',
+    name: 'Editor',
+    component: () => import('../components/LeaferDesigner.vue')
   },
   {
     path: '/designer',

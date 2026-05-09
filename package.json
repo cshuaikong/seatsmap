@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",
+    "@leafer-in/editor": "^2.1.0",
+    "@leafer-in/resize": "^2.1.0",
     "@leafer-in/view": "^2.1.0",
     "@leafer-in/viewport": "^2.1.0",
     "@leafer-ui/core": "^2.1.0",
