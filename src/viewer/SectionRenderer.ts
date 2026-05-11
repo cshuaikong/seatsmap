@@ -113,8 +113,10 @@ export class SectionRenderer {
       })
     }
     if (shape.type === 'ellipse') {
+      // store 存的是 bounding-box 左上角，Ellipse 原点在中心需转换
       return new Ellipse({
-        x: shape.x, y: shape.y,
+        x: shape.x + (shape.width ?? 100) / 2,
+        y: shape.y + (shape.height ?? 100) / 2,
         width: shape.width ?? 100, height: shape.height ?? 100,
         fill: shape.fill || 'rgba(156,163,175,0.6)',
         stroke: shape.stroke, strokeWidth: shape.strokeWidth,

@@ -181,7 +181,12 @@ export class EditorBridge {
       case 'shape': {
         const width = target.width ?? meta.shapeData?.width ?? 100
         const height = target.height ?? meta.shapeData?.height ?? 100
-        this.opts.updateShapeData(meta.id, x, y, width, height, rotation)
+        // Ellipse/Sector 的 Leafer 原点在中心，store 存左上角，需转换
+        const shapeType = meta.shapeData?.type
+        const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
+        const storeX = isCenterOrigin ? x - width / 2 : x
+        const storeY = isCenterOrigin ? y - height / 2 : y
+        this.opts.updateShapeData(meta.id, storeX, storeY, width, height, rotation)
         break
       }
       case 'text': {
@@ -217,7 +222,13 @@ export class EditorBridge {
       case 'section': {
         const width = target.width ?? 100
         const height = target.height ?? 100
-        this.opts.updateShapeData(meta.id, target.x ?? 0, target.y ?? 0, width, height, target.rotation ?? 0)
+        const x = target.x ?? 0
+        const y = target.y ?? 0
+        const shapeType = meta.shapeData?.type
+        const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
+        const storeX = isCenterOrigin ? x - width / 2 : x
+        const storeY = isCenterOrigin ? y - height / 2 : y
+        this.opts.updateShapeData(meta.id, storeX, storeY, width, height, target.rotation ?? 0)
         break
       }
       case 'text': {
@@ -246,9 +257,18 @@ export class EditorBridge {
       case 'row':
         this.opts.updateRowPosition(meta.id, target.x ?? 0, target.y ?? 0, target.rotation ?? 0)
         break
-      case 'shape':
-        this.opts.updateShapeData(meta.id, target.x ?? 0, target.y ?? 0, undefined, undefined, target.rotation ?? 0)
+      case 'shape': {
+        const x = target.x ?? 0
+        const y = target.y ?? 0
+        const width = target.width ?? meta.shapeData?.width ?? 100
+        const height = target.height ?? meta.shapeData?.height ?? 100
+        const shapeType = meta.shapeData?.type
+        const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
+        const storeX = isCenterOrigin ? x - width / 2 : x
+        const storeY = isCenterOrigin ? y - height / 2 : y
+        this.opts.updateShapeData(meta.id, storeX, storeY, undefined, undefined, target.rotation ?? 0)
         break
+      }
       case 'text':
         this.opts.updateTextData(meta.id, target.x ?? 0, target.y ?? 0, undefined, target.rotation ?? 0)
         break

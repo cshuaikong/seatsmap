@@ -10,6 +10,8 @@ export interface EditorEngineOptions {
   width?: number
   height?: number
   editorConfig?: Record<string, any>
+  /** 返回 true 时跳过 EditorEngine 的拖拽平移，用于绘制工具激活时 */
+  shouldPan?: () => boolean
 }
 
 export class EditorEngine {
@@ -17,6 +19,7 @@ export class EditorEngine {
   readonly editor: Editor
   readonly previewGroup: Group
 
+  private _options: EditorEngineOptions
   private _destroyed = false
   private _canvas: HTMLCanvasElement | null = null
 
@@ -42,6 +45,7 @@ export class EditorEngine {
   private _doubleTapOff: (() => void) | null = null
 
   constructor(options: EditorEngineOptions) {
+    this._options = options
     const { container, editorConfig } = options
     const width = options.width || container.clientWidth || 800
     const height = options.height || container.clientHeight || 600
@@ -84,6 +88,7 @@ export class EditorEngine {
     // —— 单指拖拽 ——
     this._boundPointerDown = (e: PointerEvent) => {
       if (this._pinching) return
+      if (this._options.shouldPan?.() === false) return
       this._pointerDown = true
       this._dragStarted = false
       this._downClient = { x: e.clientX, y: e.clientY }
@@ -180,6 +185,10 @@ export class EditorEngine {
     return this.leafer.scaleX ?? (this.leafer as any).__zoomLayer?.scaleX ?? 1
   }
 
+  get canvasElement(): HTMLCanvasElement | null {
+    return this._canvas
+  }
+
   get destroyed(): boolean {
     return this._destroyed
   }
@@ -187,16 +196,6 @@ export class EditorEngine {
   fitContent(padding: number = 50): Promise<void> {
     return new Promise(resolve => {
       const doFit = () => {
-        const l: any = this.leafer
-        if (l.zoom) {
-          l.zoom('fit', padding, undefined, true)
-          // viewport 插件的 zoom('fit') 可能不触发 ZoomEvent.END，手动 emit
-          setTimeout(() => {
-            this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
-            resolve()
-          }, 350)
-          return
-        }
         this._manualFitContent(padding)
         setTimeout(resolve, 350)
       }
@@ -224,19 +223,23 @@ export class EditorEngine {
       const contentCX = bounds.x + bounds.width / 2
       const contentCY = bounds.y + bounds.height / 2
 
-      this.leafer.scaleOfWorld(
-        { x: contentCX, y: contentCY },
-        newScale / (this.scale || 1)
-      )
+      // 使用 viewport 插件的 zoom('set') 设置缩放
+      const l: any = this.leafer
+      if (l.zoom) {
+        l.zoom('set', newScale, undefined, true)
+      } else {
+        this.leafer.scaleOfWorld(
+          { x: contentCX, y: contentCY },
+          newScale / (this.scale || 1)
+        )
+      }
 
       // 平移使内容居中
-      const newCX = viewW / 2
-      const newCY = viewH / 2
-      this.leafer.x = newCX - contentCX * newScale
-      this.leafer.y = newCY - contentCY * newScale
+      this.leafer.x = viewW / 2 - contentCX * newScale
+      this.leafer.y = viewH / 2 - contentCY * newScale
       ;(this.leafer as any).__updateViewPort?.()
 
-      this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
+      this.leafer.emit(ZoomEvent.END, { scale: newScale, totalScale: newScale } as any)
     } catch (e) {
       console.warn('[EditorEngine] _manualFitContent error:', e)
     }
@@ -244,23 +247,49 @@ export class EditorEngine {
 
   private _getContentBounds(): { x: number; y: number; width: number; height: number } | null {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    const collectBounds = (node: any) => {
+    const collectBounds = (node: any, depth: number = 0) => {
       if (!node || node === this.previewGroup || node === this.editor) return
+      // 遍历 children 而非依赖 width/height（Line 元素没有 width/height）
+      if (node.children && node.children.length > 0) {
+        node.children.forEach((c: any) => collectBounds(c, depth + 1))
+      }
+      // 叶子节点或有位置的节点：使用实际坐标和尺寸
       const w = node.width ?? 0
       const h = node.height ?? 0
-      if (w > 0 && h > 0) {
+      if (w > 0 || h > 0) {
         const x = node.x ?? 0
         const y = node.y ?? 0
-        minX = Math.min(minX, x)
-        minY = Math.min(minY, y)
-        maxX = Math.max(maxX, x + w)
-        maxY = Math.max(maxY, y + h)
+        // 对于 Ellipse，(x,y) 是中心点，width/height 是直径
+        const tag = node.tag ?? node.className ?? ''
+        if (tag === 'Ellipse' || node.leafType === 'ellipse') {
+          minX = Math.min(minX, x - w / 2)
+          minY = Math.min(minY, y - h / 2)
+          maxX = Math.max(maxX, x + w / 2)
+          maxY = Math.max(maxY, y + h / 2)
+        } else {
+          minX = Math.min(minX, x)
+          minY = Math.min(minY, y)
+          maxX = Math.max(maxX, x + w)
+          maxY = Math.max(maxY, y + h)
+        }
       }
-      if (node.children) {
-        node.children.forEach((c: any) => collectBounds(c))
+      // 对于 Line 元素，检查 points
+      if (node.points && Array.isArray(node.points)) {
+        const pts = node.points
+        const nx = node.x ?? 0
+        const ny = node.y ?? 0
+        for (let i = 0; i < pts.length; i += 2) {
+          minX = Math.min(minX, nx + pts[i])
+          minY = Math.min(minY, ny + pts[i + 1])
+          maxX = Math.max(maxX, nx + pts[i])
+          maxY = Math.max(maxY, ny + pts[i + 1])
+        }
       }
     }
-    ;(this.leafer as any).tree?.children?.forEach((c: any) => collectBounds(c))
+    // 直接从 leafer children 开始遍历
+    if ((this.leafer as any).children) {
+      ;(this.leafer as any).children.forEach((c: any) => collectBounds(c))
+    }
     if (minX === Infinity) return null
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
   }

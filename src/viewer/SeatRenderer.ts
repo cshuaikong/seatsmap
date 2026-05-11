@@ -156,6 +156,7 @@ export class SeatRenderer {
           x, y,
           width: logicalRadius * 2,
           height: logicalRadius * 2,
+          around: 'center',
           fill: color,
         })
 
@@ -164,6 +165,7 @@ export class SeatRenderer {
           x, y,
           width: (logicalRadius + 1 / baseScale + strokeW / 2) * 2,
           height: (logicalRadius + 1 / baseScale + strokeW / 2) * 2,
+          around: 'center',
           stroke: borderColor,
           strokeWidth: strokeW,
           fill: 'transparent',
@@ -181,6 +183,7 @@ export class SeatRenderer {
           x, y,
           width: logicalRadius * 2,
           height: logicalRadius * 2,
+          around: 'center',
           fill: color,
           stroke: borderColor,
           strokeWidth: strokeW,

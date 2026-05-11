@@ -285,13 +285,11 @@ const currentToolLabel = computed(() => {
     'row-straight': '单行座位',
     'section': '分段座位',
     'section-diagonal': '多行座位',
-    'draw_rect': '方形区域',
-    'draw_ellipse': '圆形/椭圆',
-    'draw_polygon': '多边形',
-    'draw_polyline': '折线',
-    'draw_sector': '扇形',
-    'draw_text': '文字标注',
-    'draw_area': '区域',
+    'drawRect': '方形区域',
+    'drawPolygon': '多边形',
+    'drawPolyline': '折线',
+    'text': '文字标注',
+    'image': '图片',
   }
   return labels[currentTool.value] || currentTool.value
 })
@@ -305,12 +303,10 @@ watch(currentTool, (newTool) => {
     'row-straight': 'row-straight',
     'section': 'section',
     'section-diagonal': 'section-diagonal',
-    'drawCircle': 'draw_ellipse',
     'drawRect': 'draw_rect',
     'drawPolygon': 'draw_polygon',
     'drawPolyline': 'draw_polyline',
-    'drawSector': 'draw_sector',
-    'drawRoundTable': 'draw_ellipse',
+    'drawSector': 'select',
     'text': 'draw_text',
     'image': 'select',
   }

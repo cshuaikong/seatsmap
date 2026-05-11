@@ -57,15 +57,6 @@
 
     <!-- 6-11. 座位区工具 -->
     <div class="toolbar-section">
-      <!-- 圆形 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawCircle' }"
-        title="圆形区域"
-        @click="onToolChange('drawCircle')"
-      >
-        <i class="iconfont icon-yuanxingxuankuang tool-iconfont"></i>
-      </button>
       <!-- 矩形 -->
       <button 
         class="tool-item"
@@ -92,24 +83,6 @@
         @click="onToolChange('drawPolyline')"
       >
         <i class="iconfont icon-xianduan tool-iconfont"></i>
-      </button>
-      <!-- 扇形 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawSector' }"
-        title="扇形"
-        @click="onToolChange('drawSector')"
-      >
-        <i class="iconfont icon-shanxing tool-iconfont"></i>
-      </button>
-      <!-- 圆桌 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawRoundTable' }"
-        title="圆桌"
-        @click="onToolChange('drawRoundTable')"
-      >
-        <i class="iconfont icon-yuanzhuo2 tool-iconfont"></i>
       </button>
     </div>
     <div class="toolbar-divider"></div>

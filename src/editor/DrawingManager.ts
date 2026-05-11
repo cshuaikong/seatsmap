@@ -9,6 +9,13 @@ const SEAT_SPACING = defaultSeatMapConfig.defaultSeatSpacing
 const ROW_SPACING = defaultSeatMapConfig.defaultRowSpacing
 const SNAP_TO_START_DISTANCE = 15
 
+// 预览颜色（浅色透明，避免遮挡底层元素）
+const PREVIEW_STROKE = 'rgba(59,130,246,0.45)'
+const PREVIEW_FILL = 'rgba(59,130,246,0.18)'
+const PREVIEW_LABEL = 'rgba(59,130,246,0.55)'
+const PREVIEW_MULTI_STROKE = 'rgba(255,152,0,0.50)'
+const PREVIEW_MULTI_LABEL = 'rgba(0,0,0,0.50)'
+
 export type DrawStep = 'idle' | 'first' | 'second' | 'third'
 
 export interface DrawingManagerOptions {
@@ -27,6 +34,7 @@ export class DrawingManager {
   private _seatCurrentPos: Position | null = null
   private _polygonPoints: Position[] = []
   private _dragStartPos: Position | null = null
+  private _dragEndPos: Position | null = null
   private _previewElements: any[] = []
   private _multiRowStep: DrawStep = 'idle'
   private _multiRowStart: Position | null = null
@@ -44,8 +52,8 @@ export class DrawingManager {
   get isDrawing(): boolean {
     const drawingTools = [
       'row-straight', 'section', 'section-diagonal',
-      'draw_rect', 'draw_ellipse', 'draw_polygon',
-      'draw_polyline', 'draw_sector', 'draw_text', 'draw_area'
+      'draw_rect', 'draw_polygon',
+      'draw_polyline', 'draw_text', 'draw_area'
     ]
     return drawingTools.includes(this._currentTool)
   }
@@ -61,6 +69,7 @@ export class DrawingManager {
     this._seatCurrentPos = null
     this._polygonPoints = []
     this._dragStartPos = null
+    this._dragEndPos = null
     this._multiRowStep = 'idle'
     this._multiRowStart = null
     this._multiRowEnd = null
@@ -79,11 +88,11 @@ export class DrawingManager {
         this._onMultiRowDown(pos)
         break
       case 'draw_rect':
-      case 'draw_ellipse':
-      case 'drawRoundTable':
         this._onShapeDragStart(pos)
         break
       case 'draw_polygon':
+      case 'draw_polyline':
+      case 'draw_area':
         this._onPolygonClick(pos)
         break
       case 'draw_text':
@@ -102,11 +111,11 @@ export class DrawingManager {
         this._onMultiRowMove(pos)
         break
       case 'draw_rect':
-      case 'draw_ellipse':
-      case 'drawRoundTable':
         this._onShapeDragMove(pos)
         break
       case 'draw_polygon':
+      case 'draw_polyline':
+      case 'draw_area':
         this._onPolygonMove(pos)
         break
     }
@@ -115,8 +124,6 @@ export class DrawingManager {
   handlePointerUp(_pos: Position): void {
     switch (this._currentTool) {
       case 'draw_rect':
-      case 'draw_ellipse':
-      case 'drawRoundTable':
         this._onShapeDragEnd()
         break
     }
@@ -173,8 +180,9 @@ export class DrawingManager {
     for (let i = 0; i < count; i++) {
       seats.push({
         id: generateId(),
-        x: this._seatStartPos.x + ux * spacing * i,
-        y: this._seatStartPos.y + uy * spacing * i,
+        // 相对 row origin 的偏移量，与 SeatRenderer 的 rowX + pos.x 约定一致
+        x: ux * spacing * i,
+        y: uy * spacing * i,
         status: 'available',
         categoryKey: 'default',
         label: String(i + 1),
@@ -259,8 +267,8 @@ export class DrawingManager {
       }
       const line = new Line({
         points,
-        stroke: '#ff9800',
-        strokeWidth: 2,
+        stroke: PREVIEW_MULTI_STROKE,
+        strokeWidth: (store.visualConfig?.radius ?? 6) * 2 / baseScale,
         strokeCap: 'round',
         opacity: 0.8,
       })
@@ -276,7 +284,7 @@ export class DrawingManager {
       x: cx, y: cy,
       text: `${count}×${rowCount} = ${total}座`,
       fontSize: 14,
-      fill: '#333',
+      fill: PREVIEW_MULTI_LABEL,
       textAlign: 'center',
     })
     this.previewGroup.add(label)
@@ -314,8 +322,9 @@ export class DrawingManager {
       for (let i = 0; i < count; i++) {
         seats.push({
           id: generateId(),
-          x: this._multiRowStart.x + ux * spacing * i + offsetX,
-          y: this._multiRowStart.y + uy * spacing * i + offsetY,
+          // 相对 row origin 的偏移量
+          x: ux * spacing * i,
+          y: uy * spacing * i,
           status: 'available',
           categoryKey: 'default',
           label: String(i + 1),
@@ -343,6 +352,7 @@ export class DrawingManager {
 
   private _onShapeDragMove(pos: Position): void {
     if (!this._dragStartPos) return
+    this._dragEndPos = pos
     this._clearPreview()
 
     const x = Math.min(this._dragStartPos.x, pos.x)
@@ -355,47 +365,78 @@ export class DrawingManager {
     if (this._currentTool === 'draw_rect') {
       const rect = new Rect({
         x, y, width: w, height: h,
-        fill: 'rgba(59,130,246,0.15)',
-        stroke: '#3b82f6',
+        fill: PREVIEW_FILL,
+        stroke: PREVIEW_STROKE,
         strokeWidth: 2,
       })
       this.previewGroup.add(rect)
       this._previewElements.push(rect)
-    } else {
-      // ellipse / roundTable
-      const ellipse = new Ellipse({
-        x: x + w / 2, y: y + h / 2,
-        width: w, height: h,
-        fill: 'rgba(59,130,246,0.15)',
-        stroke: '#3b82f6',
-        strokeWidth: 2,
-      })
-      this.previewGroup.add(ellipse)
-      this._previewElements.push(ellipse)
     }
   }
 
   private _onShapeDragEnd(): void {
-    if (!this._dragStartPos) return
+    if (!this._dragStartPos || !this._dragEndPos) return
     this._clearPreview()
 
     const store = useVenueStore()
+    const x = Math.min(this._dragStartPos.x, this._dragEndPos.x)
+    const y = Math.min(this._dragStartPos.y, this._dragEndPos.y)
+    const w = Math.abs(this._dragEndPos.x - this._dragStartPos.x)
+    const h = Math.abs(this._dragEndPos.y - this._dragStartPos.y)
 
-    // Use last drag info (stored in preview elements)
-    this._dragStartPos = null
+    if (w < 5 && h < 5) {
+      this._dragStartPos = null
+      this._dragEndPos = null
+      return
+    }
+
+    let sectionId: string
+    if (store.venue.sections.length === 0) {
+      sectionId = store.addSection({ name: '默认区域', rows: [], x: 0, y: 0 })
+    } else {
+      sectionId = store.venue.sections[0].id
+    }
+
+    if (this._currentTool === 'draw_rect') {
+      // Rect 原点为左上角，直接存左上角坐标，与 SectionRenderer 一致
+      store.addShape(sectionId, {
+        type: 'rect',
+        x,
+        y,
+        width: w,
+        height: h,
+        rotation: 0,
+        fill: 'rgba(59,130,246,0.15)',
+        stroke: '#3b82f6',
+        strokeWidth: 2,
+      })
+    }
+
     store.saveHistory()
+    this._dragStartPos = null
+    this._dragEndPos = null
     this._onRenderAll()
   }
 
   // ==================== 多边形 ====================
 
   private _onPolygonClick(pos: Position): void {
-    // 检查是否闭合（点击起点附近）
-    if (this._polygonPoints.length >= 3) {
-      const start = this._polygonPoints[0]
-      const dx = pos.x - start.x
-      const dy = pos.y - start.y
-      if (Math.hypot(dx, dy) < SNAP_TO_START_DISTANCE) {
+    // draw_polyline: 双击完成（由外部处理），不闭合
+    // draw_polygon / draw_area: 点击起点附近闭合
+    if (this._currentTool !== 'draw_polyline') {
+      if (this._polygonPoints.length >= 3) {
+        const start = this._polygonPoints[0]
+        const dx = pos.x - start.x
+        const dy = pos.y - start.y
+        if (Math.hypot(dx, dy) < SNAP_TO_START_DISTANCE) {
+          this._submitPolygon()
+          return
+        }
+      }
+    } else if (this._polygonPoints.length >= 2) {
+      // polyline: double-click to finish (detected by rapid clicks near last point)
+      const last = this._polygonPoints[this._polygonPoints.length - 1]
+      if (Math.hypot(pos.x - last.x, pos.y - last.y) < SNAP_TO_START_DISTANCE) {
         this._submitPolygon()
         return
       }
@@ -421,7 +462,7 @@ export class DrawingManager {
 
     const line = new Line({
       points: flatPoints,
-      stroke: '#3b82f6',
+      stroke: PREVIEW_STROKE,
       strokeWidth: 2,
       strokeCap: 'round',
       strokeJoin: 'round',
@@ -430,18 +471,75 @@ export class DrawingManager {
     this.previewGroup.add(line)
     this._previewElements.push(line)
 
-    // 顶点圆
+    // 顶点圆（around: 'center' 确保圆心在顶点坐标上）
     this._polygonPoints.forEach(p => {
-      const dot = new Ellipse({ x: p.x, y: p.y, width: 8, height: 8, fill: '#3b82f6' })
+      const dot = new Ellipse({
+        x: p.x, y: p.y,
+        width: 10, height: 10,
+        around: 'center',
+        fill: '#ffffff',
+        stroke: PREVIEW_STROKE,
+        strokeWidth: 2,
+        hitFill: 'all',
+      })
       this.previewGroup.add(dot)
       this._previewElements.push(dot)
     })
   }
 
   private _submitPolygon(): void {
-    if (this._polygonPoints.length < 3) return
-
     const store = useVenueStore()
+
+    if (this._currentTool === 'draw_polyline') {
+      if (this._polygonPoints.length < 2) return
+      let sectionId: string
+      if (store.venue.sections.length === 0) {
+        sectionId = store.addSection({ name: '默认区域', rows: [], x: 0, y: 0 })
+      } else {
+        sectionId = store.venue.sections[0].id
+      }
+      const center = calculatePolygonCenter(this._polygonPoints)
+      const relativePoints = toRelativePoints(this._polygonPoints, center)
+      store.addShape(sectionId, {
+        type: 'polyline',
+        x: center.x,
+        y: center.y,
+        rotation: 0,
+        points: relativePoints,
+        fill: 'transparent',
+        stroke: '#3b82f6',
+        strokeWidth: 2,
+      })
+      store.saveHistory()
+      this.resetState()
+      this._onRenderAll()
+      return
+    }
+
+    if (this._currentTool === 'draw_area') {
+      if (this._polygonPoints.length < 3) return
+      let sectionId: string
+      if (store.venue.sections.length === 0) {
+        sectionId = store.addSection({ name: '默认区域', rows: [], x: 0, y: 0 })
+      } else {
+        sectionId = store.venue.sections[0].id
+      }
+      // 存绝对坐标，因为 createArea 渲染时 Polygon 无 x/y 偏移
+      const flatPoints = this._polygonPoints.flatMap(p => [p.x, p.y])
+      store.addArea(sectionId, {
+        type: 'area',
+        label: `区域${store.venue.sections.find(s => s.id === sectionId)?.areas?.length ?? 0 + 1}`,
+        points: flatPoints,
+        fill: 'rgba(59,130,246,0.15)',
+      })
+      store.saveHistory()
+      this.resetState()
+      this._onRenderAll()
+      return
+    }
+
+    // draw_polygon: 创建分区
+    if (this._polygonPoints.length < 3) return
     const center = calculatePolygonCenter(this._polygonPoints)
     const relativePoints = toRelativePoints(this._polygonPoints, center)
 
@@ -488,9 +586,7 @@ export class DrawingManager {
   // ==================== Preview Helpers ====================
 
   private _clearPreview(): void {
-    this._previewElements.forEach(el => {
-      if (el.parent) el.parent.remove(el)
-    })
+    this.previewGroup.clear()
     this._previewElements = []
   }
 
@@ -499,7 +595,8 @@ export class DrawingManager {
     const dot = new Ellipse({
       x: pos.x, y: pos.y,
       width: 8, height: 8,
-      fill: '#3b82f6',
+      around: 'center',
+      fill: PREVIEW_STROKE,
     })
     this.previewGroup.add(dot)
     this._previewElements.push(dot)
@@ -512,6 +609,8 @@ export class DrawingManager {
     const store = useVenueStore()
     const baseScale = store.getBaseScale() || 1
     const spacing = SEAT_SPACING / baseScale
+    const logicalRadius = (store.visualConfig?.radius ?? 6) / baseScale
+    const seatSize = logicalRadius * 2
 
     const { ux, uy, dist } = getUnitVector(this._seatStartPos, this._seatCurrentPos)
     const count = Math.max(1, Math.round(dist / spacing))
@@ -527,8 +626,8 @@ export class DrawingManager {
     // 预览线
     const line = new Line({
       points,
-      stroke: '#3b82f6',
-      strokeWidth: 2,
+      stroke: PREVIEW_STROKE,
+      strokeWidth: seatSize,
       strokeCap: 'round',
       opacity: 0.8,
     })
@@ -541,9 +640,11 @@ export class DrawingManager {
       const y = this._seatStartPos.y + uy * spacing * i
       const dot = new Ellipse({
         x, y,
-        width: 6, height: 6,
-        fill: '#3b82f6',
-        opacity: 0.6,
+        width: seatSize, height: seatSize,
+        around: 'center',
+        fill: PREVIEW_FILL,
+        stroke: PREVIEW_STROKE,
+        strokeWidth: 1,
       })
       this.previewGroup.add(dot)
       this._previewElements.push(dot)
@@ -556,7 +657,7 @@ export class DrawingManager {
       x: midX, y: midY - 14,
       text: String(count),
       fontSize: 14,
-      fill: '#3b82f6',
+      fill: PREVIEW_LABEL,
       textAlign: 'center',
     })
     this.previewGroup.add(label)

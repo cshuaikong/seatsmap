@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { EditorEngine } from '../editor/EditorEngine'
@@ -16,7 +16,7 @@ import { LabelRenderer } from '../viewer/LabelRenderer'
 import { SelectionManager } from '../viewer/SelectionManager'
 import { PathVertexManager } from '../editor/PathVertexManager'
 import { DrawingManager } from '../editor/DrawingManager'
-import { PointerEvent } from 'leafer-ui'
+
 import { darkenColor, getCategoryColor } from '../utils/color'
 
 const props = defineProps<{
@@ -43,8 +43,12 @@ let sectionGroups: any[] = []
 /** 分区 ID → 其 Path 边框元素（用于路径顶点编辑） */
 const sectionPathMap = new Map<string, any>()
 let currentScale = 1
-let isInitialFit = true
 let isSyncing = false
+
+// 绘制工具的 DOM 事件处理器（捕获阶段，用于在 onUnmounted 中清理）
+let boundDrawPointerDown: ((e: PointerEvent) => void) | null = null
+let boundDrawPointerMove: ((e: PointerEvent) => void) | null = null
+let boundDrawPointerUp: ((e: PointerEvent) => void) | null = null
 
 // ==================== 节点元数据映射 (ID → Kind+Data) ====================
 
@@ -186,35 +190,12 @@ const createSeatRenderer = () => {
 }
 
 const renderAll = () => {
-  if (!engine || engine.destroyed) {
-    console.warn('[renderAll] 跳过 — engine:', !!engine, 'destroyed:', engine?.destroyed)
-    return
-  }
-
-  const totalSeats = props.venue.sections.reduce((s, sec) => s + sec.rows.reduce((r, row) => r + row.seats.length, 0), 0)
-  console.log('[renderAll] sections:', props.venue.sections.length, 'total seats:', totalSeats, 'isInitialFit:', isInitialFit)
+  if (!engine || engine.destroyed) return
 
   labelRenderer?.clear()
   buildNodeMeta()
   rebuildSectionLayers()
   createSeatRenderer()
-
-  // 调试：检查 tree 状态
-  const leaferAny = engine.leafer as any
-  console.log('[renderAll] leafer children count:', leaferAny.children?.length ?? leaferAny.__children?.length ?? 'N/A')
-  console.log('[renderAll] leafer scaleX:', engine.leafer.scaleX, 'x:', engine.leafer.x, 'y:', engine.leafer.y)
-  console.log('[renderAll] seatRenderer seatMap size:', seatRenderer?.seatMap.size)
-  console.log('[renderAll] seatRenderer rowLODMap size:', seatRenderer?.rowLODMap.size)
-
-  if (isInitialFit) {
-    isInitialFit = false
-    const hasContent = props.venue.sections.some(s => s.rows.length > 0)
-    if (hasContent) {
-      nextTick(() => {
-        engine?.fitContent(50)
-      })
-    }
-  }
 }
 
 const updateViewState = (scale?: number) => {
@@ -303,7 +284,6 @@ const deleteSelected = () => {
 // ==================== 生命周期 ====================
 
 onMounted(() => {
-  console.log('[LeaferEditor] onMounted START')
   if (!containerRef.value) {
     console.error('[LeaferEditor] containerRef is null!')
     return
@@ -313,13 +293,13 @@ onMounted(() => {
 
   const width = props.width || containerRef.value.clientWidth || 800
   const height = props.height || containerRef.value.clientHeight || 600
-  console.log('[LeaferEditor] creating engine, container size:', containerRef.value.clientWidth, 'x', containerRef.value.clientHeight, 'props:', width, height)
 
   try {
     engine = new EditorEngine({
     container: containerRef.value,
     width,
     height,
+    shouldPan: () => !drawingManager?.isDrawing,
     editorConfig: {
       stroke: '#836DFF',
       pointSize: 10,
@@ -365,25 +345,45 @@ onMounted(() => {
     onRenderAll: renderAll,
   })
 
-  // 为绘制工具注册全局 Pointer 事件
-  const leafer = engine.leafer
-  if (leafer) {
-    leafer.on(PointerEvent.DOWN, (e: any) => {
+  // 为绘制工具注册 DOM 捕获阶段事件（早于 EditorEngine 的冒泡阶段 pan 处理）
+  engine.leafer.waitViewReady(() => {
+    const canvas = engine!.canvasElement
+    if (!canvas) return
+
+    /** 屏幕坐标 → 世界坐标：逆变换 = (client - rect - pan) / scale */
+    const screenToWorld = (clientX: number, clientY: number) => {
+      const l = engine!.leafer as any
+      const rect = canvas.getBoundingClientRect()
+      const sx = clientX - rect.left
+      const sy = clientY - rect.top
+      const zl = l.__zoomLayer
+      const scaleX = l.scaleX ?? zl?.scaleX ?? 1
+      const scaleY = l.scaleY ?? zl?.scaleY ?? 1
+      const panX = l.x ?? zl?.x ?? 0
+      const panY = l.y ?? zl?.y ?? 0
+      return { x: (sx - panX) / scaleX, y: (sy - panY) / scaleY }
+    }
+
+    boundDrawPointerDown = (e: PointerEvent) => {
       if (!drawingManager?.isDrawing) return
-      const pos = { x: e.x ?? e.worldX ?? 0, y: e.y ?? e.worldY ?? 0 }
-      drawingManager.handlePointerDown(pos)
-    })
-    leafer.on(PointerEvent.MOVE, (e: any) => {
+      e.stopPropagation()
+      e.preventDefault()
+      drawingManager.handlePointerDown(screenToWorld(e.clientX, e.clientY))
+    }
+    boundDrawPointerMove = (e: PointerEvent) => {
       if (!drawingManager?.isDrawing) return
-      const pos = { x: e.x ?? e.worldX ?? 0, y: e.y ?? e.worldY ?? 0 }
-      drawingManager.handlePointerMove(pos)
-    })
-    leafer.on(PointerEvent.UP, (e: any) => {
+      e.stopPropagation()
+      drawingManager.handlePointerMove(screenToWorld(e.clientX, e.clientY))
+    }
+    boundDrawPointerUp = (e: PointerEvent) => {
       if (!drawingManager?.isDrawing) return
-      const pos = { x: e.x ?? e.worldX ?? 0, y: e.y ?? e.worldY ?? 0 }
-      drawingManager.handlePointerUp(pos)
-    })
-  }
+      e.stopPropagation()
+      drawingManager.handlePointerUp(screenToWorld(e.clientX, e.clientY))
+    }
+    canvas.addEventListener('pointerdown', boundDrawPointerDown, true)
+    canvas.addEventListener('pointermove', boundDrawPointerMove, true)
+    canvas.addEventListener('pointerup', boundDrawPointerUp, true)
+  })
 
   keyboard = new KeyboardManager({
     onUndo: () => { store.undo(); renderAll() },
@@ -417,6 +417,24 @@ onUnmounted(() => {
   keyboard?.unlisten()
   pathVertexManager?.destroy()
   drawingManager?.resetState()
+
+  // 移除绘制工具 DOM 捕获阶段事件
+  const canvas = engine?.canvasElement
+  if (canvas) {
+    if (boundDrawPointerDown) {
+      canvas.removeEventListener('pointerdown', boundDrawPointerDown, true)
+      boundDrawPointerDown = null
+    }
+    if (boundDrawPointerMove) {
+      canvas.removeEventListener('pointermove', boundDrawPointerMove, true)
+      boundDrawPointerMove = null
+    }
+    if (boundDrawPointerUp) {
+      canvas.removeEventListener('pointerup', boundDrawPointerUp, true)
+      boundDrawPointerUp = null
+    }
+  }
+
   engine?.destroy()
   engine = null
   seatRenderer = null
@@ -433,11 +451,7 @@ onUnmounted(() => {
 
 watch(
   () => props.venue.sections,
-  (newSections, oldSections) => {
-    console.log('[watch] sections changed — old:', oldSections?.length, 'new:', newSections?.length, 'isInitialFit:', isInitialFit)
-    if (newSections && newSections.length > 0 && !isInitialFit) {
-      isInitialFit = true
-    }
+  () => {
     renderAll()
   }
 )
@@ -501,10 +515,11 @@ const setDrawingTool = (tool: string) => {
   currentTool = tool
   drawingManager?.setTool(tool)
 
-  // 绘制工具激活时禁用 Editor 的选择/变换
   if (drawingManager?.isDrawing) {
     engine?.editor.cancel()
-    engine?.editor.setAttr?.('hittable', false)
+    ;(engine?.editor as any)?.setAttr?.('hittable', false)
+  } else {
+    ;(engine?.editor as any)?.setAttr?.('hittable', true)
   }
 }
 
@@ -575,7 +590,6 @@ const enterSectionFocus = (sectionId: string) => {
     engine?.leafer.emit?.('zoom.end' as any, { scale: engine?.scale ?? 1 })
   }, 350)
 
-  isInitialFit = false
   renderAll()
 }
 
@@ -597,7 +611,6 @@ const exitSectionFocus = () => {
     engine?.leafer.emit?.('zoom.end' as any, { scale: engine?.scale ?? 1 })
   }, 350)
 
-  isInitialFit = true
   renderAll()
 }
 
@@ -654,6 +667,7 @@ defineExpose({
 
 <style scoped>
 .leafer-editor-container {
+  position: relative;
   width: 100%;
   height: 100%;
   background: white;
