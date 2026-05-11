@@ -354,6 +354,8 @@ const onImportData = async () => {
   const venue = await importSeatMap(file)
   if (venue) {
     venueStore.importVenueData(venue)
+    // 触发画布重渲染（watch 也会触发，此处作为保险）
+    rendererRef.value?.renderAll?.()
     const seatCount = venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
     importStatus.value = 'success'
     importTip.value = `成功导入 ${seatCount} 个座位`

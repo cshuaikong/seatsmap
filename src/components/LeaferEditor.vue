@@ -15,6 +15,8 @@ import { SeatRenderer } from '../viewer/SeatRenderer'
 import { LabelRenderer } from '../viewer/LabelRenderer'
 import { SelectionManager } from '../viewer/SelectionManager'
 import { PathVertexManager } from '../editor/PathVertexManager'
+import { DrawingManager } from '../editor/DrawingManager'
+import { PointerEvent } from 'leafer-ui'
 import { darkenColor, getCategoryColor } from '../utils/color'
 
 const props = defineProps<{
@@ -36,6 +38,7 @@ let selectionManager: SelectionManager | null = null
 let editorBridge: EditorBridge | null = null
 let keyboard: KeyboardManager | null = null
 let pathVertexManager: PathVertexManager | null = null
+let drawingManager: DrawingManager | null = null
 let sectionGroups: any[] = []
 /** 分区 ID → 其 Path 边框元素（用于路径顶点编辑） */
 const sectionPathMap = new Map<string, any>()
@@ -357,6 +360,31 @@ onMounted(() => {
     setSyncing: (v: boolean) => { isSyncing = v },
   })
 
+  drawingManager = new DrawingManager({
+    previewGroup: engine.previewGroup,
+    onRenderAll: renderAll,
+  })
+
+  // 为绘制工具注册全局 Pointer 事件
+  const leafer = engine.leafer
+  if (leafer) {
+    leafer.on(PointerEvent.DOWN, (e: any) => {
+      if (!drawingManager?.isDrawing) return
+      const pos = { x: e.x ?? e.worldX ?? 0, y: e.y ?? e.worldY ?? 0 }
+      drawingManager.handlePointerDown(pos)
+    })
+    leafer.on(PointerEvent.MOVE, (e: any) => {
+      if (!drawingManager?.isDrawing) return
+      const pos = { x: e.x ?? e.worldX ?? 0, y: e.y ?? e.worldY ?? 0 }
+      drawingManager.handlePointerMove(pos)
+    })
+    leafer.on(PointerEvent.UP, (e: any) => {
+      if (!drawingManager?.isDrawing) return
+      const pos = { x: e.x ?? e.worldX ?? 0, y: e.y ?? e.worldY ?? 0 }
+      drawingManager.handlePointerUp(pos)
+    })
+  }
+
   keyboard = new KeyboardManager({
     onUndo: () => { store.undo(); renderAll() },
     onRedo: () => { store.redo(); renderAll() },
@@ -364,6 +392,7 @@ onMounted(() => {
     onEscape: () => {
       if (currentTool !== 'select') {
         currentTool = 'select'
+        drawingManager?.setTool('select')
         return
       }
       store.clearSelection()
@@ -387,6 +416,7 @@ onUnmounted(() => {
   editorBridge?.unlisten()
   keyboard?.unlisten()
   pathVertexManager?.destroy()
+  drawingManager?.resetState()
   engine?.destroy()
   engine = null
   seatRenderer = null
@@ -395,6 +425,7 @@ onUnmounted(() => {
   editorBridge = null
   keyboard = null
   pathVertexManager = null
+  drawingManager = null
   sectionGroups = []
 })
 
@@ -468,6 +499,13 @@ const updateViewportCulling = () => {
 
 const setDrawingTool = (tool: string) => {
   currentTool = tool
+  drawingManager?.setTool(tool)
+
+  // 绘制工具激活时禁用 Editor 的选择/变换
+  if (drawingManager?.isDrawing) {
+    engine?.editor.cancel()
+    engine?.editor.setAttr?.('hittable', false)
+  }
 }
 
 const enterSectionFocus = (sectionId: string) => {
