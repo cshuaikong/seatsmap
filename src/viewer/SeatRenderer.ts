@@ -14,6 +14,7 @@ export interface SeatRenderConfig {
 interface RowLODGroups {
   lineGroup: Group
   circleGroup: Group
+  rowGroup?: Group
 }
 
 export class SeatRenderer {
@@ -26,19 +27,22 @@ export class SeatRenderer {
   private getCategoryColor: (key: string | number) => string
   private darkenColor: (color: string, percent: number) => string
   private onSeatClick?: (seat: Seat, row: SeatRow, section: Section) => void
+  private editMode: boolean
 
   constructor(
     venue: VenueData,
     config: SeatRenderConfig,
     getCategoryColor: (key: string | number) => string,
     darkenColor: (color: string, percent: number) => string,
-    onSeatClick?: (seat: Seat, row: SeatRow, section: Section) => void
+    onSeatClick?: (seat: Seat, row: SeatRow, section: Section) => void,
+    editMode?: boolean,
   ) {
     this.venue = venue
     this.config = config
     this.getCategoryColor = getCategoryColor
     this.darkenColor = darkenColor
     this.onSeatClick = onSeatClick
+    this.editMode = editMode ?? false
     this.rootGroup = new Group({ id: 'seat-root' })
   }
 
@@ -63,17 +67,29 @@ export class SeatRenderer {
 
         const curvedPositions = calculateCurvedPositions(row.seats, curve)
 
-        // LOD Level 1: 座位条（连续线条）
         const lineGroup = new Group({ id: `line-${row.id}`, visible: false })
-        this.createSeatLine(lineGroup, row, curvedPositions, rowX, rowY, rotation)
-
-        // LOD Level 2: 圆形座位
         const circleGroup = new Group({ id: `circle-${row.id}`, visible: false })
-        this.createSeatCircles(circleGroup, row, section, curvedPositions, rowX, rowY, rotation, logicalRadius)
 
-        this.rowLODMap.set(row.id, { lineGroup, circleGroup })
-        sectionGroup.add(lineGroup)
-        sectionGroup.add(circleGroup)
+        let rowGroup: Group | undefined
+        if (this.editMode) {
+          // 编辑模式：rowGroup 承载位置和旋转，内部坐标相对于 rowGroup
+          this.createSeatLine(lineGroup, row, curvedPositions, 0)
+          this.createSeatCircles(circleGroup, row, section, curvedPositions, 0, logicalRadius)
+
+          rowGroup = new Group({ id: `row-${row.id}`, x: rowX, y: rowY, rotation, editable: true })
+          rowGroup.add(lineGroup)
+          rowGroup.add(circleGroup)
+          sectionGroup.add(rowGroup)
+        } else {
+          // 预览模式：手动应用偏移和旋转
+          this.createSeatLine(lineGroup, row, curvedPositions, rotation, rowX, rowY)
+          this.createSeatCircles(circleGroup, row, section, curvedPositions, rotation, logicalRadius, rowX, rowY)
+
+          sectionGroup.add(lineGroup)
+          sectionGroup.add(circleGroup)
+        }
+
+        this.rowLODMap.set(row.id, { lineGroup, circleGroup, rowGroup: this.editMode ? rowGroup : undefined })
       })
 
       this.rootGroup.add(sectionGroup)
@@ -85,19 +101,22 @@ export class SeatRenderer {
     group: Group,
     row: SeatRow,
     positions: Array<{ x: number; y: number }>,
-    rowX: number,
-    rowY: number,
-    rotation: number
+    rotation: number,
+    offsetX?: number,
+    offsetY?: number,
   ): void {
     if (row.seats.length === 0) return
 
+    const ox = offsetX ?? 0
+    const oy = offsetY ?? 0
+
     const points: number[] = []
     positions.forEach(pos => {
-      points.push(rowX + pos.x, rowY + pos.y)
+      points.push(ox + pos.x, oy + pos.y)
     })
 
     const rotatedPoints = rotation
-      ? this.applyRotation(points, rowX, rowY, rotation)
+      ? this.applyRotation(points, ox, oy, rotation)
       : points
 
     const color = row.seats[0]
@@ -124,24 +143,26 @@ export class SeatRenderer {
     row: SeatRow,
     section: Section,
     positions: Array<{ x: number; y: number }>,
-    rowX: number,
-    rowY: number,
     rotation: number,
-    logicalRadius: number
+    logicalRadius: number,
+    offsetX?: number,
+    offsetY?: number,
   ): void {
     const { borderWidth, baseScale } = this.config
+    const ox = offsetX ?? 0
+    const oy = offsetY ?? 0
 
     row.seats.forEach((seat, index) => {
       const pos = positions[index]
-      let x = rowX + pos.x
-      let y = rowY + pos.y
+      let x = ox + pos.x
+      let y = oy + pos.y
 
       if (rotation) {
         const rad = rotation * Math.PI / 180
-        const relX = x - rowX
-        const relY = y - rowY
-        x = rowX + relX * Math.cos(rad) - relY * Math.sin(rad)
-        y = rowY + relX * Math.sin(rad) + relY * Math.cos(rad)
+        const relX = x - ox
+        const relY = y - oy
+        x = ox + relX * Math.cos(rad) - relY * Math.sin(rad)
+        y = oy + relX * Math.sin(rad) + relY * Math.cos(rad)
       }
 
       const color = this.getCategoryColor(seat.categoryKey)
@@ -237,9 +258,11 @@ export class SeatRenderer {
     const baseLineWidth = (radius * 2) / baseScale
     const MIN_SCREEN_PX = 1.5
 
-    this.rowLODMap.forEach(({ lineGroup, circleGroup }) => {
+    this.rowLODMap.forEach(({ lineGroup, circleGroup, rowGroup }) => {
       lineGroup.visible = showLevel1
       circleGroup.visible = showLevel2
+      // 横条状态下排不可选中
+      if (rowGroup) rowGroup.editable = showLevel2
 
       if (showLevel1) {
         const line = lineGroup.children[0]

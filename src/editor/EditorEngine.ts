@@ -63,6 +63,7 @@ export class EditorEngine {
     this.leafer.waitViewReady(() => {
       this._canvas = this.leafer.canvas.view as HTMLCanvasElement
       if (this._canvas) {
+        this._canvas.tabIndex = 0
         this._setupManualEvents()
       }
     })
@@ -98,6 +99,14 @@ export class EditorEngine {
 
     this._boundPointerMove = (e: PointerEvent) => {
       if (!this._pointerDown || this._pinching) return
+
+      // Editor 正在操作（移动/缩放/旋转）→ 不平移画布
+      if ((this.editor as any).dragging || (this.editor as any).resizing || (this.editor as any).rotating) {
+        this._pointerDown = false
+        this._dragStarted = false
+        return
+      }
+
       if (!this._dragStarted) {
         const dx = e.clientX - this._downClient.x
         const dy = e.clientY - this._downClient.y

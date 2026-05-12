@@ -3,6 +3,9 @@ export interface KeyboardManagerOptions {
   onRedo: () => void
   onDelete: () => void
   onEscape: () => void
+  onDuplicate?: () => void
+  onGroup?: () => void
+  onUngroup?: () => void
   /** 获取当前正在绘图的状态标志 */
   isDrawingActive?: () => boolean
   /** 绘图时撤销最后顶点 */
@@ -49,6 +52,24 @@ export class KeyboardManager {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
         this.opts.onDelete()
+        return
+      }
+
+      // Ctrl/Cmd+D → 复制选中元素
+      if (meta && e.key === 'd' && !e.shiftKey) {
+        e.preventDefault()
+        this.opts.onDuplicate?.()
+        return
+      }
+
+      // Ctrl/Cmd+G → 编组 / Ctrl+Shift+G → 取消编组
+      if (meta && e.key === 'g') {
+        e.preventDefault()
+        if (e.shiftKey) {
+          this.opts.onUngroup?.()
+        } else {
+          this.opts.onGroup?.()
+        }
         return
       }
 

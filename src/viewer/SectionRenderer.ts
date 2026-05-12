@@ -17,29 +17,39 @@ export class SectionRenderer {
    * 返回包含边框等的 Group
    */
   static render(section: Section, options: SectionRenderOptions = {}): Group {
-    const group = new Group({ id: `section-${section.id}`, hittable: options.interactive ?? false })
+    const interactive = options.interactive ?? false
+    const group = new Group({
+      id: `section-group-${section.id}`,
+      hittable: interactive,
+      editable: interactive,
+    })
+
+    // polygon/path 类型分区用顶点编辑代替缩放
+    if (interactive && (section.borderType === 'polygon' || section.borderType === 'path')) {
+      ;(group as any).setEditConfig?.({ resizeable: false })
+    }
 
     // 1. 边框
     if (section.borderType && section.borderType !== 'none') {
-      const border = SectionRenderer.createBorder(section)
+      const border = SectionRenderer.createBorder(section, interactive)
       if (border) group.add(border)
     }
 
     // 2. 形状
     section.shapes?.forEach(shape => {
-      const el = SectionRenderer.createShape(shape)
+      const el = SectionRenderer.createShape(shape, interactive)
       if (el) group.add(el)
     })
 
     // 3. 文本
     section.texts?.forEach(text => {
-      const el = SectionRenderer.createText(text)
+      const el = SectionRenderer.createText(text, interactive)
       if (el) group.add(el)
     })
 
     // 4. 区域
     section.areas?.forEach(area => {
-      const el = SectionRenderer.createArea(area)
+      const el = SectionRenderer.createArea(area, interactive)
       if (el) group.add(el)
     })
 
@@ -53,12 +63,13 @@ export class SectionRenderer {
   }
 
   /** 创建分区边框元素 */
-  private static createBorder(section: Section): Rect | Ellipse | Polygon | Path | null {
+  private static createBorder(section: Section, editable: boolean): Rect | Ellipse | Polygon | Path | null {
     const fill = section.borderFill || 'rgba(128,128,128,0.15)'
     const stroke = section.borderStroke || '#808080'
     const strokeWidth = 0 // 预览模式无边框
 
-    const base = { fill, stroke, strokeWidth, opacity: section.borderOpacity ?? 1 }
+    const id = `section-${section.id}`
+    const base = { id, fill, stroke, strokeWidth, opacity: section.borderOpacity ?? 1, editable }
 
     switch (section.borderType) {
       case 'rect':
@@ -79,12 +90,16 @@ export class SectionRenderer {
         })
       case 'polygon':
         if (!section.borderPoints) return null
-        return new Polygon({
+        const sectionPoly = new Polygon({
           ...base,
           x: section.borderX ?? 0,
           y: section.borderY ?? 0,
           points: section.borderPoints,
         })
+        console.log('[SectionRenderer] polygon section setEditConfig:', typeof (sectionPoly as any).setEditConfig, 'editConfig before:', (sectionPoly as any).editConfig)
+        ;(sectionPoly as any).setEditConfig?.({ resizeable: false })
+        console.log('[SectionRenderer] polygon section editConfig after:', (sectionPoly as any).editConfig)
+        return sectionPoly
       case 'path':
         if (!section.borderPathPoints) return null
         const d = pathPointsToSvgPath(section.borderPathPoints)
@@ -100,9 +115,11 @@ export class SectionRenderer {
   }
 
   /** 创建形状对象 */
-  private static createShape(shape: ShapeObject): Rect | Ellipse | Polygon | Line | null {
+  private static createShape(shape: ShapeObject, editable: boolean): Rect | Ellipse | Polygon | Line | null {
+    const id = `shape-${shape.id}`
     if (shape.type === 'rect') {
       return new Rect({
+        id,
         x: shape.x, y: shape.y,
         width: shape.width ?? 100, height: shape.height ?? 100,
         fill: shape.fill || 'rgba(156,163,175,0.6)',
@@ -110,11 +127,13 @@ export class SectionRenderer {
         rotation: shape.rotation ?? 0,
         cornerRadius: shape.cornerRadius,
         opacity: shape.opacity,
+        editable,
       })
     }
     if (shape.type === 'ellipse') {
       // store 存的是 bounding-box 左上角，Ellipse 原点在中心需转换
       return new Ellipse({
+        id,
         x: shape.x + (shape.width ?? 100) / 2,
         y: shape.y + (shape.height ?? 100) / 2,
         width: shape.width ?? 100, height: shape.height ?? 100,
@@ -122,34 +141,47 @@ export class SectionRenderer {
         stroke: shape.stroke, strokeWidth: shape.strokeWidth,
         rotation: shape.rotation ?? 0,
         opacity: shape.opacity,
+        editable,
       })
     }
     if (shape.type === 'polygon' && shape.points) {
-      return new Polygon({
+      const poly = new Polygon({
+        id,
         x: shape.x, y: shape.y,
         points: shape.points,
         fill: shape.fill || 'rgba(156,163,175,0.6)',
         stroke: shape.stroke, strokeWidth: shape.strokeWidth,
         rotation: shape.rotation ?? 0,
         opacity: shape.opacity,
+        editable,
       })
+      console.log('[SectionRenderer] polygon shape setEditConfig:', typeof (poly as any).setEditConfig, 'editConfig before:', (poly as any).editConfig)
+      ;(poly as any).setEditConfig?.({ resizeable: false })
+      console.log('[SectionRenderer] polygon shape editConfig after:', (poly as any).editConfig)
+      return poly
     }
     if (shape.type === 'polyline' && shape.points) {
-      return new Line({
+      const line = new Line({
+        id,
         x: shape.x, y: shape.y,
         points: shape.points,
         stroke: shape.stroke || shape.fill || '#808080',
         strokeWidth: shape.strokeWidth || 1,
         rotation: shape.rotation ?? 0,
         opacity: shape.opacity,
+        editable,
       })
+      console.log('[SectionRenderer] polyline shape setEditConfig:', typeof (line as any).setEditConfig)
+      ;(line as any).setEditConfig?.({ resizeable: false })
+      return line
     }
     return null
   }
 
   /** 创建文本对象 */
-  private static createText(text: TextObject): Text | null {
+  private static createText(text: TextObject, editable: boolean): Text | null {
     return new Text({
+      id: `text-${text.id}`,
       x: text.x, y: text.y,
       text: text.text || text.caption || '',
       fontSize: text.fontSize ?? 14,
@@ -160,17 +192,23 @@ export class SectionRenderer {
       textAlign: text.align || 'center',
       fontFamily: text.fontFamily,
       fontStyle: text.fontStyle,
+      editable,
     })
   }
 
   /** 创建区域对象 */
-  private static createArea(area: AreaObject): Polygon | null {
+  private static createArea(area: AreaObject, editable: boolean): Polygon | null {
     if (!area.points) return null
-    return new Polygon({
+    const areaPoly = new Polygon({
+      id: `area-${area.id}`,
       points: area.points,
       fill: area.fill || 'rgba(100,100,100,0.3)',
       opacity: area.opacity,
+      editable,
     })
+    console.log('[SectionRenderer] area setEditConfig:', typeof (areaPoly as any).setEditConfig)
+    ;(areaPoly as any).setEditConfig?.({ resizeable: false })
+    return areaPoly
   }
 
   /** 创建分区名称标签（居中） */

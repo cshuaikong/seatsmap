@@ -34,6 +34,8 @@ export interface EditorBridgeOptions {
   /** 同步回流防重入标志 */
   getSyncing: () => boolean
   setSyncing: (v: boolean) => void
+  /** 防抖存档回调（由外部管理以保证 isSyncing 正确时序） */
+  requestSaveHistory: () => void
 }
 
 export class EditorBridge {
@@ -42,6 +44,13 @@ export class EditorBridge {
 
   constructor(opts: EditorBridgeOptions) {
     this.opts = opts
+  }
+
+  /** 获取当前被编辑的元素（Editor 原生属性，比事件 target 更可靠） */
+  private _getEditTarget(): any {
+    const { editor } = this.opts
+    const e: any = editor
+    return e.element || e.editTarget || e.list?.[0] || null
   }
 
   /** 启动监听 Editor 事件 */
@@ -53,19 +62,19 @@ export class EditorBridge {
       this._syncSelectionToStore()
     }
 
-    const onMove = (e: any) => {
+    const onMove = (_e: any) => {
       if (this.opts.getSyncing()) return
-      this._syncTransformToStore(e)
+      this._syncTransformToStore()
     }
 
-    const onScale = (e: any) => {
+    const onScale = (_e: any) => {
       if (this.opts.getSyncing()) return
-      this._syncScaleToStore(e)
+      this._syncScaleToStore()
     }
 
-    const onRotate = (e: any) => {
+    const onRotate = (_e: any) => {
       if (this.opts.getSyncing()) return
-      this._syncRotationToStore(e)
+      this._syncRotationToStore()
     }
 
     editor.on(EditorEvent.SELECT, onSelect)
@@ -159,13 +168,17 @@ export class EditorBridge {
     this.opts.setSyncing(false)
   }
 
-  /** 移动变换 → Store */
-  private _syncTransformToStore(e: any): void {
-    const target = e.target || e.editTarget
-    if (!target) return
+  /** 解析被编辑元素的 meta */
+  private _resolveMeta(target: any): ElementMeta | undefined {
+    const elId = target?.id || target?.getAttr?.('id') || ''
+    if (!elId) return undefined
+    return this.opts.getNodeMeta(elId)
+  }
 
-    const elId = target.id || ''
-    const meta = this.opts.getNodeMeta(elId)
+  /** 移动变换 → Store */
+  private _syncTransformToStore(): void {
+    const target = this._getEditTarget()
+    const meta = this._resolveMeta(target)
     if (!meta) return
 
     this.opts.setSyncing(true)
@@ -181,7 +194,6 @@ export class EditorBridge {
       case 'shape': {
         const width = target.width ?? meta.shapeData?.width ?? 100
         const height = target.height ?? meta.shapeData?.height ?? 100
-        // Ellipse/Sector 的 Leafer 原点在中心，store 存左上角，需转换
         const shapeType = meta.shapeData?.type
         const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
         const storeX = isCenterOrigin ? x - width / 2 : x
@@ -202,17 +214,14 @@ export class EditorBridge {
       }
     }
 
-    this.opts.saveHistory()
     this.opts.setSyncing(false)
+    this.opts.requestSaveHistory()
   }
 
   /** 缩放变换 → Store */
-  private _syncScaleToStore(e: any): void {
-    const target = e.target || e.editTarget
-    if (!target) return
-
-    const elId = target.id || ''
-    const meta = this.opts.getNodeMeta(elId)
+  private _syncScaleToStore(): void {
+    const target = this._getEditTarget()
+    const meta = this._resolveMeta(target)
     if (!meta) return
 
     this.opts.setSyncing(true)
@@ -238,17 +247,14 @@ export class EditorBridge {
       }
     }
 
-    this.opts.saveHistory()
     this.opts.setSyncing(false)
+    this.opts.requestSaveHistory()
   }
 
   /** 旋转变换 → Store */
-  private _syncRotationToStore(e: any): void {
-    const target = e.target || e.editTarget
-    if (!target) return
-
-    const elId = target.id || ''
-    const meta = this.opts.getNodeMeta(elId)
+  private _syncRotationToStore(): void {
+    const target = this._getEditTarget()
+    const meta = this._resolveMeta(target)
     if (!meta) return
 
     this.opts.setSyncing(true)
@@ -274,7 +280,7 @@ export class EditorBridge {
         break
     }
 
-    this.opts.saveHistory()
     this.opts.setSyncing(false)
+    this.opts.requestSaveHistory()
   }
 }

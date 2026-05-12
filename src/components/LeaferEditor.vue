@@ -1,9 +1,28 @@
 <template>
-  <div ref="containerRef" class="leafer-editor-container"></div>
+  <div ref="containerRef" class="leafer-editor-container">
+    <!-- 右键菜单 -->
+    <div
+      v-if="ctxMenu.visible"
+      class="ctx-menu"
+      :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
+      @click.stop
+      @pointerdown.stop
+    >
+      <div
+        v-for="item in ctxMenu.items"
+        :key="item.label"
+        class="ctx-menu-item"
+        :class="{ 'ctx-menu-item--danger': item.danger }"
+        @click="item.action()"
+      >
+        {{ item.label }}
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { EditorEngine } from '../editor/EditorEngine'
@@ -15,9 +34,23 @@ import { SeatRenderer } from '../viewer/SeatRenderer'
 import { LabelRenderer } from '../viewer/LabelRenderer'
 import { SelectionManager } from '../viewer/SelectionManager'
 import { PathVertexManager } from '../editor/PathVertexManager'
+import { ShapeVertexManager } from '../editor/ShapeVertexManager'
 import { DrawingManager } from '../editor/DrawingManager'
 
 import { darkenColor, getCategoryColor } from '../utils/color'
+
+interface CtxMenuItem {
+  label: string
+  action: () => void
+  danger?: boolean
+}
+
+const ctxMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  items: [] as CtxMenuItem[],
+})
 
 const props = defineProps<{
   venue: VenueData
@@ -38,12 +71,22 @@ let selectionManager: SelectionManager | null = null
 let editorBridge: EditorBridge | null = null
 let keyboard: KeyboardManager | null = null
 let pathVertexManager: PathVertexManager | null = null
+let shapeVertexManager: ShapeVertexManager | null = null
 let drawingManager: DrawingManager | null = null
 let sectionGroups: any[] = []
 /** 分区 ID → 其 Path 边框元素（用于路径顶点编辑） */
 const sectionPathMap = new Map<string, any>()
+/** shape/area ID → 其 Leafer 元素（用于顶点编辑） */
+const shapeElMap = new Map<string, any>()
+const areaElMap = new Map<string, any>()
+/** 分区 ID → 其 Polygon 边框元素（用于多边形分区顶点编辑） */
+const sectionPolygonElMap = new Map<string, any>()
 let currentScale = 1
 let isSyncing = false
+let pendingAutoSelect: { kind: string; id: string } | null = null
+let dblClickCleanup: (() => void) | null = null
+let ctxMenuCleanup: (() => void) | null = null
+const EDITOR_BASE_POINT_SIZE = 6
 
 // 绘制工具的 DOM 事件处理器（捕获阶段，用于在 onUnmounted 中清理）
 let boundDrawPointerDown: ((e: PointerEvent) => void) | null = null
@@ -59,6 +102,8 @@ const buildNodeMeta = () => {
 
   props.venue.sections.forEach(section => {
     nodeMetaMap.set(`section-${section.id}`, { kind: 'section', id: section.id })
+    // sectionGroup（Editor 选中整个分区时会选中 Group 包装器）
+    nodeMetaMap.set(`section-group-${section.id}`, { kind: 'section', id: section.id })
 
     section.rows.forEach(row => {
       nodeMetaMap.set(`row-${row.id}`, { kind: 'row', id: row.id, sectionId: section.id, rowData: row })
@@ -114,6 +159,9 @@ const rebuildSectionLayers = () => {
   sectionGroups.forEach(g => leafer.remove(g))
   sectionGroups = []
   sectionPathMap.clear()
+  shapeElMap.clear()
+  areaElMap.clear()
+  sectionPolygonElMap.clear()
 
   const isFocusMode = !!store.focusedSectionId
 
@@ -128,46 +176,32 @@ const rebuildSectionLayers = () => {
 
     leafer.add(sectionGroup)
 
-    // 缓存 Path 边框元素，供路径顶点编辑使用
-    if (section.borderType === 'path' && section.borderPathPoints?.length) {
+    // 缓存 Path/Polygon 边框元素，供顶点编辑使用
+    if ((section.borderType === 'path' && section.borderPathPoints?.length) ||
+        (section.borderType === 'polygon' && section.borderPoints?.length)) {
       const borderEl = sectionGroup.children[0]
-      if (borderEl && (borderEl as any).tag === 'Path') {
-        sectionPathMap.set(section.id, borderEl)
+      if (borderEl) {
+        const tag = (borderEl as any).tag
+        if (tag === 'Path') {
+          sectionPathMap.set(section.id, borderEl)
+        } else if (tag === 'Polygon') {
+          sectionPolygonElMap.set(section.id, borderEl)
+        }
       }
     }
-  })
 
-  // 为分区边框绑定双击聚焦
-  if (!isFocusMode) {
-    attachSectionDoubleClick()
-  }
-}
-
-let lastClickTime = 0
-let lastClickSectionId = ''
-
-const attachSectionDoubleClick = () => {
-  sectionGroups.forEach(group => {
-    const sectionId = (group as any).id?.replace('section-', '') || ''
-    if (!sectionId || !group.children.length) return
-
-    const borderEl = group.children[0]
-    if (!borderEl) return
-
-    borderEl.off('tap' as any)
-    borderEl.on('tap', () => {
-      const now = Date.now()
-      if (sectionId === lastClickSectionId && now - lastClickTime < 350) {
-        enterSectionFocus(sectionId)
-        lastClickSectionId = ''
-      } else {
-        lastClickSectionId = sectionId
-        lastClickTime = now
+    // 缓存 polygon/polyline shape 和 area 元素，供顶点编辑使用
+    sectionGroup.children?.forEach((child: any) => {
+      const cid = child.id || child.getAttr?.('id') || ''
+      if (cid.startsWith('shape-')) {
+        shapeElMap.set(cid.slice(6), child)
+      } else if (cid.startsWith('area-')) {
+        areaElMap.set(cid.slice(5), child)
       }
     })
-    ;(borderEl as any).cursor = 'pointer'
   })
 }
+
 
 const createSeatRenderer = () => {
   if (seatRenderer && engine) {
@@ -178,10 +212,14 @@ const createSeatRenderer = () => {
   seatRenderer = new SeatRenderer(
     props.venue, config, resolveCategoryColor, darkenColor,
     (seat, row, section) => {
-      selectionManager?.handleSeatClick(seat, row, section, (s, r, sec) => {
-        emit('seat-click', s, r, sec)
-      })
-    }
+      // selectseat 模式才切换座位状态，select 模式由 Editor 插件处理
+      if (currentTool === 'selectseat') {
+        selectionManager?.handleSeatClick(seat, row, section, (s, r, sec) => {
+          emit('seat-click', s, r, sec)
+        })
+      }
+    },
+    true,  // editMode
   )
   seatRenderer.render()
   seatRenderer.updateLOD(currentScale)
@@ -196,6 +234,25 @@ const renderAll = () => {
   buildNodeMeta()
   rebuildSectionLayers()
   createSeatRenderer()
+
+  // 确保 Editor（EditBox）始终在最顶层，不被座位/分区遮挡
+  engine.leafer.add(engine.editor as any)
+
+  // 绘制完成后自动选中新元素
+  if (pendingAutoSelect && !isSyncing) {
+    const info = pendingAutoSelect
+    pendingAutoSelect = null
+    // 延迟一帧等待 Leafer 树更新完成
+    requestAnimationFrame(() => {
+      if (!engine || engine.destroyed) return
+      setDrawingTool('select')
+      const fullId = `${info.kind}-${info.id}`
+      const el = (engine.leafer as any)?.findId?.(fullId)
+      if (el) {
+        engine.editor.select(el)
+      }
+    })
+  }
 }
 
 const updateViewState = (scale?: number) => {
@@ -207,6 +264,32 @@ const updateViewState = (scale?: number) => {
 // ==================== Editor Bridge ====================
 
 const store = useVenueStore()
+
+// 防抖存档：变换过程中不存档，结束后 200ms 存档一次
+let _transformSaveDebounce: ReturnType<typeof setTimeout> | null = null
+const debouncedSaveHistory = () => {
+  if (_transformSaveDebounce) clearTimeout(_transformSaveDebounce)
+  _transformSaveDebounce = setTimeout(() => {
+    store.saveHistory()
+    _transformSaveDebounce = null
+  }, 200)
+}
+
+// 在 venue 数据中查找 shape/area
+const findShape = (id: string) => {
+  for (const s of props.venue.sections) {
+    const shape = s.shapes?.find(sh => sh.id === id)
+    if (shape) return { shape, sectionId: s.id }
+  }
+  return undefined
+}
+const findArea = (id: string) => {
+  for (const s of props.venue.sections) {
+    const area = s.areas?.find(a => a.id === id)
+    if (area) return { area, sectionId: s.id }
+  }
+  return undefined
+}
 
 const createEditorBridge = (): EditorBridge => {
   const bridgeOpts: EditorBridgeOptions = {
@@ -238,6 +321,7 @@ const createEditorBridge = (): EditorBridge => {
     saveHistory: () => store.saveHistory(),
     getSyncing: () => isSyncing,
     setSyncing: (v: boolean) => { isSyncing = v },
+    requestSaveHistory: () => { debouncedSaveHistory() },
   }
 
   return new EditorBridge(bridgeOpts)
@@ -281,6 +365,153 @@ const deleteSelected = () => {
   renderAll()
 }
 
+// ==================== 右键菜单 ====================
+
+const buildCtxMenuItems = (): CtxMenuItem[] => {
+  const items: CtxMenuItem[] = []
+  const hasSelection = store.selectedSectionIds.length > 0
+    || store.selectedShapeIds.length > 0
+    || store.selectedTextIds.length > 0
+    || store.selectedAreaIds.length > 0
+
+  if (hasSelection) {
+    // 多选 → 编组选项
+    const totalSelected = store.selectedSectionIds.length
+      + store.selectedShapeIds.length
+      + store.selectedTextIds.length
+      + store.selectedAreaIds.length
+    if (totalSelected >= 2) {
+      items.push({ label: '编组 Ctrl+G', action: () => groupSelected() })
+    }
+    items.push({ label: '复制 Ctrl+D', action: () => duplicateSelected() })
+    items.push({ label: '删除 Delete', action: () => deleteSelected(), danger: true })
+  }
+
+  if (store.selectedSectionIds.length === 1) {
+    items.unshift({ label: '聚焦此分区', action: () => enterSectionFocus(store.selectedSectionIds[0]) })
+  }
+
+  if (store.focusedSectionId) {
+    items.push({ label: '退出聚焦', action: () => exitSectionFocus() })
+  }
+
+  // 画布操作（始终可用）
+  items.push({ label: '适应画布', action: () => engine?.fitContent(50) })
+  items.push({ label: '重置缩放', action: () => {
+    const l: any = engine?.leafer
+    if (l?.zoom) l.zoom('set', 1, undefined, true)
+    if (engine) { engine.leafer.x = 0; engine.leafer.y = 0 }
+    ;(engine?.leafer as any)?.__updateViewPort?.()
+  }})
+
+  return items
+}
+
+// ==================== 编组操作 ====================
+
+const groupSelected = () => {
+  const ed = engine?.editor as any
+  if (!ed || ed.list?.length < 2) return
+  ed.group()
+}
+
+const ungroupSelected = () => {
+  const ed = engine?.editor as any
+  if (!ed) return
+  ed.ungroup()
+}
+
+// ==================== 复制操作 ====================
+
+const duplicateSelected = () => {
+  const offsetX = 20
+  const offsetY = 20
+
+  // 复制分区
+  store.selectedSectionIds.forEach(sectionId => {
+    const section = props.venue.sections.find(s => s.id === sectionId)
+    if (!section) return
+    const newId = store.addSection({
+      ...JSON.parse(JSON.stringify(section)),
+      name: `${section.name} 副本`,
+    })
+    store.updateSectionBorder(newId, {
+      borderX: (section.borderX ?? 0) + offsetX,
+      borderY: (section.borderY ?? 0) + offsetY,
+    })
+    store.clearSelection()
+    store.selectSection(newId)
+  })
+
+  // 复制形状
+  store.selectedShapeIds.forEach(shapeId => {
+    for (const section of props.venue.sections) {
+      const shape = section.shapes?.find(s => s.id === shapeId)
+      if (!shape) continue
+      const clone = { ...JSON.parse(JSON.stringify(shape)), id: undefined! }
+      clone.x = (clone.x ?? 0) + offsetX
+      clone.y = (clone.y ?? 0) + offsetY
+      const newId = store.addShape(section.id, clone)
+      if (!newId) continue
+      store.clearSelection()
+      store.selectShape(newId)
+      break
+    }
+  })
+
+  // 复制文本
+  store.selectedTextIds.forEach(textId => {
+    for (const section of props.venue.sections) {
+      const text = section.texts?.find(t => t.id === textId)
+      if (!text) continue
+      const clone = { ...JSON.parse(JSON.stringify(text)), id: undefined! }
+      clone.x = (clone.x ?? 0) + offsetX
+      clone.y = (clone.y ?? 0) + offsetY
+      const newId = store.addText(section.id, clone)
+      if (!newId) continue
+      store.clearSelection()
+      store.selectText(newId)
+      break
+    }
+  })
+
+  // 复制区域
+  store.selectedAreaIds.forEach(areaId => {
+    for (const section of props.venue.sections) {
+      const area = section.areas?.find(a => a.id === areaId)
+      if (!area) continue
+      const clone = { ...JSON.parse(JSON.stringify(area)), id: undefined! }
+      if (clone.points) {
+        clone.points = clone.points.map((p: number, i: number) => i % 2 === 0 ? p + offsetX : p + offsetY)
+      }
+      const newId = store.addArea(section.id, clone)
+      if (!newId) continue
+      store.clearSelection()
+      store.selectArea(newId)
+      break
+    }
+  })
+
+  store.saveHistory()
+  renderAll()
+  // 延迟选中新元素
+  setTimeout(() => {
+    if (!engine || engine.destroyed) return
+    const selected = new Set([
+      ...store.selectedSectionIds,
+      ...store.selectedShapeIds,
+      ...store.selectedTextIds,
+      ...store.selectedAreaIds,
+    ])
+    const els: any[] = []
+    selected.forEach(id => {
+      const el = (engine!.leafer as any)?.findId?.(id)
+      if (el) els.push(el)
+    })
+    if (els.length > 0) engine.editor.select(els)
+  }, 50)
+}
+
 // ==================== 生命周期 ====================
 
 onMounted(() => {
@@ -302,13 +533,15 @@ onMounted(() => {
     shouldPan: () => !drawingManager?.isDrawing,
     editorConfig: {
       stroke: '#836DFF',
-      pointSize: 10,
+      strokeWidth: 1,
+      pointSize: EDITOR_BASE_POINT_SIZE,
+      resizeLine: { strokeWidth: 1 },
       moveable: true,
       resizeable: true,
       rotateable: true,
       selector: true,
       editBox: true,
-      hover: true,
+      hover: false,
       select: 'press',
       multipleSelect: true,
       boxSelect: true,
@@ -319,7 +552,7 @@ onMounted(() => {
   labelRenderer = new LabelRenderer()
 
   const config = getRenderConfig()
-  seatRenderer = new SeatRenderer(props.venue, config, resolveCategoryColor, darkenColor)
+  seatRenderer = new SeatRenderer(props.venue, config, resolveCategoryColor, darkenColor, undefined, true)
 
   selectionManager = new SelectionManager(
     seatRenderer,
@@ -340,9 +573,23 @@ onMounted(() => {
     setSyncing: (v: boolean) => { isSyncing = v },
   })
 
+  shapeVertexManager = new ShapeVertexManager({
+    leafer: engine.leafer,
+    getScale: () => engine?.scale ?? 1,
+    getSyncing: () => isSyncing,
+    setSyncing: (v: boolean) => { isSyncing = v },
+    saveHistory: () => store.saveHistory(),
+    updateShapePoints: (id, points) => store.updateShape(id, { points }),
+    updateAreaPoints: (id, points) => store.updateArea(id, { points }),
+    updateSectionPoints: (sectionId, points) => store.updateSectionBorder(sectionId, { borderPoints: points }),
+  })
+
   drawingManager = new DrawingManager({
     previewGroup: engine.previewGroup,
     onRenderAll: renderAll,
+    onSubmitComplete: (info) => {
+      if (info) pendingAutoSelect = info
+    },
   })
 
   // 为绘制工具注册 DOM 捕获阶段事件（早于 EditorEngine 的冒泡阶段 pan 处理）
@@ -389,6 +636,9 @@ onMounted(() => {
     onUndo: () => { store.undo(); renderAll() },
     onRedo: () => { store.redo(); renderAll() },
     onDelete: () => deleteSelected(),
+    onDuplicate: () => duplicateSelected(),
+    onGroup: () => groupSelected(),
+    onUngroup: () => ungroupSelected(),
     onEscape: () => {
       if (currentTool !== 'select') {
         currentTool = 'select'
@@ -401,12 +651,66 @@ onMounted(() => {
   })
   keyboard.listen()
 
+  // 右键菜单
+  ctxMenuCleanup = () => { ctxMenu.visible = false }
+  window.addEventListener('click', ctxMenuCleanup)
+  window.addEventListener('pointerdown', ctxMenuCleanup, true)
+
+  // 双击分区 → 聚焦（DOM 级 dblclick，避免与 Editor 事件冲突）
+  engine.leafer.waitViewReady(() => {
+    const canvas = engine!.canvasElement
+    if (canvas) {
+      // dblclick → 聚焦分区
+      const dblHandler = () => {
+        if (store.selectedSectionIds.length === 1) {
+          enterSectionFocus(store.selectedSectionIds[0])
+        }
+      }
+      canvas.addEventListener('dblclick', dblHandler)
+      dblClickCleanup = () => canvas.removeEventListener('dblclick', dblHandler)
+
+      // contextmenu → 右键菜单
+      canvas.addEventListener('contextmenu', (e: MouseEvent) => {
+        e.preventDefault()
+        const rect = canvas.getBoundingClientRect()
+        ctxMenu.x = e.clientX - rect.left
+        ctxMenu.y = e.clientY - rect.top
+        ctxMenu.items = buildCtxMenuItems()
+        ctxMenu.visible = ctxMenu.items.length > 0
+      })
+    }
+  })
+
   engine.onZoomChange((scale) => {
     updateViewState(scale)
+    // EditBox 控制点/描边反向缩放补偿：保持屏幕像素大小一致
+    const safeScale = Math.max(scale, 0.02)
+    const scaledPointSize = EDITOR_BASE_POINT_SIZE / safeScale
+    const scaledStrokeWidth = 1 / safeScale
+    const ed = engine?.editor as any
+    if (ed?.config) {
+      ed.config.pointSize = scaledPointSize
+      ed.config.strokeWidth = scaledStrokeWidth
+      if (!ed.config.resizeLine) ed.config.resizeLine = {}
+      ed.config.resizeLine.strokeWidth = scaledStrokeWidth
+      if (!ed.config.middlePoint) ed.config.middlePoint = {}
+      ed.config.middlePoint.strokeWidth = scaledStrokeWidth
+    }
+    if (ed?.list?.length > 0) {
+      ed.editBox?.load?.()
+      // 直接修改控件点元素尺寸（load() 走 mergeConfig 链路，某些属性可能被缓存覆盖）
+      const eb = ed.editBox as any
+      if (eb) {
+        ;[...(eb.resizePoints || []), ...(eb.rotatePoints || []), eb.circle].forEach((p: any) => {
+          if (p) { p.width = scaledPointSize; p.height = scaledPointSize }
+        })
+      }
+    }
   })
 
   console.log('[onMounted] initial renderAll, venue sections:', props.venue.sections.length)
   renderAll()
+  setDrawingTool('select') // 初始化选择工具状态
   } catch (err) {
     console.error('[LeaferEditor] onMounted error:', err)
   }
@@ -416,9 +720,14 @@ onUnmounted(() => {
   editorBridge?.unlisten()
   keyboard?.unlisten()
   pathVertexManager?.destroy()
+  shapeVertexManager?.destroy()
   drawingManager?.resetState()
-
-  // 移除绘制工具 DOM 捕获阶段事件
+  dblClickCleanup?.()
+  if (ctxMenuCleanup) {
+    window.removeEventListener('click', ctxMenuCleanup)
+    window.removeEventListener('pointerdown', ctxMenuCleanup, true)
+    ctxMenuCleanup = null
+  }
   const canvas = engine?.canvasElement
   if (canvas) {
     if (boundDrawPointerDown) {
@@ -443,6 +752,7 @@ onUnmounted(() => {
   editorBridge = null
   keyboard = null
   pathVertexManager = null
+  shapeVertexManager = null
   drawingManager = null
   sectionGroups = []
 })
@@ -452,7 +762,22 @@ onUnmounted(() => {
 watch(
   () => props.venue.sections,
   () => {
+    // 编辑器同步期间跳过重渲染，避免销毁正在拖拽的元素
+    if (isSyncing) return
     renderAll()
+    // 恢复编辑器选中状态
+    if (editorBridge) {
+      const allSelected = [
+        ...store.selectedSectionIds,
+        ...store.selectedRowIds,
+        ...store.selectedShapeIds,
+        ...store.selectedTextIds,
+        ...store.selectedAreaIds,
+      ]
+      if (allSelected.length > 0) {
+        editorBridge.syncStoreToEditor(allSelected)
+      }
+    }
   }
 )
 
@@ -460,19 +785,89 @@ watch(
 watch(
   () => store.selectedSectionIds,
   (ids) => {
-    if (!pathVertexManager || pathVertexManager.isDragging || isSyncing) return
+    if (isSyncing) return
 
     if (ids.length === 1) {
       const section = props.venue.sections.find(s => s.id === ids[0])
-      if (section?.borderType === 'path' && section.borderPathPoints?.length) {
+      if (!section) {
+        pathVertexManager?.hideVertices()
+        shapeVertexManager?.hideVertices()
+        return
+      }
+
+      // path 类型 → PathVertexManager
+      if (section.borderType === 'path' && section.borderPathPoints?.length &&
+          pathVertexManager && !pathVertexManager.isDragging && !shapeVertexManager?.isDragging) {
         const pathEl = sectionPathMap.get(section.id)
         if (pathEl) {
+          shapeVertexManager?.hideVertices()
           pathVertexManager.showVertices(section, pathEl)
           return
         }
       }
+
+      // polygon 类型 → ShapeVertexManager
+      if (section.borderType === 'polygon' && section.borderPoints?.length &&
+          shapeVertexManager && !shapeVertexManager.isDragging && !pathVertexManager?.isDragging) {
+        const polyEl = sectionPolygonElMap.get(section.id)
+        if (polyEl) {
+          pathVertexManager?.hideVertices()
+          shapeVertexManager.showSectionPolygonVertices(
+            section.id,
+            section.borderPoints,
+            section.borderX ?? 0,
+            section.borderY ?? 0,
+            polyEl,
+          )
+          return
+        }
+      }
     }
-    pathVertexManager.hideVertices()
+
+    pathVertexManager?.hideVertices()
+    shapeVertexManager?.hideVertices()
+  }
+)
+
+// 选中 shape 变更 → 显示/隐藏形状顶点编辑手柄
+watch(
+  () => store.selectedShapeIds,
+  (ids) => {
+    if (!shapeVertexManager || shapeVertexManager.isDragging || isSyncing) return
+
+    if (ids.length === 1) {
+      const found = findShape(ids[0])
+      const shape = found?.shape
+      if (shape && (shape.type === 'polygon' || shape.type === 'polyline') && shape.points?.length) {
+        const el = shapeElMap.get(ids[0])
+        if (el) {
+          shapeVertexManager.showShapeVertices(shape, el)
+          return
+        }
+      }
+    }
+    shapeVertexManager.hideVertices()
+  }
+)
+
+// 选中 area 变更 → 显示/隐藏区域顶点编辑手柄
+watch(
+  () => store.selectedAreaIds,
+  (ids) => {
+    if (!shapeVertexManager || shapeVertexManager.isDragging || isSyncing) return
+
+    if (ids.length === 1) {
+      const found = findArea(ids[0])
+      const area = found?.area
+      if (area && area.points?.length) {
+        const el = areaElMap.get(ids[0])
+        if (el) {
+          shapeVertexManager.showAreaVertices(area, el)
+          return
+        }
+      }
+    }
+    shapeVertexManager.hideVertices()
   }
 )
 
@@ -515,12 +910,29 @@ const setDrawingTool = (tool: string) => {
   currentTool = tool
   drawingManager?.setTool(tool)
 
+  // select 模式启用 Editor 编辑框；selectseat 禁用避免与 SelectionManager 冲突
   if (drawingManager?.isDrawing) {
     engine?.editor.cancel()
-    ;(engine?.editor as any)?.setAttr?.('hittable', false)
+    setEditorHittable(false)
+  } else if (tool === 'select') {
+    setEditorHittable(true)
+    engine?.editor.cancel() // 清除之前选中状态
   } else {
-    ;(engine?.editor as any)?.setAttr?.('hittable', true)
+    // selectseat 或其他非绘图工具：禁用编辑器
+    setEditorHittable(false)
+    engine?.editor.cancel()
   }
+}
+
+const setEditorHittable = (v: boolean) => {
+  const ed = engine?.editor as any
+  if (ed) {
+    ed.hittable = v
+  }
+  // 同步更新所有顶层元素的可交互性
+  sectionGroups.forEach(g => {
+    g.hittable = v
+  })
 }
 
 const enterSectionFocus = (sectionId: string) => {
@@ -674,5 +1086,36 @@ defineExpose({
   border-radius: 12px;
   overflow: hidden;
   user-select: none;
+}
+
+.ctx-menu {
+  position: absolute;
+  z-index: 1000;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+}
+
+.ctx-menu-item {
+  padding: 7px 16px;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ctx-menu-item:hover {
+  background: #f1f5f9;
+}
+
+.ctx-menu-item--danger {
+  color: #ef4444;
+}
+
+.ctx-menu-item--danger:hover {
+  background: #fef2f2;
 }
 </style>

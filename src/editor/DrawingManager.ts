@@ -21,11 +21,14 @@ export type DrawStep = 'idle' | 'first' | 'second' | 'third'
 export interface DrawingManagerOptions {
   previewGroup: Group
   onRenderAll: () => void
+  /** 绘制提交完成后回调，传入新创建元素的 kind 和原始 id */
+  onSubmitComplete?: (info: { kind: string; id: string } | null) => void
 }
 
 export class DrawingManager {
   readonly previewGroup: Group
   private _onRenderAll: () => void
+  private _onSubmitComplete?: (info: { kind: string; id: string } | null) => void
 
   // 工具状态
   private _currentTool = 'select'
@@ -43,6 +46,7 @@ export class DrawingManager {
   constructor(opts: DrawingManagerOptions) {
     this.previewGroup = opts.previewGroup
     this._onRenderAll = opts.onRenderAll
+    this._onSubmitComplete = opts.onSubmitComplete
   }
 
   get currentTool(): string {
@@ -245,7 +249,7 @@ export class DrawingManager {
       })
     }
 
-    store.addRow(sectionId, {
+    const rowId = store.addRow(sectionId, {
       x: this._seatStartPos.x,
       y: this._seatStartPos.y,
       seats,
@@ -256,6 +260,7 @@ export class DrawingManager {
     store.saveHistory()
     this.resetState()
     this._onRenderAll()
+    this._onSubmitComplete?.({ kind: 'row', id: rowId! })
   }
 
   // ==================== 多排座位 (section-diagonal) ====================
@@ -388,6 +393,7 @@ export class DrawingManager {
       sectionId = store.venue.sections[0].id
     }
 
+    let firstRowId: string | undefined
     for (let r = 0; r < rowCount; r++) {
       const offsetX = actualPerpX * rowSpacing * r
       const offsetY = actualPerpY * rowSpacing * r
@@ -403,18 +409,20 @@ export class DrawingManager {
           label: String(i + 1),
         })
       }
-      store.addRow(sectionId, {
+      const rid = store.addRow(sectionId, {
         x: this._multiRowStart.x + offsetX,
         y: this._multiRowStart.y + offsetY,
         seats,
         seatSpacing: spacing,
         label: `排${r + 1}`,
       })
+      if (r === 0) firstRowId = rid
     }
 
     store.saveHistory()
     this.resetState()
     this._onRenderAll()
+    this._onSubmitComplete?.({ kind: 'row', id: firstRowId! })
   }
 
   // ==================== 矩形 / 椭圆 ====================
@@ -470,9 +478,10 @@ export class DrawingManager {
       sectionId = store.venue.sections[0].id
     }
 
+    let shapeId: string | undefined
     if (this._currentTool === 'draw_rect') {
       // Rect 原点为左上角，直接存左上角坐标，与 SectionRenderer 一致
-      store.addShape(sectionId, {
+      shapeId = store.addShape(sectionId, {
         type: 'rect',
         x,
         y,
@@ -489,6 +498,7 @@ export class DrawingManager {
     this._dragStartPos = null
     this._dragEndPos = null
     this._onRenderAll()
+    if (shapeId) this._onSubmitComplete?.({ kind: 'shape', id: shapeId })
   }
 
   // ==================== 多边形 ====================
@@ -573,7 +583,7 @@ export class DrawingManager {
       }
       const center = calculatePolygonCenter(this._polygonPoints)
       const relativePoints = toRelativePoints(this._polygonPoints, center)
-      store.addShape(sectionId, {
+      const polylineId = store.addShape(sectionId, {
         type: 'polyline',
         x: center.x,
         y: center.y,
@@ -586,6 +596,7 @@ export class DrawingManager {
       store.saveHistory()
       this.resetState()
       this._onRenderAll()
+      this._onSubmitComplete?.({ kind: 'shape', id: polylineId! })
       return
     }
 
@@ -599,7 +610,7 @@ export class DrawingManager {
       }
       // 存绝对坐标，因为 createArea 渲染时 Polygon 无 x/y 偏移
       const flatPoints = this._polygonPoints.flatMap(p => [p.x, p.y])
-      store.addArea(sectionId, {
+      const areaId = store.addArea(sectionId, {
         type: 'area',
         label: `区域${store.venue.sections.find(s => s.id === sectionId)?.areas?.length ?? 0 + 1}`,
         points: flatPoints,
@@ -608,6 +619,7 @@ export class DrawingManager {
       store.saveHistory()
       this.resetState()
       this._onRenderAll()
+      this._onSubmitComplete?.({ kind: 'area', id: areaId! })
       return
     }
 
@@ -616,7 +628,7 @@ export class DrawingManager {
     const center = calculatePolygonCenter(this._polygonPoints)
     const relativePoints = toRelativePoints(this._polygonPoints, center)
 
-    store.addSection({
+    const sectionId = store.addSection({
       name: `分区${store.venue.sections.length + 1}`,
       rows: [],
       borderType: 'polygon',
@@ -628,6 +640,7 @@ export class DrawingManager {
     store.saveHistory()
     this.resetState()
     this._onRenderAll()
+    this._onSubmitComplete?.({ kind: 'section', id: sectionId })
   }
 
   // ==================== 文字 ====================
@@ -641,7 +654,7 @@ export class DrawingManager {
       sectionId = store.venue.sections[0].id
     }
 
-    store.addText(sectionId, {
+    const textId = store.addText(sectionId, {
       type: 'text',
       x: pos.x,
       y: pos.y,
@@ -654,6 +667,7 @@ export class DrawingManager {
     store.saveHistory()
     this.resetState()
     this._onRenderAll()
+    this._onSubmitComplete?.({ kind: 'text', id: textId! })
   }
 
   // ==================== Preview Helpers ====================
