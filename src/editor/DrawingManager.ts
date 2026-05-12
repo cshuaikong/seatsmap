@@ -139,8 +139,22 @@ export class DrawingManager {
       this._seatCurrentPos = pos
     } else if (this._seatDrawStep === 'first') {
       if (this._currentTool === 'section') {
-        // 分段模式：记录当前段，继续等待下一个点
-        this._addSegmentPoint(pos)
+        // 点击最后一个座位附近 → 结束分段绘制
+        const distFromLast = this._seatStartPos
+          ? Math.hypot(pos.x - this._seatStartPos.x, pos.y - this._seatStartPos.y)
+          : Infinity
+        if (distFromLast < SNAP_TO_START_DISTANCE) {
+          this.resetState()
+          this._onRenderAll()
+          return
+        }
+        // 分段模式：提交当前段为新排，下一段起点为上一段最后一个座位中心
+        const lastSeatPos = this._submitSectionSegment(pos)
+        if (lastSeatPos) {
+          this._seatStartPos = lastSeatPos
+          this._seatCurrentPos = lastSeatPos
+          this._showCursorCircle(lastSeatPos)
+        }
       } else {
         // 直排模式：完成排
         this._submitSeatRow()
@@ -155,9 +169,51 @@ export class DrawingManager {
     }
   }
 
-  private _addSegmentPoint(pos: Position): void {
-    this._seatStartPos = pos
-    this._showCursorCircle(pos)
+  private _submitSectionSegment(pos: Position): Position | null {
+    const store = useVenueStore()
+    if (!this._seatStartPos) return null
+
+    const { ux, uy, dist } = getUnitVector(this._seatStartPos, pos)
+    const spacing = SEAT_SPACING / (store.getBaseScale() || 1)
+    const count = Math.max(1, Math.round(dist / spacing))
+    if (count < 1) return null
+
+    let sectionId: string
+    if (store.venue.sections.length === 0) {
+      sectionId = store.addSection({ name: '默认区域', rows: [], x: 0, y: 0 })
+    } else {
+      sectionId = store.venue.sections[0].id
+    }
+
+    const seats: any[] = []
+    for (let i = 0; i < count; i++) {
+      seats.push({
+        id: generateId(),
+        x: ux * spacing * i,
+        y: uy * spacing * i,
+        status: 'available',
+        categoryKey: 'default',
+        label: String(i + 1),
+      })
+    }
+
+    store.addRow(sectionId, {
+      x: this._seatStartPos.x,
+      y: this._seatStartPos.y,
+      seats,
+      seatSpacing: spacing,
+      label: `排${store.venue.sections.find(s => s.id === sectionId)?.rows.length ?? 0 + 1}`,
+    })
+
+    // 最后一个座位的世界坐标（作为下一段起点）
+    const lastIdx = count - 1
+    const lastWorldX = this._seatStartPos.x + ux * spacing * lastIdx
+    const lastWorldY = this._seatStartPos.y + uy * spacing * lastIdx
+
+    store.saveHistory()
+    this._onRenderAll()
+    // 不调用 resetState — 保持 'first' 状态继续绘制下一段
+    return { x: lastWorldX, y: lastWorldY }
   }
 
   private _submitSeatRow(): void {
@@ -228,6 +284,7 @@ export class DrawingManager {
 
   private _showSeatRowPreviewForMulti(pos: Position): void {
     if (!this._multiRowStart) return
+    this._seatStartPos = this._multiRowStart
     this._seatCurrentPos = pos
     this._showSeatRowPreview()
   }
@@ -240,6 +297,8 @@ export class DrawingManager {
     const baseScale = store.getBaseScale() || 1
     const spacing = SEAT_SPACING / baseScale
     const rowSpacing = ROW_SPACING / baseScale
+    const logicalRadius = (store.visualConfig?.radius ?? 6) / baseScale
+    const seatSize = logicalRadius * 2
 
     // 第一排方向
     const { ux, uy, dist } = getUnitVector(this._multiRowStart, this._multiRowEnd)
@@ -259,16 +318,30 @@ export class DrawingManager {
       const offsetX = actualPerpX * rowSpacing * r
       const offsetY = actualPerpY * rowSpacing * r
       const points: number[] = []
+
       for (let i = 0; i < count; i++) {
-        points.push(
-          this._multiRowStart.x + ux * spacing * i + offsetX,
-          this._multiRowStart.y + uy * spacing * i + offsetY
-        )
+        const sx = this._multiRowStart.x + ux * spacing * i + offsetX
+        const sy = this._multiRowStart.y + uy * spacing * i + offsetY
+        points.push(sx, sy)
+
+        // 预览座位圆
+        const dot = new Ellipse({
+          x: sx, y: sy,
+          width: seatSize, height: seatSize,
+          around: 'center',
+          fill: PREVIEW_FILL,
+          stroke: PREVIEW_MULTI_STROKE,
+          strokeWidth: 1,
+        })
+        this.previewGroup.add(dot)
+        this._previewElements.push(dot)
       }
+
+      // 预览排线
       const line = new Line({
         points,
         stroke: PREVIEW_MULTI_STROKE,
-        strokeWidth: (store.visualConfig?.radius ?? 6) * 2 / baseScale,
+        strokeWidth: seatSize,
         strokeCap: 'round',
         opacity: 0.8,
       })
@@ -281,7 +354,7 @@ export class DrawingManager {
     const cx = this._multiRowStart.x + depthX / 2 + actualPerpX * rowSpacing * (rowCount - 1) / 2
     const cy = this._multiRowStart.y + depthY / 2 + actualPerpY * rowSpacing * (rowCount - 1) / 2
     const label = new Text({
-      x: cx, y: cy,
+      x: cx, y: cy - 7,
       text: `${count}×${rowCount} = ${total}座`,
       fontSize: 14,
       fill: PREVIEW_MULTI_LABEL,
@@ -654,7 +727,7 @@ export class DrawingManager {
     const midX = this._seatStartPos.x + (this._seatCurrentPos.x - this._seatStartPos.x) / 2
     const midY = this._seatStartPos.y + (this._seatCurrentPos.y - this._seatStartPos.y) / 2
     const label = new Text({
-      x: midX, y: midY - 14,
+      x: midX, y: midY - 7,
       text: String(count),
       fontSize: 14,
       fill: PREVIEW_LABEL,
