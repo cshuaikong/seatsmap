@@ -30,7 +30,7 @@ export class ShapeVertexManager {
   private _isDragging = false
   private _activeEl: any = null
   private _activeData: ShapeObject | AreaObject | null = null
-  private _activeKind: 'shape' | 'area' | null = null
+  private _activeKind: 'shape' | 'area' | 'sectionPolygon' | null = null
   private _boundOnZoom: (() => void) | null = null
 
   constructor(opts: ShapeVertexManagerOptions) {
@@ -44,6 +44,10 @@ export class ShapeVertexManager {
 
   get isDragging(): boolean {
     return this._isDragging
+  }
+
+  get handleKind(): 'shape' | 'area' | 'sectionPolygon' | null {
+    return this._activeKind
   }
 
   /** 为 polygon/polyline 形状显示顶点编辑手柄 */
@@ -110,7 +114,7 @@ export class ShapeVertexManager {
 
     this._activeEl = el
     this._activeData = null
-    this._activeKind = null
+    this._activeKind = 'sectionPolygon'
     ;(this as any)._sectionId = sectionId
     ;(this as any)._sectionBorderX = borderX
     ;(this as any)._sectionBorderY = borderY
@@ -132,7 +136,6 @@ export class ShapeVertexManager {
 
   /** 隐藏所有顶点手柄 */
   hideVertices(): void {
-    console.log('[ShapeVertex] hideVertices called, handle count:', this.handles.length)
     this.handles.forEach(h => h.ellipse.remove())
     this.handles = []
     this._activeEl = null
@@ -236,7 +239,7 @@ export class ShapeVertexManager {
       const pts = (this._activeData as AreaObject).points
       if (pts) this.opts.updateAreaPoints((this._activeData as AreaObject).id, [...pts])
       this.opts.saveHistory()
-    } else if ((this as any)._sectionId) {
+    } else if (this._activeKind === 'sectionPolygon') {
       const pts = (this as any)._sectionPoints as number[] | undefined
       if (pts && this.opts.updateSectionPoints) {
         this.opts.updateSectionPoints((this as any)._sectionId, [...pts])
@@ -279,7 +282,7 @@ export class ShapeVertexManager {
         h.ellipse.x = pts[h.index * 2] ?? 0
         h.ellipse.y = pts[h.index * 2 + 1] ?? 0
       })
-    } else if ((this as any)._sectionId) {
+    } else if (this._activeKind === 'sectionPolygon') {
       const bx = (this as any)._sectionBorderX ?? 0
       const by = (this as any)._sectionBorderY ?? 0
       const pts = (this as any)._sectionPoints as number[] | undefined

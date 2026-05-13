@@ -26,7 +26,7 @@ export class SectionRenderer {
 
     // polygon/path 类型分区用顶点编辑代替缩放
     if (interactive && (section.borderType === 'polygon' || section.borderType === 'path')) {
-      ;(group as any).setEditConfig?.({ resizeable: false })
+      ;(group as any).editConfig = { resizeable: false }
     }
 
     // 1. 边框
@@ -96,9 +96,7 @@ export class SectionRenderer {
           y: section.borderY ?? 0,
           points: section.borderPoints,
         })
-        console.log('[SectionRenderer] polygon section setEditConfig:', typeof (sectionPoly as any).setEditConfig, 'editConfig before:', (sectionPoly as any).editConfig)
-        ;(sectionPoly as any).setEditConfig?.({ resizeable: false })
-        console.log('[SectionRenderer] polygon section editConfig after:', (sectionPoly as any).editConfig)
+        ;(sectionPoly as any).editConfig = { resizeable: false }
         return sectionPoly
       case 'path':
         if (!section.borderPathPoints) return null
@@ -155,9 +153,7 @@ export class SectionRenderer {
         opacity: shape.opacity,
         editable,
       })
-      console.log('[SectionRenderer] polygon shape setEditConfig:', typeof (poly as any).setEditConfig, 'editConfig before:', (poly as any).editConfig)
-      ;(poly as any).setEditConfig?.({ resizeable: false })
-      console.log('[SectionRenderer] polygon shape editConfig after:', (poly as any).editConfig)
+      ;(poly as any).editConfig = { resizeable: false }
       return poly
     }
     if (shape.type === 'polyline' && shape.points) {
@@ -171,8 +167,7 @@ export class SectionRenderer {
         opacity: shape.opacity,
         editable,
       })
-      console.log('[SectionRenderer] polyline shape setEditConfig:', typeof (line as any).setEditConfig)
-      ;(line as any).setEditConfig?.({ resizeable: false })
+      ;(line as any).editConfig = { resizeable: false }
       return line
     }
     return null
@@ -206,8 +201,7 @@ export class SectionRenderer {
       opacity: area.opacity,
       editable,
     })
-    console.log('[SectionRenderer] area setEditConfig:', typeof (areaPoly as any).setEditConfig)
-    ;(areaPoly as any).setEditConfig?.({ resizeable: false })
+    ;(areaPoly as any).editConfig = { resizeable: false }
     return areaPoly
   }
 

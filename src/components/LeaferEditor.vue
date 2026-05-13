@@ -708,7 +708,6 @@ onMounted(() => {
     }
   })
 
-  console.log('[onMounted] initial renderAll, venue sections:', props.venue.sections.length)
   renderAll()
   setDrawingTool('select') // 初始化选择工具状态
   } catch (err) {
@@ -825,7 +824,9 @@ watch(
     }
 
     pathVertexManager?.hideVertices()
-    shapeVertexManager?.hideVertices()
+    if (shapeVertexManager?.handleKind === 'sectionPolygon') {
+      shapeVertexManager?.hideVertices()
+    }
   }
 )
 
@@ -846,7 +847,9 @@ watch(
         }
       }
     }
-    shapeVertexManager.hideVertices()
+    if (shapeVertexManager.handleKind === 'shape') {
+      shapeVertexManager.hideVertices()
+    }
   }
 )
 
@@ -867,7 +870,9 @@ watch(
         }
       }
     }
-    shapeVertexManager.hideVertices()
+    if (shapeVertexManager.handleKind === 'area') {
+      shapeVertexManager.hideVertices()
+    }
   }
 )
 

@@ -30,6 +30,11 @@ const routes: RouteRecordRaw[] = [
     path: '/transformer-test',
     name: 'TransformerTest',
     component: () => import('../components/TransformerTest.vue')
+  },
+  {
+    path: '/polygon-test',
+    name: 'PolygonTest',
+    component: () => import('../components/PolygonTest.vue')
   }
 ]
 
