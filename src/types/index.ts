@@ -179,6 +179,7 @@ export interface Section {
   borderRadiusX?: number  // 椭圆专用
   borderRadiusY?: number  // 椭圆专用
   borderPoints?: number[] // 多边形专用（相对坐标）
+  borderArcDepths?: number[]  // 多边形边框弧深数组，长度=borderPoints.length/2
   borderPathPoints?: PathPoint[] // 路径点，type/arcDepth 定义从当前点出发的边，arcDepth=0 视为直线
   borderFill?: string
   borderStroke?: string
@@ -277,6 +278,7 @@ export interface ShapeObject {
   categoryKey?: string | number
   // polygon/polyline 专用
   points?: number[]
+  arcDepths?: number[]  // 弧深数组，长度=points.length/2，每条边的弯曲深度 (-1~1)
   // sector 专用
   innerRadius?: number
   outerRadius?: number
@@ -325,6 +327,7 @@ export interface AreaObject {
   label: string
   // 多边形顶点 (相对于区域位置的坐标)
   points: number[]
+  arcDepths?: number[]  // 弧深数组，长度=points.length/2，每条边的弯曲深度 (-1~1)
   fill?: string
   opacity?: number
   width?: number

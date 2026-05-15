@@ -77,6 +77,28 @@ export function createArcSegment(
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 0 ${sweepFlag} ${end.x} ${end.y}`
 }
 
+/** 将 flat number[] + arcDepths 转为 PathPoint[] */
+export function flatToPathPoints(points: number[], arcDepths?: number[]): PathPoint[] {
+  const result: PathPoint[] = []
+  const n = points.length / 2
+  for (let i = 0; i < n; i++) {
+    const ad = arcDepths?.[i] ?? 0
+    result.push({
+      x: points[i * 2],
+      y: points[i * 2 + 1],
+      type: Math.abs(ad) > 0.005 ? 'arc' : 'line',
+      arcDepth: ad,
+    })
+  }
+  return result
+}
+
+/** 检查 arcDepths 是否有非零值 */
+export function hasArcs(arcDepths?: number[]): boolean {
+  if (!arcDepths || arcDepths.length === 0) return false
+  return arcDepths.some(v => Math.abs(v) > 0.005)
+}
+
 /** 将路径点数组转为 SVG Path 数据 */
 export function pathPointsToSvgPath(points: PathPoint[]): string {
   if (points.length < 2) return ''

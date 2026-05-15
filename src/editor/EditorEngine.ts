@@ -20,6 +20,10 @@ export class EditorEngine {
   readonly previewGroup: Group
 
   private _options: EditorEngineOptions
+  /** 运行时更新 shouldPan 回调（用于绘制工具 / 顶点编辑拖拽守卫） */
+  updateShouldPan(fn: () => boolean): void {
+    this._options.shouldPan = fn
+  }
   private _destroyed = false
   private _canvas: HTMLCanvasElement | null = null
 
@@ -99,6 +103,13 @@ export class EditorEngine {
 
     this._boundPointerMove = (e: PointerEvent) => {
       if (!this._pointerDown || this._pinching) return
+
+      // 绘制工具 / 顶点编辑拖拽中 → 不平移画布
+      if (this._options.shouldPan?.() === false) {
+        this._pointerDown = false
+        this._dragStarted = false
+        return
+      }
 
       // Editor 正在操作（移动/缩放/旋转）→ 不平移画布
       if ((this.editor as any).dragging || (this.editor as any).resizing || (this.editor as any).rotating) {

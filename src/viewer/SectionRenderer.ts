@@ -1,6 +1,6 @@
 import { Group, Rect, Ellipse, Polygon, Line, Path, Text } from 'leafer-ui'
 import type { Section, ShapeObject, TextObject, AreaObject } from '../types'
-import { pathPointsToSvgPath } from './geometry'
+import { pathPointsToSvgPath, flatToPathPoints, hasArcs } from './geometry'
 
 /**
  * 渲染分区边框、形状、文本和区域对象。
@@ -90,6 +90,18 @@ export class SectionRenderer {
         })
       case 'polygon':
         if (!section.borderPoints) return null
+        if (hasArcs(section.borderArcDepths)) {
+          const pts = flatToPathPoints(section.borderPoints, section.borderArcDepths)
+          const d = pathPointsToSvgPath(pts)
+          const pathEl = new Path({
+            ...base,
+            x: section.borderX ?? 0,
+            y: section.borderY ?? 0,
+            path: d,
+          })
+          ;(pathEl as any).editConfig = { resizeable: false }
+          return pathEl
+        }
         const sectionPoly = new Polygon({
           ...base,
           x: section.borderX ?? 0,
@@ -143,6 +155,22 @@ export class SectionRenderer {
       })
     }
     if (shape.type === 'polygon' && shape.points) {
+      if (hasArcs(shape.arcDepths)) {
+        const pts = flatToPathPoints(shape.points, shape.arcDepths)
+        const d = pathPointsToSvgPath(pts)
+        const pathEl = new Path({
+          id,
+          x: shape.x, y: shape.y,
+          path: d,
+          fill: shape.fill || 'rgba(156,163,175,0.6)',
+          stroke: shape.stroke, strokeWidth: shape.strokeWidth,
+          rotation: shape.rotation ?? 0,
+          opacity: shape.opacity,
+          editable,
+        })
+        ;(pathEl as any).editConfig = { resizeable: false }
+        return pathEl
+      }
       const poly = new Polygon({
         id,
         x: shape.x, y: shape.y,
@@ -157,6 +185,23 @@ export class SectionRenderer {
       return poly
     }
     if (shape.type === 'polyline' && shape.points) {
+      if (hasArcs(shape.arcDepths)) {
+        const pts = flatToPathPoints(shape.points, shape.arcDepths)
+        // polyline 不闭合
+        const d = pathPointsToSvgPath(pts).replace(/ Z$/, '')
+        const pathEl = new Path({
+          id,
+          x: shape.x, y: shape.y,
+          path: d,
+          stroke: shape.stroke || shape.fill || '#808080',
+          strokeWidth: shape.strokeWidth || 1,
+          rotation: shape.rotation ?? 0,
+          opacity: shape.opacity,
+          editable,
+        })
+        ;(pathEl as any).editConfig = { resizeable: false }
+        return pathEl
+      }
       const line = new Line({
         id,
         x: shape.x, y: shape.y,
@@ -192,8 +237,21 @@ export class SectionRenderer {
   }
 
   /** 创建区域对象 */
-  private static createArea(area: AreaObject, editable: boolean): Polygon | null {
+  private static createArea(area: AreaObject, editable: boolean): Polygon | Path | null {
     if (!area.points) return null
+    if (hasArcs(area.arcDepths)) {
+      const pts = flatToPathPoints(area.points, area.arcDepths)
+      const d = pathPointsToSvgPath(pts)
+      const pathEl = new Path({
+        id: `area-${area.id}`,
+        path: d,
+        fill: area.fill || 'rgba(100,100,100,0.3)',
+        opacity: area.opacity,
+        editable,
+      })
+      ;(pathEl as any).editConfig = { resizeable: false }
+      return pathEl
+    }
     const areaPoly = new Polygon({
       id: `area-${area.id}`,
       points: area.points,

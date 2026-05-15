@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
+import { PointerEvent as LeaferPointer } from 'leafer-ui'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { EditorEngine } from '../editor/EditorEngine'
@@ -177,15 +178,24 @@ const rebuildSectionLayers = () => {
     leafer.add(sectionGroup)
 
     // 缓存 Path/Polygon 边框元素，供顶点编辑使用
-    if ((section.borderType === 'path' && section.borderPathPoints?.length) ||
-        (section.borderType === 'polygon' && section.borderPoints?.length)) {
+    if (section.borderType === 'path' && section.borderPathPoints?.length) {
+      const borderEl = sectionGroup.children[0]
+      if (borderEl && (borderEl as any).tag === 'Path') {
+        sectionPathMap.set(section.id, borderEl)
+        borderEl.on(LeaferPointer.DOUBLE_CLICK, () => {
+          enterSectionVertexEdit(section.id, 'path')
+        })
+      }
+    } else if (section.borderType === 'polygon' && section.borderPoints?.length) {
       const borderEl = sectionGroup.children[0]
       if (borderEl) {
         const tag = (borderEl as any).tag
-        if (tag === 'Path') {
-          sectionPathMap.set(section.id, borderEl)
-        } else if (tag === 'Polygon') {
+        // 有弧深时渲染为 Path，但仍由 ShapeVertexManager 管理
+        if (tag === 'Path' || tag === 'Polygon') {
           sectionPolygonElMap.set(section.id, borderEl)
+          borderEl.on(LeaferPointer.DOUBLE_CLICK, () => {
+            enterSectionVertexEdit(section.id, 'polygon')
+          })
         }
       }
     }
@@ -194,9 +204,21 @@ const rebuildSectionLayers = () => {
     sectionGroup.children?.forEach((child: any) => {
       const cid = child.id || child.getAttr?.('id') || ''
       if (cid.startsWith('shape-')) {
-        shapeElMap.set(cid.slice(6), child)
+        const sid = cid.slice(6)
+        shapeElMap.set(sid, child)
+        // 双击进入顶点编辑（仅 polygon/polyline）
+        const shape = section.shapes?.find(s => s.id === sid)
+        if (shape && (shape.type === 'polygon' || shape.type === 'polyline')) {
+          child.on(LeaferPointer.DOUBLE_CLICK, () => {
+            enterShapeVertexEdit(sid)
+          })
+        }
       } else if (cid.startsWith('area-')) {
-        areaElMap.set(cid.slice(5), child)
+        const aid = cid.slice(5)
+        areaElMap.set(aid, child)
+        child.on(LeaferPointer.DOUBLE_CLICK, () => {
+          enterAreaVertexEdit(aid)
+        })
       }
     })
   })
@@ -582,6 +604,9 @@ onMounted(() => {
     updateShapePoints: (id, points) => store.updateShape(id, { points }),
     updateAreaPoints: (id, points) => store.updateArea(id, { points }),
     updateSectionPoints: (sectionId, points) => store.updateSectionBorder(sectionId, { borderPoints: points }),
+    updateShapeArcDepths: (id, arcDepths) => store.updateShape(id, { arcDepths }),
+    updateAreaArcDepths: (id, arcDepths) => store.updateArea(id, { arcDepths }),
+    updateSectionArcDepths: (sectionId, arcDepths) => store.updateSectionBorder(sectionId, { borderArcDepths: arcDepths }),
   })
 
   drawingManager = new DrawingManager({
@@ -593,6 +618,10 @@ onMounted(() => {
   })
 
   // 为绘制工具注册 DOM 捕获阶段事件（早于 EditorEngine 的冒泡阶段 pan 处理）
+    // 更新 shouldPan — 绘制工具或顶点拖拽激活时禁止画布平移
+    engine.updateShouldPan(() => !drawingManager?.isDrawing && !pathVertexManager?.isDragging && !shapeVertexManager?.isDragging)
+
+    // 为绘制工具注册 DOM 捕获阶段事件（早于 EditorEngine 的冒泡阶段 pan 处理）
   engine.leafer.waitViewReady(() => {
     const canvas = engine!.canvasElement
     if (!canvas) return
@@ -660,8 +689,9 @@ onMounted(() => {
   engine.leafer.waitViewReady(() => {
     const canvas = engine!.canvasElement
     if (canvas) {
-      // dblclick → 聚焦分区
+      // dblclick → 聚焦分区（顶点编辑模式时不触发）
       const dblHandler = () => {
+        if (pathVertexManager?.isActive || shapeVertexManager?.handleKind) return
         if (store.selectedSectionIds.length === 1) {
           enterSectionFocus(store.selectedSectionIds[0])
         }
@@ -756,6 +786,65 @@ onUnmounted(() => {
   sectionGroups = []
 })
 
+// 双击形状 → 进入顶点编辑模式
+function enterShapeVertexEdit(shapeId: string) {
+  if (!engine || !shapeVertexManager) return
+  const found = findShape(shapeId)
+  const shape = found?.shape
+  if (!shape || !(shape.type === 'polygon' || shape.type === 'polyline') || !shape.points?.length) return
+  const el = shapeElMap.get(shapeId)
+  if (!el) return
+
+  engine.editor.cancel()
+  pathVertexManager?.hideVertices()
+  shapeVertexManager.showShapeVertices(shape, el)
+}
+
+// 双击区域 → 进入顶点编辑模式
+function enterAreaVertexEdit(areaId: string) {
+  if (!engine || !shapeVertexManager) return
+  const found = findArea(areaId)
+  const area = found?.area
+  if (!area || !area.points?.length) return
+  const el = areaElMap.get(areaId)
+  if (!el) return
+
+  engine.editor.cancel()
+  pathVertexManager?.hideVertices()
+  shapeVertexManager.showAreaVertices(area, el)
+}
+
+// 双击分区边线 → 进入顶点编辑模式
+function enterSectionVertexEdit(sectionId: string, borderType: 'path' | 'polygon') {
+  if (!engine) return
+
+  const section = props.venue.sections.find(s => s.id === sectionId)
+  if (!section) return
+
+  engine.editor.cancel()
+
+  if (borderType === 'path' && pathVertexManager && section.borderPathPoints?.length) {
+    const pathEl = sectionPathMap.get(sectionId)
+    if (pathEl) {
+      shapeVertexManager?.hideVertices()
+      pathVertexManager.showVertices(section, pathEl)
+    }
+  } else if (borderType === 'polygon' && shapeVertexManager && section.borderPoints?.length) {
+    const polyEl = sectionPolygonElMap.get(sectionId)
+    if (polyEl) {
+      pathVertexManager?.hideVertices()
+      shapeVertexManager.showSectionPolygonVertices(
+        sectionId,
+        section.borderPoints,
+        section.borderX ?? 0,
+        section.borderY ?? 0,
+        polyEl,
+        section.borderArcDepths,
+      )
+    }
+  }
+}
+
 // ==================== Watch ====================
 
 watch(
@@ -780,49 +869,11 @@ watch(
   }
 )
 
-// 选中分区变更 → 显示/隐藏路径顶点编辑手柄
+// 选中分区变更 → 隐藏顶点手柄（顶点模式与选择模式互斥，由双击进入）
 watch(
   () => store.selectedSectionIds,
-  (ids) => {
+  (_ids) => {
     if (isSyncing) return
-
-    if (ids.length === 1) {
-      const section = props.venue.sections.find(s => s.id === ids[0])
-      if (!section) {
-        pathVertexManager?.hideVertices()
-        shapeVertexManager?.hideVertices()
-        return
-      }
-
-      // path 类型 → PathVertexManager
-      if (section.borderType === 'path' && section.borderPathPoints?.length &&
-          pathVertexManager && !pathVertexManager.isDragging && !shapeVertexManager?.isDragging) {
-        const pathEl = sectionPathMap.get(section.id)
-        if (pathEl) {
-          shapeVertexManager?.hideVertices()
-          pathVertexManager.showVertices(section, pathEl)
-          return
-        }
-      }
-
-      // polygon 类型 → ShapeVertexManager
-      if (section.borderType === 'polygon' && section.borderPoints?.length &&
-          shapeVertexManager && !shapeVertexManager.isDragging && !pathVertexManager?.isDragging) {
-        const polyEl = sectionPolygonElMap.get(section.id)
-        if (polyEl) {
-          pathVertexManager?.hideVertices()
-          shapeVertexManager.showSectionPolygonVertices(
-            section.id,
-            section.borderPoints,
-            section.borderX ?? 0,
-            section.borderY ?? 0,
-            polyEl,
-          )
-          return
-        }
-      }
-    }
-
     pathVertexManager?.hideVertices()
     if (shapeVertexManager?.handleKind === 'sectionPolygon') {
       shapeVertexManager?.hideVertices()
@@ -830,46 +881,22 @@ watch(
   }
 )
 
-// 选中 shape 变更 → 显示/隐藏形状顶点编辑手柄
+// 选中 shape 变更 → 隐藏形状顶点手柄
 watch(
   () => store.selectedShapeIds,
-  (ids) => {
+  (_ids) => {
     if (!shapeVertexManager || shapeVertexManager.isDragging || isSyncing) return
-
-    if (ids.length === 1) {
-      const found = findShape(ids[0])
-      const shape = found?.shape
-      if (shape && (shape.type === 'polygon' || shape.type === 'polyline') && shape.points?.length) {
-        const el = shapeElMap.get(ids[0])
-        if (el) {
-          shapeVertexManager.showShapeVertices(shape, el)
-          return
-        }
-      }
-    }
     if (shapeVertexManager.handleKind === 'shape') {
       shapeVertexManager.hideVertices()
     }
   }
 )
 
-// 选中 area 变更 → 显示/隐藏区域顶点编辑手柄
+// 选中 area 变更 → 隐藏区域顶点手柄
 watch(
   () => store.selectedAreaIds,
-  (ids) => {
+  (_ids) => {
     if (!shapeVertexManager || shapeVertexManager.isDragging || isSyncing) return
-
-    if (ids.length === 1) {
-      const found = findArea(ids[0])
-      const area = found?.area
-      if (area && area.points?.length) {
-        const el = areaElMap.get(ids[0])
-        if (el) {
-          shapeVertexManager.showAreaVertices(area, el)
-          return
-        }
-      }
-    }
     if (shapeVertexManager.handleKind === 'area') {
       shapeVertexManager.hideVertices()
     }

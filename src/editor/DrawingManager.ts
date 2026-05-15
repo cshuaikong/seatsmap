@@ -15,6 +15,7 @@ const PREVIEW_FILL = 'rgba(59,130,246,0.18)'
 const PREVIEW_LABEL = 'rgba(59,130,246,0.55)'
 const PREVIEW_MULTI_STROKE = 'rgba(255,152,0,0.50)'
 const PREVIEW_MULTI_LABEL = 'rgba(0,0,0,0.50)'
+const START_INDICATOR_RADIUS = 15
 
 export type DrawStep = 'idle' | 'first' | 'second' | 'third'
 
@@ -568,6 +569,24 @@ export class DrawingManager {
       this.previewGroup.add(dot)
       this._previewElements.push(dot)
     })
+
+    // 起点闭合指示器（仅 draw_polygon / draw_area，不用于 draw_polyline）
+    if (this._currentTool !== 'draw_polyline' && this._polygonPoints.length >= 1) {
+      const first = this._polygonPoints[0]
+      const indicator = new Ellipse({
+        x: first.x, y: first.y,
+        width: START_INDICATOR_RADIUS * 2,
+        height: START_INDICATOR_RADIUS * 2,
+        around: 'center',
+        fill: 'rgba(34,197,94,0.1)',
+        stroke: '#22c55e',
+        strokeWidth: 2,
+        dashPattern: [4, 4],
+        hitFill: 'none',
+      })
+      this.previewGroup.add(indicator)
+      this._previewElements.push(indicator)
+    }
   }
 
   private _submitPolygon(): void {
