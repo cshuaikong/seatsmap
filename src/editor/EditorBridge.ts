@@ -53,6 +53,16 @@ export class EditorBridge {
     return e.element || e.editTarget || e.list?.[0] || null
   }
 
+  /** 将 shape/text 在 section group 内的相对坐标转回世界坐标 */
+  private _toWorld(meta: ElementMeta, x: number, y: number): { x: number; y: number } {
+    if (!meta.sectionId) return { x, y }
+    const section = this.opts.getVenue().sections.find(s => s.id === meta.sectionId)
+    return {
+      x: x + (section?.borderX ?? 0),
+      y: y + (section?.borderY ?? 0),
+    }
+  }
+
   /** 启动监听 Editor 事件 */
   listen(): void {
     const { editor } = this.opts
@@ -196,14 +206,16 @@ export class EditorBridge {
         const height = target.height ?? meta.shapeData?.height ?? 100
         const shapeType = meta.shapeData?.type
         const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
-        const storeX = isCenterOrigin ? x - width / 2 : x
-        const storeY = isCenterOrigin ? y - height / 2 : y
+        const world = this._toWorld(meta, x, y)
+        const storeX = isCenterOrigin ? world.x - width / 2 : world.x
+        const storeY = isCenterOrigin ? world.y - height / 2 : world.y
         this.opts.updateShapeData(meta.id, storeX, storeY, width, height, rotation)
         break
       }
       case 'text': {
         const fontSize = target.fontSize ?? target.getAttr?.('fontSize') ?? meta.textData?.fontSize ?? 14
-        this.opts.updateTextData(meta.id, x, y, fontSize, rotation)
+        const world = this._toWorld(meta, x, y)
+        this.opts.updateTextData(meta.id, world.x, world.y, fontSize, rotation)
         break
       }
       case 'section': {
@@ -227,22 +239,31 @@ export class EditorBridge {
     this.opts.setSyncing(true)
 
     switch (meta.kind) {
-      case 'shape':
+      case 'shape': {
+        const width = target.width ?? 100
+        const height = target.height ?? 100
+        const x = target.x ?? 0
+        const y = target.y ?? 0
+        const world = this._toWorld(meta, x, y)
+        const shapeType = meta.shapeData?.type
+        const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
+        const storeX = isCenterOrigin ? world.x - width / 2 : world.x
+        const storeY = isCenterOrigin ? world.y - height / 2 : world.y
+        this.opts.updateShapeData(meta.id, storeX, storeY, width, height, target.rotation ?? 0)
+        break
+      }
       case 'section': {
         const width = target.width ?? 100
         const height = target.height ?? 100
         const x = target.x ?? 0
         const y = target.y ?? 0
-        const shapeType = meta.shapeData?.type
-        const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
-        const storeX = isCenterOrigin ? x - width / 2 : x
-        const storeY = isCenterOrigin ? y - height / 2 : y
-        this.opts.updateShapeData(meta.id, storeX, storeY, width, height, target.rotation ?? 0)
+        this.opts.updateSectionBorder(meta.id, x, y, width, height)
         break
       }
       case 'text': {
         const fontSize = target.fontSize ?? meta.textData?.fontSize ?? 14
-        this.opts.updateTextData(meta.id, target.x ?? 0, target.y ?? 0, fontSize, target.rotation ?? 0)
+        const world = this._toWorld(meta, target.x ?? 0, target.y ?? 0)
+        this.opts.updateTextData(meta.id, world.x, world.y, fontSize, target.rotation ?? 0)
         break
       }
     }
@@ -268,16 +289,19 @@ export class EditorBridge {
         const y = target.y ?? 0
         const width = target.width ?? meta.shapeData?.width ?? 100
         const height = target.height ?? meta.shapeData?.height ?? 100
+        const world = this._toWorld(meta, x, y)
         const shapeType = meta.shapeData?.type
         const isCenterOrigin = shapeType === 'ellipse' || shapeType === 'sector'
-        const storeX = isCenterOrigin ? x - width / 2 : x
-        const storeY = isCenterOrigin ? y - height / 2 : y
+        const storeX = isCenterOrigin ? world.x - width / 2 : world.x
+        const storeY = isCenterOrigin ? world.y - height / 2 : world.y
         this.opts.updateShapeData(meta.id, storeX, storeY, undefined, undefined, target.rotation ?? 0)
         break
       }
-      case 'text':
-        this.opts.updateTextData(meta.id, target.x ?? 0, target.y ?? 0, undefined, target.rotation ?? 0)
+      case 'text': {
+        const world = this._toWorld(meta, target.x ?? 0, target.y ?? 0)
+        this.opts.updateTextData(meta.id, world.x, world.y, undefined, target.rotation ?? 0)
         break
+      }
     }
 
     this.opts.setSyncing(false)

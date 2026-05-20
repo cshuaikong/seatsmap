@@ -13,10 +13,12 @@
         :is-multi="isMultiSectionSelected"
         :selected-count="selectedSections.length"
         :selected-sections="selectedSections"
+        :vertex-edit-active="vertexEditActive"
         @update-property="(key, val) => handleSectionPropertyUpdate(key, val)"
         @activate-path-segment="(pointIndex) => handleActivatePathSegment(pointIndex)"
         @enter-section="onEnterSection"
         @batch-update-names="handleBatchUpdateNames"
+        @toggle-vertex-edit="emit('toggle-vertex-edit')"
       />
     </template>
 
@@ -263,6 +265,7 @@ const props = defineProps<{
   // 兼容旧版：selection 现在可选，优先从 venueStore 读取
   selection?: PanelSelection | null
   selectedRow?: Row | null
+  vertexEditActive?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -271,6 +274,7 @@ const emit = defineEmits<{
   'update-property': [updates: Record<string, any>]
   'manage-categories': []
   'enter-section': [sectionId: string]
+  'toggle-vertex-edit': []
 }>()
 
 // 使用 venueStore 作为唯一数据源

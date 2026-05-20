@@ -39,7 +39,16 @@ export class DrawingManager {
   private _polygonPoints: Position[] = []
   private _dragStartPos: Position | null = null
   private _dragEndPos: Position | null = null
-  private _previewElements: any[] = []
+  // 预览元素池（避免每帧 GC）
+  private _poolEllipse: Ellipse[] = []
+  private _poolLine: Line[] = []
+  private _poolText: Text[] = []
+  private _poolRect: Rect[] = []
+  /** 当前帧已使用的元素索引 */
+  private _usedEllipse = 0
+  private _usedLine = 0
+  private _usedText = 0
+  private _usedRect = 0
   private _multiRowStep: DrawStep = 'idle'
   private _multiRowStart: Position | null = null
   private _multiRowEnd: Position | null = null
@@ -78,7 +87,7 @@ export class DrawingManager {
     this._multiRowStep = 'idle'
     this._multiRowStart = null
     this._multiRowEnd = null
-    this._clearPreview()
+    this._clearPools()
   }
 
   // ==================== 事件入口 ====================
@@ -297,7 +306,7 @@ export class DrawingManager {
 
   private _showMultiRowPreview(pos: Position): void {
     if (!this._multiRowStart || !this._multiRowEnd) return
-    this._clearPreview()
+    this._resetPreviewFrame()
 
     const store = useVenueStore()
     const baseScale = store.getBaseScale() || 1
@@ -306,11 +315,9 @@ export class DrawingManager {
     const logicalRadius = (store.visualConfig?.radius ?? 6) / baseScale
     const seatSize = logicalRadius * 2
 
-    // 第一排方向
     const { ux, uy, dist } = getUnitVector(this._multiRowStart, this._multiRowEnd)
     const count = Math.max(1, Math.round(dist / spacing))
 
-    // 多排方向（垂直于第一排）
     const perpX = -uy
     const perpY = ux
     const depthX = pos.x - this._multiRowStart.x
@@ -330,44 +337,19 @@ export class DrawingManager {
         const sy = this._multiRowStart.y + uy * spacing * i + offsetY
         points.push(sx, sy)
 
-        // 预览座位圆
-        const dot = new Ellipse({
-          x: sx, y: sy,
-          width: seatSize, height: seatSize,
-          around: 'center',
-          fill: PREVIEW_FILL,
-          stroke: PREVIEW_MULTI_STROKE,
-          strokeWidth: 1,
-        })
-        this.previewGroup.add(dot)
-        this._previewElements.push(dot)
+        const dot = this._acquireEllipse()
+        dot.set({ x: sx, y: sy, width: seatSize, height: seatSize, fill: PREVIEW_FILL, stroke: PREVIEW_MULTI_STROKE, strokeWidth: 1 })
       }
 
-      // 预览排线
-      const line = new Line({
-        points,
-        stroke: PREVIEW_MULTI_STROKE,
-        strokeWidth: seatSize,
-        strokeCap: 'round',
-        opacity: 0.8,
-      })
-      this.previewGroup.add(line)
-      this._previewElements.push(line)
+      const line = this._acquireLine()
+      line.set({ points, stroke: PREVIEW_MULTI_STROKE, strokeWidth: seatSize, strokeCap: 'round', opacity: 0.8 })
     }
 
-    // 计数标签
     const total = count * rowCount
     const cx = this._multiRowStart.x + depthX / 2 + actualPerpX * rowSpacing * (rowCount - 1) / 2
     const cy = this._multiRowStart.y + depthY / 2 + actualPerpY * rowSpacing * (rowCount - 1) / 2
-    const label = new Text({
-      x: cx, y: cy - 7,
-      text: `${count}×${rowCount} = ${total}座`,
-      fontSize: 14,
-      fill: PREVIEW_MULTI_LABEL,
-      textAlign: 'center',
-    })
-    this.previewGroup.add(label)
-    this._previewElements.push(label)
+    const label = this._acquireText()
+    label.set({ x: cx, y: cy - 7, text: `${count}×${rowCount} = ${total}座`, fontSize: 14, fill: PREVIEW_MULTI_LABEL, textAlign: 'center' })
   }
 
   private _submitMultiRows(pos: Position): void {
@@ -435,7 +417,7 @@ export class DrawingManager {
   private _onShapeDragMove(pos: Position): void {
     if (!this._dragStartPos) return
     this._dragEndPos = pos
-    this._clearPreview()
+    this._resetPreviewFrame()
 
     const x = Math.min(this._dragStartPos.x, pos.x)
     const y = Math.min(this._dragStartPos.y, pos.y)
@@ -445,20 +427,14 @@ export class DrawingManager {
     if (w < 5 && h < 5) return
 
     if (this._currentTool === 'draw_rect') {
-      const rect = new Rect({
-        x, y, width: w, height: h,
-        fill: PREVIEW_FILL,
-        stroke: PREVIEW_STROKE,
-        strokeWidth: 2,
-      })
-      this.previewGroup.add(rect)
-      this._previewElements.push(rect)
+      const rect = this._acquireRect()
+      rect.set({ x, y, width: w, height: h, fill: PREVIEW_FILL, stroke: PREVIEW_STROKE, strokeWidth: 2 })
     }
   }
 
   private _onShapeDragEnd(): void {
     if (!this._dragStartPos || !this._dragEndPos) return
-    this._clearPreview()
+    this._clearPools()
 
     const store = useVenueStore()
     const x = Math.min(this._dragStartPos.x, this._dragEndPos.x)
@@ -536,7 +512,7 @@ export class DrawingManager {
   }
 
   private _showPolygonPreview(currentPos?: Position): void {
-    this._clearPreview()
+    this._resetPreviewFrame()
 
     if (this._polygonPoints.length < 2 && !currentPos) return
 
@@ -544,48 +520,25 @@ export class DrawingManager {
     if (currentPos) allPoints.push(currentPos)
     const flatPoints = allPoints.flatMap(p => [p.x, p.y])
 
-    const line = new Line({
-      points: flatPoints,
-      stroke: PREVIEW_STROKE,
-      strokeWidth: 2,
-      strokeCap: 'round',
-      strokeJoin: 'round',
-      closed: false,
-    })
-    this.previewGroup.add(line)
-    this._previewElements.push(line)
+    const line = this._acquireLine()
+    line.set({ points: flatPoints, stroke: PREVIEW_STROKE, strokeWidth: 2, strokeCap: 'round', strokeJoin: 'round', closed: false })
 
-    // 顶点圆（around: 'center' 确保圆心在顶点坐标上）
+    // 顶点圆
     this._polygonPoints.forEach(p => {
-      const dot = new Ellipse({
-        x: p.x, y: p.y,
-        width: 10, height: 10,
-        around: 'center',
-        fill: '#ffffff',
-        stroke: PREVIEW_STROKE,
-        strokeWidth: 2,
-        hitFill: 'all',
-      })
-      this.previewGroup.add(dot)
-      this._previewElements.push(dot)
+      const dot = this._acquireEllipse()
+      dot.set({ x: p.x, y: p.y, width: 10, height: 10, fill: '#ffffff', stroke: PREVIEW_STROKE, strokeWidth: 2, hitFill: 'all' })
     })
 
-    // 起点闭合指示器（仅 draw_polygon / draw_area，不用于 draw_polyline）
+    // 起点闭合指示器
     if (this._currentTool !== 'draw_polyline' && this._polygonPoints.length >= 1) {
       const first = this._polygonPoints[0]
-      const indicator = new Ellipse({
+      const indicator = this._acquireEllipse()
+      indicator.set({
         x: first.x, y: first.y,
-        width: START_INDICATOR_RADIUS * 2,
-        height: START_INDICATOR_RADIUS * 2,
-        around: 'center',
-        fill: 'rgba(34,197,94,0.1)',
-        stroke: '#22c55e',
-        strokeWidth: 2,
-        dashPattern: [4, 4],
-        hitFill: 'none',
+        width: START_INDICATOR_RADIUS * 2, height: START_INDICATOR_RADIUS * 2,
+        fill: 'rgba(34,197,94,0.1)', stroke: '#22c55e', strokeWidth: 2,
+        dashPattern: [4, 4], hitFill: 'none',
       })
-      this.previewGroup.add(indicator)
-      this._previewElements.push(indicator)
     }
   }
 
@@ -691,26 +644,103 @@ export class DrawingManager {
 
   // ==================== Preview Helpers ====================
 
-  private _clearPreview(): void {
+  // ==================== 预览元素池 ====================
+
+  /** 隐藏所有已用的池元素 */
+  private _hidePreview(): void {
+    for (let i = 0; i < this._usedEllipse; i++) this._poolEllipse[i].visible = false
+    for (let i = 0; i < this._usedLine; i++) this._poolLine[i].visible = false
+    for (let i = 0; i < this._usedText; i++) this._poolText[i].visible = false
+    for (let i = 0; i < this._usedRect; i++) this._poolRect[i].visible = false
+  }
+
+  /** 隐藏并重置使用计数（每帧开头调用） */
+  private _resetPreviewFrame(): void {
+    this._hidePreview()
+    this._usedEllipse = 0
+    this._usedLine = 0
+    this._usedText = 0
+    this._usedRect = 0
+  }
+
+  /** 真正清空池（切换工具时调用） */
+  private _clearPools(): void {
     this.previewGroup.clear()
-    this._previewElements = []
+    this._poolEllipse = []
+    this._poolLine = []
+    this._poolText = []
+    this._poolRect = []
+    this._usedEllipse = 0
+    this._usedLine = 0
+    this._usedText = 0
+    this._usedRect = 0
+  }
+
+  private _acquireEllipse(): Ellipse {
+    if (this._usedEllipse < this._poolEllipse.length) {
+      const el = this._poolEllipse[this._usedEllipse]
+      el.visible = true
+      this._usedEllipse++
+      return el
+    }
+    const el = new Ellipse({ around: 'center' })
+    this.previewGroup.add(el)
+    this._poolEllipse.push(el)
+    this._usedEllipse++
+    return el
+  }
+
+  private _acquireLine(): Line {
+    if (this._usedLine < this._poolLine.length) {
+      const el = this._poolLine[this._usedLine]
+      el.visible = true
+      this._usedLine++
+      return el
+    }
+    const el = new Line()
+    this.previewGroup.add(el)
+    this._poolLine.push(el)
+    this._usedLine++
+    return el
+  }
+
+  private _acquireText(): Text {
+    if (this._usedText < this._poolText.length) {
+      const el = this._poolText[this._usedText]
+      el.visible = true
+      this._usedText++
+      return el
+    }
+    const el = new Text()
+    this.previewGroup.add(el)
+    this._poolText.push(el)
+    this._usedText++
+    return el
+  }
+
+  private _acquireRect(): Rect {
+    if (this._usedRect < this._poolRect.length) {
+      const el = this._poolRect[this._usedRect]
+      el.visible = true
+      this._usedRect++
+      return el
+    }
+    const el = new Rect()
+    this.previewGroup.add(el)
+    this._poolRect.push(el)
+    this._usedRect++
+    return el
   }
 
   private _showCursorCircle(pos: Position): void {
-    this._clearPreview()
-    const dot = new Ellipse({
-      x: pos.x, y: pos.y,
-      width: 8, height: 8,
-      around: 'center',
-      fill: PREVIEW_STROKE,
-    })
-    this.previewGroup.add(dot)
-    this._previewElements.push(dot)
+    this._resetPreviewFrame()
+    const dot = this._acquireEllipse()
+    dot.set({ x: pos.x, y: pos.y, width: 8, height: 8, fill: PREVIEW_STROKE, stroke: '' })
   }
 
   private _showSeatRowPreview(): void {
     if (!this._seatStartPos || !this._seatCurrentPos) return
-    this._clearPreview()
+    this._resetPreviewFrame()
 
     const store = useVenueStore()
     const baseScale = store.getBaseScale() || 1
@@ -723,50 +753,22 @@ export class DrawingManager {
     const points: number[] = []
 
     for (let i = 0; i < count; i++) {
-      points.push(
-        this._seatStartPos.x + ux * spacing * i,
-        this._seatStartPos.y + uy * spacing * i
-      )
+      const sx = this._seatStartPos.x + ux * spacing * i
+      const sy = this._seatStartPos.y + uy * spacing * i
+      points.push(sx, sy)
+
+      const dot = this._acquireEllipse()
+      dot.set({ x: sx, y: sy, width: seatSize, height: seatSize, fill: PREVIEW_FILL, stroke: PREVIEW_STROKE, strokeWidth: 1 })
     }
 
     // 预览线
-    const line = new Line({
-      points,
-      stroke: PREVIEW_STROKE,
-      strokeWidth: seatSize,
-      strokeCap: 'round',
-      opacity: 0.8,
-    })
-    this.previewGroup.add(line)
-    this._previewElements.push(line)
-
-    // 预览座位圆
-    for (let i = 0; i < count; i++) {
-      const x = this._seatStartPos.x + ux * spacing * i
-      const y = this._seatStartPos.y + uy * spacing * i
-      const dot = new Ellipse({
-        x, y,
-        width: seatSize, height: seatSize,
-        around: 'center',
-        fill: PREVIEW_FILL,
-        stroke: PREVIEW_STROKE,
-        strokeWidth: 1,
-      })
-      this.previewGroup.add(dot)
-      this._previewElements.push(dot)
-    }
+    const line = this._acquireLine()
+    line.set({ points, stroke: PREVIEW_STROKE, strokeWidth: seatSize, strokeCap: 'round', opacity: 0.8 })
 
     // 数量标签
     const midX = this._seatStartPos.x + (this._seatCurrentPos.x - this._seatStartPos.x) / 2
     const midY = this._seatStartPos.y + (this._seatCurrentPos.y - this._seatStartPos.y) / 2
-    const label = new Text({
-      x: midX, y: midY - 7,
-      text: String(count),
-      fontSize: 14,
-      fill: PREVIEW_LABEL,
-      textAlign: 'center',
-    })
-    this.previewGroup.add(label)
-    this._previewElements.push(label)
+    const label = this._acquireText()
+    label.set({ x: midX, y: midY - 7, text: String(count), fontSize: 14, fill: PREVIEW_LABEL, textAlign: 'center' })
   }
 }

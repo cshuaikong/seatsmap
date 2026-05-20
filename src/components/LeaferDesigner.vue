@@ -104,8 +104,10 @@
         :categories="displayCategories"
         :total-seats="totalSeats"
         :current-tool="currentTool as any"
+        :vertex-edit-active="vertexEditActive"
         @manage-categories="onManageCategories"
         @enter-section="(sectionId: string) => (rendererRef as any)?.enterSectionFocus?.(sectionId)"
+        @toggle-vertex-edit="onToggleVertexEdit"
       />
 
       <CategoryManager
@@ -146,6 +148,7 @@ const currentStageScale = ref(1)
 const currentBaseScale = ref(1)
 
 const currentTool = ref<string>('select')
+const vertexEditActive = ref(false)
 const chartName = ref('Leafer 座位图编辑器')
 
 let updateScaleInterval: ReturnType<typeof setInterval> | null = null
@@ -327,6 +330,12 @@ const onDelete = () => {
 
 const onManageCategories = () => {
   showCategoryManager.value = true
+}
+
+const onToggleVertexEdit = () => {
+  const r = rendererRef.value as any
+  r?.toggleVertexEdit?.()
+  vertexEditActive.value = r?.isVertexEditActive?.() ?? false
 }
 
 const onExportData = async () => {

@@ -34,9 +34,10 @@ import { SectionRenderer } from '../viewer/SectionRenderer'
 import { SeatRenderer } from '../viewer/SeatRenderer'
 import { LabelRenderer } from '../viewer/LabelRenderer'
 import { SelectionManager } from '../viewer/SelectionManager'
-import { PathVertexManager } from '../editor/PathVertexManager'
-import { ShapeVertexManager } from '../editor/ShapeVertexManager'
+import { InteractionDispatcher } from '../editor/InteractionDispatcher'
+import { VertexEditManager } from '../editor/VertexEditManager'
 import { DrawingManager } from '../editor/DrawingManager'
+import { getSectionAABB, isInsideSection, isNearSectionBorder } from '../viewer/geometry'
 
 import { darkenColor, getCategoryColor } from '../utils/color'
 
@@ -71,8 +72,8 @@ let labelRenderer: LabelRenderer | null = null
 let selectionManager: SelectionManager | null = null
 let editorBridge: EditorBridge | null = null
 let keyboard: KeyboardManager | null = null
-let pathVertexManager: PathVertexManager | null = null
-let shapeVertexManager: ShapeVertexManager | null = null
+let dispatcher: InteractionDispatcher | null = null
+let vertexEditManager: VertexEditManager | null = null
 let drawingManager: DrawingManager | null = null
 let sectionGroups: any[] = []
 /** 分区 ID → 其 Path 边框元素（用于路径顶点编辑） */
@@ -85,9 +86,25 @@ const sectionPolygonElMap = new Map<string, any>()
 let currentScale = 1
 let isSyncing = false
 let pendingAutoSelect: { kind: string; id: string } | null = null
-let dblClickCleanup: (() => void) | null = null
 let ctxMenuCleanup: (() => void) | null = null
+/** 分区 ID → 其边框元素（用于悬停高亮，覆盖所有 borderType） */
+const sectionBorderElMap = new Map<string, any>()
+let hoveredSectionId: string | null = null
+const _hoverOriginals = new Map<string, { strokeWidth: number; stroke: string }>()
+const _selectionHighlighted = new Set<string>()
+let boundHoverMove: ((e: PointerEvent) => void) | null = null
+// 手动双击检测（绕开 Leafer Editor 对 editable 元素的 DOUBLE_CLICK 拦截）
+let _lastClickTime = 0
+let _lastClickPos = { x: 0, y: 0 }
+let _dblClickDetector: ((e: PointerEvent) => void) | null = null
+// 顶点编辑模式下的点击切换/退出（pointerup 捕获阶段）
+let _vertexEditClickHandler: ((e: PointerEvent) => void) | null = null
+const DBL_CLICK_WINDOW = 350   // ms
+const DBL_CLICK_DIST = 8       // px
+const HOVER_HIGHLIGHT_COLOR = '#3B82F6'
+const HOVER_HIGHLIGHT_WIDTH_DELTA = 1
 const EDITOR_BASE_POINT_SIZE = 6
+const EDITOR_BASE_STROKE_WIDTH = 2.5
 
 // 绘制工具的 DOM 事件处理器（捕获阶段，用于在 onUnmounted 中清理）
 let boundDrawPointerDown: ((e: PointerEvent) => void) | null = null
@@ -103,8 +120,6 @@ const buildNodeMeta = () => {
 
   props.venue.sections.forEach(section => {
     nodeMetaMap.set(`section-${section.id}`, { kind: 'section', id: section.id })
-    // sectionGroup（Editor 选中整个分区时会选中 Group 包装器）
-    nodeMetaMap.set(`section-group-${section.id}`, { kind: 'section', id: section.id })
 
     section.rows.forEach(row => {
       nodeMetaMap.set(`row-${row.id}`, { kind: 'row', id: row.id, sectionId: section.id, rowData: row })
@@ -126,10 +141,6 @@ const buildNodeMeta = () => {
     })
   })
 }
-
-// ==================== 当前工具状态 ====================
-
-let currentTool = 'select'
 
 // ==================== 配置 ====================
 
@@ -159,6 +170,7 @@ const rebuildSectionLayers = () => {
 
   sectionGroups.forEach(g => leafer.remove(g))
   sectionGroups = []
+  sectionBorderElMap.clear()
   sectionPathMap.clear()
   shapeElMap.clear()
   areaElMap.clear()
@@ -177,47 +189,66 @@ const rebuildSectionLayers = () => {
 
     leafer.add(sectionGroup)
 
+    // 缓存边框元素（供悬停高亮用，覆盖所有 borderType）
+    if (section.borderType && section.borderType !== 'none') {
+      const borderEl = sectionGroup.children[0]
+      if (borderEl) {
+        sectionBorderElMap.set(section.id, borderEl)
+        // 单击边框 → 顶点编辑 / 普通选择
+        borderEl.on(LeaferPointer.CLICK, (e: any) => {
+          if (!engine || !vertexEditManager) return
+          if (dispatcher?.mode !== 'IDLE' && dispatcher?.mode !== 'VERTEX_EDIT') return
+          const worldPos = (borderEl as any).localToWorld?.({ x: e.x ?? 0, y: e.y ?? 0 }) ?? { x: (section.borderX ?? 0) + (e.x ?? 0), y: (section.borderY ?? 0) + (e.y ?? 0) }
+
+          if (isNearSectionBorder(section, worldPos, currentScale)) {
+            if (section.borderType === 'polygon' && section.borderPoints?.length) {
+              dispatcher.enterVertexEdit(section, 'polygon')
+            } else if (section.borderType === 'path' && section.borderPathPoints?.length) {
+              dispatcher.enterVertexEdit(section, 'path')
+            }
+          }
+        })
+      }
+    }
+
     // 缓存 Path/Polygon 边框元素，供顶点编辑使用
     if (section.borderType === 'path' && section.borderPathPoints?.length) {
       const borderEl = sectionGroup.children[0]
       if (borderEl && (borderEl as any).tag === 'Path') {
         sectionPathMap.set(section.id, borderEl)
-        borderEl.on(LeaferPointer.DOUBLE_CLICK, () => {
-          enterSectionVertexEdit(section.id, 'path')
-        })
       }
     } else if (section.borderType === 'polygon' && section.borderPoints?.length) {
       const borderEl = sectionGroup.children[0]
       if (borderEl) {
         const tag = (borderEl as any).tag
-        // 有弧深时渲染为 Path，但仍由 ShapeVertexManager 管理
         if (tag === 'Path' || tag === 'Polygon') {
           sectionPolygonElMap.set(section.id, borderEl)
-          borderEl.on(LeaferPointer.DOUBLE_CLICK, () => {
-            enterSectionVertexEdit(section.id, 'polygon')
-          })
         }
       }
     }
 
-    // 缓存 polygon/polyline shape 和 area 元素，供顶点编辑使用
+    // 缓存 shape 和 area 元素（shape/area 仍用逐元素双击进入顶点编辑）
     sectionGroup.children?.forEach((child: any) => {
       const cid = child.id || child.getAttr?.('id') || ''
       if (cid.startsWith('shape-')) {
         const sid = cid.slice(6)
         shapeElMap.set(sid, child)
-        // 双击进入顶点编辑（仅 polygon/polyline）
         const shape = section.shapes?.find(s => s.id === sid)
         if (shape && (shape.type === 'polygon' || shape.type === 'polyline')) {
           child.on(LeaferPointer.DOUBLE_CLICK, () => {
-            enterShapeVertexEdit(sid)
+            if (!engine || !vertexEditManager) return
+            engine.editor.cancel()
+            vertexEditManager.enterForShape(shape, child)
           })
         }
       } else if (cid.startsWith('area-')) {
         const aid = cid.slice(5)
         areaElMap.set(aid, child)
         child.on(LeaferPointer.DOUBLE_CLICK, () => {
-          enterAreaVertexEdit(aid)
+          if (!engine || !vertexEditManager) return
+          engine.editor.cancel()
+          const area = section.areas?.find(a => a.id === aid)
+          if (area) vertexEditManager.enterForArea(area, child)
         })
       }
     })
@@ -235,7 +266,7 @@ const createSeatRenderer = () => {
     props.venue, config, resolveCategoryColor, darkenColor,
     (seat, row, section) => {
       // selectseat 模式才切换座位状态，select 模式由 Editor 插件处理
-      if (currentTool === 'selectseat') {
+      if (dispatcher?.mode === 'SEAT_SELECT') {
         selectionManager?.handleSeatClick(seat, row, section, (s, r, sec) => {
           emit('seat-click', s, r, sec)
         })
@@ -244,8 +275,8 @@ const createSeatRenderer = () => {
     true,  // editMode
   )
   seatRenderer.render()
+  seatRenderer.setFocusedSectionId(store.focusedSectionId)
   seatRenderer.updateLOD(currentScale)
-  engine?.leafer.add(seatRenderer.rootGroup)
   selectionManager?.setRenderer(seatRenderer)
 }
 
@@ -255,7 +286,28 @@ const renderAll = () => {
   labelRenderer?.clear()
   buildNodeMeta()
   rebuildSectionLayers()
+  // 重建后恢复选中分区边框高亮
+  const selScale = Math.max(currentScale, 0.02)
+  _selectionHighlighted.forEach(sid => {
+    const el = sectionBorderElMap.get(sid)
+    if (el) { el.strokeWidth = 1 / selScale; el.stroke = '#3b82f6' }
+  })
   createSeatRenderer()
+
+  // 将座位分区分组挂到对应的分区 Group 下，移动分区时座位跟随移动
+  sectionGroups.forEach(sg => {
+    const sid = (sg as any).id?.replace('section-', '')
+    if (!sid) return
+    const seatGroup = seatRenderer?.rootGroup.children?.find(
+      (c: any) => c.id === `seats-${sid}`
+    ) as any
+    if (seatGroup) {
+      seatRenderer!.rootGroup.remove(seatGroup)
+      sg.add(seatGroup)
+    }
+  })
+  // seat-root 现在已空，不再添加到 leafer（seat 已在 sectionGroup 内）
+  // 但 updateLOD 等仍依赖 seatRenderer.rootGroup 存在，保留引用即可
 
   // 确保 Editor（EditBox）始终在最顶层，不被座位/分区遮挡
   engine.leafer.add(engine.editor as any)
@@ -297,22 +349,6 @@ const debouncedSaveHistory = () => {
   }, 200)
 }
 
-// 在 venue 数据中查找 shape/area
-const findShape = (id: string) => {
-  for (const s of props.venue.sections) {
-    const shape = s.shapes?.find(sh => sh.id === id)
-    if (shape) return { shape, sectionId: s.id }
-  }
-  return undefined
-}
-const findArea = (id: string) => {
-  for (const s of props.venue.sections) {
-    const area = s.areas?.find(a => a.id === id)
-    if (area) return { area, sectionId: s.id }
-  }
-  return undefined
-}
-
 const createEditorBridge = (): EditorBridge => {
   const bridgeOpts: EditorBridgeOptions = {
     editor: engine!.editor,
@@ -338,7 +374,33 @@ const createEditorBridge = (): EditorBridge => {
       store.updateArea(id, { points })
     },
     updateSectionBorder: (id, x, y, width?, height?) => {
+      const section = props.venue.sections.find(s => s.id === id)
+      const dx = x - (section?.borderX ?? 0)
+      const dy = y - (section?.borderY ?? 0)
+
       store.updateSectionBorder(id, { borderX: x, borderY: y, borderWidth: width, borderHeight: height })
+
+      // 更新 Store 内部元素的世界坐标（leafer 子元素通过父级 transform 自动跟随，不手动偏移）
+      if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
+        section?.rows.forEach(row => {
+          store.updateRow(row.id, { x: (row.x ?? 0) + dx, y: (row.y ?? 0) + dy })
+        })
+        section?.shapes?.forEach(shape => {
+          store.updateShape(shape.id, { x: (shape.x ?? 0) + dx, y: (shape.y ?? 0) + dy })
+        })
+        section?.texts?.forEach(text => {
+          store.updateText(text.id, { x: (text.x ?? 0) + dx, y: (text.y ?? 0) + dy })
+        })
+        section?.areas?.forEach(area => {
+          store.updateArea(area.id, {
+            points: area.points.map((p, i) => p + (i % 2 === 0 ? dx : dy)),
+          })
+        })
+      }
+
+      // 同步 leafer group 位置
+      const sg = sectionGroups.find(g => (g as any).id === `section-${id}`) as any
+      if (sg) { sg.x = x; sg.y = y }
     },
     saveHistory: () => store.saveHistory(),
     getSyncing: () => isSyncing,
@@ -552,12 +614,12 @@ onMounted(() => {
     container: containerRef.value,
     width,
     height,
-    shouldPan: () => !drawingManager?.isDrawing,
+    shouldPan: () => true, // 初始值，等 dispatcher 创建后更新
     editorConfig: {
       stroke: '#836DFF',
-      strokeWidth: 1,
+      strokeWidth: EDITOR_BASE_STROKE_WIDTH,
       pointSize: EDITOR_BASE_POINT_SIZE,
-      resizeLine: { strokeWidth: 1 },
+      resizeLine: { strokeWidth: 1, height: 2 },
       moveable: true,
       resizeable: true,
       rotateable: true,
@@ -585,28 +647,20 @@ onMounted(() => {
   editorBridge = createEditorBridge()
   editorBridge.listen()
 
-  pathVertexManager = new PathVertexManager({
-    leafer: engine.leafer,
-    getSection: (id) => props.venue.sections.find(s => s.id === id),
-    updateSectionBorder: (sectionId, border) => store.updateSectionBorder(sectionId, border),
-    saveHistory: () => store.saveHistory(),
-    getScale: () => engine?.scale ?? 1,
-    getSyncing: () => isSyncing,
-    setSyncing: (v: boolean) => { isSyncing = v },
-  })
-
-  shapeVertexManager = new ShapeVertexManager({
+  vertexEditManager = new VertexEditManager({
     leafer: engine.leafer,
     getScale: () => engine?.scale ?? 1,
     getSyncing: () => isSyncing,
     setSyncing: (v: boolean) => { isSyncing = v },
     saveHistory: () => store.saveHistory(),
-    updateShapePoints: (id, points) => store.updateShape(id, { points }),
-    updateAreaPoints: (id, points) => store.updateArea(id, { points }),
-    updateSectionPoints: (sectionId, points) => store.updateSectionBorder(sectionId, { borderPoints: points }),
-    updateShapeArcDepths: (id, arcDepths) => store.updateShape(id, { arcDepths }),
-    updateAreaArcDepths: (id, arcDepths) => store.updateArea(id, { arcDepths }),
-    updateSectionArcDepths: (sectionId, arcDepths) => store.updateSectionBorder(sectionId, { borderArcDepths: arcDepths }),
+    updateSectionBorderPathPoints: (sectionId, pathPoints) =>
+      store.updateSectionBorder(sectionId, { borderPathPoints: pathPoints }),
+    updateSectionBorderPoints: (sectionId, points, arcDepths) =>
+      store.updateSectionBorder(sectionId, { borderPoints: points, borderArcDepths: arcDepths }),
+    updateShapePoints: (id, points, arcDepths) =>
+      store.updateShape(id, { points, arcDepths }),
+    updateAreaPoints: (id, points, arcDepths) =>
+      store.updateArea(id, { points, arcDepths }),
   })
 
   drawingManager = new DrawingManager({
@@ -617,16 +671,54 @@ onMounted(() => {
     },
   })
 
-  // 为绘制工具注册 DOM 捕获阶段事件（早于 EditorEngine 的冒泡阶段 pan 处理）
-    // 更新 shouldPan — 绘制工具或顶点拖拽激活时禁止画布平移
-    engine.updateShouldPan(() => !drawingManager?.isDrawing && !pathVertexManager?.isDragging && !shapeVertexManager?.isDragging)
+  dispatcher = new InteractionDispatcher({
+    getSections: () => props.venue.sections,
+    getScale: () => engine?.scale ?? 1,
+    isVertexEditActive: () => vertexEditManager?.isActive ?? false,
+    isDrawing: () => drawingManager?.isDrawing ?? false,
+    onEnterDrawing: (tool) => {
+      drawingManager?.setTool(tool)
+      engine?.editor.cancel()
+      setEditorHittable(false)
+    },
+    onExitDrawing: () => {
+      drawingManager?.setTool('select')
+      drawingManager?.resetState()
+      setEditorHittable(true)
+    },
+    onEnterVertexEdit: (section, kind) => {
+      if (!engine || !vertexEditManager) return
+      engine.editor.cancel()
+      // 编辑器不可交互但分区边框保持可点，以便切换顶点编辑目标
+      sectionGroups.forEach(g => { g.hittable = true })
+      // 同步右边面板选中
+      store.selectSection(section.id)
+      if (kind === 'path') {
+        const el = sectionPathMap.get(section.id)
+        if (el) vertexEditManager.enterForPathSection(section, el)
+      } else {
+        const el = sectionPolygonElMap.get(section.id)
+        if (el) vertexEditManager.enterForPolygonSection(section, el)
+      }
+    },
+    onExitVertexEdit: () => {
+      vertexEditManager?.hideVertices()
+    },
+    onEnterSectionFocus: (sectionId) => {
+      enterSectionFocus(sectionId)
+    },
+    onExitSectionFocus: () => {},
+    cancelEditorSelection: () => engine?.editor.cancel(),
+    setEditorHittable: (v) => setEditorHittable(v),
+  })
 
-    // 为绘制工具注册 DOM 捕获阶段事件（早于 EditorEngine 的冒泡阶段 pan 处理）
+  engine.updateShouldPan(() => dispatcher?.canPan ?? true)
+
+  // 为绘制工具注册 DOM 捕获阶段事件
   engine.leafer.waitViewReady(() => {
     const canvas = engine!.canvasElement
     if (!canvas) return
 
-    /** 屏幕坐标 → 世界坐标：逆变换 = (client - rect - pan) / scale */
     const screenToWorld = (clientX: number, clientY: number) => {
       const l = engine!.leafer as any
       const rect = canvas.getBoundingClientRect()
@@ -641,24 +733,98 @@ onMounted(() => {
     }
 
     boundDrawPointerDown = (e: PointerEvent) => {
-      if (!drawingManager?.isDrawing) return
+      if (dispatcher?.mode !== 'DRAWING') return
       e.stopPropagation()
       e.preventDefault()
-      drawingManager.handlePointerDown(screenToWorld(e.clientX, e.clientY))
+      drawingManager?.handlePointerDown(screenToWorld(e.clientX, e.clientY))
     }
     boundDrawPointerMove = (e: PointerEvent) => {
-      if (!drawingManager?.isDrawing) return
+      if (dispatcher?.mode !== 'DRAWING') return
       e.stopPropagation()
-      drawingManager.handlePointerMove(screenToWorld(e.clientX, e.clientY))
+      drawingManager?.handlePointerMove(screenToWorld(e.clientX, e.clientY))
     }
     boundDrawPointerUp = (e: PointerEvent) => {
-      if (!drawingManager?.isDrawing) return
+      if (dispatcher?.mode !== 'DRAWING') return
       e.stopPropagation()
-      drawingManager.handlePointerUp(screenToWorld(e.clientX, e.clientY))
+      drawingManager?.handlePointerUp(screenToWorld(e.clientX, e.clientY))
     }
     canvas.addEventListener('pointerdown', boundDrawPointerDown, true)
     canvas.addEventListener('pointermove', boundDrawPointerMove, true)
     canvas.addEventListener('pointerup', boundDrawPointerUp, true)
+
+    // 手动双击检测（DOM pointerdown，绕开 Leafer Editor 对 editable 元素的 DOUBLE_CLICK 拦截）
+    _dblClickDetector = (e: PointerEvent) => {
+      if (dispatcher?.mode !== 'IDLE') return
+      const now = Date.now()
+      const dx = e.clientX - _lastClickPos.x
+      const dy = e.clientY - _lastClickPos.y
+      if (now - _lastClickTime < DBL_CLICK_WINDOW && Math.hypot(dx, dy) < DBL_CLICK_DIST) {
+        dispatcher.handleDoubleClick(screenToWorld(e.clientX, e.clientY))
+        _lastClickTime = 0
+        return
+      }
+      _lastClickTime = now
+      _lastClickPos = { x: e.clientX, y: e.clientY }
+    }
+    canvas.addEventListener('pointerdown', _dblClickDetector, true)
+
+    // 顶点编辑模式下：点击其他分区主体 → 切换；点击空白 → 退出
+    _vertexEditClickHandler = (e: PointerEvent) => {
+      if (dispatcher?.mode !== 'VERTEX_EDIT') return
+      if (vertexEditManager?.isDragging) return // 顶点拖拽中，跳过
+      const worldPos = screenToWorld(e.clientX, e.clientY)
+      const sections = props.venue.sections
+      // 从后往前遍历（上层优先）
+      for (let i = sections.length - 1; i >= 0; i--) {
+        const s = sections[i]
+        if (!s.borderType || s.borderType === 'none') continue
+        if (s.readonly) continue
+        const aabb = getSectionAABB(s)
+        if (!aabb) continue
+        // AABB 粗筛
+        if (
+          worldPos.x < aabb.x - 1 || worldPos.x > aabb.x + aabb.width + 1 ||
+          worldPos.y < aabb.y - 1 || worldPos.y > aabb.y + aabb.height + 1
+        ) continue
+        if (isInsideSection(s, worldPos)) {
+          // 点击了另一个分区 → 切换顶点编辑
+          if (s.borderType === 'polygon' && s.borderPoints?.length) {
+            dispatcher.enterVertexEdit(s, 'polygon')
+            return
+          }
+          if (s.borderType === 'path' && s.borderPathPoints?.length) {
+            dispatcher.enterVertexEdit(s, 'path')
+            return
+          }
+          // rect/ellipse 暂不支持顶点编辑，退出
+          dispatcher.exitToIdle()
+          return
+        }
+      }
+      // 点击空白 → 退出顶点编辑
+      dispatcher.exitToIdle()
+    }
+    canvas.addEventListener('pointerup', _vertexEditClickHandler, true)
+
+    // 悬停边框高亮 — 仅在 IDLE 模式下生效
+    boundHoverMove = (e: PointerEvent) => {
+      if (dispatcher?.mode !== 'IDLE') {
+        _clearHoverHighlight()
+        return
+      }
+      _updateHoverHighlight(screenToWorld(e.clientX, e.clientY))
+    }
+    canvas.addEventListener('pointermove', boundHoverMove, true)
+
+    // contextmenu → 右键菜单
+    canvas.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault()
+      const rect = canvas.getBoundingClientRect()
+      ctxMenu.x = e.clientX - rect.left
+      ctxMenu.y = e.clientY - rect.top
+      ctxMenu.items = buildCtxMenuItems()
+      ctxMenu.visible = ctxMenu.items.length > 0
+    })
   })
 
   keyboard = new KeyboardManager({
@@ -669,9 +835,8 @@ onMounted(() => {
     onGroup: () => groupSelected(),
     onUngroup: () => ungroupSelected(),
     onEscape: () => {
-      if (currentTool !== 'select') {
-        currentTool = 'select'
-        drawingManager?.setTool('select')
+      if (dispatcher?.mode !== 'IDLE') {
+        dispatcher?.exitToIdle()
         return
       }
       store.clearSelection()
@@ -680,51 +845,29 @@ onMounted(() => {
   })
   keyboard.listen()
 
-  // 右键菜单
+  // 右键菜单清理
   ctxMenuCleanup = () => { ctxMenu.visible = false }
   window.addEventListener('click', ctxMenuCleanup)
   window.addEventListener('pointerdown', ctxMenuCleanup, true)
-
-  // 双击分区 → 聚焦（DOM 级 dblclick，避免与 Editor 事件冲突）
-  engine.leafer.waitViewReady(() => {
-    const canvas = engine!.canvasElement
-    if (canvas) {
-      // dblclick → 聚焦分区（顶点编辑模式时不触发）
-      const dblHandler = () => {
-        if (pathVertexManager?.isActive || shapeVertexManager?.handleKind) return
-        if (store.selectedSectionIds.length === 1) {
-          enterSectionFocus(store.selectedSectionIds[0])
-        }
-      }
-      canvas.addEventListener('dblclick', dblHandler)
-      dblClickCleanup = () => canvas.removeEventListener('dblclick', dblHandler)
-
-      // contextmenu → 右键菜单
-      canvas.addEventListener('contextmenu', (e: MouseEvent) => {
-        e.preventDefault()
-        const rect = canvas.getBoundingClientRect()
-        ctxMenu.x = e.clientX - rect.left
-        ctxMenu.y = e.clientY - rect.top
-        ctxMenu.items = buildCtxMenuItems()
-        ctxMenu.visible = ctxMenu.items.length > 0
-      })
-    }
-  })
 
   engine.onZoomChange((scale) => {
     updateViewState(scale)
     // EditBox 控制点/描边反向缩放补偿：保持屏幕像素大小一致
     const safeScale = Math.max(scale, 0.02)
-    const scaledPointSize = EDITOR_BASE_POINT_SIZE / safeScale
-    const scaledStrokeWidth = 1 / safeScale
+    // 选中分区边框缩放补偿：保持屏幕 1px
+    _selectionHighlighted.forEach(sid => {
+      const el = sectionBorderElMap.get(sid)
+      if (el) el.strokeWidth = 1 / safeScale
+    })
+    // 反向缩放补偿但设上限，避免缩小画布时控制点过大挡住邻近元素
+    const scaledPointSize = Math.min(EDITOR_BASE_POINT_SIZE / safeScale, 8)
+    const scaledStrokeWidth = Math.min(EDITOR_BASE_STROKE_WIDTH / safeScale, 3)
     const ed = engine?.editor as any
     if (ed?.config) {
       ed.config.pointSize = scaledPointSize
       ed.config.strokeWidth = scaledStrokeWidth
       if (!ed.config.resizeLine) ed.config.resizeLine = {}
       ed.config.resizeLine.strokeWidth = scaledStrokeWidth
-      if (!ed.config.middlePoint) ed.config.middlePoint = {}
-      ed.config.middlePoint.strokeWidth = scaledStrokeWidth
     }
     if (ed?.list?.length > 0) {
       ed.editBox?.load?.()
@@ -733,6 +876,10 @@ onMounted(() => {
       if (eb) {
         ;[...(eb.resizePoints || []), ...(eb.rotatePoints || []), eb.circle].forEach((p: any) => {
           if (p) { p.width = scaledPointSize; p.height = scaledPointSize }
+        })
+        // 隐藏中间手柄
+        ;(eb.middlePoints || []).forEach((p: any) => {
+          if (p) p.visible = false
         })
       }
     }
@@ -748,10 +895,8 @@ onMounted(() => {
 onUnmounted(() => {
   editorBridge?.unlisten()
   keyboard?.unlisten()
-  pathVertexManager?.destroy()
-  shapeVertexManager?.destroy()
+  vertexEditManager?.destroy()
   drawingManager?.resetState()
-  dblClickCleanup?.()
   if (ctxMenuCleanup) {
     window.removeEventListener('click', ctxMenuCleanup)
     window.removeEventListener('pointerdown', ctxMenuCleanup, true)
@@ -771,6 +916,18 @@ onUnmounted(() => {
       canvas.removeEventListener('pointerup', boundDrawPointerUp, true)
       boundDrawPointerUp = null
     }
+    if (boundHoverMove) {
+      canvas.removeEventListener('pointermove', boundHoverMove, true)
+      boundHoverMove = null
+    }
+    if (_dblClickDetector) {
+      canvas.removeEventListener('pointerdown', _dblClickDetector, true)
+      _dblClickDetector = null
+    }
+    if (_vertexEditClickHandler) {
+      canvas.removeEventListener('pointerup', _vertexEditClickHandler, true)
+      _vertexEditClickHandler = null
+    }
   }
 
   engine?.destroy()
@@ -780,70 +937,12 @@ onUnmounted(() => {
   selectionManager = null
   editorBridge = null
   keyboard = null
-  pathVertexManager = null
-  shapeVertexManager = null
+  dispatcher = null
+  vertexEditManager = null
   drawingManager = null
   sectionGroups = []
+  sectionBorderElMap.clear()
 })
-
-// 双击形状 → 进入顶点编辑模式
-function enterShapeVertexEdit(shapeId: string) {
-  if (!engine || !shapeVertexManager) return
-  const found = findShape(shapeId)
-  const shape = found?.shape
-  if (!shape || !(shape.type === 'polygon' || shape.type === 'polyline') || !shape.points?.length) return
-  const el = shapeElMap.get(shapeId)
-  if (!el) return
-
-  engine.editor.cancel()
-  pathVertexManager?.hideVertices()
-  shapeVertexManager.showShapeVertices(shape, el)
-}
-
-// 双击区域 → 进入顶点编辑模式
-function enterAreaVertexEdit(areaId: string) {
-  if (!engine || !shapeVertexManager) return
-  const found = findArea(areaId)
-  const area = found?.area
-  if (!area || !area.points?.length) return
-  const el = areaElMap.get(areaId)
-  if (!el) return
-
-  engine.editor.cancel()
-  pathVertexManager?.hideVertices()
-  shapeVertexManager.showAreaVertices(area, el)
-}
-
-// 双击分区边线 → 进入顶点编辑模式
-function enterSectionVertexEdit(sectionId: string, borderType: 'path' | 'polygon') {
-  if (!engine) return
-
-  const section = props.venue.sections.find(s => s.id === sectionId)
-  if (!section) return
-
-  engine.editor.cancel()
-
-  if (borderType === 'path' && pathVertexManager && section.borderPathPoints?.length) {
-    const pathEl = sectionPathMap.get(sectionId)
-    if (pathEl) {
-      shapeVertexManager?.hideVertices()
-      pathVertexManager.showVertices(section, pathEl)
-    }
-  } else if (borderType === 'polygon' && shapeVertexManager && section.borderPoints?.length) {
-    const polyEl = sectionPolygonElMap.get(sectionId)
-    if (polyEl) {
-      pathVertexManager?.hideVertices()
-      shapeVertexManager.showSectionPolygonVertices(
-        sectionId,
-        section.borderPoints,
-        section.borderX ?? 0,
-        section.borderY ?? 0,
-        polyEl,
-        section.borderArcDepths,
-      )
-    }
-  }
-}
 
 // ==================== Watch ====================
 
@@ -869,15 +968,34 @@ watch(
   }
 )
 
-// 选中分区变更 → 隐藏顶点手柄（顶点模式与选择模式互斥，由双击进入）
+// 选中分区变更 → 隐藏顶点手柄 + 切换选中边框高亮
+// 注意：dispatcher 进入 VERTEX_EDIT 时会 cancelEditorSelection 清空选中，
+// 此时不应销毁刚创建的手柄，因此跳过 VERTEX_EDIT 模式下的选中变更。
 watch(
   () => store.selectedSectionIds,
-  (_ids) => {
-    if (isSyncing) return
-    pathVertexManager?.hideVertices()
-    if (shapeVertexManager?.handleKind === 'sectionPolygon') {
-      shapeVertexManager?.hideVertices()
+  (ids) => {
+    if (dispatcher?.mode === 'VERTEX_EDIT') return
+    if (vertexEditManager?.activeKind === 'path' || vertexEditManager?.activeKind === 'polygon') {
+      vertexEditManager?.hideVertices()
     }
+
+    // 选中边框高亮（蓝色，屏幕固定 1px）
+    const newSet = new Set(ids)
+    const scale = Math.max(currentScale, 0.02)
+    _selectionHighlighted.forEach(sid => {
+      if (!newSet.has(sid)) {
+        const el = sectionBorderElMap.get(sid)
+        if (el) { el.strokeWidth = 0; el.stroke = el.stroke ?? '#808080' }
+      }
+    })
+    newSet.forEach(sid => {
+      if (!_selectionHighlighted.has(sid)) {
+        const el = sectionBorderElMap.get(sid)
+        if (el) { el.strokeWidth = 1 / scale; el.stroke = '#3b82f6' }
+      }
+    })
+    _selectionHighlighted.clear()
+    newSet.forEach(sid => _selectionHighlighted.add(sid))
   }
 )
 
@@ -885,9 +1003,9 @@ watch(
 watch(
   () => store.selectedShapeIds,
   (_ids) => {
-    if (!shapeVertexManager || shapeVertexManager.isDragging || isSyncing) return
-    if (shapeVertexManager.handleKind === 'shape') {
-      shapeVertexManager.hideVertices()
+    if (!vertexEditManager || vertexEditManager.isDragging || isSyncing || dispatcher?.mode === 'VERTEX_EDIT') return
+    if (vertexEditManager.activeKind === 'shape') {
+      vertexEditManager.hideVertices()
     }
   }
 )
@@ -896,9 +1014,9 @@ watch(
 watch(
   () => store.selectedAreaIds,
   (_ids) => {
-    if (!shapeVertexManager || shapeVertexManager.isDragging || isSyncing) return
-    if (shapeVertexManager.handleKind === 'area') {
-      shapeVertexManager.hideVertices()
+    if (!vertexEditManager || vertexEditManager.isDragging || isSyncing || dispatcher?.mode === 'VERTEX_EDIT') return
+    if (vertexEditManager.activeKind === 'area') {
+      vertexEditManager.hideVertices()
     }
   }
 )
@@ -939,20 +1057,13 @@ const updateViewportCulling = () => {
 }
 
 const setDrawingTool = (tool: string) => {
-  currentTool = tool
-  drawingManager?.setTool(tool)
-
-  // select 模式启用 Editor 编辑框；selectseat 禁用避免与 SelectionManager 冲突
-  if (drawingManager?.isDrawing) {
-    engine?.editor.cancel()
-    setEditorHittable(false)
-  } else if (tool === 'select') {
-    setEditorHittable(true)
-    engine?.editor.cancel() // 清除之前选中状态
+  if (!dispatcher) return
+  if (tool === 'select') {
+    dispatcher.enterIdle()
+  } else if (tool === 'selectseat') {
+    dispatcher.enterSeatSelect()
   } else {
-    // selectseat 或其他非绘图工具：禁用编辑器
-    setEditorHittable(false)
-    engine?.editor.cancel()
+    dispatcher.enterDrawing(tool)
   }
 }
 
@@ -967,13 +1078,70 @@ const setEditorHittable = (v: boolean) => {
   })
 }
 
+// ==================== 悬停边框高亮 ====================
+
+const _clearHoverHighlight = () => {
+  if (hoveredSectionId) {
+    const el = sectionBorderElMap.get(hoveredSectionId)
+    if (el) {
+      const isSelected = _selectionHighlighted.has(hoveredSectionId)
+      if (isSelected) {
+        el.strokeWidth = 1 / Math.max(currentScale, 0.02)
+        el.stroke = '#3b82f6'
+      } else {
+        const orig = _hoverOriginals.get(hoveredSectionId)
+        if (orig) {
+          el.strokeWidth = orig.strokeWidth
+          el.stroke = orig.stroke
+        }
+      }
+    }
+    _hoverOriginals.delete(hoveredSectionId)
+    hoveredSectionId = null
+  }
+}
+
+const _updateHoverHighlight = (worldPos: { x: number; y: number }) => {
+  const sections = props.venue.sections
+  const scale = currentScale
+
+  for (let i = sections.length - 1; i >= 0; i--) {
+    const section = sections[i]
+    if (!section.borderType || section.borderType === 'none') continue
+    if (section.readonly) continue
+
+    const aabb = getSectionAABB(section)
+    if (!aabb) continue
+
+    if (isNearSectionBorder(section, worldPos, scale)) {
+      if (hoveredSectionId === section.id) return
+
+      _clearHoverHighlight()
+
+      const el = sectionBorderElMap.get(section.id)
+      if (el) {
+        _hoverOriginals.set(section.id, {
+          strokeWidth: el.strokeWidth ?? 0,
+          stroke: el.stroke ?? '#808080',
+        })
+        el.strokeWidth = (el.strokeWidth ?? 0) + HOVER_HIGHLIGHT_WIDTH_DELTA
+        el.stroke = HOVER_HIGHLIGHT_COLOR
+        hoveredSectionId = section.id
+      }
+      return
+    }
+  }
+
+  _clearHoverHighlight()
+}
+
 const enterSectionFocus = (sectionId: string) => {
   const section = props.venue.sections.find(s => s.id === sectionId)
   if (!section || !engine) return
 
   store.focusedSectionId = sectionId
   store.clearSelection()
-  pathVertexManager?.hideVertices()
+  vertexEditManager?.hideVertices()
 
   // 计算分区中心
   let cx = section.borderX ?? 0
@@ -1041,7 +1209,7 @@ const exitSectionFocus = () => {
   if (!engine) return
 
   store.focusedSectionId = null
-  pathVertexManager?.hideVertices()
+  vertexEditManager?.hideVertices()
 
   const l: any = engine.leafer
   if (l.zoom) {
@@ -1089,6 +1257,26 @@ const getSelectedSeats = () => {
   return selected
 }
 
+// 切换当前选中分区的顶点编辑模式
+const toggleVertexEdit = () => {
+  if (!dispatcher || !vertexEditManager || !engine) return
+  if (dispatcher.mode === 'VERTEX_EDIT') {
+    dispatcher.exitToIdle()
+    return
+  }
+  const sectionId = store.selectedSectionIds[0]
+  if (!sectionId) return
+  const section = props.venue.sections.find(s => s.id === sectionId)
+  if (!section) return
+  if (section.borderType === 'polygon' && section.borderPoints?.length) {
+    dispatcher.enterVertexEdit(section, 'polygon')
+  } else if (section.borderType === 'path' && section.borderPathPoints?.length) {
+    dispatcher.enterVertexEdit(section, 'path')
+  }
+}
+
+const isVertexEditActive = () => dispatcher?.mode === 'VERTEX_EDIT'
+
 defineExpose({
   renderAll,
   stage: () => engine?.leafer ?? null,
@@ -1099,13 +1287,15 @@ defineExpose({
   getViewport,
   updateViewportCulling,
   setDrawingTool,
-  currentDrawingTool: () => currentTool,
+  currentDrawingTool: () => dispatcher?.mode ?? 'IDLE',
   enterSectionFocus,
   exitSectionFocus,
   deleteSelected,
   clearDrawing,
   getVenueBounds,
   getSelectedSeats,
+  toggleVertexEdit,
+  isVertexEditActive,
 })
 </script>
 

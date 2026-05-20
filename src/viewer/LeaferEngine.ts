@@ -19,7 +19,7 @@ export class LeaferEngine {
   private _pinching = false
   private _pinchStartDist = 0
   private _pinchStartScale = 1
-  // 绑定的事件引用
+
   private _boundWheel: ((e: WheelEvent) => void) | null = null
   private _boundPointerDown: ((e: PointerEvent) => void) | null = null
   private _boundPointerMove: ((e: PointerEvent) => void) | null = null
@@ -48,12 +48,38 @@ export class LeaferEngine {
     })
   }
 
+  // ==================== 子类可覆写的保护方法 ====================
+
+  /** 是否允许开始平移拖拽。子类覆写以禁用特定模式下的 pan */
+  protected _shouldStartPan(): boolean {
+    return true
+  }
+
+  /** 是否允许继续平移（每帧检查）。返回 false 会取消当前拖拽 */
+  protected _shouldContinuePan(): boolean {
+    return true
+  }
+
+  /** fitContent 的核心实现，子类可覆写自定义适配逻辑 */
+  protected _doFitContent(padding: number): void {
+    const l: any = this.leafer
+    if (l.zoom) {
+      l.zoom('fit', padding, undefined, true)
+    }
+  }
+
+  /** 是否启用双击缩放（编辑器模式下应禁用，双击用于顶点编辑/聚焦） */
+  protected _shouldEnableDoubleTapZoom(): boolean { return true }
+
+  /** 销毁时调用，子类覆写以清理额外资源 */
+  protected _onDestroy(): void {}
+
+  // ==================== 手动事件注册 ====================
+
   private _setupManualEvents(): void {
     if (!this._canvas) return
 
-    // 防止浏览器手势（移动端滚动、缩放）拦截触摸事件
     this._canvas.style.touchAction = 'none'
-    // 消除移动端 tap 高亮闪烁
     ;(this._canvas.style as any).webkitTapHighlightColor = 'transparent'
 
     // —— 桌面端滚轮缩放 ——
@@ -67,9 +93,10 @@ export class LeaferEngine {
       this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
     }
 
-    // —— 单指拖拽（PC + 移动端） ——
+    // —— 单指拖拽 ——
     this._boundPointerDown = (e: PointerEvent) => {
       if (this._pinching) return
+      if (!this._shouldStartPan()) return
       this._pointerDown = true
       this._dragStarted = false
       this._downClient = { x: e.clientX, y: e.clientY }
@@ -79,6 +106,12 @@ export class LeaferEngine {
 
     this._boundPointerMove = (e: PointerEvent) => {
       if (!this._pointerDown || this._pinching) return
+
+      if (!this._shouldContinuePan()) {
+        this._pointerDown = false
+        this._dragStarted = false
+        return
+      }
 
       if (!this._dragStarted) {
         const dx = e.clientX - this._downClient.x
@@ -98,7 +131,7 @@ export class LeaferEngine {
       this._dragStarted = false
     }
 
-    // —— 双指缩放（移动端 pinch-to-zoom） ——
+    // —— 双指缩放 ——
     this._boundTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         this._pinching = true
@@ -144,8 +177,9 @@ export class LeaferEngine {
       }
     }
 
-    // —— 双击缩放（移动端） ——
-    this._doubleTapOff = this.leafer.on_(LeaferPointer.DOUBLE_TAP, (e: any) => {
+    // —— 双击缩放（移动端，编辑器模式下禁用） ——
+    if (this._shouldEnableDoubleTapZoom()) {
+      this._doubleTapOff = this.leafer.on_(LeaferPointer.DOUBLE_TAP, (e: any) => {
       const local = this.leafer.interaction?.getLocal({ clientX: e.clientX ?? e.x, clientY: e.clientY ?? e.y })
       if (!local) return
       const zoomType = this.scale < 1.5 ? 'in' : 'out'
@@ -155,6 +189,7 @@ export class LeaferEngine {
         this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
       }, 350)
     }) as unknown as (() => void)
+    }
 
     // 注册事件
     this._canvas.addEventListener('wheel', this._boundWheel, { passive: false })
@@ -167,8 +202,14 @@ export class LeaferEngine {
     this._canvas.addEventListener('touchcancel', this._boundTouchEnd)
   }
 
+  // ==================== 公共 API ====================
+
   get scale(): number {
     return this.leafer.scaleX ?? (this.leafer as any).__zoomLayer?.scaleX ?? 1
+  }
+
+  get canvasElement(): HTMLCanvasElement | null {
+    return this._canvas
   }
 
   get destroyed(): boolean {
@@ -178,10 +219,7 @@ export class LeaferEngine {
   fitContent(padding: number = 50): Promise<void> {
     return new Promise(resolve => {
       const doFit = () => {
-        const l: any = this.leafer
-        if (l.zoom) {
-          l.zoom('fit', padding, undefined, true)
-        }
+        this._doFitContent(padding)
         setTimeout(resolve, 350)
       }
       if (this.leafer.viewReady) {
@@ -206,6 +244,7 @@ export class LeaferEngine {
   destroy(): void {
     if (this._destroyed) return
     this._destroyed = true
+    this._onDestroy()
 
     if (this._canvas) {
       if (this._boundWheel) {

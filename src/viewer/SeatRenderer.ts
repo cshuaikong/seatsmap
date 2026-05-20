@@ -15,6 +15,7 @@ interface RowLODGroups {
   lineGroup: Group
   circleGroup: Group
   rowGroup?: Group
+  sectionId: string
 }
 
 export class SeatRenderer {
@@ -28,6 +29,7 @@ export class SeatRenderer {
   private darkenColor: (color: string, percent: number) => string
   private onSeatClick?: (seat: Seat, row: SeatRow, section: Section) => void
   private editMode: boolean
+  private _focusedSectionId: string | null = null
 
   constructor(
     venue: VenueData,
@@ -60,8 +62,8 @@ export class SeatRenderer {
       const sectionGroup = new Group({ id: `seats-${section.id}` })
 
       section.rows.forEach(row => {
-        const rowX = row.x ?? 0
-        const rowY = row.y ?? 0
+        const worldRowX = row.x ?? 0
+        const worldRowY = row.y ?? 0
         const rotation = row.rotation ?? 0
         const curve = row.curve ?? 0
 
@@ -72,24 +74,27 @@ export class SeatRenderer {
 
         let rowGroup: Group | undefined
         if (this.editMode) {
-          // 编辑模式：rowGroup 承载位置和旋转，内部坐标相对于 rowGroup
+          // 编辑模式：seatGroup 将被挂载到 section group（位于 borderX,borderY）下，
+          // row 存储为世界坐标，需转为相对坐标
+          const sectionOx = section.borderX ?? 0
+          const sectionOy = section.borderY ?? 0
           this.createSeatLine(lineGroup, row, curvedPositions, 0)
           this.createSeatCircles(circleGroup, row, section, curvedPositions, 0, logicalRadius)
 
-          rowGroup = new Group({ id: `row-${row.id}`, x: rowX, y: rowY, rotation, editable: true })
+          rowGroup = new Group({ id: `row-${row.id}`, x: worldRowX - sectionOx, y: worldRowY - sectionOy, rotation, editable: false })
           rowGroup.add(lineGroup)
           rowGroup.add(circleGroup)
           sectionGroup.add(rowGroup)
         } else {
-          // 预览模式：手动应用偏移和旋转
-          this.createSeatLine(lineGroup, row, curvedPositions, rotation, rowX, rowY)
-          this.createSeatCircles(circleGroup, row, section, curvedPositions, rotation, logicalRadius, rowX, rowY)
+          // 预览模式：手动应用偏移和旋转（世界坐标）
+          this.createSeatLine(lineGroup, row, curvedPositions, rotation, worldRowX, worldRowY)
+          this.createSeatCircles(circleGroup, row, section, curvedPositions, rotation, logicalRadius, worldRowX, worldRowY)
 
           sectionGroup.add(lineGroup)
           sectionGroup.add(circleGroup)
         }
 
-        this.rowLODMap.set(row.id, { lineGroup, circleGroup, rowGroup: this.editMode ? rowGroup : undefined })
+        this.rowLODMap.set(row.id, { lineGroup, circleGroup, rowGroup: this.editMode ? rowGroup : undefined, sectionId: section.id })
       })
 
       this.rootGroup.add(sectionGroup)
@@ -258,11 +263,14 @@ export class SeatRenderer {
     const baseLineWidth = (radius * 2) / baseScale
     const MIN_SCREEN_PX = 1.5
 
-    this.rowLODMap.forEach(({ lineGroup, circleGroup, rowGroup }) => {
+    this.rowLODMap.forEach(({ lineGroup, circleGroup, rowGroup, sectionId }) => {
       lineGroup.visible = showLevel1
       circleGroup.visible = showLevel2
-      // 横条状态下排不可选中
-      if (rowGroup) rowGroup.editable = showLevel2
+      // 横条状态下排不可选中；非聚焦模式下座位排同样不可选中
+      if (rowGroup) {
+        const isFocusedRow = !!this._focusedSectionId && sectionId === this._focusedSectionId
+        rowGroup.editable = showLevel2 && isFocusedRow
+      }
 
       if (showLevel1) {
         const line = lineGroup.children[0]
@@ -275,6 +283,11 @@ export class SeatRenderer {
         }
       }
     })
+  }
+
+  /** 设置聚焦分区 ID，控制座位排可选性 */
+  setFocusedSectionId(sectionId: string | null): void {
+    this._focusedSectionId = sectionId
   }
 
   /** 更新单个座位的外观（选中/取消选中） */

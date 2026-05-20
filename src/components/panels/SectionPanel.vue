@@ -204,6 +204,17 @@
         </div>
       </div>
 
+      <!-- 顶点编辑按钮（仅 polygon/path 分区显示） -->
+      <button
+        v-if="(section.borderType === 'polygon' || section.borderType === 'path') && !isMulti"
+        class="vertex-edit-btn"
+        :class="{ active: vertexEditActive }"
+        @click="emit('toggle-vertex-edit')"
+      >
+        <Icon :icon="vertexEditActive ? 'lucide:edit-3' : 'lucide:edit'" class="btn-icon" />
+        {{ vertexEditActive ? '退出顶点编辑' : '顶点编辑' }}
+      </button>
+
       <!-- 进入分区按钮 -->
       <button class="enter-section-btn" @click="emit('enter-section')">
         <Icon icon="lucide:zoom-in" class="btn-icon" />
@@ -228,6 +239,7 @@ const props = defineProps<{
   isMulti?: boolean  // 是否多选模式
   selectedCount?: number  // 选中的分区数量
   selectedSections?: Section[]  // 所有选中的分区
+  vertexEditActive?: boolean  // 是否处于顶点编辑模式
 }>()
 
 const emit = defineEmits<{
@@ -235,6 +247,7 @@ const emit = defineEmits<{
   'enter-section': []
   'activate-path-segment': [pointIndex: number]
   'batch-update-names': [names: string[]]  // 批量更新名称
+  'toggle-vertex-edit': []
 }>()
 
 // 批量重命名状态
@@ -598,6 +611,34 @@ const pathSegments = computed(() => {
 
 .enter-section-btn:hover {
   opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.vertex-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border: 1.5px solid #3b82f6;
+  border-radius: 8px;
+  background: transparent;
+  color: #3b82f6;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+
+.vertex-edit-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.vertex-edit-btn:hover {
+  opacity: 0.85;
   transform: translateY(-1px);
 }
 
