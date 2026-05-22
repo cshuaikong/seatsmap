@@ -16,7 +16,7 @@ export interface InteractionDispatcherOptions {
   onEnterVertexEdit: (section: Section, kind: 'path' | 'polygon') => void
   onExitVertexEdit: () => void
   // Section focus
-  onEnterSectionFocus: (sectionId: string) => void
+  onEnterSectionFocus: (sectionId: string, worldPos: { x: number; y: number }) => void
   onExitSectionFocus: () => void
 
   // Editor controls
@@ -121,7 +121,7 @@ export class InteractionDispatcher {
       ) continue
 
       // 精筛 — 边框附近 → 顶点编辑
-      if (isNearSectionBorder(section, worldPos, scale)) {
+      if (isNearSectionBorder(section, worldPos)) {
         if (section.borderType === 'polygon' && section.borderPoints?.length) {
           this.enterVertexEdit(section, 'polygon')
           return true
@@ -137,7 +137,7 @@ export class InteractionDispatcher {
       if (isInsideSection(section, worldPos)) {
         this._exitMode(this.mode)
         this.mode = 'IDLE'
-        this.opts.onEnterSectionFocus(section.id)
+        this.opts.onEnterSectionFocus(section.id, worldPos)
         return true
       }
     }

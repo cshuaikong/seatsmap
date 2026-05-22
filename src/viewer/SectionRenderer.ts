@@ -30,6 +30,8 @@ export class SectionRenderer {
       editable: interactive,
     })
 
+    ;(group as any).__meta = { kind: 'section', id: section.id }
+
     if (interactive && (section.borderType === 'polygon' || section.borderType === 'path')) {
       ;(group as any).editConfig = { resizeable: false }
     }
@@ -40,22 +42,31 @@ export class SectionRenderer {
       if (border) group.add(border)
     }
 
-    // 2. 形状（转为相对坐标）
+    // 2. 形状
     section.shapes?.forEach(shape => {
       const el = SectionRenderer.createShape(shape, interactive, ox, oy)
-      if (el) group.add(el)
+      if (el) {
+        ;(el as any).__meta = { kind: 'shape', id: shape.id, sectionId: section.id, shapeData: shape }
+        group.add(el)
+      }
     })
 
-    // 3. 文本（转为相对坐标）
+    // 3. 文本
     section.texts?.forEach(text => {
       const el = SectionRenderer.createText(text, interactive, ox, oy)
-      if (el) group.add(el)
+      if (el) {
+        ;(el as any).__meta = { kind: 'text', id: text.id, sectionId: section.id, textData: text }
+        group.add(el)
+      }
     })
 
-    // 4. 区域（转为相对坐标）
+    // 4. 区域
     section.areas?.forEach(area => {
       const el = SectionRenderer.createArea(area, interactive, ox, oy)
-      if (el) group.add(el)
+      if (el) {
+        ;(el as any).__meta = { kind: 'area', id: area.id, sectionId: section.id, areaData: area }
+        group.add(el)
+      }
     })
 
     // 5. 分区名称标签（转为相对坐标）

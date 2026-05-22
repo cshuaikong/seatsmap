@@ -82,6 +82,7 @@ export class SeatRenderer {
           this.createSeatCircles(circleGroup, row, section, curvedPositions, 0, logicalRadius)
 
           rowGroup = new Group({ id: `row-${row.id}`, x: worldRowX - sectionOx, y: worldRowY - sectionOy, rotation, editable: false })
+          ;(rowGroup as any).__meta = { kind: 'row', id: row.id, sectionId: section.id, rowData: row }
           rowGroup.add(lineGroup)
           rowGroup.add(circleGroup)
           sectionGroup.add(rowGroup)
@@ -202,6 +203,7 @@ export class SeatRenderer {
 
         // 存 inner 以便选中切换时定位
         this.seatMap.set(seat.id, inner as Ellipse)
+        ;(inner as any).__meta = { kind: 'seat', id: seat.id, sectionId: section.id, rowData: row }
       } else {
         // 未选中态
         const ellipse = new Ellipse({
@@ -217,6 +219,7 @@ export class SeatRenderer {
 
         group.add(ellipse)
         this.seatMap.set(seat.id, ellipse as Ellipse)
+        ;(ellipse as any).__meta = { kind: 'seat', id: seat.id, sectionId: section.id, rowData: row }
       }
 
       // 绑定点击事件

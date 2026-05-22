@@ -3,7 +3,7 @@ import type { Seat, PathPoint, Section } from '../types'
 // ==================== 几何检测常量 ====================
 
 /** 边框命中阈值 (世界坐标)，对应屏幕约 10px */
-const BORDER_HIT_RADIUS = 25
+const BORDER_HIT_RADIUS = 4
 
 /** 弧边采样点数 */
 const ARC_SAMPLE_COUNT = 12
@@ -140,12 +140,12 @@ export function isInsideSection(section: Section, worldPos: { x: number; y: numb
 }
 
 /** 检测 worldPos 是否靠近分区边框（用于双击进入顶点编辑），threshold = BORDER_HIT_RADIUS / scale */
-export function isNearSectionBorder(section: Section, worldPos: { x: number; y: number }, scale: number): boolean {
+export function isNearSectionBorder(section: Section, worldPos: { x: number; y: number }): boolean {
   const bx = section.borderX ?? 0
   const by = section.borderY ?? 0
   const px = worldPos.x
   const py = worldPos.y
-  const threshold = BORDER_HIT_RADIUS / Math.max(scale, 0.01)
+  const threshold = BORDER_HIT_RADIUS
 
   switch (section.borderType) {
     case 'rect':

@@ -17,7 +17,6 @@ export interface ElementMeta {
 export interface EditorBridgeOptions {
   editor: Editor
   getVenue: () => VenueData
-  getNodeMeta: (id: string) => ElementMeta | undefined
   selectSection: (id: string) => void
   selectRow: (id: string) => void
   selectSeat: (id: string) => void
@@ -119,11 +118,8 @@ export class EditorBridge {
     // 通过 ID 查找对应的 Leafer 元素
     const elements: any[] = []
     selectedIds.forEach(id => {
-      const meta = this.opts.getNodeMeta(id)
-      if (meta) {
-        const el = (editor.leafer as any)?.findId?.(id) || (editor.app as any)?.findId?.(id)
-        if (el) elements.push(el)
-      }
+      const el = (editor.leafer as any)?.findId?.(id) || (editor.app as any)?.findId?.(id)
+      if (el?.__meta) elements.push(el)
     })
 
     if (elements.length > 0) {
@@ -149,8 +145,7 @@ export class EditorBridge {
     }
 
     selected.forEach((el: any) => {
-      const elId = el.id || el.getAttr?.('id') || ''
-      const meta = this.opts.getNodeMeta(elId)
+      const meta: ElementMeta | undefined = el?.__meta
       if (!meta) return
 
       switch (meta.kind) {
@@ -180,9 +175,7 @@ export class EditorBridge {
 
   /** 解析被编辑元素的 meta */
   private _resolveMeta(target: any): ElementMeta | undefined {
-    const elId = target?.id || target?.getAttr?.('id') || ''
-    if (!elId) return undefined
-    return this.opts.getNodeMeta(elId)
+    return target?.__meta
   }
 
   /** 移动变换 → Store */
