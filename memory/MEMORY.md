@@ -1,0 +1,1 @@
+- [PolygonTest architecture](polygon-test-architecture.md) — 独立多边形测试组件实现方案：LeaferJS TAP 事件、viewport 冲突解决、弧度法线方向、手柄定位
