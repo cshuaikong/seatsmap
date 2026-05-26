@@ -9,6 +9,8 @@ import { pathPointsToSvgPath, flatToPathPoints, hasArcs } from './geometry'
 export interface SectionRenderOptions {
   /** 是否允许交互（编辑器模式需设为 true） */
   interactive?: boolean
+  /** 是否使用双图层边框（fill + stroke 分离，便于区分边框/主体点击） */
+  dualLayer?: boolean
 }
 
 export class SectionRenderer {
@@ -18,6 +20,7 @@ export class SectionRenderer {
    */
   static render(section: Section, options: SectionRenderOptions = {}): Group {
     const interactive = options.interactive ?? false
+    const dualLayer = options.dualLayer ?? false
     const ox = section.borderX ?? 0
     const oy = section.borderY ?? 0
 
@@ -38,8 +41,17 @@ export class SectionRenderer {
 
     // 1. 边框（相对 group 在 0,0）
     if (section.borderType && section.borderType !== 'none') {
-      const border = SectionRenderer.createBorder(section, interactive)
-      if (border) group.add(border)
+      if (dualLayer) {
+        const dual = SectionRenderer.createDualBorder(section)
+        if (dual) {
+          const [fillEl, strokeEl] = dual
+          group.add(fillEl)
+          group.add(strokeEl)
+        }
+      } else {
+        const border = SectionRenderer.createBorder(section, interactive)
+        if (border) group.add(border)
+      }
     }
 
     // 2. 形状
@@ -79,7 +91,7 @@ export class SectionRenderer {
   }
 
   /** 创建分区边框元素（相对 group 原点即 0,0） */
-  private static createBorder(section: Section, editable: boolean): Rect | Ellipse | Polygon | Path | null {
+  static createBorder(section: Section, editable: boolean): Rect | Ellipse | Polygon | Path | null {
     const fill = section.borderFill || 'rgba(128,128,128,0.15)'
     const stroke = section.borderStroke || '#808080'
     const strokeWidth = editable ? 0 : 0
@@ -128,6 +140,63 @@ export class SectionRenderer {
           x: 0, y: 0,
           path: d,
         })
+      default:
+        return null
+    }
+  }
+
+  /**
+   * 创建双图层边框：fill 元素响应主体点击，stroke 元素响应边框点击。
+   * 仅用于交互模式下的选中分区。
+   */
+  static createDualBorder(section: Section): [Rect | Ellipse | Polygon | Path, Rect | Ellipse | Polygon | Path] | null {
+    const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'
+    const opacity = section.borderOpacity ?? 1
+
+    const fillBase = { fill: fillColor, strokeWidth: 0, opacity, editable: false, hitFill: 'all' as const, hitStroke: 'none' as const }
+    // strokeWidth: 4 提供点击命中区；stroke: 'transparent' 默认不可见，高亮时改颜色
+    const strokeBase = { fill: 'none' as const, stroke: 'transparent', strokeWidth: 4, opacity, editable: false, hitFill: 'none' as const, hitStroke: 'all' as const }
+
+    switch (section.borderType) {
+      case 'rect': {
+        const w = section.borderWidth ?? 100
+        const h = section.borderHeight ?? 100
+        return [
+          new Rect({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, width: w, height: h }),
+          new Rect({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, width: w, height: h }),
+        ]
+      }
+      case 'ellipse': {
+        const rx = section.borderRadiusX ?? 50
+        const ry = section.borderRadiusY ?? 50
+        return [
+          new Ellipse({ id: `section-border-fill-${section.id}`, ...fillBase, x: rx, y: ry, width: rx * 2, height: ry * 2 }),
+          new Ellipse({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: rx, y: ry, width: rx * 2, height: ry * 2 }),
+        ]
+      }
+      case 'polygon': {
+        if (!section.borderPoints) return null
+        if (hasArcs(section.borderArcDepths)) {
+          const pts = flatToPathPoints(section.borderPoints, section.borderArcDepths)
+          const d = pathPointsToSvgPath(pts)
+          return [
+            new Path({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, path: d }),
+            new Path({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, path: d }),
+          ]
+        }
+        return [
+          new Polygon({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, points: section.borderPoints }),
+          new Polygon({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, points: section.borderPoints }),
+        ]
+      }
+      case 'path': {
+        if (!section.borderPathPoints) return null
+        const d = pathPointsToSvgPath(section.borderPathPoints)
+        return [
+          new Path({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, path: d }),
+          new Path({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, path: d }),
+        ]
+      }
       default:
         return null
     }
@@ -312,6 +381,7 @@ export class SectionRenderer {
       fill: 'rgba(102,102,102,0.6)',
       textAlign: 'center',
       verticalAlign: 'middle',
+      hittable: false,
     })
   }
 }
