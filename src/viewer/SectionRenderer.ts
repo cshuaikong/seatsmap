@@ -21,8 +21,8 @@ export class SectionRenderer {
   static render(section: Section, options: SectionRenderOptions = {}): Group {
     const interactive = options.interactive ?? false
     const dualLayer = options.dualLayer ?? false
-    const ox = section.borderX ?? 0
-    const oy = section.borderY ?? 0
+    const ox = section.x ?? 0
+    const oy = section.y ?? 0
 
     // section group 定位到分区坐标，所有子元素使用相对坐标，移动 group 即可带动全部子元素
     const group = new Group({
@@ -35,7 +35,7 @@ export class SectionRenderer {
 
     ;(group as any).__meta = { kind: 'section', id: section.id }
 
-    if (interactive && (section.borderType === 'polygon' || section.borderType === 'path')) {
+    if (interactive && section.borderType === 'path') {
       ;(group as any).editConfig = { resizeable: false }
     }
 
@@ -91,13 +91,13 @@ export class SectionRenderer {
   }
 
   /** 创建分区边框元素（相对 group 原点即 0,0） */
-  static createBorder(section: Section, editable: boolean): Rect | Ellipse | Polygon | Path | null {
-    const fill = section.borderFill || 'rgba(128,128,128,0.15)'
-    const stroke = section.borderStroke || '#808080'
+  static createBorder(section: Section, editable: boolean): Rect | Ellipse | Path | null {
+    const fill = section.fill || 'rgba(128,128,128,0.15)'
+    const stroke = section.stroke || '#808080'
     const strokeWidth = editable ? 0 : 0
 
     const id = `section-border-${section.id}`
-    const base = { id, fill, stroke, strokeWidth, opacity: section.borderOpacity ?? 1, editable: false }
+    const base = { id, fill, stroke, strokeWidth, opacity: section.opacity ?? 1, editable: false }
 
     switch (section.borderType) {
       case 'rect':
@@ -105,36 +105,20 @@ export class SectionRenderer {
           ...base,
           x: 0,
           y: 0,
-          width: section.borderWidth ?? 100,
-          height: section.borderHeight ?? 100,
+          width: section.width ?? 100,
+          height: section.height ?? 100,
         })
       case 'ellipse':
         return new Ellipse({
           ...base,
-          x: (section.borderRadiusX ?? 50),
-          y: (section.borderRadiusY ?? 50),
-          width: (section.borderRadiusX ?? 50) * 2,
-          height: (section.borderRadiusY ?? 50) * 2,
-        })
-      case 'polygon':
-        if (!section.borderPoints) return null
-        if (hasArcs(section.borderArcDepths)) {
-          const pts = flatToPathPoints(section.borderPoints, section.borderArcDepths)
-          const d = pathPointsToSvgPath(pts)
-          return new Path({
-            ...base,
-            x: 0, y: 0,
-            path: d,
-          })
-        }
-        return new Polygon({
-          ...base,
-          x: 0, y: 0,
-          points: section.borderPoints,
+          x: (section.radiusX ?? 50),
+          y: (section.radiusY ?? 50),
+          width: (section.radiusX ?? 50) * 2,
+          height: (section.radiusY ?? 50) * 2,
         })
       case 'path':
-        if (!section.borderPathPoints) return null
-        const d = pathPointsToSvgPath(section.borderPathPoints)
+        if (!section.pathPoints) return null
+        const d = pathPointsToSvgPath(section.pathPoints)
         return new Path({
           ...base,
           x: 0, y: 0,
@@ -149,9 +133,9 @@ export class SectionRenderer {
    * 创建双图层边框：fill 元素响应主体点击，stroke 元素响应边框点击。
    * 仅用于交互模式下的选中分区。
    */
-  static createDualBorder(section: Section): [Rect | Ellipse | Polygon | Path, Rect | Ellipse | Polygon | Path] | null {
-    const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'
-    const opacity = section.borderOpacity ?? 1
+  static createDualBorder(section: Section): [Rect | Ellipse | Path, Rect | Ellipse | Path] | null {
+    const fillColor = section.fill || 'rgba(128,128,128,0.15)'
+    const opacity = section.opacity ?? 1
 
     const fillBase = { fill: fillColor, strokeWidth: 0, opacity, editable: false, hitFill: 'all' as const, hitStroke: 'none' as const }
     // strokeWidth: 4 提供点击命中区；stroke: 'transparent' 默认不可见，高亮时改颜色
@@ -159,39 +143,24 @@ export class SectionRenderer {
 
     switch (section.borderType) {
       case 'rect': {
-        const w = section.borderWidth ?? 100
-        const h = section.borderHeight ?? 100
+        const w = section.width ?? 100
+        const h = section.height ?? 100
         return [
           new Rect({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, width: w, height: h }),
           new Rect({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, width: w, height: h }),
         ]
       }
       case 'ellipse': {
-        const rx = section.borderRadiusX ?? 50
-        const ry = section.borderRadiusY ?? 50
+        const rx = section.radiusX ?? 50
+        const ry = section.radiusY ?? 50
         return [
           new Ellipse({ id: `section-border-fill-${section.id}`, ...fillBase, x: rx, y: ry, width: rx * 2, height: ry * 2 }),
           new Ellipse({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: rx, y: ry, width: rx * 2, height: ry * 2 }),
         ]
       }
-      case 'polygon': {
-        if (!section.borderPoints) return null
-        if (hasArcs(section.borderArcDepths)) {
-          const pts = flatToPathPoints(section.borderPoints, section.borderArcDepths)
-          const d = pathPointsToSvgPath(pts)
-          return [
-            new Path({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, path: d }),
-            new Path({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, path: d }),
-          ]
-        }
-        return [
-          new Polygon({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, points: section.borderPoints }),
-          new Polygon({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, points: section.borderPoints }),
-        ]
-      }
       case 'path': {
-        if (!section.borderPathPoints) return null
-        const d = pathPointsToSvgPath(section.borderPathPoints)
+        if (!section.pathPoints) return null
+        const d = pathPointsToSvgPath(section.pathPoints)
         return [
           new Path({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, path: d }),
           new Path({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, path: d }),
@@ -348,24 +317,14 @@ export class SectionRenderer {
     let cy = 0
 
     if (section.borderType === 'rect') {
-      cx = (section.borderWidth ?? 100) / 2
-      cy = (section.borderHeight ?? 100) / 2
+      cx = (section.width ?? 100) / 2
+      cy = (section.height ?? 100) / 2
     } else if (section.borderType === 'ellipse') {
-      cx = (section.borderRadiusX ?? 50) / 2
-      cy = (section.borderRadiusY ?? 50) / 2
-    } else if (section.borderType === 'polygon' && section.borderPoints) {
+      cx = (section.radiusX ?? 50) / 2
+      cy = (section.radiusY ?? 50) / 2
+    } else if (section.borderType === 'path' && section.pathPoints) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (let i = 0; i < section.borderPoints.length; i += 2) {
-        minX = Math.min(minX, section.borderPoints[i])
-        minY = Math.min(minY, section.borderPoints[i + 1])
-        maxX = Math.max(maxX, section.borderPoints[i])
-        maxY = Math.max(maxY, section.borderPoints[i + 1])
-      }
-      cx = (minX + maxX) / 2
-      cy = (minY + maxY) / 2
-    } else if (section.borderType === 'path' && section.borderPathPoints) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      section.borderPathPoints.forEach(p => {
+      section.pathPoints.forEach(p => {
         minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
         minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y)
       })

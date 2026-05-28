@@ -218,12 +218,12 @@ const getOrCreateDefaultSection = (): string => {
       x: 0,
       y: 0,
       borderType: 'rect',
-      borderX: 100,      // 左上角 x
-      borderY: 100,      // 左上角 y
-      borderWidth: 400,  // 宽度
-      borderHeight: 300, // 高度
-      borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-      borderStroke: '#808080'  // 默认灰色边框
+      x: 100,      // 左上角 x
+      y: 100,      // 左上角 y
+      width: 400,  // 宽度
+      height: 300, // 高度
+      fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+      stroke: '#808080'  // 默认灰色边框
     })
     return sectionId || 'default'
   }
@@ -522,8 +522,8 @@ const updateRowSelectionVisuals = () => {
         const isGlobalView = !venueStore.focusedSectionId
         const isFocusedSection = venueStore.focusedSectionId === section.id
         const shouldForceBarMode = isGlobalView || !isFocusedSection
-        const { borderWidth } = venueStore.visualConfig
-        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, borderWidth))
+        const { width } = venueStore.visualConfig
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, width))
         
         // 同步更新 listening 状态
         if (shouldForceBarMode) {
@@ -681,17 +681,17 @@ const createPathSegmentData = (points: PathPoint[], pointIndex: number): string 
 
 /** 渲染 Path 顶点拖拽手柄 */
 const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
-  if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
+  if (!mainLayer || !section.pathPoints || section.pathPoints.length < 2) return
 
   // 清理旧的顶点手柄
   mainLayer.find('.path-vertex-handle').forEach(handle => handle.destroy())
 
   // 顶点手柄放在 mainLayer，确保在 path 之上
   const layer = mainLayer
-  const baseX = section.borderX || 0
-  const baseY = section.borderY || 0
+  const baseX = section.x || 0
+  const baseY = section.y || 0
 
-  section.borderPathPoints.forEach((point, index) => {
+  section.pathPoints.forEach((point, index) => {
     // 顶点拖拽手柄 - 始终可拖拽
     // 计算反向缩放因子，使手柄在视觉上保持固定大小
     const stageScale = stage?.scaleX() || 1
@@ -734,8 +734,8 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       isDraggingPathVertex = true  // 设置拖拽标志
       dragStartX = vertexHandle.x() - baseX  // 相对坐标
       dragStartY = vertexHandle.y() - baseY
-      pointStartX = section.borderPathPoints?.[index]?.x ?? point.x
-      pointStartY = section.borderPathPoints?.[index]?.y ?? point.y
+      pointStartX = section.pathPoints?.[index]?.x ?? point.x
+      pointStartY = section.pathPoints?.[index]?.y ?? point.y
     })
     
     vertexHandle.on('dragmove', () => {
@@ -746,14 +746,14 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       const newY = absY - baseY
       
       // 更新 section 数据
-      if (section.borderPathPoints) {
-        section.borderPathPoints[index] = { ...section.borderPathPoints[index], x: newX, y: newY }
+      if (section.pathPoints) {
+        section.pathPoints[index] = { ...section.pathPoints[index], x: newX, y: newY }
       }
       
       // 实时更新 path 形状
       const borderShape = nodeMap.get('sectionBorder_' + section.id) as Konva.Path
       if (borderShape) {
-        const newPathData = pathPointsToSvgPath(section.borderPathPoints || [])
+        const newPathData = pathPointsToSvgPath(section.pathPoints || [])
         borderShape.data(newPathData)
         borderShape.draw()  // 强制立即绘制
       }
@@ -769,9 +769,9 @@ const renderPathVertexHandles = (section: Section, isOtherFocused: boolean) => {
       const newX = vertexHandle.x() - baseX
       const newY = vertexHandle.y() - baseY
       
-      const updatedPoints = [...(section.borderPathPoints || [])]
+      const updatedPoints = [...(section.pathPoints || [])]
       updatedPoints[index] = { ...updatedPoints[index], x: newX, y: newY }
-      venueStore.updateSectionBorder(section.id, { borderPathPoints: updatedPoints })
+      venueStore.updateSectionBorder(section.id, { pathPoints: updatedPoints })
       
       isDraggingPathVertex = false  // 清除拖拽标志
     })
@@ -811,8 +811,8 @@ const updatePathVertexHandlesPosition = (sectionId: string, x: number, y: number
     if (handleSectionId === sectionId) {
       const vertexIndex = handle.getAttr('vertexIndex') as number
       const section = venueStore.venue.sections.find(s => s.id === sectionId)
-      if (section && section.borderPathPoints && section.borderPathPoints[vertexIndex]) {
-        const point = section.borderPathPoints[vertexIndex]
+      if (section && section.pathPoints && section.pathPoints[vertexIndex]) {
+        const point = section.pathPoints[vertexIndex]
         // 更新手柄位置：新的 baseX/baseY + 相对坐标
         handle.position({ x: x + point.x, y: y + point.y })
         // 同步更新缩放，保持视觉大小恒定
@@ -827,16 +827,16 @@ const updatePathVertexHandlesPosition = (sectionId: string, x: number, y: number
 }
 
 const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOtherFocused: boolean) => {
-  if (!mainLayer || !section.borderPathPoints || section.borderPathPoints.length < 2) return
+  if (!mainLayer || !section.pathPoints || section.pathPoints.length < 2) return
         // 获取舞台缩放比例，用于反向缩放保持视觉大小恒定
   const stageScale = stage?.scaleX() || 1
   const layer = mainLayer
   const activePointIndex = venueStore.activePathSectionId === section.id ? venueStore.activePathPointIndex : null
 
-  section.borderPathPoints.forEach((startPoint, segmentIndex) => {
+  section.pathPoints.forEach((startPoint, segmentIndex) => {
     const pointIndex = segmentIndex
-    const nextPoint = section.borderPathPoints![(segmentIndex + 1) % section.borderPathPoints!.length]
-    const segmentData = createPathSegmentData(section.borderPathPoints!, pointIndex)
+    const nextPoint = section.pathPoints![(segmentIndex + 1) % section.pathPoints!.length]
+    const segmentData = createPathSegmentData(section.pathPoints!, pointIndex)
     if (!segmentData) return
 
     const isSelected = venueStore.selectedSectionIds.includes(section.id)
@@ -844,8 +844,8 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
     const isCurveSegment = isCurvedEdge(startPoint)
 
     const hitPath = new Konva.Path({
-      x: section.borderX || 0,
-      y: section.borderY || 0,
+      x: section.x || 0,
+      y: section.y || 0,
       data: segmentData,
       stroke: 'transparent',
       strokeWidth: 1 / stageScale,
@@ -878,8 +878,8 @@ const renderPathSegmentHandles = (section: Section, _strokeColor: string, isOthe
 
     if (isActive) {
       const activePath = new Konva.Path({
-        x: section.borderX || 0,
-        y: section.borderY || 0,
+        x: section.x || 0,
+        y: section.y || 0,
         data: segmentData,
         stroke: darkenColor('#77FD9F', 40),
         strokeWidth: 2 / stageScale,
@@ -941,9 +941,9 @@ const renderSectionBorder = (section: Section) => {
   let borderShape: Konva.Rect | Konva.Ellipse | Konva.Line | Konva.Path
 
   // 填充色：未选中保持原始填充；选中时用原始填充（内部）+ 粗边框线展示点击区域
-  const fillColor = section.borderFill || 'rgba(128,128,128,0.15)'
+  const fillColor = section.fill || 'rgba(128,128,128,0.15)'
   const autoStrokeColor = darkenColor(fillColor, 40)
-  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.borderStroke || autoStrokeColor))
+  const strokeColor = isSelected ? '#3b82f6' : (isFocused ? '#f59e0b' : (section.stroke || autoStrokeColor))
 
   // strokeWidth 使用反向缩放，保持视觉大小恒定，但设置最小值确保始终可见
   // 选中状态：加粗到 6px 视觉宽度，用半透明蓝色直观展示边框线的点击区域
@@ -965,17 +965,17 @@ const renderSectionBorder = (section: Section) => {
     strokeWidth: scaledStrokeWidth,
     hitStrokeWidth: scaledStrokeWidth,  // 点击区域和视觉边框完全重叠
     dash: [],  // 实线边框，无虚线
-    opacity: isOtherFocused ? 0.3 : ((section.borderOpacity ?? 1) * backgroundOpacity),
+    opacity: isOtherFocused ? 0.3 : ((section.opacity ?? 1) * backgroundOpacity),
     listening: canListen,
   }
 
   if (section.borderType === 'ellipse') {
     // ellipse: x,y 为中心点，radiusX,radiusY 为半径（与 ShapeObject 一致）
-    const rx = section.borderRadiusX || 50
-    const ry = section.borderRadiusY || 30
+    const rx = section.radiusX || 50
+    const ry = section.radiusY || 30
     borderShape = new Konva.Ellipse({
-      x: section.borderX || 0,
-      y: section.borderY || 0,
+      x: section.x || 0,
+      y: section.y || 0,
       radiusX: rx,
       radiusY: ry,
       ...commonAttrs
@@ -987,45 +987,19 @@ const renderSectionBorder = (section: Section) => {
       width: rx * 2,
       height: ry * 2
     })
-  } else if (section.borderType === 'polygon') {
-    // polygon: x,y 为中心点，points 为相对坐标（与 ShapeObject 一致）
-    borderShape = new Konva.Line({
-      x: section.borderX || 0,
-      y: section.borderY || 0,
-      points: section.borderPoints || [],
-      closed: true,
-      ...commonAttrs
-    })
-    // 设置 getSelfRect 确保 Transformer 包围盒正确
-    const points = section.borderPoints || []
-    if (points.length >= 2) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (let i = 0; i < points.length; i += 2) {
-        minX = Math.min(minX, points[i])
-        minY = Math.min(minY, points[i + 1])
-        maxX = Math.max(maxX, points[i])
-        maxY = Math.max(maxY, points[i + 1])
-      }
-      ;(borderShape as any).getSelfRect = () => ({
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY
-      })
-    }
   } else if (section.borderType === 'path') {
-    // path: 带弧线的路径，使用 borderPathPoints
-    const pathData = section.borderPathPoints 
-      ? pathPointsToSvgPath(section.borderPathPoints)
+    // path: 带弧线的路径，使用 pathPoints
+    const pathData = section.pathPoints 
+      ? pathPointsToSvgPath(section.pathPoints)
       : ''
     borderShape = new Konva.Path({
-      x: section.borderX || 0,
-      y: section.borderY || 0,
+      x: section.x || 0,
+      y: section.y || 0,
       data: pathData,
       ...commonAttrs
     })
     // 设置 getSelfRect 确保 Transformer 包围盒正确
-    const pathPoints = section.borderPathPoints || []
+    const pathPoints = section.pathPoints || []
     if (pathPoints.length > 0) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
       pathPoints.forEach(p => {
@@ -1044,16 +1018,16 @@ const renderSectionBorder = (section: Section) => {
   } else {
     // rect: x,y 为左上角，width,height 为宽高（与 ShapeObject 一致）
     borderShape = new Konva.Rect({
-      x: section.borderX || 0,
-      y: section.borderY || 0,
-      width: section.borderWidth || 0,
-      height: section.borderHeight || 0,
+      x: section.x || 0,
+      y: section.y || 0,
+      width: section.width || 0,
+      height: section.height || 0,
       cornerRadius: 6,
       ...commonAttrs
     })
     // Rect 自带 getSelfRect，但为了统一处理也设置一下
-    const w = section.borderWidth || 0
-    const h = section.borderHeight || 0
+    const w = section.width || 0
+    const h = section.height || 0
     ;(borderShape as any).getSelfRect = () => ({
       x: 0,
       y: 0,
@@ -1066,16 +1040,16 @@ const renderSectionBorder = (section: Section) => {
   let labelX: number, labelY: number
   if (section.borderType === 'ellipse') {
     // 椭圆中心点
-    labelX = section.borderX || 0
-    labelY = section.borderY || 0
-  } else if (section.borderType === 'polygon' || section.borderType === 'path') {
-    // 多边形/路径中心点
-    labelX = section.borderX || 0
-    labelY = section.borderY || 0
+    labelX = section.x || 0
+    labelY = section.y || 0
+  } else if (section.borderType === 'path') {
+    // 路径中心点
+    labelX = section.x || 0
+    labelY = section.y || 0
   } else {
     // 矩形中心偏上
-    labelX = (section.borderX || 0) + (section.borderWidth || 0) / 2
-    labelY = (section.borderY || 0) + 14
+    labelX = (section.x || 0) + (section.width || 0) / 2
+    labelY = (section.y || 0) + 14
   }
   const label = new Konva.Text({
     x: labelX,
@@ -1191,23 +1165,23 @@ const renderSectionBorder = (section: Section) => {
     if (section.readonly) return
     isSyncingFromTransformer = true
     const updates: any = {
-      borderX: borderNode.x(),
-      borderY: borderNode.y(),
+      x: borderNode.x(),
+      y: borderNode.y(),
       rotation: borderNode.rotation()
     }
     const bt = section.borderType
     const scaleX = borderNode.scaleX()
     const scaleY = borderNode.scaleY()
     if (bt === 'rect') {
-      const w = borderNode.getAttr('width') || section.borderWidth || 100
-      const h = borderNode.getAttr('height') || section.borderHeight || 100
-      updates.borderWidth = w * scaleX
-      updates.borderHeight = h * scaleY
+      const w = borderNode.getAttr('width') || section.width || 100
+      const h = borderNode.getAttr('height') || section.height || 100
+      updates.width = w * scaleX
+      updates.height = h * scaleY
     } else if (bt === 'ellipse') {
-      const rx = borderNode.getAttr('radiusX') || section.borderRadiusX || 50
-      const ry = borderNode.getAttr('radiusY') || section.borderRadiusY || 50
-      updates.borderRadiusX = rx * scaleX
-      updates.borderRadiusY = ry * scaleY
+      const rx = borderNode.getAttr('radiusX') || section.radiusX || 50
+      const ry = borderNode.getAttr('radiusY') || section.radiusY || 50
+      updates.radiusX = rx * scaleX
+      updates.radiusY = ry * scaleY
     }
     venueStore.updateSectionBorder(section.id, updates)
     borderNode.scaleX(1)
@@ -1363,8 +1337,8 @@ const renderRow = (row: SeatRow, section: Section, forceBarMode: boolean = false
   // 设置绘制函数
   // 全局视图或强制横条模式下使用横条渲染，否则显示具体座位
   const shouldForceBarMode = isGlobalView || forceBarMode
-  const { borderWidth } = venueStore.visualConfig
-  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, borderWidth))
+  const { width } = venueStore.visualConfig
+  rowShape.sceneFunc(createRowSceneFunc(row, getSeatColor, venueStore.selectedRowIds.includes(row.id), rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, width))
   
   // 横条模式下禁用事件响应（只读展示），具体座位模式下启用事件响应（可框选/点击）
   if (shouldForceBarMode) {
@@ -2806,10 +2780,10 @@ const enterSectionFocus = (sectionId: string) => {
   const stageWidth = stage.width()
   const stageHeight = stage.height()
 
-  let sectionW = section.borderWidth || 100
-  let sectionH = section.borderHeight || 100
-  let sectionX = section.borderX || 0
-  let sectionY = section.borderY || 0
+  let sectionW = section.width || 100
+  let sectionH = section.height || 100
+  let sectionX = section.x || 0
+  let sectionY = section.y || 0
 
   // 如果已存在 baseScale，直接使用该值；否则计算合适的缩放
   const existingBaseScale = venueStore.getBaseScale()
@@ -2889,12 +2863,12 @@ const submitRect = (startPos: Position, endPos: Position) => {
     x: 0,
     y: 0,
     borderType: 'rect',
-    borderX: x,
-    borderY: y,
-    borderWidth: width,
-    borderHeight: height,
-    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-    borderStroke: '#808080'  // 默认灰色边框
+    x: x,
+    y: y,
+    width: width,
+    height: height,
+    fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    stroke: '#808080'  // 默认灰色边框
   })
   
   // 保存历史记录
@@ -2957,12 +2931,12 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     x: 0,
     y: 0,
     borderType: 'ellipse',
-    borderX: centerX,
-    borderY: centerY,
-    borderRadiusX: radiusX,
-    borderRadiusY: radiusY,
-    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-    borderStroke: '#808080'  // 默认灰色边框
+    x: centerX,
+    y: centerY,
+    radiusX: radiusX,
+    radiusY: radiusY,
+    fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    stroke: '#808080'  // 默认灰色边框
   })
   
   // 保存历史记录
@@ -2998,14 +2972,12 @@ const submitPolygon = (points: import('../types').PathPoint[]) => {
   venueStore.addSection({
     name: '路径分区',
     rows: [],
-    x: 0,
-    y: 0,
     borderType: 'path',
-    borderX: center.x,
-    borderY: center.y,
-    borderPathPoints: relativePathPoints,
-    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-    borderStroke: '#808080'  // 默认灰色边框
+    x: center.x,
+    y: center.y,
+    pathPoints: relativePathPoints,
+    fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    stroke: '#808080'  // 默认灰色边框
   })
   
   // 保存历史记录

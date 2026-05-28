@@ -1,5 +1,5 @@
 import { Group, Line, Rect, Ellipse, Text } from 'leafer-ui'
-import type { Position } from '../types'
+import type { Position, PathPoint } from '../types'
 import { defaultSeatMapConfig } from '../types'
 import { generateId } from '../utils/id'
 import { useVenueStore } from '../stores/venueStore'
@@ -599,14 +599,19 @@ export class DrawingManager {
     if (this._polygonPoints.length < 3) return
     const center = calculatePolygonCenter(this._polygonPoints)
     const relativePoints = toRelativePoints(this._polygonPoints, center)
+    // 转为 PathPoint[] 格式（path borderType 需要）
+    const pathPts: PathPoint[] = []
+    for (let i = 0; i < relativePoints.length; i += 2) {
+      pathPts.push({ x: relativePoints[i], y: relativePoints[i + 1], type: 'line', arcDepth: 0 })
+    }
 
     const sectionId = store.addSection({
       name: `分区${store.venue.sections.length + 1}`,
       rows: [],
-      borderType: 'polygon',
-      borderX: center.x,
-      borderY: center.y,
-      borderPoints: relativePoints,
+      borderType: 'path',
+      x: center.x,
+      y: center.y,
+      pathPoints: pathPts,
     })
 
     store.saveHistory()

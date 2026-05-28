@@ -106,7 +106,7 @@ const getRenderConfig = () => {
     radius: visualConfig?.radius ?? 6,
     gap: visualConfig?.gap ?? 18,
     rowGap: visualConfig?.rowGap ?? 24,
-    borderWidth: visualConfig?.borderWidth ?? 2,
+    width: visualConfig?.width ?? 2,
   }
 }
 
@@ -231,9 +231,7 @@ const bindStrokeDoubleClick = (sectionId: string, el: any) => {
     if (dispatcher?.mode === 'VERTEX_EDIT') return
     const section = props.venue.sections.find(s => s.id === sectionId)
     if (!section || !dispatcher) return
-    if (section.borderType === 'polygon' && section.borderPoints?.length) {
-      dispatcher.enterVertexEdit(section, 'polygon')
-    } else if (section.borderType === 'path' && section.borderPathPoints?.length) {
+    if (section.borderType === 'path' && section.pathPoints?.length) {
       dispatcher.enterVertexEdit(section, 'path')
     }
   })
@@ -453,10 +451,10 @@ const createEditorBridge = (): EditorBridge => {
     },
     updateSectionBorder: (id, x, y, width?, height?) => {
       const section = props.venue.sections.find(s => s.id === id)
-      const dx = x - (section?.borderX ?? 0)
-      const dy = y - (section?.borderY ?? 0)
+      const dx = x - (section?.x ?? 0)
+      const dy = y - (section?.y ?? 0)
 
-      store.updateSectionBorder(id, { borderX: x, borderY: y, borderWidth: width, borderHeight: height })
+      store.updateSectionBorder(id, { x: x, y: y, width: width, height: height })
 
       // 更新 Store 内部元素的世界坐标（leafer 子元素通过父级 transform 自动跟随，不手动偏移）
       if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
@@ -598,8 +596,8 @@ const duplicateSelected = () => {
       name: `${section.name} 副本`,
     })
     store.updateSectionBorder(newId, {
-      borderX: (section.borderX ?? 0) + offsetX,
-      borderY: (section.borderY ?? 0) + offsetY,
+      x: (section.x ?? 0) + offsetX,
+      y: (section.y ?? 0) + offsetY,
     })
     store.clearSelection()
     store.selectSection(newId)
@@ -733,9 +731,7 @@ onMounted(() => {
     setSyncing: (v: boolean) => { isSyncing = v },
     saveHistory: () => store.saveHistory(),
     updateSectionBorderPathPoints: (sectionId, pathPoints) =>
-      store.updateSectionBorder(sectionId, { borderPathPoints: pathPoints }),
-    updateSectionBorderPoints: (sectionId, points, arcDepths) =>
-      store.updateSectionBorder(sectionId, { borderPoints: points, borderArcDepths: arcDepths }),
+      store.updateSectionBorder(sectionId, { pathPoints: pathPoints }),
     updateShapePoints: (id, points, arcDepths) =>
       store.updateShape(id, { points, arcDepths }),
     updateAreaPoints: (id, points, arcDepths) =>
@@ -777,8 +773,6 @@ onMounted(() => {
       if (!el) return
       if (kind === 'path') {
         vertexEditManager.enterForPathSection(section, el)
-      } else {
-        vertexEditManager.enterForPolygonSection(section, el)
       }
     },
     onExitVertexEdit: () => {
@@ -840,11 +834,7 @@ onMounted(() => {
           worldPos.y < aabb.y - 1 || worldPos.y > aabb.y + aabb.height + 1
         ) continue
         if (isInsideSection(s, worldPos)) {
-          if (s.borderType === 'polygon' && s.borderPoints?.length) {
-            dispatcher.enterVertexEdit(s, 'polygon')
-            return
-          }
-          if (s.borderType === 'path' && s.borderPathPoints?.length) {
+          if (s.borderType === 'path' && s.pathPoints?.length) {
             dispatcher.enterVertexEdit(s, 'path')
             return
           }
@@ -986,7 +976,7 @@ watch(
   () => store.selectedSectionIds,
   (ids, oldIds) => {
     if (dispatcher?.mode === 'VERTEX_EDIT') return
-    if (vertexEditManager?.activeKind === 'path' || vertexEditManager?.activeKind === 'polygon') {
+    if (vertexEditManager?.activeKind === 'path') {
       vertexEditManager?.hideVertices()
     }
 
@@ -1120,21 +1110,11 @@ const enterSectionFocus = (sectionId: string, worldPos?: { x: number; y: number 
     cx = worldPos.x
     cy = worldPos.y
   } else {
-    cx = section.borderX ?? 0
-    cy = section.borderY ?? 0
+    cx = section.x ?? 0
+    cy = section.y ?? 0
     if (section.borderType === 'rect') {
-      cx += (section.borderWidth ?? 100) / 2
-      cy += (section.borderHeight ?? 100) / 2
-    } else if (section.borderType === 'polygon' && section.borderPoints) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (let i = 0; i < section.borderPoints.length; i += 2) {
-        minX = Math.min(minX, section.borderPoints[i])
-        minY = Math.min(minY, section.borderPoints[i + 1])
-        maxX = Math.max(maxX, section.borderPoints[i])
-        maxY = Math.max(maxY, section.borderPoints[i + 1])
-      }
-      cx += (minX + maxX) / 2
-      cy += (minY + maxY) / 2
+      cx += (section.width ?? 100) / 2
+      cy += (section.height ?? 100) / 2
     }
   }
 
@@ -1192,9 +1172,7 @@ const toggleVertexEdit = () => {
   if (!sectionId) return
   const section = props.venue.sections.find(s => s.id === sectionId)
   if (!section) return
-  if (section.borderType === 'polygon' && section.borderPoints?.length) {
-    dispatcher.enterVertexEdit(section, 'polygon')
-  } else if (section.borderType === 'path' && section.borderPathPoints?.length) {
+  if (section.borderType === 'path' && section.pathPoints?.length) {
     dispatcher.enterVertexEdit(section, 'path')
   }
 }

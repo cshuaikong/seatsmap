@@ -86,23 +86,20 @@ function sampleArcPoints(arc: ReturnType<typeof getArcGeometry>, count: number, 
 
 /** 获取分区在 world-space 的包围盒，无边框返回 null */
 export function getSectionAABB(section: Section): AABB | null {
-  const bx = section.borderX ?? 0
-  const by = section.borderY ?? 0
+  const bx = section.x ?? 0
+  const by = section.y ?? 0
 
   switch (section.borderType) {
     case 'rect':
-      return { x: bx, y: by, width: section.borderWidth ?? 100, height: section.borderHeight ?? 100 }
+      return { x: bx, y: by, width: section.width ?? 100, height: section.height ?? 100 }
     case 'ellipse': {
-      const rx = section.borderRadiusX ?? 50
-      const ry = section.borderRadiusY ?? 50
+      const rx = section.radiusX ?? 50
+      const ry = section.radiusY ?? 50
       return { x: bx, y: by, width: rx * 2, height: ry * 2 }
     }
-    case 'polygon':
-      if (!section.borderPoints || section.borderPoints.length < 6) return null
-      return _pointsAABB(section.borderPoints, bx, by)
     case 'path':
-      if (!section.borderPathPoints || section.borderPathPoints.length < 3) return null
-      return _pathPointsAABB(section.borderPathPoints, bx, by)
+      if (!section.pathPoints || section.pathPoints.length < 3) return null
+      return _pathPointsAABB(section.pathPoints, bx, by)
     default:
       return null
   }
@@ -110,30 +107,27 @@ export function getSectionAABB(section: Section): AABB | null {
 
 /** 检测 worldPos 是否在分区边框内部 */
 export function isInsideSection(section: Section, worldPos: { x: number; y: number }): boolean {
-  const bx = section.borderX ?? 0
-  const by = section.borderY ?? 0
+  const bx = section.x ?? 0
+  const by = section.y ?? 0
   const px = worldPos.x
   const py = worldPos.y
 
   switch (section.borderType) {
     case 'rect':
-      return px >= bx && px <= bx + (section.borderWidth ?? 100)
-          && py >= by && py <= by + (section.borderHeight ?? 100)
+      return px >= bx && px <= bx + (section.width ?? 100)
+          && py >= by && py <= by + (section.height ?? 100)
     case 'ellipse': {
-      const rx = section.borderRadiusX ?? 50
-      const ry = section.borderRadiusY ?? 50
+      const rx = section.radiusX ?? 50
+      const ry = section.radiusY ?? 50
       const cx = bx + rx
       const cy = by + ry
       const dx = (px - cx) / rx
       const dy = (py - cy) / ry
       return dx * dx + dy * dy <= 1
     }
-    case 'polygon':
-      if (!section.borderPoints || section.borderPoints.length < 6) return false
-      return _polygonContains(section.borderPoints, bx, by, px, py)
     case 'path':
-      if (!section.borderPathPoints || section.borderPathPoints.length < 3) return false
-      return _pathPolygonContains(section.borderPathPoints, bx, by, px, py)
+      if (!section.pathPoints || section.pathPoints.length < 3) return false
+      return _pathPolygonContains(section.pathPoints, bx, by, px, py)
     default:
       return false
   }
@@ -141,8 +135,8 @@ export function isInsideSection(section: Section, worldPos: { x: number; y: numb
 
 /** 检测 worldPos 是否靠近分区边框（用于双击进入顶点编辑），threshold = BORDER_HIT_RADIUS / scale */
 export function isNearSectionBorder(section: Section, worldPos: { x: number; y: number }): boolean {
-  const bx = section.borderX ?? 0
-  const by = section.borderY ?? 0
+  const bx = section.x ?? 0
+  const by = section.y ?? 0
   const px = worldPos.x
   const py = worldPos.y
   const threshold = BORDER_HIT_RADIUS
@@ -152,12 +146,9 @@ export function isNearSectionBorder(section: Section, worldPos: { x: number; y: 
       return _isNearRectBorder(section, bx, by, px, py, threshold)
     case 'ellipse':
       return _isNearEllipseBorder(section, bx, by, px, py, threshold)
-    case 'polygon':
-      if (!section.borderPoints || section.borderPoints.length < 6) return false
-      return _isNearPolygonBorder(section.borderPoints, section.borderArcDepths, bx, by, px, py, threshold)
     case 'path':
-      if (!section.borderPathPoints || section.borderPathPoints.length < 3) return false
-      return _isNearPathBorder(section.borderPathPoints, bx, by, px, py, threshold)
+      if (!section.pathPoints || section.pathPoints.length < 3) return false
+      return _isNearPathBorder(section.pathPoints, bx, by, px, py, threshold)
     default:
       return false
   }
@@ -227,8 +218,8 @@ function _pathPolygonContains(pts: PathPoint[], ox: number, oy: number, px: numb
 function _isNearRectBorder(
   _section: Section, bx: number, by: number, px: number, py: number, threshold: number,
 ): boolean {
-  const w = _section.borderWidth ?? 100
-  const h = _section.borderHeight ?? 100
+  const w = _section.width ?? 100
+  const h = _section.height ?? 100
   // 先排除远离 AABB 的点
   if (px < bx - threshold || px > bx + w + threshold || py < by - threshold || py > by + h + threshold) return false
 
@@ -248,8 +239,8 @@ function _isNearRectBorder(
 function _isNearEllipseBorder(
   section: Section, _bx: number, _by: number, px: number, py: number, threshold: number,
 ): boolean {
-  const rx = section.borderRadiusX ?? 50
-  const ry = section.borderRadiusY ?? 50
+  const rx = section.radiusX ?? 50
+  const ry = section.radiusY ?? 50
   const cx = _bx + rx
   const cy = _by + ry
 

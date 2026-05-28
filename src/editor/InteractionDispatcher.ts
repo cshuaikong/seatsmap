@@ -10,7 +10,7 @@ export interface InteractionDispatcherOptions {
   onEnterDrawing: (tool: string) => void
   onExitDrawing: () => void
   // Vertex-edit lifecycle
-  onEnterVertexEdit: (section: Section, kind: 'path' | 'polygon') => void
+  onEnterVertexEdit: (section: Section, kind: 'path') => void
   onExitVertexEdit: () => void
 
   // Editor controls
@@ -69,7 +69,7 @@ export class InteractionDispatcher {
   }
 
   /** 进入顶点编辑模式 */
-  enterVertexEdit(section: Section, kind: 'path' | 'polygon'): void {
+  enterVertexEdit(section: Section, kind: 'path'): void {
     this._exitMode(this.mode)
     this.mode = 'VERTEX_EDIT'
     this.opts.cancelEditorSelection()

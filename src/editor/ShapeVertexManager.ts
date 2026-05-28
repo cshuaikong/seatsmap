@@ -13,14 +13,10 @@ export interface ShapeVertexManagerOptions {
   updateShapePoints: (id: string, points: number[]) => void
   /** 更新 area points 到 store */
   updateAreaPoints: (id: string, points: number[]) => void
-  /** 更新 section polygon 边框点到 store */
-  updateSectionPoints?: (sectionId: string, points: number[]) => void
   /** 更新 shape arcDepths 到 store */
   updateShapeArcDepths?: (id: string, arcDepths: number[]) => void
   /** 更新 area arcDepths 到 store */
   updateAreaArcDepths?: (id: string, arcDepths: number[]) => void
-  /** 更新 section borderArcDepths 到 store */
-  updateSectionArcDepths?: (sectionId: string, arcDepths: number[]) => void
 }
 
 interface VertexHandle {
@@ -34,7 +30,7 @@ interface EdgeHandle {
   ellipse: Ellipse
   /** 边起点的顶点索引 */
   index: number
-  kind: 'shape' | 'area' | 'sectionPolygon'
+  kind: 'shape' | 'area'
   dataId: string
 }
 
@@ -46,7 +42,7 @@ export class ShapeVertexManager {
   private _isDragging = false
   private _activeEl: any = null
   private _activeData: ShapeObject | AreaObject | null = null
-  private _activeKind: 'shape' | 'area' | 'sectionPolygon' | null = null
+  private _activeKind: 'shape' | 'area' | null = null
   private _activeArcDepths: number[] | null = null
   private _boundOnZoom: (() => void) | null = null
 
@@ -63,7 +59,7 @@ export class ShapeVertexManager {
     return this._isDragging
   }
 
-  get handleKind(): 'shape' | 'area' | 'sectionPolygon' | null {
+  get handleKind(): 'shape' | 'area' | null {
     return this._activeKind
   }
 
@@ -124,40 +120,6 @@ export class ShapeVertexManager {
         i,
         'area',
         area.id,
-      )
-      this.handles.push(h)
-    }
-
-    if (n >= 2) this._buildEdgeHandles(logicalRadius)
-  }
-
-  /** 为 polygon 分区边框显示顶点编辑手柄 */
-  showSectionPolygonVertices(sectionId: string, borderPoints: number[], borderX: number, borderY: number, el: any, borderArcDepths?: number[]): void {
-    this.hideVertices()
-    if (!borderPoints || borderPoints.length < 2) return
-
-    const scale = this.opts.getScale()
-    const logicalRadius = 4 / Math.max(scale, 0.05)
-    const n = borderPoints.length / 2
-
-    this._activeEl = el
-    this._activeData = null
-    this._activeKind = 'sectionPolygon'
-    this._activeArcDepths = borderArcDepths ? [...borderArcDepths] : new Array(n).fill(0)
-    ;(this as any)._sectionId = sectionId
-    ;(this as any)._sectionBorderX = borderX
-    ;(this as any)._sectionBorderY = borderY
-    ;(this as any)._sectionPoints = [...borderPoints]
-
-    for (let i = 0; i < n; i++) {
-      const h = this._createVertexHandle(
-        `sectvertex-${sectionId}-${i}`,
-        borderX + borderPoints[i * 2],
-        borderY + borderPoints[i * 2 + 1],
-        logicalRadius,
-        i,
-        'sectionPolygon' as any,
-        sectionId,
       )
       this.handles.push(h)
     }
@@ -305,7 +267,7 @@ export class ShapeVertexManager {
       this.edgeHandles.push({
         ellipse: edgeHandle,
         index: i,
-        kind: this._activeKind === 'sectionPolygon' ? 'sectionPolygon' : this._activeKind!,
+        kind: this._activeKind!,
         dataId: this._getActiveDataId(),
       })
     }
@@ -408,15 +370,6 @@ export class ShapeVertexManager {
         this.opts.updateAreaArcDepths?.(area.id, [...this._activeArcDepths])
       }
       this.opts.saveHistory()
-    } else if (this._activeKind === 'sectionPolygon') {
-      const pts = (this as any)._sectionPoints as number[] | undefined
-      if (pts && this.opts.updateSectionPoints) {
-        this.opts.updateSectionPoints((this as any)._sectionId, [...pts])
-      }
-      if (this._activeArcDepths && this.opts.updateSectionArcDepths) {
-        this.opts.updateSectionArcDepths((this as any)._sectionId, [...this._activeArcDepths])
-      }
-      this.opts.saveHistory()
     }
 
     this.opts.setSyncing(false)
@@ -462,16 +415,6 @@ export class ShapeVertexManager {
         h.ellipse.y = pts[h.index * 2 + 1] ?? 0
       })
       this._updateEdgeHandlePositions(pts, 0, 0)
-    } else if (this._activeKind === 'sectionPolygon') {
-      const bx = (this as any)._sectionBorderX ?? 0
-      const by = (this as any)._sectionBorderY ?? 0
-      const pts = (this as any)._sectionPoints as number[] | undefined
-      if (!pts) return
-      this.handles.forEach(h => {
-        h.ellipse.x = bx + (pts[h.index * 2] ?? 0)
-        h.ellipse.y = by + (pts[h.index * 2 + 1] ?? 0)
-      })
-      this._updateEdgeHandlePositions(pts, bx, by)
     }
   }
 
@@ -511,20 +454,10 @@ export class ShapeVertexManager {
     if (this._activeKind === 'area') {
       return (this._activeData as AreaObject)?.points ?? []
     }
-    // sectionPolygon
-    const bx = (this as any)._sectionBorderX ?? 0
-    const by = (this as any)._sectionBorderY ?? 0
-    const pts = (this as any)._sectionPoints as number[] | undefined
-    if (!pts) return []
-    const result: number[] = []
-    for (let i = 0; i < pts.length; i += 2) {
-      result.push(bx + pts[i], by + pts[i + 1])
-    }
-    return result
+    return []
   }
 
   private _getActiveDataId(): string {
-    if (this._activeKind === 'sectionPolygon') return (this as any)._sectionId ?? ''
     return (this._activeData as any)?.id ?? ''
   }
 

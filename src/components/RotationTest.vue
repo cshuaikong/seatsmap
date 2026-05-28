@@ -41,7 +41,7 @@ onMounted(() => {
     resizeEnabled: false,
     rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
     padding: 0,  // 移除内边距
-    borderStroke: '#0066ff',  // 蓝色边框
+    stroke: '#0066ff',  // 蓝色边框
     borderStrokeWidth: 1,
   })
   layer.add(transformer)

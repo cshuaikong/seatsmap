@@ -45,7 +45,7 @@ const getRenderConfig = () => {
     radius: visualConfig?.radius ?? 6,
     gap: visualConfig?.gap ?? 18,
     rowGap: visualConfig?.rowGap ?? 24,
-    borderWidth: visualConfig?.borderWidth ?? 2,
+    width: visualConfig?.width ?? 2,
   }
 }
 

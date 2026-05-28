@@ -674,12 +674,12 @@ export function submitRect(startPos: Position, endPos: Position) {
     x: 0,
     y: 0,
     borderType: 'rect',
-    borderX: x,
-    borderY: y,
-    borderWidth: width,
-    borderHeight: height,
-    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-    borderStroke: '#808080'  // 默认灰色边框
+    x: x,
+    y: y,
+    width: width,
+    height: height,
+    fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    stroke: '#808080'  // 默认灰色边框
   })
   
   clearDrawingPreview()
@@ -734,12 +734,12 @@ export function submitEllipse(startPos: Position, endPos: Position) {
     x: 0,
     y: 0,
     borderType: 'ellipse',
-    borderX: startPos.x,
-    borderY: startPos.y,
-    borderRadiusX: radius,
-    borderRadiusY: radius,
-    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-    borderStroke: '#808080'  // 默认灰色边框
+    x: startPos.x,
+    y: startPos.y,
+    radiusX: radius,
+    radiusY: radius,
+    fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    stroke: '#808080'  // 默认灰色边框
   })
   
   clearDrawingPreview()
@@ -868,14 +868,12 @@ export function submitPolygon(points: PathPoint[]) {
   useVenueStore().addSection({
     name: '路径分区',
     rows: [],
-    x: 0,
-    y: 0,
     borderType: 'path',
-    borderX: center.x,
-    borderY: center.y,
-    borderPathPoints: relativePathPoints,
-    borderFill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
-    borderStroke: '#808080'  // 默认灰色边框
+    x: center.x,
+    y: center.y,
+    pathPoints: relativePathPoints,
+    fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
+    stroke: '#808080'  // 默认灰色边框
   })
   
   clearDrawingPreview()

@@ -96,7 +96,7 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
       padding: 0,
       visible: false,
 
-      borderStroke: '#3b82f6',
+      stroke: '#3b82f6',
       borderStrokeWidth: 1,
 
       anchorFill: '#ffffff',
@@ -216,8 +216,8 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         const scaleX = node.scaleX()
         const scaleY = node.scaleY()
         const updates: any = { 
-          borderX: node.x(), 
-          borderY: node.y(),
+          x: node.x(), 
+          y: node.y(),
           rotation: node.rotation()
         }
         
@@ -226,13 +226,13 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         if (borderType === 'rect') {
           const width = node.getAttr('width') || 100
           const height = node.getAttr('height') || 100
-          updates.borderWidth = width * scaleX
-          updates.borderHeight = height * scaleY
+          updates.width = width * scaleX
+          updates.height = height * scaleY
         } else if (borderType === 'ellipse') {
           const radiusX = node.getAttr('radiusX') || 50
           const radiusY = node.getAttr('radiusY') || 50
-          updates.borderRadiusX = radiusX * scaleX
-          updates.borderRadiusY = radiusY * scaleY
+          updates.radiusX = radiusX * scaleX
+          updates.radiusY = radiusY * scaleY
         }
         
         venueStore.updateSectionBorder(sectionId, updates)
@@ -561,11 +561,11 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
         node.position({ x: 0, y: 0 })
       }
     } else if (sectionId && borderType) {
-      // Section 边框拖拽 - 更新 borderX, borderY
+      // Section 边框拖拽 - 更新 x, y
       // 直接使用 node.x/y，因为节点已经被移回 mainLayer
       venueStore.updateSectionBorder(sectionId, { 
-        borderX: node.x(), 
-        borderY: node.y(),
+        x: node.x(), 
+        y: node.y(),
         rotation: node.rotation() 
       })
     }

@@ -58,7 +58,7 @@
             type="color"
             class="color-swatch"
             :value="solidFill"
-            @change="(e) => emit('update-property', 'borderFill', (e.target as HTMLInputElement).value)"
+            @change="(e) => emit('update-property', 'fill', (e.target as HTMLInputElement).value)"
           />
           <span class="color-value">{{ solidFill }}</span>
         </div>
@@ -71,10 +71,10 @@
           <input
             type="color"
             class="color-swatch"
-            :value="section.borderStroke || '#3b82f6'"
-            @change="(e) => emit('update-property', 'borderStroke', (e.target as HTMLInputElement).value)"
+            :value="section.stroke || '#3b82f6'"
+            @change="(e) => emit('update-property', 'stroke', (e.target as HTMLInputElement).value)"
           />
-          <span class="color-value">{{ section.borderStroke || '#3b82f6' }}</span>
+          <span class="color-value">{{ section.stroke || '#3b82f6' }}</span>
         </div>
       </div>
 
@@ -86,11 +86,11 @@
           min="0"
           max="1"
           step="0.05"
-          :value="section.borderOpacity ?? 1"
+          :value="section.opacity ?? 1"
           class="slider"
-          @input="(e) => emit('update-property', 'borderOpacity', parseFloat((e.target as HTMLInputElement).value))"
+          @input="(e) => emit('update-property', 'opacity', parseFloat((e.target as HTMLInputElement).value))"
         />
-        <span class="slider-val">{{ Math.round((section.borderOpacity ?? 1) * 100) }}%</span>
+        <span class="slider-val">{{ Math.round((section.opacity ?? 1) * 100) }}%</span>
       </div>
 
       <!-- 层级设置 -->
@@ -206,7 +206,7 @@
 
       <!-- 顶点编辑按钮（仅 polygon/path 分区显示） -->
       <button
-        v-if="(section.borderType === 'polygon' || section.borderType === 'path') && !isMulti"
+        v-if="section.borderType === 'path' && !isMulti"
         class="vertex-edit-btn"
         :class="{ active: vertexEditActive }"
         @click="emit('toggle-vertex-edit')"
@@ -278,8 +278,8 @@ const activateSegment = (pointIndex: number) => {
 }
 
 const updatePathPointType = (pointIndex: number, nextType: 'line' | 'arc') => {
-  if (!props.section?.borderPathPoints) return
-  const nextPoints: PathPoint[] = props.section.borderPathPoints.map((point, currentIndex) => {
+  if (!props.section?.pathPoints) return
+  const nextPoints: PathPoint[] = props.section.pathPoints.map((point, currentIndex) => {
     if (currentIndex !== pointIndex) return { ...point }
     return {
       ...point,
@@ -287,12 +287,12 @@ const updatePathPointType = (pointIndex: number, nextType: 'line' | 'arc') => {
       arcDepth: nextType === 'arc' ? (point.arcDepth ?? 0) : 0
     }
   })
-  emit('update-property', 'borderPathPoints', nextPoints)
+  emit('update-property', 'pathPoints', nextPoints)
 }
 
 const updatePathPointArcDepth = (pointIndex: number, nextDepth: number) => {
-  if (!props.section?.borderPathPoints) return
-  const nextPoints: PathPoint[] = props.section.borderPathPoints.map((point, currentIndex) => {
+  if (!props.section?.pathPoints) return
+  const nextPoints: PathPoint[] = props.section.pathPoints.map((point, currentIndex) => {
     if (currentIndex !== pointIndex) return { ...point }
     return {
       ...point,
@@ -300,12 +300,12 @@ const updatePathPointArcDepth = (pointIndex: number, nextDepth: number) => {
       arcDepth: nextDepth
     }
   })
-  emit('update-property', 'borderPathPoints', nextPoints)
+  emit('update-property', 'pathPoints', nextPoints)
 }
 
 // 将带透明度的 rgba fill 转为纯色（用于 color input）
 const solidFill = computed(() => {
-  const f = props.section?.borderFill || '#3b82f6'
+  const f = props.section?.fill || '#3b82f6'
   // 如果是 rgba，取前三通道近似转换
   if (f.startsWith('rgba')) {
     const match = f.match(/rgba\((\d+),\s*(\d+),\s*(\d+)/)
@@ -329,11 +329,10 @@ const borderTypeLabel = computed(() => {
   if (type === 'path') return '路径分区'
   if (type === 'ellipse') return '椭圆分区'
   if (type === 'rect') return '矩形分区'
-  if (type === 'polygon') return '多边形分区'
   return '普通分区'
 })
 
-const pathPoints = computed(() => props.section?.borderPathPoints || [])
+const pathPoints = computed(() => props.section?.pathPoints || [])
 
 const pathSegments = computed(() => {
   if (pathPoints.value.length < 2) return []

@@ -55,7 +55,7 @@ export const useVenueStore = defineStore('venue', () => {
     radius: 6,      // 期望在屏幕上看到的半径 6px
     gap: 18,        // 期望在屏幕上看到的间距 18px（= SEAT_SPACING）
     rowGap: 24,     // 期望在屏幕上看到的行距 24px（= ROW_SPACING）
-    borderWidth: 2  // 期望在屏幕上看到的边框宽度 2px
+    width: 2  // 期望在屏幕上看到的边框宽度 2px
   }
 
   // 当前激活的 path 边段（用于画布与右侧面板联动）
@@ -697,20 +697,18 @@ export const useVenueStore = defineStore('venue', () => {
     'name'
     | 'rotation'
     | 'borderType'
-    | 'borderX'
-    | 'borderY'
-    | 'borderWidth'
-    | 'borderHeight'
-    | 'borderRadiusX'
-    | 'borderRadiusY'
-    | 'borderPoints'
-    | 'borderPathPoints'
-    | 'borderFill'
-    | 'borderStroke'
-    | 'borderOpacity'
+    | 'x'
+    | 'y'
+    | 'width'
+    | 'height'
+    | 'radiusX'
+    | 'radiusY'
+    | 'pathPoints'
+    | 'fill'
+    | 'stroke'
+    | 'opacity'
     | 'zIndex'
     | 'readonly'
-    | 'borderArcDepths'
   >>) {
     const section = venue.value.sections.find(s => s.id === sectionId)
     if (!section) return
@@ -921,10 +919,9 @@ export const useVenueStore = defineStore('venue', () => {
     // 清除选择状态
     clearSelection()
 
-    // 为 section 填充默认值（强制重置 readonly 为 false，确保导入后可编辑）
     const normalizedSections: Section[] = data.sections.map(section => ({
       ...section,
-      readonly: false,  // 导入后强制可编辑
+      readonly: false,
       rows: Array.isArray(section.rows) ? section.rows : [],
       shapes: Array.isArray(section.shapes) ? section.shapes : [],
       texts: Array.isArray(section.texts) ? section.texts : [],

@@ -8,7 +8,7 @@ export interface SeatRenderConfig {
   radius: number
   gap: number
   rowGap: number
-  borderWidth: number
+  width: number
 }
 
 interface RowLODGroups {
@@ -74,10 +74,10 @@ export class SeatRenderer {
 
         let rowGroup: Group | undefined
         if (this.editMode) {
-          // 编辑模式：seatGroup 将被挂载到 section group（位于 borderX,borderY）下，
+          // 编辑模式：seatGroup 将被挂载到 section group（位于 x,y）下，
           // row 存储为世界坐标，需转为相对坐标
-          const sectionOx = section.borderX ?? 0
-          const sectionOy = section.borderY ?? 0
+          const sectionOx = section.x ?? 0
+          const sectionOy = section.y ?? 0
           this.createSeatLine(lineGroup, row, curvedPositions, 0)
           this.createSeatCircles(circleGroup, row, section, curvedPositions, 0, logicalRadius)
 
@@ -154,7 +154,7 @@ export class SeatRenderer {
     offsetX?: number,
     offsetY?: number,
   ): void {
-    const { borderWidth, baseScale } = this.config
+    const { width, baseScale } = this.config
     const ox = offsetX ?? 0
     const oy = offsetY ?? 0
 
@@ -174,7 +174,7 @@ export class SeatRenderer {
       const color = this.getCategoryColor(seat.categoryKey)
       const borderColor = this.darkenColor(color, 50)
       const isSelected = seat.status === SEAT_STATUS.SELECTED
-      const strokeW = borderWidth / baseScale
+      const strokeW = width / baseScale
 
       if (isSelected) {
         // 选中态：双层同心圆
@@ -302,8 +302,8 @@ export class SeatRenderer {
     const borderColor = this.darkenColor(color, 50)
     const isSelected = seat.status === SEAT_STATUS.SELECTED
     const newStrokeWidth = isSelected
-      ? (this.config.borderWidth / this.config.baseScale) + 1
-      : this.config.borderWidth / this.config.baseScale
+      ? (this.config.width / this.config.baseScale) + 1
+      : this.config.width / this.config.baseScale
 
     // 只在值实际变化时才更新，避免不必要的重绘闪烁
     if (el.fill !== color) el.fill = color

@@ -57,8 +57,8 @@ export class EditorBridge {
     if (!meta.sectionId) return { x, y }
     const section = this.opts.getVenue().sections.find(s => s.id === meta.sectionId)
     return {
-      x: x + (section?.borderX ?? 0),
-      y: y + (section?.borderY ?? 0),
+      x: x + (section?.x ?? 0),
+      y: y + (section?.y ?? 0),
     }
   }
 

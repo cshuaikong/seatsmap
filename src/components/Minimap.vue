@@ -75,56 +75,42 @@ const renderMinimap = () => {
     props.venue.sections.forEach((section: any) => {
       if (!section.borderType || section.borderType === 'none') return
       
-      ctx.fillStyle = section.borderFill || 'rgba(128, 128, 128, 0.15)'
-      ctx.strokeStyle = section.borderStroke || '#808080'
+      ctx.fillStyle = section.fill || 'rgba(128, 128, 128, 0.15)'
+      ctx.strokeStyle = section.stroke || '#808080'
       ctx.lineWidth = 1 * 2
       
-      const baseX = offsetX + ((section.borderX || 0) - venueBounds!.x) * minimapScale
-      const baseY = offsetY + ((section.borderY || 0) - venueBounds!.y) * minimapScale
+      const baseX = offsetX + ((section.x || 0) - venueBounds!.x) * minimapScale
+      const baseY = offsetY + ((section.y || 0) - venueBounds!.y) * minimapScale
       
       if (section.borderType === 'rect') {
         ctx.fillRect(
           baseX,
           baseY,
-          (section.borderWidth || 100) * minimapScale,
-          (section.borderHeight || 100) * minimapScale
+          (section.width || 100) * minimapScale,
+          (section.height || 100) * minimapScale
         )
         ctx.strokeRect(
           baseX,
           baseY,
-          (section.borderWidth || 100) * minimapScale,
-          (section.borderHeight || 100) * minimapScale
+          (section.width || 100) * minimapScale,
+          (section.height || 100) * minimapScale
         )
       } else if (section.borderType === 'ellipse') {
         ctx.beginPath()
         ctx.ellipse(
-          baseX + (section.borderRadiusX || 50) * minimapScale,
-          baseY + (section.borderRadiusY || 50) * minimapScale,
-          (section.borderRadiusX || 50) * minimapScale,
-          (section.borderRadiusY || 50) * minimapScale,
+          baseX + (section.radiusX || 50) * minimapScale,
+          baseY + (section.radiusY || 50) * minimapScale,
+          (section.radiusX || 50) * minimapScale,
+          (section.radiusY || 50) * minimapScale,
           0,
           0,
           Math.PI * 2
         )
         ctx.fill()
         ctx.stroke()
-      } else if (section.borderType === 'polygon' && section.borderPoints) {
+      } else if (section.borderType === 'path' && section.pathPoints) {
         ctx.beginPath()
-        section.borderPoints.forEach((point: number, index: number) => {
-          const x = baseX + point * minimapScale
-          const y = baseY + (section.borderPoints![index + 1]) * minimapScale
-          if (index === 0) {
-            ctx.moveTo(x, y)
-          } else if (index % 2 === 0) {
-            ctx.lineTo(x, y)
-          }
-        })
-        ctx.closePath()
-        ctx.fill()
-        ctx.stroke()
-      } else if (section.borderType === 'path' && section.borderPathPoints) {
-        ctx.beginPath()
-        section.borderPathPoints.forEach((point: any, index: number) => {
+        section.pathPoints.forEach((point: any, index: number) => {
           const x = baseX + point.x * minimapScale
           const y = baseY + point.y * minimapScale
           if (index === 0) {

@@ -59,17 +59,17 @@ export class PathVertexManager {
   showVertices(section: Section, pathEl: Path): void {
     this.hideVertices()
 
-    if (!section.borderPathPoints || section.borderPathPoints.length === 0) return
+    if (!section.pathPoints || section.pathPoints.length === 0) return
 
-    const baseX = section.borderX ?? 0
-    const baseY = section.borderY ?? 0
+    const baseX = section.x ?? 0
+    const baseY = section.y ?? 0
     const scale = this.opts.getScale()
     const logicalRadius = 4 / Math.max(scale, 0.05)
 
     this._activeSectionId = section.id
     this._activePathElement = pathEl
 
-    const pts = section.borderPathPoints
+    const pts = section.pathPoints
 
     // 顶点手柄
     pts.forEach((pt, index) => {
@@ -163,22 +163,22 @@ export class PathVertexManager {
 
   /** 更新手柄位置（分区移动后调用） */
   updatePositions(section: Section): void {
-    if (!section.borderPathPoints) return
+    if (!section.pathPoints) return
 
-    const baseX = section.borderX ?? 0
-    const baseY = section.borderY ?? 0
+    const baseX = section.x ?? 0
+    const baseY = section.y ?? 0
 
     // 顶点手柄
     this.handles.forEach(h => {
       if (h.sectionId !== section.id) return
-      const pt = section.borderPathPoints![h.index]
+      const pt = section.pathPoints![h.index]
       if (!pt) return
       h.ellipse.x = baseX + pt.x
       h.ellipse.y = baseY + pt.y
     })
 
     // 边弧手柄
-    const pts = section.borderPathPoints
+    const pts = section.pathPoints
     const n = pts.length
     this.edgeHandles.forEach(h => {
       if (h.sectionId !== section.id) return
@@ -225,18 +225,18 @@ export class PathVertexManager {
     const section = this._activeSectionId
       ? this.opts.getSection(this._activeSectionId)
       : undefined
-    if (!section || !section.borderPathPoints) return
+    if (!section || !section.pathPoints) return
 
     const handle = this.handles.find(h => h.index === index)
     if (!handle) return
 
-    const baseX = section.borderX ?? 0
-    const baseY = section.borderY ?? 0
+    const baseX = section.x ?? 0
+    const baseY = section.y ?? 0
 
     const nx = (handle.ellipse.x ?? baseX) - baseX
     const ny = (handle.ellipse.y ?? baseY) - baseY
-    section.borderPathPoints[index] = {
-      ...section.borderPathPoints[index],
+    section.pathPoints[index] = {
+      ...section.pathPoints[index],
       x: nx,
       y: ny,
     }
@@ -250,19 +250,19 @@ export class PathVertexManager {
     const section = this._activeSectionId
       ? this.opts.getSection(this._activeSectionId)
       : undefined
-    if (!section || !section.borderPathPoints) return
+    if (!section || !section.pathPoints) return
 
     const handle = this.edgeHandles.find(h => h.index === edgeIndex)
     if (!handle) return
 
-    const pts = section.borderPathPoints
+    const pts = section.pathPoints
     const n = pts.length
     const a = pts[edgeIndex]
     const b = pts[(edgeIndex + 1) % n]
     if (!a || !b) return
 
-    const baseX = section.borderX ?? 0
-    const baseY = section.borderY ?? 0
+    const baseX = section.x ?? 0
+    const baseY = section.y ?? 0
 
     const ax = baseX + a.x
     const ay = baseY + a.y
@@ -298,9 +298,9 @@ export class PathVertexManager {
   private _onDragEnd(section: Section): void {
     this._isDragging = false
 
-    if (section.borderPathPoints) {
+    if (section.pathPoints) {
       this.opts.updateSectionBorder(section.id, {
-        borderPathPoints: section.borderPathPoints.map(p => ({ ...p })),
+        pathPoints: section.pathPoints.map(p => ({ ...p })),
       })
       this.opts.saveHistory()
     }
@@ -313,9 +313,9 @@ export class PathVertexManager {
     const section = this._activeSectionId
       ? this.opts.getSection(this._activeSectionId)
       : undefined
-    if (!section || !section.borderPathPoints || !this._activePathElement) return
+    if (!section || !section.pathPoints || !this._activePathElement) return
 
-    const d = pathPointsToSvgPath(section.borderPathPoints)
+    const d = pathPointsToSvgPath(section.pathPoints)
     try {
       ;(this._activePathElement as any).path = d
     } catch {

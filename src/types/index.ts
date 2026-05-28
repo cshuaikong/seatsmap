@@ -153,7 +153,6 @@ export interface PathPoint {
 }
 
 // 扩展 Section - 同时作为分区容器和可选边框
-// 坐标格式与 ShapeObject 保持一致：
 // - rect: x,y 为左上角，width,height 为宽高
 // - ellipse: x,y 为中心点，radiusX,radiusY 为半径
 // - polygon: x,y 为中心点，points 为相对坐标数组
@@ -162,31 +161,26 @@ export interface Section {
   id: string
   name: string
   rows: SeatRow[]
-  x?: number
+  x?: number             // 分区位置
   y?: number
   rotation?: number
-  // 扩展对象类型
   shapes?: ShapeObject[]
   texts?: TextObject[]
   areas?: AreaObject[]
-  // 分区边框属性（绘制矩形/圆形/多边形时创建）
-  borderType?: 'rect' | 'ellipse' | 'polygon' | 'path' | 'none'  // none 表示无边框（默认）
-  // 矩形: x,y,width,height | 圆形: x,y,radiusX,radiusY | 多边形: x,y,points
-  borderX?: number
-  borderY?: number
-  borderWidth?: number
-  borderHeight?: number
-  borderRadiusX?: number  // 椭圆专用
-  borderRadiusY?: number  // 椭圆专用
-  borderPoints?: number[] // 多边形专用（相对坐标）
-  borderArcDepths?: number[]  // 多边形边框弧深数组，长度=borderPoints.length/2
-  borderPathPoints?: PathPoint[] // 路径点，type/arcDepth 定义从当前点出发的边，arcDepth=0 视为直线
-  borderFill?: string
-  borderStroke?: string
-  borderOpacity?: number
-  // 层级控制（数值越大越在上层，默认 0）
+  // 分区形状类型
+  borderType?: 'rect' | 'ellipse' | 'path' | 'none'
+  width?: number          // rect 专用
+  height?: number         // rect 专用
+  radiusX?: number        // ellipse 专用
+  radiusY?: number        // ellipse 专用
+  points?: number[]       // polygon 专用（相对坐标）
+  arcDepths?: number[]    // polygon 弧深数组
+  pathPoints?: PathPoint[] // path 专用
+  cornerRadius?: number   // rect 圆角
+  fill?: string
+  stroke?: string
+  opacity?: number
   zIndex?: number
-  // 只读属性（只读的分区不能选中、不参与点击）
   readonly?: boolean
 }
 

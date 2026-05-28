@@ -4,7 +4,7 @@ import type { Section, ShapeObject, AreaObject, PathPoint } from '../types'
 import { pathPointsToSvgPath } from '../viewer/geometry'
 
 // 支持的编辑目标类型
-export type EditKind = 'path' | 'polygon' | 'shape' | 'area' | 'rect' | 'ellipse'
+export type EditKind = 'path' | 'shape' | 'area' | 'rect' | 'ellipse'
 
 export interface VertexEditManagerOptions {
   leafer: any
@@ -15,8 +15,6 @@ export interface VertexEditManagerOptions {
 
   // path 分区（borderType='path'）
   updateSectionBorderPathPoints?: (sectionId: string, pathPoints: PathPoint[]) => void
-  // polygon 分区（borderType='polygon'）
-  updateSectionBorderPoints?: (sectionId: string, points: number[], arcDepths?: number[]) => void
   // 形状（ShapeObject: polygon/polyline）
   updateShapePoints?: (id: string, points: number[], arcDepths?: number[]) => void
   // 区域（AreaObject）
@@ -75,15 +73,15 @@ export class VertexEditManager {
 
   /** 为 path 分区显示顶点编辑手柄 */
   enterForPathSection(section: Section, element: any): void {
-    if (!section.borderPathPoints?.length) return
+    if (!section.pathPoints?.length) return
     if (!this.handleGroup.leafer) {
       this.opts.leafer.add(this.handleGroup)
     }
     this.hideVertices()
 
-    const ox = section.borderX ?? 0
-    const oy = section.borderY ?? 0
-    const pts: PathPoint[] = section.borderPathPoints.map(p => ({
+    const ox = section.x ?? 0
+    const oy = section.y ?? 0
+    const pts: PathPoint[] = section.pathPoints.map(p => ({
       x: ox + p.x,
       y: oy + p.y,
       type: p.type,
@@ -92,36 +90,6 @@ export class VertexEditManager {
 
     this._workspace = {
       kind: 'path', dataId: section.id,
-      points: pts, offsetX: ox, offsetY: oy,
-      element,
-    }
-    this._createAllHandles(pts)
-  }
-
-  /** 为 polygon 分区显示顶点编辑手柄 */
-  enterForPolygonSection(section: Section, element: any): void {
-    if (!section.borderPoints?.length) return
-    if (!this.handleGroup.leafer) {
-      this.opts.leafer.add(this.handleGroup)
-    }
-    this.hideVertices()
-
-    const ox = section.borderX ?? 0
-    const oy = section.borderY ?? 0
-    const n = section.borderPoints.length / 2
-    const arcDepths = section.borderArcDepths ?? new Array(n).fill(0)
-    const pts: PathPoint[] = []
-    for (let i = 0; i < n; i++) {
-      pts.push({
-        x: ox + section.borderPoints[i * 2],
-        y: oy + section.borderPoints[i * 2 + 1],
-        type: Math.abs(arcDepths[i] ?? 0) > 0.005 ? 'arc' : 'line',
-        arcDepth: arcDepths[i] ?? 0,
-      })
-    }
-
-    this._workspace = {
-      kind: 'polygon', dataId: section.id,
       points: pts, offsetX: ox, offsetY: oy,
       element,
     }
@@ -409,11 +377,6 @@ export class VertexEditManager {
           arcDepth: p.arcDepth,
         }))
         this.opts.updateSectionBorderPathPoints?.(ws.dataId, rel)
-        break
-      }
-      case 'polygon': {
-        const { flat, ads } = this._toFlat(ws.points, ox, oy)
-        this.opts.updateSectionBorderPoints?.(ws.dataId, flat, ads.length > 0 ? ads : undefined)
         break
       }
       case 'shape': {
