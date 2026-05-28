@@ -18,6 +18,14 @@
       >
         <i class="iconfont icon-selectseat tool-iconfont"></i>
       </button>
+      <button
+        class="tool-item"
+        :class="{ active: modelValue === 'node' }"
+        title="节点编辑 (E)"
+        @click="onToolChange('node')"
+      >
+        <i class="iconfont icon-a-4404035571 tool-iconfont"></i>
+      </button>
     </div>
 
     <div class="toolbar-divider"></div>

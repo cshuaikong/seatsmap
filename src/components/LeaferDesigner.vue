@@ -285,6 +285,7 @@ const currentToolLabel = computed(() => {
   const labels: Record<string, string> = {
     'select': '选择',
     'selectseat': '选择座位',
+    'node': '节点编辑',
     'row-straight': '单行座位',
     'section': '分段座位',
     'section-diagonal': '多行座位',

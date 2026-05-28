@@ -34,6 +34,7 @@ export type DrawingToolMode =
 // 兼容旧代码的 ToolMode（保留所有旧值）
 export type ToolMode =
   | 'select' | 'pan'
+  | 'node'
   | 'single-seat'
   | 'row-straight'
   | 'section'

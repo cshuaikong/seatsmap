@@ -82,6 +82,8 @@ let sectionGroups: any[] = []
 let currentScale = 1
 let isSyncing = false
 let pendingAutoSelect: { kind: string; id: string } | null = null
+/** 节点编辑工具模式：等待点击分区进入顶点编辑 */
+let nodeToolActive = false
 let ctxMenuCleanup: (() => void) | null = null
 /** 分区 ID → 其边框元素（用于悬停高亮，覆盖所有 borderType） */
 const sectionBorderElMap = new Map<string, any>()
@@ -817,9 +819,9 @@ onMounted(() => {
       drawingManager?.handlePointerUp(canvasToWorld(e.x ?? 0, e.y ?? 0))
     })
 
-    // 顶点编辑模式：点击其他分区 → 切换；点击空白 → 退出
+    // 顶点编辑 / 节点工具模式：点击其他分区 → 切换；点击空白 → 退出
     leafer.on(LeaferPointer.CLICK, (e: any) => {
-      if (dispatcher?.mode !== 'VERTEX_EDIT') return
+      if (dispatcher?.mode !== 'VERTEX_EDIT' && !nodeToolActive) return
       if (vertexEditManager?.isDragging) return
       const worldPos = canvasToWorld(e.x ?? 0, e.y ?? 0)
       const sections = props.venue.sections
@@ -1028,10 +1030,25 @@ const getBaseScale = () => store.getBaseScale?.() ?? 1
 
 const setDrawingTool = (tool: string) => {
   if (!dispatcher) return
+  nodeToolActive = false
   if (tool === 'select') {
     dispatcher.enterIdle()
   } else if (tool === 'selectseat') {
     dispatcher.enterSeatSelect()
+  } else if (tool === 'node') {
+    // 节点编辑工具：有选中分区 → 立即进入顶点编辑；否则等待点击
+    const sid = store.selectedSectionIds[0]
+    const section = sid ? props.venue.sections.find(s => s.id === sid) : null
+    if (section?.borderType === 'path' && section.pathPoints?.length) {
+      if (vertexEditManager?.activeKind !== 'path') {
+        engine?.editor.cancel()
+        vertexEditManager?.enterForPathSection(section, sectionBorderElMap.get(section.id))
+        dispatcher.enterVertexEdit(section, 'path')
+      }
+    } else {
+      nodeToolActive = true
+      dispatcher.enterIdle()
+    }
   } else {
     dispatcher.enterDrawing(tool)
   }
