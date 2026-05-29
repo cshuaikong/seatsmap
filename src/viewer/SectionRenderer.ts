@@ -35,8 +35,11 @@ export class SectionRenderer {
 
     ;(group as any).__meta = { kind: 'section', id: section.id }
 
-    if (interactive && section.borderType === 'path') {
-      ;(group as any).editConfig = { resizeable: false }
+    // 编辑模式下配置编辑行为
+    if (interactive) {
+      ;(group as any).editConfig = {
+        resizeable: section.borderType === 'path' ? false : true,
+      }
     }
 
     // 1. 边框（相对 group 在 0,0）

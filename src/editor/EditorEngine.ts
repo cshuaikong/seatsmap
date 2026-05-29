@@ -1,4 +1,4 @@
-import { Group, ZoomEvent } from 'leafer-ui'
+import { Group, ZoomEvent, PointerEvent as LeaferPointer } from 'leafer-ui'
 import '@leafer-in/editor'
 import { Editor } from '@leafer-in/editor'
 import { LeaferEngine } from '../viewer/LeaferEngine'
@@ -8,8 +8,6 @@ export interface EditorEngineOptions {
   width?: number
   height?: number
   editorConfig?: Record<string, any>
-  /** 返回 true 时允许画布平移拖拽 */
-  shouldPan?: () => boolean
 }
 
 export class EditorEngine extends LeaferEngine {
@@ -26,9 +24,18 @@ export class EditorEngine extends LeaferEngine {
     this.previewGroup = new Group({ id: 'preview-layer' })
     this.leafer.add(this.previewGroup)
 
-    // Editor 插件
+    // Editor 插件（内置 select/drag/resize/rotate/boxSelect）
     this.editor = new Editor(options.editorConfig)
     this.leafer.add(this.editor)
+
+    // 修复框选：selector.allow() 检查 e.target.leafer !== editor.leafer，
+    // 但在 viewport 模式下空画布点击的 target 与 editor 同属一个 leafer，导致返回 false。
+    // 覆写为始终返回 true（允许空画布框选 + 点击空白取消选中，均为正常行为）。
+    const sel = (this.editor as any).selector
+    if (sel) sel.allow = () => true
+
+    // 协调 Editor 拖拽与 Viewport 平移：Editor 操作时暂停 pan
+    this._setupEditorViewportCoordination()
 
     // 画布可聚焦（键盘事件用）
     this.leafer.waitViewReady(() => {
@@ -38,30 +45,38 @@ export class EditorEngine extends LeaferEngine {
     })
   }
 
-  /** 运行时更新 shouldPan 回调 */
-  updateShouldPan(fn: () => boolean): void {
-    this._options.shouldPan = fn
+  /** Editor 拖拽/框选期间暂停 viewport pan，松手后恢复 */
+  private _setupEditorViewportCoordination(): void {
+    let panWasEnabled = true
+    let editorActive = false
+
+    this.leafer.on(LeaferPointer.DOWN, () => {
+      panWasEnabled = !((this.leafer as any).app?.config?.move?.disabled)
+    })
+    this.leafer.on(LeaferPointer.MOVE, () => {
+      if (editorActive) return
+      const ed = this.editor as any
+      if (ed.dragging || ed.selector?.dragging) {
+        editorActive = true
+        this.setPanEnabled(false)
+      }
+    })
+    this.leafer.on(LeaferPointer.UP, () => {
+      if (editorActive) {
+        editorActive = false
+        if (panWasEnabled) this.setPanEnabled(true)
+      }
+    })
   }
 
   // ==================== 覆写保护方法 ====================
 
   protected _shouldEnableDoubleTapZoom(): boolean { return false }
 
-  protected _shouldStartPan(): boolean {
-    return this._options.shouldPan?.() ?? true
-  }
-
-  protected _shouldContinuePan(): boolean {
-    if (this._options.shouldPan?.() === false) return false
-    if ((this.editor as any).dragging || (this.editor as any).resizing || (this.editor as any).rotating) return false
-    return true
-  }
-
   protected _doFitContent(padding: number): void {
     try {
       const bounds = this._getContentBounds()
       if (!bounds || bounds.width === 0 || bounds.height === 0) {
-        // 回退到 viewport 插件的默认 fit
         super._doFitContent(padding)
         return
       }
@@ -81,10 +96,7 @@ export class EditorEngine extends LeaferEngine {
       if (l.zoom) {
         l.zoom('set', newScale, undefined, true)
       } else {
-        this.leafer.scaleOfWorld(
-          { x: contentCX, y: contentCY },
-          newScale / (this.scale || 1)
-        )
+        this.leafer.scaleOfWorld({ x: contentCX, y: contentCY }, newScale / (this.scale || 1))
       }
 
       this.leafer.x = viewW / 2 - contentCX * newScale

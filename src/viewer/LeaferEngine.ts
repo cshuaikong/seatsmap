@@ -1,33 +1,18 @@
 import { Leafer, ZoomEvent, PointerEvent as LeaferPointer } from 'leafer-ui'
 import '@leafer-in/view'
+import '@leafer-in/viewport'
 
-const DRAG_THRESHOLD = 3
-
+/**
+ * 基于 Leafer 原生 Viewport 插件的渲染引擎。
+ * Pan / 双指缩放 由 @leafer-in/viewport 内置处理，
+ * Ctrl+滚轮缩放 / 双击缩放 由自定义处理器接管。
+ */
 export class LeaferEngine {
   readonly leafer: Leafer
   private _destroyed = false
   private _canvas: HTMLCanvasElement | null = null
-
-  // 单指拖拽
-  private _pointerDown = false
-  private _dragStarted = false
-  private _downClient = { x: 0, y: 0 }
-  private _startViewX = 0
-  private _startViewY = 0
-
-  // 双指缩放
-  private _pinching = false
-  private _pinchStartDist = 0
-  private _pinchStartScale = 1
-
-  private _boundWheel: ((e: WheelEvent) => void) | null = null
-  private _boundPointerDown: ((e: PointerEvent) => void) | null = null
-  private _boundPointerMove: ((e: PointerEvent) => void) | null = null
-  private _boundPointerUp: ((e: PointerEvent) => void) | null = null
-  private _boundTouchStart: ((e: TouchEvent) => void) | null = null
-  private _boundTouchMove: ((e: TouchEvent) => void) | null = null
-  private _boundTouchEnd: ((e: TouchEvent) => void) | null = null
   private _doubleTapOff: (() => void) | null = null
+  private _boundWheel: ((e: WheelEvent) => void) | null = null
 
   constructor(container: HTMLElement, config?: Record<string, any>) {
     const width = container.clientWidth || 800
@@ -37,53 +22,27 @@ export class LeaferEngine {
       view: container,
       width,
       height,
+      move: { scroll: true, disabled: false, holdSpaceKey: true, holdMiddleKey: true },
+      wheel: { preventDefault: true, speed: 0.5 },
+      zoom: { min: 0.05, max: 20 },
       ...config,
     })
 
     this.leafer.waitViewReady(() => {
       this._canvas = this.leafer.canvas.view as HTMLCanvasElement
       if (this._canvas) {
-        this._setupManualEvents()
+        this._setupWheelZoom()
+        this._setupDoubleTapZoom()
       }
     })
   }
 
-  // ==================== 子类可覆写的保护方法 ====================
+  // ==================== Ctrl+滚轮缩放 ====================
 
-  /** 是否允许开始平移拖拽。子类覆写以禁用特定模式下的 pan */
-  protected _shouldStartPan(): boolean {
-    return true
-  }
-
-  /** 是否允许继续平移（每帧检查）。返回 false 会取消当前拖拽 */
-  protected _shouldContinuePan(): boolean {
-    return true
-  }
-
-  /** fitContent 的核心实现，子类可覆写自定义适配逻辑 */
-  protected _doFitContent(padding: number): void {
-    const l: any = this.leafer
-    if (l.zoom) {
-      l.zoom('fit', padding, undefined, true)
-    }
-  }
-
-  /** 是否启用双击缩放（编辑器模式下应禁用，双击用于顶点编辑/聚焦） */
-  protected _shouldEnableDoubleTapZoom(): boolean { return true }
-
-  /** 销毁时调用，子类覆写以清理额外资源 */
-  protected _onDestroy(): void {}
-
-  // ==================== 手动事件注册 ====================
-
-  private _setupManualEvents(): void {
+  private _setupWheelZoom(): void {
     if (!this._canvas) return
-
-    this._canvas.style.touchAction = 'none'
-    ;(this._canvas.style as any).webkitTapHighlightColor = 'transparent'
-
-    // —— 桌面端滚轮缩放 ——
     this._boundWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
       const local = this.leafer.interaction?.getLocal({ clientX: e.clientX, clientY: e.clientY })
       if (!local) return
@@ -92,94 +51,14 @@ export class LeaferEngine {
       this.leafer.scaleOfWorld(local, changeScale)
       this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
     }
+    this._canvas.addEventListener('wheel', this._boundWheel, { passive: false })
+  }
 
-    // —— 单指拖拽 ——
-    this._boundPointerDown = (e: PointerEvent) => {
-      if (this._pinching) return
-      if (!this._shouldStartPan()) return
-      this._pointerDown = true
-      this._dragStarted = false
-      this._downClient = { x: e.clientX, y: e.clientY }
-      this._startViewX = this.leafer.x ?? 0
-      this._startViewY = this.leafer.y ?? 0
-    }
+  // ==================== 双击缩放（自定义业务逻辑） ====================
 
-    this._boundPointerMove = (e: PointerEvent) => {
-      if (!this._pointerDown || this._pinching) return
-
-      if (!this._shouldContinuePan()) {
-        this._pointerDown = false
-        this._dragStarted = false
-        return
-      }
-
-      if (!this._dragStarted) {
-        const dx = e.clientX - this._downClient.x
-        const dy = e.clientY - this._downClient.y
-        if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return
-        this._dragStarted = true
-      }
-
-      const dx = e.clientX - this._downClient.x
-      const dy = e.clientY - this._downClient.y
-      this.leafer.x = this._startViewX + dx
-      this.leafer.y = this._startViewY + dy
-    }
-
-    this._boundPointerUp = () => {
-      this._pointerDown = false
-      this._dragStarted = false
-    }
-
-    // —— 双指缩放 ——
-    this._boundTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        this._pinching = true
-        this._pointerDown = false
-        this._dragStarted = false
-        this._pinchStartDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        )
-        this._pinchStartScale = this.scale
-      }
-    }
-
-    this._boundTouchMove = (e: TouchEvent) => {
-      if (!this._pinching || e.touches.length !== 2) return
-      e.preventDefault()
-
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      )
-      const targetScale = this._pinchStartScale * (dist / this._pinchStartDist)
-      const local = this.leafer.interaction?.getLocal({
-        clientX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        clientY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-      })
-      if (!local) return
-
-      const currentScale = this.scale
-      const changeScale = targetScale / currentScale
-      this.leafer.scaleOfWorld(local, changeScale)
-      this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
-    }
-
-    this._boundTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) {
-        this._pinching = false
-        this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
-        if (e.touches.length === 0) {
-          this._pointerDown = false
-          this._dragStarted = false
-        }
-      }
-    }
-
-    // —— 双击缩放（移动端，编辑器模式下禁用） ——
-    if (this._shouldEnableDoubleTapZoom()) {
-      this._doubleTapOff = this.leafer.on_(LeaferPointer.DOUBLE_TAP, (e: any) => {
+  private _setupDoubleTapZoom(): void {
+    if (!this._shouldEnableDoubleTapZoom()) return
+    this._doubleTapOff = this.leafer.on_(LeaferPointer.DOUBLE_TAP, (e: any) => {
       const local = this.leafer.interaction?.getLocal({ clientX: e.clientX ?? e.x, clientY: e.clientY ?? e.y })
       if (!local) return
       const zoomType = this.scale < 1.5 ? 'in' : 'out'
@@ -189,17 +68,40 @@ export class LeaferEngine {
         this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
       }, 350)
     }) as unknown as (() => void)
-    }
+  }
 
-    // 注册事件
-    this._canvas.addEventListener('wheel', this._boundWheel, { passive: false })
-    this._canvas.addEventListener('pointerdown', this._boundPointerDown)
-    window.addEventListener('pointermove', this._boundPointerMove)
-    window.addEventListener('pointerup', this._boundPointerUp)
-    this._canvas.addEventListener('touchstart', this._boundTouchStart, { passive: false })
-    this._canvas.addEventListener('touchmove', this._boundTouchMove, { passive: false })
-    this._canvas.addEventListener('touchend', this._boundTouchEnd)
-    this._canvas.addEventListener('touchcancel', this._boundTouchEnd)
+  // ==================== 子类可覆写的保护方法 ====================
+
+  /** 是否启用双击缩放（编辑器模式下禁用，双击用于顶点编辑/聚焦） */
+  protected _shouldEnableDoubleTapZoom(): boolean { return true }
+
+  /** fitContent 核心实现，子类可覆写 */
+  protected _doFitContent(padding: number): void {
+    const l: any = this.leafer
+    if (l.zoom) {
+      l.zoom('fit', padding, undefined, true)
+    }
+  }
+
+  /** 销毁时调用，子类覆写以清理额外资源 */
+  protected _onDestroy(): void {}
+
+  // ==================== 动态控制 Viewport 行为 ====================
+
+  /** 运行时切换画布平移是否可用（绘制模式/顶点编辑时禁用） */
+  setPanEnabled(enabled: boolean): void {
+    const app: any = (this.leafer as any).app
+    if (app?.config?.move) {
+      app.config.move.disabled = !enabled
+    }
+  }
+
+  /** 运行时切换滚轮缩放是否可用 */
+  setWheelZoomEnabled(enabled: boolean): void {
+    const app: any = (this.leafer as any).app
+    if (app?.config?.wheel) {
+      app.config.wheel.disabled = !enabled
+    }
   }
 
   // ==================== 公共 API ====================
@@ -246,34 +148,15 @@ export class LeaferEngine {
     this._destroyed = true
     this._onDestroy()
 
-    if (this._canvas) {
-      if (this._boundWheel) {
-        this._canvas.removeEventListener('wheel', this._boundWheel)
-        this._boundWheel = null
-      }
-      if (this._boundPointerDown) {
-        this._canvas.removeEventListener('pointerdown', this._boundPointerDown)
-        window.removeEventListener('pointermove', this._boundPointerMove!)
-        window.removeEventListener('pointerup', this._boundPointerUp!)
-        this._boundPointerDown = null
-        this._boundPointerMove = null
-        this._boundPointerUp = null
-      }
-      if (this._boundTouchStart) {
-        this._canvas.removeEventListener('touchstart', this._boundTouchStart)
-        this._canvas.removeEventListener('touchmove', this._boundTouchMove!)
-        this._canvas.removeEventListener('touchend', this._boundTouchEnd!)
-        this._canvas.removeEventListener('touchcancel', this._boundTouchEnd!)
-        this._boundTouchStart = null
-        this._boundTouchMove = null
-        this._boundTouchEnd = null
-      }
-      if (this._doubleTapOff) {
-        this._doubleTapOff()
-        this._doubleTapOff = null
-      }
-      this._canvas = null
+    if (this._boundWheel) {
+      this._canvas?.removeEventListener('wheel', this._boundWheel)
+      this._boundWheel = null
     }
+    if (this._doubleTapOff) {
+      this._doubleTapOff()
+      this._doubleTapOff = null
+    }
+    this._canvas = null
 
     this.leafer.destroy()
   }

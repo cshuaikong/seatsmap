@@ -692,7 +692,6 @@ onMounted(() => {
     container: containerRef.value,
     width,
     height,
-    shouldPan: () => true, // 初始值，等 dispatcher 创建后更新
     editorConfig: {
       stroke: '#836DFF',
       strokeWidth: EDITOR_BASE_STROKE_WIDTH,
@@ -782,9 +781,8 @@ onMounted(() => {
     },
     cancelEditorSelection: () => engine?.editor.cancel(),
     setEditorHittable: (v) => setEditorHittable(v),
+    setPanEnabled: (v) => engine?.setPanEnabled(v),
   })
-
-  engine.updateShouldPan(() => dispatcher?.canPan ?? true)
 
   // 注册 Leafer 事件（绘制、悬停、顶点编辑切换）
   engine.leafer.waitViewReady(() => {
