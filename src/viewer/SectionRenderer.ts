@@ -35,10 +35,10 @@ export class SectionRenderer {
 
     ;(group as any).__meta = { kind: 'section', id: section.id }
 
-    // 编辑模式下配置编辑行为
+    // 编辑模式下配置编辑行为：分区禁用缩放手柄，保留移动和旋转
     if (interactive) {
       ;(group as any).editConfig = {
-        resizeable: section.borderType === 'path' ? false : true,
+        resizeable: false,
       }
     }
 
