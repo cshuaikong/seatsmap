@@ -28,11 +28,41 @@ export class EditorEngine extends LeaferEngine {
     this.editor = new Editor(options.editorConfig)
     this.leafer.add(this.editor)
 
-    // 修复框选：selector.allow() 检查 e.target.leafer !== editor.leafer，
-    // 但在 viewport 模式下空画布点击的 target 与 editor 同属一个 leafer，导致返回 false。
-    // 覆写为始终返回 true（允许空画布框选 + 点击空白取消选中，均为正常行为）。
+    // 修复框选：selector.allow() 检查 target.leafer !== editor.leafer，
+    // 但 viewport zoomLayer 与 editor 同属一个 leafer，导致空画布框选失效。
+    // 同时避免 section 双层边框的 stroke/fill 元素被误判为框选目标，
+    // 以及编辑器内部元素（editMask 等）在多选空白区点击时错误清空选中。
     const sel = (this.editor as any).selector
-    if (sel) sel.allow = () => true
+    if (sel) {
+      const _origAllow = sel.allow.bind(sel)
+      const editorInstance = this.editor
+      sel.allow = (target: any) => {
+        if (!target) return _origAllow(target)
+        // 分区边框元素不触发框选（让 section 本体响应拖拽）
+        if (target?.id?.startsWith?.('section-border-')) return false
+        // 编辑器内部元素不触发 allow（避免点击多选包围盒空白区时清空选中）
+        let node = target
+        while (node) {
+          if (node === editorInstance) return false
+          node = node.parent
+        }
+        // 非交互背景元素允许框选（空画布框选无需 Shift）
+        // allowDrag 仅在 !e.target.draggable 时才检查 allow，可拖拽元素不受影响
+        if (!target?.draggable && !target?.editable) return true
+        return _origAllow(target)
+      }
+
+      // 修复多选拖拽：点击已选中元素时跳过 checkAndSelect，避免
+      // editor.target = find 把多选替换成单选。Shift+click 仍走原生逻辑。
+      const _origCheckAndSelect = sel.checkAndSelect.bind(sel)
+      sel.checkAndSelect = function (e: any) {
+        const find = sel.findUI(e)
+        if (find && sel.editor.hasItem(find) && sel.editor.multiple && !sel.isMultipleSelect(e)) {
+          return
+        }
+        _origCheckAndSelect(e)
+      }
+    }
 
     // 协调 Editor 拖拽与 Viewport 平移：Editor 操作时暂停 pan
     this._setupEditorViewportCoordination()

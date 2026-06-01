@@ -94,7 +94,7 @@ const _hoverOriginals = new Map<string, { strokeWidth: number; stroke: string }>
 const _selectionHighlighted = new Set<string>()
 const HOVER_HIGHLIGHT_COLOR = '#3B82F6'
 const EDITOR_BASE_POINT_SIZE = 6
-const EDITOR_BASE_STROKE_WIDTH = 2.5
+const EDITOR_BASE_STROKE_WIDTH = 1
 
 // ==================== 配置 ====================
 
@@ -891,7 +891,7 @@ onMounted(() => {
     })
     // 反向缩放补偿但设上限，避免缩小画布时控制点过大挡住邻近元素
     const scaledPointSize = Math.min(EDITOR_BASE_POINT_SIZE / safeScale, 8)
-    const scaledStrokeWidth = Math.min(EDITOR_BASE_STROKE_WIDTH / safeScale, 3)
+    const scaledStrokeWidth = EDITOR_BASE_STROKE_WIDTH / safeScale
     const ed = engine?.editor as any
     if (ed?.config) {
       ed.config.pointSize = scaledPointSize

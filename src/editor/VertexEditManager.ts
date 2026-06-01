@@ -173,8 +173,7 @@ export class VertexEditManager {
 
   private _createAllHandles(pts: PathPoint[]): void {
     const scale = this.opts.getScale()
-    const r = 4 / Math.max(scale, 0.05)
-    const er = r * 1.7
+    const r = 3 / Math.max(scale, 0.05)
 
     // 顶点手柄
     pts.forEach((pt, index) => {
@@ -218,7 +217,7 @@ export class VertexEditManager {
       const edgeHandle = new Ellipse({
         id: `edge-${i}`,
         x: hx, y: hy,
-        width: er, height: er,
+        width: r * 2, height: r * 2,
         around: 'center',
         fill: '#22c55e', stroke: '#ffffff', strokeWidth: 1,
         draggable: true, cursor: 'grab', hitFill: 'all', zIndex: 999,
@@ -408,14 +407,14 @@ export class VertexEditManager {
 
   private _updateHandleScale(): void {
     const scale = this.opts.getScale()
-    const r = 4 / Math.max(scale, 0.05)
+    const r = 3 / Math.max(scale, 0.05)
     this.vertexHandles.forEach(h => {
       h.ellipse.width = r * 2
       h.ellipse.height = r * 2
     })
     this.edgeHandles.forEach(h => {
-      h.ellipse.width = r * 1.7
-      h.ellipse.height = r * 1.7
+      h.ellipse.width = r * 2
+      h.ellipse.height = r * 2
     })
   }
 
