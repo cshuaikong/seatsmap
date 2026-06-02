@@ -432,12 +432,12 @@ const createEditorBridge = (): EditorBridge => {
   const bridgeOpts: EditorBridgeOptions = {
     editor: engine!.editor,
     getVenue: () => props.venue,
-    selectSection: (id) => store.selectSection(id),
-    selectRow: (id) => store.selectRow(id),
-    selectSeat: (id) => store.selectSeat(id),
-    selectShape: (id) => store.selectShape(id),
-    selectText: (id) => store.selectText(id),
-    selectArea: (id) => store.selectArea(id),
+    selectSection: (id, additive) => store.selectSection(id, additive),
+    selectRow: (id, additive) => store.selectRow(id, additive),
+    selectSeat: (id, additive) => store.selectSeat(id, additive),
+    selectShape: (id, additive) => store.selectShape(id, additive),
+    selectText: (id, additive) => store.selectText(id, additive),
+    selectArea: (id, additive) => store.selectArea(id, additive),
     clearSelection: () => store.clearSelection(),
     updateRowPosition: (id, x, y, rotation) => {
       store.updateRow(id, { x, y, rotation })
@@ -699,6 +699,7 @@ onMounted(() => {
       circle: {},
       circleMargin: 2,
       circleDirection: 'top',
+      selectedStyle: { stroke: 'transparent' },
       hideResizeLines: true,
       moveable: true,
       resizeable: false,
@@ -988,17 +989,17 @@ watch(
 
     // 选中边框高亮 / 取消高亮
     const scale = Math.max(currentScale, 0.02)
+    // 取消已移除分区的高亮
     oldSet.forEach(sid => {
       if (!newSet.has(sid)) {
         const el = sectionBorderElMap.get(sid)
         if (el) clearSelectionHighlight(el, scale)
       }
     })
+    // 统一给所有当前选中分区应用高亮（保证多选时每个分区都有描边）
     newSet.forEach(sid => {
-      if (!oldSet.has(sid)) {
-        const el = sectionBorderElMap.get(sid)
-        if (el) applySelectionHighlight(el, scale)
-      }
+      const el = sectionBorderElMap.get(sid)
+      if (el) applySelectionHighlight(el, scale)
     })
 
     // 更新快照，供 renderAll / zoom / hover 使用

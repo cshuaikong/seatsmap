@@ -17,12 +17,12 @@ export interface ElementMeta {
 export interface EditorBridgeOptions {
   editor: Editor
   getVenue: () => VenueData
-  selectSection: (id: string) => void
-  selectRow: (id: string) => void
-  selectSeat: (id: string) => void
-  selectShape: (id: string) => void
-  selectText: (id: string) => void
-  selectArea: (id: string) => void
+  selectSection: (id: string, additive?: boolean) => void
+  selectRow: (id: string, additive?: boolean) => void
+  selectSeat: (id: string, additive?: boolean) => void
+  selectShape: (id: string, additive?: boolean) => void
+  selectText: (id: string, additive?: boolean) => void
+  selectArea: (id: string, additive?: boolean) => void
   clearSelection: () => void
   updateRowPosition: (id: string, x: number, y: number, rotation: number) => void
   updateShapeData: (id: string, x: number, y: number, width?: number, height?: number, rotation?: number) => void
@@ -150,22 +150,22 @@ export class EditorBridge {
 
       switch (meta.kind) {
         case 'section':
-          this.opts.selectSection(meta.id)
+          this.opts.selectSection(meta.id, true)
           break
         case 'row':
-          this.opts.selectRow(meta.id)
+          this.opts.selectRow(meta.id, true)
           break
         case 'seat':
-          this.opts.selectSeat(meta.id)
+          this.opts.selectSeat(meta.id, true)
           break
         case 'shape':
-          this.opts.selectShape(meta.id)
+          this.opts.selectShape(meta.id, true)
           break
         case 'text':
-          this.opts.selectText(meta.id)
+          this.opts.selectText(meta.id, true)
           break
         case 'area':
-          this.opts.selectArea(meta.id)
+          this.opts.selectArea(meta.id, true)
           break
       }
     })
