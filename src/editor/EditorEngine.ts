@@ -1,6 +1,6 @@
 import { Group, ZoomEvent, PointerEvent as LeaferPointer } from 'leafer-ui'
 import '@leafer-in/editor'
-import { Editor } from '@leafer-in/editor'
+import { Editor, EditorMoveEvent, EditorRotateEvent } from '@leafer-in/editor'
 import { LeaferEngine } from '../viewer/LeaferEngine'
 
 export interface EditorEngineOptions {
@@ -63,6 +63,15 @@ export class EditorEngine extends LeaferEngine {
         _origCheckAndSelect(e)
       }
     }
+
+    // 修复拖拽/旋转时选择框不跟手：Leafer 默认只在 dragEnd 时调用
+    // editBox.update()，需要在 MOVE/ROTATE 事件中手动触发
+    this.editor.on(EditorMoveEvent.MOVE, () => {
+      ;(this.editor as any).editBox?.update()
+    })
+    this.editor.on(EditorRotateEvent.ROTATE, () => {
+      ;(this.editor as any).editBox?.update()
+    })
 
     // 协调 Editor 拖拽与 Viewport 平移：Editor 操作时暂停 pan
     this._setupEditorViewportCoordination()

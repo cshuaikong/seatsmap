@@ -696,9 +696,12 @@ onMounted(() => {
       stroke: '#836DFF',
       strokeWidth: EDITOR_BASE_STROKE_WIDTH,
       pointSize: EDITOR_BASE_POINT_SIZE,
-      resizeLine: { strokeWidth: 1, height: 2 },
+      circle: {},
+      circleMargin: 2,
+      circleDirection: 'top',
+      hideResizeLines: true,
       moveable: true,
-      resizeable: true,
+      resizeable: false,
       rotateable: true,
       selector: true,
       editBox: true,
@@ -901,15 +904,11 @@ onMounted(() => {
     }
     if (ed?.list?.length > 0) {
       ed.editBox?.load?.()
-      // 直接修改控件点元素尺寸（load() 走 mergeConfig 链路，某些属性可能被缓存覆盖）
+      // 调整旋转手柄和圆形控制点尺寸（缩放已通过 resizeable: false 禁用）
       const eb = ed.editBox as any
       if (eb) {
-        ;[...(eb.resizePoints || []), ...(eb.rotatePoints || []), eb.circle].forEach((p: any) => {
+        ;[...(eb.rotatePoints || []), eb.circle].forEach((p: any) => {
           if (p) { p.width = scaledPointSize; p.height = scaledPointSize }
-        })
-        // 隐藏中间手柄
-        ;(eb.middlePoints || []).forEach((p: any) => {
-          if (p) p.visible = false
         })
       }
     }
