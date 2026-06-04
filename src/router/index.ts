@@ -35,6 +35,11 @@ const routes: RouteRecordRaw[] = [
     path: '/polygon-test',
     name: 'PolygonTest',
     component: () => import('../components/PolygonTest.vue')
+  },
+  {
+    path: '/path-select-test',
+    name: 'PathSelectTest',
+    component: () => import('../components/PathSelectTest.vue')
   }
 ]
 

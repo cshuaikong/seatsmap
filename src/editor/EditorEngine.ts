@@ -1,6 +1,7 @@
 import { Group, ZoomEvent, PointerEvent as LeaferPointer } from 'leafer-ui'
 import '@leafer-in/editor'
-import { Editor, EditorMoveEvent, EditorRotateEvent } from '@leafer-in/editor'
+import { Editor, EditorMoveEvent, EditorRotateEvent, EditSelectHelper } from '@leafer-in/editor'
+import { LeafList } from '@leafer-ui/core'
 import { LeaferEngine } from '../viewer/LeaferEngine'
 
 export interface EditorEngineOptions {
@@ -24,9 +25,13 @@ export class EditorEngine extends LeaferEngine {
     this.previewGroup = new Group({ id: 'preview-layer' })
     this.leafer.add(this.previewGroup)
 
-    // Editor 插件（内置 select/drag/resize/rotate/boxSelect）
     this.editor = new Editor(options.editorConfig)
     this.leafer.add(this.editor)
+
+    // 修复外层容器布局导致的框选坐标偏移：
+    // Vue 侧边栏/工具栏使画布容器 BoundingClientRect 偏移，
+    // 框选时强制刷新 clientBounds 确保 getLocal 拿到正确的容器位置
+    this._fixSelectorDrift()
 
     // 修复框选：selector.allow() 检查 target.leafer !== editor.leafer，
     // 但 viewport zoomLayer 与 editor 同属一个 leafer，导致空画布框选失效。
@@ -62,6 +67,48 @@ export class EditorEngine extends LeaferEngine {
         }
         _origCheckAndSelect(e)
       }
+
+      // 修复缩放后框选坐标空间不匹配：selector 内部使用局部坐标构建 dragBounds，
+      // 但 findByBounds 对比的是元素的 __world（世界坐标），需要手动转换。
+      const { findByBounds } = EditSelectHelper
+      sel.onDrag = function (e: any) {
+        if (e.multiTouch) return
+        if (this.editor.dragging) return this.onDragEnd(e)
+        if (this.dragging) {
+          const editor = this.editor
+          const total = e.getInnerTotal(this)
+          const dragBounds = this.bounds.clone().unsign()
+
+          const worldBounds = dragBounds.clone()
+          const sw = (this as any).__world
+          if (sw) {
+            const startWX = this.bounds.x * sw.a + this.bounds.y * sw.c + sw.e
+            const startWY = this.bounds.x * sw.b + this.bounds.y * sw.d + sw.f
+            worldBounds.set(
+              Math.min(startWX, e.x),
+              Math.min(startWY, e.y),
+              Math.abs(e.x - startWX),
+              Math.abs(e.y - startWY)
+            )
+          }
+          const list = new LeafList(findByBounds(editor.app, worldBounds) as any)
+
+          this.bounds.width = total.x
+          this.bounds.height = total.y
+          this.selectArea.setBounds(dragBounds.get())
+
+          if (list.length) {
+            const selectList: any[] = []
+            this.originList.forEach((item: any) => { if (!list.has(item)) selectList.push(item) })
+            list.forEach((item: any) => { if (!this.originList.has(item)) selectList.push(item) })
+            if (selectList.length !== editor.list.length || editor.list.some((c: any, i: number) => c !== selectList[i])) {
+              editor.target = selectList as any
+            }
+          } else {
+            editor.target = this.originList.list
+          }
+        }
+      }
     }
 
     // 修复拖拽/旋转时选择框不跟手：Leafer 默认只在 dragEnd 时调用
@@ -81,6 +128,16 @@ export class EditorEngine extends LeaferEngine {
       if (this.canvasElement) {
         this.canvasElement.tabIndex = 0
       }
+    })
+  }
+
+  /** 框选前强制刷新 canvas 在页面中的 BoundingClientRect，
+   *  修复 Vue 侧边栏/工具栏导致的固定坐标偏移（偏左偏上）。 */
+  private _fixSelectorDrift(): void {
+    this.leafer.on(LeaferPointer.DOWN, () => {
+      try {
+        ;(this.leafer as any).canvas?.getClientBounds?.(true)
+      } catch (_) { /* 忽略旧版 API 缺失 */ }
     })
   }
 
