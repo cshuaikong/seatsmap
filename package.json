@@ -17,6 +17,7 @@
     "@leafer-in/viewport": "^2.1.0",
     "@leafer-ui/core": "^2.1.0",
     "@leafer-ui/draw": "^2.1.0",
+    "@leafer/interface": "^2.1.0",
     "konva": "^10.2.0",
     "leafer-ui": "^2.1.0",
     "pinia": "^2.1.0",

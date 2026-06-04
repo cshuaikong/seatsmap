@@ -732,11 +732,9 @@ export function submitEllipse(startPos: Position, endPos: Position) {
   useVenueStore().addSection({
     name: '圆形分区',
     rows: [],
-    x: 0,
-    y: 0,
-    borderType: 'ellipse',
     x: startPos.x,
     y: startPos.y,
+    borderType: 'ellipse',
     radiusX: radius,
     radiusY: radius,
     fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明

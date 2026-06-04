@@ -2928,11 +2928,9 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
   venueStore.addSection({
     name: '椭圆分区',
     rows: [],
-    x: 0,
-    y: 0,
-    borderType: 'ellipse',
     x: centerX,
     y: centerY,
+    borderType: 'ellipse',
     radiusX: radiusX,
     radiusY: radiusY,
     fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明

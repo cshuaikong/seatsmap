@@ -699,7 +699,6 @@ onMounted(() => {
       circle: {},
       circleMargin: 2,
       circleDirection: 'top',
-      selectedStyle: { stroke: 'transparent' },
       hideResizeLines: true,
       moveable: true,
       resizeable: false,
@@ -905,6 +904,7 @@ onMounted(() => {
     }
     if (ed?.list?.length > 0) {
       ed.editBox?.load?.()
+      ed.editBox?.update?.()
       // 调整旋转手柄和圆形控制点尺寸（缩放已通过 resizeable: false 禁用）
       const eb = ed.editBox as any
       if (eb) {
