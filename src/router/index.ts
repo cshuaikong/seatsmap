@@ -40,6 +40,12 @@ const routes: RouteRecordRaw[] = [
     path: '/path-select-test',
     name: 'PathSelectTest',
     component: () => import('../components/PathSelectTest.vue')
+  },
+  {
+    path: '/editor-v2',
+    name: 'SeatMapEditor',
+    component: () => import('../components/SeatMapEditor.vue'),
+    props: { dataUrl: '/static/分区座位 全_path.json' }
   }
 ]
 

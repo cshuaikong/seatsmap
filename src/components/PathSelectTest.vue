@@ -5,6 +5,9 @@
       <button @click="fitContent">适应画布</button>
       <button @click="resetView">重置视图 (1:1)</button>
       <span class="pst-info">缩放: {{ scale.toFixed(2) }}x | 选中: {{ selectedCount }}</span>
+      <button @click="exportJSON">JSON</button>
+      <button @click="exportPNG">PNG</button>
+      <button @click="exportSVG">SVG</button>
       <button v-if="isEditing" @click="exitVertexEdit" class="pst-btn-exit">退出编辑 (Esc)</button>
     </div>
     <div ref="containerRef" class="pst-canvas" />
@@ -19,6 +22,7 @@ import '@leafer-in/view'
 import '@leafer-in/viewport'
 import '@leafer-in/editor'
 import { Editor, EditorEvent, EditorMoveEvent, EditorRotateEvent, EditSelectHelper } from '@leafer-in/editor'
+import { compensateZoom } from '../utils/zoomCompensation'
 
 const containerRef = ref<HTMLDivElement>()
 const scale = ref(1)
@@ -94,7 +98,7 @@ onMounted(() => {
   })
 
   // Editor
-  editor = new Editor({ selector: true, moveable: true, rotateable: true, keyEvent: true })
+  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, flipable: false, skewable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1 })
 
   // === selector 补丁（必须在 leafer.add(editor) 之前） ===
   const sel = (editor as any).selector
@@ -248,7 +252,6 @@ onMounted(() => {
         this.bounds.width = total.x
         this.bounds.height = total.y
         this.selectArea.setBounds(dragBounds.get())
-
         if (leafList.length) {
           const selectList: any[] = []
           this.originList.forEach((item: any) => { if (!leafList.has(item)) selectList.push(item) })
@@ -265,9 +268,16 @@ onMounted(() => {
 
   leafer.add(editor as any)
 
-  // === 拖拽/旋转时选择框跟手 ===
-  editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update() })
-  editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update() })
+  // === 拖拽/旋转时选择框跟手 + 边框同步 ===
+  const syncBorder = () => {
+    if (currentBorder && currentBorderBody) {
+      currentBorder.x = currentBorderBody.x
+      currentBorder.y = currentBorderBody.y
+      currentBorder.rotation = currentBorderBody.rotation
+    }
+  }
+  editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update(); syncBorder() })
+  editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder() })
 
   // === 框选时刷新 clientBounds，修复 Vue 布局偏移 ===
   leafer.on(LP.DOWN, () => {
@@ -283,6 +293,7 @@ onMounted(() => {
       fill: p.fill,
       stroke: p.fill.replace('0.2', '0.7'),
       strokeWidth: 2,
+      strokeAlign: 'inside',
       editable: true,
       draggable: true,
       hittable: true,
@@ -301,30 +312,35 @@ onMounted(() => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
 
-    // 移除旧边框层
-    if (currentBorder) {
-      currentBorder.remove()
-      currentBorder = null
-      currentBorderBody = null
+    // 顶点编辑模式下保留边框，不清除
+    if (!isEditing.value) {
+      // 移除旧边框层
+      if (currentBorder) {
+        currentBorder.remove()
+        currentBorder = null
+        currentBorderBody = null
+      }
     }
 
     // 仅单选分区时创建边框层（多选或无选中不创建）
-    if (list.length === 1 && list[0]?.tag === 'Path') {
+    if (!isEditing.value && list.length === 1 && list[0]?.tag === 'Path') {
       const body = list[0]
       const border = new Path({
         id: `section-border-${body.id}`,
         path: body.path,
         x: body.x, y: body.y,
+        rotation: body.rotation,
         fill: 'transparent',
-        stroke: 'transparent',
-        strokeWidth: 2,
+        stroke: '#3b82f6',
+        strokeWidth: 1 / scale.value,
         hitFill: 'none' as any,
         hitStroke: 'all' as any,
         editable: false,
         draggable: false,
         hittable: true,
+        cursor: 'pointer',
       })
-      leafer!.add(border) // 叠在 body 上方
+      leafer!.add(border)
       currentBorder = border
       currentBorderBody = body
 
@@ -361,9 +377,16 @@ onMounted(() => {
     ;(leafer as any).__onKey = onKey
   })
 
-  leafer.on(ZoomEvent.END, () => { scale.value = getS() })
+  leafer.on(ZoomEvent.END, () => {
+    scale.value = getS()
+    const s = getS()
+    const handles = vertexEditTarget ? [...vertexHandles, ...edgeHandles] : undefined
+    compensateZoom(editor, s, handles)
+    if (currentBorder) currentBorder.strokeWidth = 1 / s
+  })
 
 })
+
 
 function getS(): number {
   return (leafer as any)?.scaleX ?? (leafer as any)?.__zoomLayer?.scaleX ?? 1
@@ -485,27 +508,42 @@ function setPanEnabled(enabled: boolean): void {
   if (app?.config?.move) app.config.move.disabled = !enabled
 }
 
-// 手柄和 path 元素在同一父容器中，用 el.x/el.y 做坐标偏移即可，不经过 __world
+// 手柄放在 leafer 根下，需将 body 局部坐标转为世界坐标（考虑旋转）
+function toWorld(lx: number, ly: number, ox: number, oy: number, rad: number) {
+  const c = Math.cos(rad), s = Math.sin(rad)
+  return { x: ox + lx * c - ly * s, y: oy + lx * s + ly * c }
+}
+function toLocal(wx: number, wy: number, ox: number, oy: number, rad: number) {
+  const c = Math.cos(rad), s = Math.sin(rad)
+  const dx = wx - ox, dy = wy - oy
+  return { x: dx * c + dy * s, y: -dx * s + dy * c }
+}
+
 function createAllHandles(): void {
   const el = vertexEditTarget
   if (!el) return
   const ox = el.x ?? 0, oy = el.y ?? 0
+  const angle = ((el.rotation ?? 0) * Math.PI) / 180
   const n = editVerts.length
+  const hs = Math.max(getS(), 0.02)
+  const handleSize = 6 / hs
+  const handleStroke = 1 / hs
 
   // 顶点手柄
   for (let i = 0; i < n; i++) {
     const v = editVerts[i]
+    const wp = toWorld(v.x, v.y, ox, oy, angle)
     const h = new Rect({
-      x: ox + v.x, y: oy + v.y,
-      width: 6, height: 6,
-      fill: '#3b82f6', stroke: '#fff', strokeWidth: 1,
+      x: wp.x, y: wp.y,
+      width: handleSize, height: handleSize,
+      fill: '#3b82f6', stroke: '#fff', strokeWidth: handleStroke,
       draggable: true, cursor: 'move',
       around: 'center',
     })
     ;(h as any).__vi = i
 
     h.on_(DragEvent.DRAG, () => {
-      editVerts[i] = { x: h.x! - ox, y: h.y! - oy }
+      editVerts[i] = toLocal(h.x!, h.y!, ox, oy, angle)
       rebuildPath()
       repositionEdgeHandles(i)
       repositionEdgeHandles((i - 1 + n) % n)
@@ -518,17 +556,19 @@ function createAllHandles(): void {
   // 边弧手柄：全部运算在局部空间，只在设置 h.x/h.y 时转到父空间
   for (let i = 0; i < n; i++) {
     const a = editVerts[i], b = editVerts[(i + 1) % n]
+    const midW = toWorld((a.x + b.x) / 2, (a.y + b.y) / 2, ox, oy, angle)
     const h = new Ellipse({
-      x: ox + (a.x + b.x) / 2, y: oy + (a.y + b.y) / 2,
-      width: 6, height: 6,
-      fill: '#22c55e', stroke: '#fff', strokeWidth: 1,
+      x: midW.x, y: midW.y,
+      width: handleSize, height: handleSize,
+      fill: '#22c55e', stroke: '#fff', strokeWidth: handleStroke,
       draggable: true, cursor: 'move',
       around: 'center',
     })
     ;(h as any).__ei = i
 
     h.on_(DragEvent.DRAG, () => {
-      const hlx = h.x! - ox, hly = h.y! - oy
+      const lp = toLocal(h.x!, h.y!, ox, oy, angle)
+      const hlx = lp.x, hly = lp.y
       const ca = editVerts[i], cb = editVerts[(i + 1) % n]
       const cmx = (ca.x + cb.x) / 2, cmy = (ca.y + cb.y) / 2
       const cdx = cb.x - ca.x, cdy = cb.y - ca.y
@@ -547,8 +587,9 @@ function createAllHandles(): void {
       const cdx = cb.x - ca.x, cdy = cb.y - ca.y
       const cLen = Math.hypot(cdx, cdy) || 1
       const cnx = cdy / cLen, cny = -cdx / cLen
-      h.x = ox + cmx + cnx * ad * cLen * 0.5
-      h.y = oy + cmy + cny * ad * cLen * 0.5
+      const snapW = toWorld(cmx + cnx * ad * cLen * 0.5, cmy + cny * ad * cLen * 0.5, ox, oy, angle)
+      h.x = snapW.x
+      h.y = snapW.y
     })
 
     leafer!.add(h)
@@ -557,15 +598,13 @@ function createAllHandles(): void {
 
   // 根据已恢复的 editArcDepths 把手柄从初始中点偏移到正确弧顶位置
   for (let i = 0; i < n; i++) repositionEdgeHandles(i)
-
-  el.stroke = '#3b82f6'
-  el.strokeWidth = 3
 }
 
 function repositionEdgeHandles(edgeIndex: number): void {
   const el = vertexEditTarget
   if (!el) return
   const ox = el.x ?? 0, oy = el.y ?? 0
+  const angle = ((el.rotation ?? 0) * Math.PI) / 180
   const n = editVerts.length
   const ei = ((edgeIndex % n) + n) % n
   const h = edgeHandles[ei]
@@ -576,9 +615,12 @@ function repositionEdgeHandles(edgeIndex: number): void {
   const edgeLen = Math.hypot(dx, dy) || 1
   const arcDepth = editArcDepths[ei] ?? 0
   const nx = dy / edgeLen, ny = -dx / edgeLen
-  h.x = ox + cmx + nx * arcDepth * edgeLen * 0.5
-  h.y = oy + cmy + ny * arcDepth * edgeLen * 0.5
+  const wp = toWorld(cmx + nx * arcDepth * edgeLen * 0.5, cmy + ny * arcDepth * edgeLen * 0.5, ox, oy, angle)
+  h.x = wp.x
+  h.y = wp.y
 }
+
+const r = (n: number) => +n.toFixed(2)
 
 function rebuildPath(): void {
   const el = vertexEditTarget
@@ -586,7 +628,7 @@ function rebuildPath(): void {
   const verts = editVerts
   const n = verts.length
   if (n < 2) return
-  let d = `M${verts[0].x},${verts[0].y}`
+  let d = `M${r(verts[0].x)},${r(verts[0].y)}`
   for (let i = 0; i < n; i++) {
     const a = verts[i], b = verts[(i + 1) % n]
     const depth = editArcDepths[i] ?? 0
@@ -598,13 +640,14 @@ function rebuildPath(): void {
       let R = (sagitta * sagitta + halfChord * halfChord) / (2 * Math.max(sagitta, 0.001))
       R = Math.max(R, halfChord)
       const sweep = depth > 0 ? 1 : 0
-      d += `A${R},${R} 0 0 ${sweep} ${b.x},${b.y}`
+      d += `A${r(R)},${r(R)} 0 0 ${sweep} ${r(b.x)},${r(b.y)}`
     } else {
-      d += `L${b.x},${b.y}`
+      d += `L${r(b.x)},${r(b.y)}`
     }
   }
   d += 'Z'
   try { el.path = d } catch (_) { el.setAttr?.('path', d) }
+  if (currentBorder) currentBorder.path = d
   // 清除边缓存，下次框选时重建
   edgeCache.delete(el)
 }
@@ -624,6 +667,51 @@ function resetView(): void {
   if (leafer) { leafer.x = 0; leafer.y = 0 }
   ;(leafer as any)?.__updateViewPort?.()
   scale.value = 1
+}
+
+// ==================== 导出 ====================
+
+function exportJSON(): void {
+  const data = allPaths.map((p: any) => ({
+    id: p.id,
+    path: p.path,
+    x: r(p.x), y: r(p.y),
+    rotation: r(p.rotation ?? 0),
+    fill: p.fill,
+    stroke: p.stroke,
+  }))
+  downloadFile('polygons.json', JSON.stringify(data, null, 2))
+}
+
+function exportPNG(): void {
+  const cv = leafer?.canvas?.view as HTMLCanvasElement | undefined
+  if (!cv) return
+  const url = cv.toDataURL('image/png')
+  downloadURL(url, 'canvas.png')
+}
+
+function exportSVG(): void {
+  const w = leafer?.width ?? 1000, h = leafer?.height ?? 700
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+  for (const p of allPaths) {
+    const rot = r(p.rotation ?? 0)
+    const t = rot ? ` transform="translate(${r(p.x)},${r(p.y)}) rotate(${rot})"` : ` transform="translate(${r(p.x)},${r(p.y)})"`
+    svg += `<path d="${p.path}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="2"${t}/>`
+  }
+  svg += '</svg>'
+  downloadFile('canvas.svg', svg)
+}
+
+function downloadFile(filename: string, content: string): void {
+  const blob = new Blob([content], { type: 'application/octet-stream' })
+  downloadURL(URL.createObjectURL(blob), filename)
+}
+
+function downloadURL(url: string, filename: string): void {
+  const a = document.createElement('a')
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click()
+  document.body.removeChild(a)
 }
 
 onUnmounted(() => {
