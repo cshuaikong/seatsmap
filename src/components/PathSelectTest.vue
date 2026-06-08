@@ -268,7 +268,7 @@ onMounted(() => {
 
   leafer.add(editor as any)
 
-  // === 拖拽/旋转时选择框跟手 + 边框同步 ===
+  // === 拖拽/旋转时选择框跟手 + 边框同步 + 旋转烘焙 ===
   const syncBorder = () => {
     if (currentBorder && currentBorderBody) {
       currentBorder.x = currentBorderBody.x
@@ -276,8 +276,27 @@ onMounted(() => {
       currentBorder.rotation = currentBorderBody.rotation
     }
   }
+  let didRotate = false
   editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update(); syncBorder() })
-  editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder() })
+  editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder(); didRotate = true })
+  // 旋转结束后把角度烘焙进 path，归零 rotation
+  leafer.on(LP.UP, () => {
+    if (!didRotate) return
+    didRotate = false
+    const list: any[] = (editor as any)?.list ?? []
+    list.forEach((el: any) => {
+      if (el.tag !== 'Path') return
+      const rot = el.rotation ?? 0
+      if (!rot) return
+      el.path = rotatePath(el.path, rot)
+      el.rotation = 0
+    })
+    if (currentBorder && currentBorderBody) {
+      currentBorder.path = currentBorderBody.path
+      currentBorder.rotation = 0
+    }
+    ;(editor as any).editBox?.update()
+  })
 
   // === 框选时刷新 clientBounds，修复 Vue 布局偏移 ===
   leafer.on(LP.DOWN, () => {
@@ -671,12 +690,40 @@ function resetView(): void {
 
 // ==================== 导出 ====================
 
+function rotatePath(d: string, angle: number): string {
+  if (!angle) return d
+  const rad = angle * Math.PI / 180
+  const c = Math.cos(rad), s = Math.sin(rad)
+  const rot = (x: number, y: number) => [r(x * c - y * s), r(x * s + y * c)]
+  const cmds = d.match(/[MLCZA][^MLCZA]*/gi)
+  if (!cmds) return d
+  const parts: string[] = []
+  for (const cmd of cmds) {
+    const nums = cmd.slice(1).trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n))
+    const type = cmd[0]
+    if (type === 'M' || type === 'L') {
+      const [rx, ry] = rot(nums[0], nums[1])
+      parts.push(`${type}${rx},${ry}`)
+    } else if (type === 'A') {
+      const [rx, ry] = rot(nums[5], nums[6])
+      parts.push(`A${r(nums[0])},${r(nums[1])} ${nums[2]} ${nums[3]} ${nums[4]} ${rx},${ry}`)
+    } else if (type === 'C') {
+      const [rx1, ry1] = rot(nums[0], nums[1])
+      const [rx2, ry2] = rot(nums[2], nums[3])
+      const [rx3, ry3] = rot(nums[4], nums[5])
+      parts.push(`C${rx1},${ry1} ${rx2},${ry2} ${rx3},${ry3}`)
+    } else if (type === 'Z') {
+      parts.push('Z')
+    }
+  }
+  return parts.join('')
+}
+
 function exportJSON(): void {
   const data = allPaths.map((p: any) => ({
     id: p.id,
-    path: p.path,
+    path: rotatePath(p.path, p.rotation ?? 0),
     x: r(p.x), y: r(p.y),
-    rotation: r(p.rotation ?? 0),
     fill: p.fill,
     stroke: p.stroke,
   }))
@@ -694,9 +741,8 @@ function exportSVG(): void {
   const w = leafer?.width ?? 1000, h = leafer?.height ?? 700
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
   for (const p of allPaths) {
-    const rot = r(p.rotation ?? 0)
-    const t = rot ? ` transform="translate(${r(p.x)},${r(p.y)}) rotate(${rot})"` : ` transform="translate(${r(p.x)},${r(p.y)})"`
-    svg += `<path d="${p.path}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="2"${t}/>`
+    const d = rotatePath(p.path, p.rotation ?? 0)
+    svg += `<path d="${d}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="2" transform="translate(${r(p.x)},${r(p.y)})"/>`
   }
   svg += '</svg>'
   downloadFile('canvas.svg', svg)
