@@ -10,14 +10,7 @@
       >
         <i class="iconfont icon-shubiaojiantoumoshi tool-iconfont"></i>
       </button>
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'selectseat' }"
-        title="选择座位"
-        @click="onToolChange('selectseat')"
-      >
-        <i class="iconfont icon-selectseat tool-iconfont"></i>
-      </button>
+
       <button
         class="tool-item"
         :class="{ active: modelValue === 'node' }"
@@ -25,6 +18,14 @@
         @click="onToolChange('node')"
       >
         <i class="iconfont icon-a-4404035571 tool-iconfont"></i>
+      </button>
+      <button 
+        class="tool-item"
+        :class="{ active: modelValue === 'selectseat' }"
+        title="选择座位"
+        @click="onToolChange('selectseat')"
+      >
+        <i class="iconfont icon-selectseat tool-iconfont"></i>
       </button>
     </div>
 

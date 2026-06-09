@@ -1,21 +1,21 @@
 <template>
-  <div class="pst">
-    <div class="pst-bar">
-      <span class="pst-title">Path 多边形框选测试</span>
+  <div class="pe" :class="{ 'pe--embedded': hideToolbar }">
+    <div v-if="!hideToolbar" class="pe-bar">
+      <span class="pe-title">{{ title }}</span>
       <button @click="fitContent">适应画布</button>
       <button @click="resetView">重置视图 (1:1)</button>
-      <span class="pst-info">缩放: {{ scale.toFixed(2) }}x | 选中: {{ selectedCount }}</span>
+      <span class="pe-info">缩放: {{ scale.toFixed(2) }}x | 选中: {{ selectedCount }}</span>
       <button @click="exportJSON">JSON</button>
       <button @click="exportPNG">PNG</button>
       <button @click="exportSVG">SVG</button>
-      <button v-if="isEditing" @click="exitVertexEdit" class="pst-btn-exit">退出编辑 (Esc)</button>
+      <button v-if="isEditing" @click="exitVertexEdit()" class="pe-btn-exit">退出编辑 (Esc)</button>
     </div>
-    <div ref="containerRef" class="pst-canvas" />
+    <div ref="containerRef" class="pe-canvas" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { Leafer, Path, Rect, Ellipse, ZoomEvent, PointerEvent as LP, DragEvent } from 'leafer-ui'
 import { LeafList } from '@leafer-ui/core'
 import '@leafer-in/view'
@@ -23,6 +23,26 @@ import '@leafer-in/viewport'
 import '@leafer-in/editor'
 import { Editor, EditorEvent, EditorMoveEvent, EditorRotateEvent, EditSelectHelper } from '@leafer-in/editor'
 import { compensateZoom } from '../utils/zoomCompensation'
+import type { VenueData } from '../types'
+
+const props = withDefaults(defineProps<{
+  venueData?: VenueData
+  seatList?: any[]
+  hideToolbar?: boolean
+  currentTool?: string
+}>(), {
+  hideToolbar: false,
+  venueData: () => ({}) as VenueData,
+  seatList: () => [],
+  currentTool: 'select',
+})
+const title = ref('座位图设计器')
+const emit = defineEmits<{
+  (e: 'body-double-tap', body: any): void
+  (e: 'ready', leafer: any, editor: any): void
+  (e: 'update:currentTool', tool: string): void
+  (e: 'vertex-edit-change', active: boolean): void
+}>()
 
 const containerRef = ref<HTMLDivElement>()
 const scale = ref(1)
@@ -42,52 +62,18 @@ let editVerts: { x: number; y: number }[] = []
 let editArcDepths: number[] = []
 let allPaths: any[] = []
 
-// Path 轮廓边缓存 — 用于框选命中检测，rebuildPath 后清除
-const edgeCache = new WeakMap<object, number[][]>()
+// Path 轮廓边缓存
+let edgeCache = new WeakMap<object, number[][]>()
 
-// 边框层：仅单选分区时动态创建，拦截边线双击进入顶点编辑
-// 多选或无选中时移除，避免拦截未选中分区的正常点击
+// 边框层
 let currentBorder: any = null
 let currentBorderBody: any = null
 
-// 预设几个不规则多边形
-const polygons: { id: string; path: string; x: number; y: number; fill: string }[] = [
-  {
-    id: 'star',
-    path: 'M0,-60 L14,-18 L58,-18 L22,10 L36,54 L0,28 L-36,54 L-22,10 L-58,-18 L-14,-18 Z',
-    x: 300, y: 300, fill: 'rgba(239,68,68,0.2)',
-  },
-  {
-    id: 'hexagon',
-    path: 'M50,0 L25,43 L-25,43 L-50,0 L-25,-43 L25,-43 Z',
-    x: 650, y: 260, fill: 'rgba(59,130,246,0.2)',
-  },
-  {
-    id: 'arrow',
-    path: 'M0,-50 L40,0 L20,0 L20,50 L-20,50 L-20,0 L-40,0 Z',
-    x: 500, y: 500, fill: 'rgba(34,197,94,0.2)',
-  },
-  {
-    id: 'blob',
-    path: 'M0,-40 C30,-50 60,-20 55,10 C50,40 25,55 -10,45 C-45,35 -55,0 -45,-25 C-35,-50 -15,-45 0,-40 Z',
-    x: 200, y: 500, fill: 'rgba(168,85,247,0.2)',
-  },
-  {
-    id: 'diamond',
-    path: 'M0,-60 L35,0 L0,60 L-35,0 Z',
-    x: 750, y: 480, fill: 'rgba(251,146,60,0.2)',
-  },
-  {
-    id: 'trapezoid',
-    path: 'M-40,-35 L40,-35 L25,35 L-25,35 Z',
-    x: 450, y: 120, fill: 'rgba(236,72,153,0.2)',
-  },
-]
 
 onMounted(() => {
   if (!containerRef.value) return
-  const w = containerRef.value.clientWidth || 1000
-  const h = containerRef.value.clientHeight || 700
+  const w = containerRef.value.clientWidth || 800
+  const h = containerRef.value.clientHeight || 800
 
   leafer = new Leafer({
     view: containerRef.value,
@@ -97,21 +83,16 @@ onMounted(() => {
     zoom: { min: 0.05, max: 20 },
   })
 
-  // Editor
-  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, flipable: false, skewable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1 })
+  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, flipable: false, skewable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1,stroke :'#3b82f6', multiSelect: true })
 
-  // === selector 补丁（必须在 leafer.add(editor) 之前） ===
+  // === selector 补丁 ===
   const sel = (editor as any).selector
   if (sel) {
-    // ① allow: Editor 的守门人 — 点击选中、框选、拖拽都先过这里。
-    // 顶点编辑模式下只放行手柄，阻止对分区本体的所有交互。
     const _origAllow = sel.allow.bind(sel)
     sel.allow = (target: any) => {
-      // vertexEditTarget 非空 = 正在顶点编辑，短路：只认手柄
       if (vertexEditTarget) {
         return target?.tag === 'Rect' || target?.tag === 'Ellipse'
       }
-      // 边框层永远不参与 Editor 选中（独立响应双击）
       if (target?.id?.startsWith?.('section-border-')) return false
       if (!target) return _origAllow(target)
       let node = target
@@ -123,8 +104,6 @@ onMounted(() => {
       return _origAllow(target)
     }
 
-    // ② findUI: 边框层 → body 重定向，使 Editor 所有操作（选中/拖拽/多选）
-    // 均作用在 body 上，无需区分点击来源。
     const _origFindUI = sel.findUI.bind(sel)
     sel.findUI = function (e: any) {
       const result = _origFindUI(e)
@@ -132,7 +111,6 @@ onMounted(() => {
       return result
     }
 
-    // ③ checkAndSelect: 多选拖拽不替换为单选
     const _origCheck = sel.checkAndSelect.bind(sel)
     sel.checkAndSelect = function (e: any) {
       const find = sel.findUI(e)
@@ -140,9 +118,8 @@ onMounted(() => {
       _origCheck(e)
     }
 
-    // ④ onDrag: 修复缩放后框选坐标空间不匹配
+    // ④ onDrag: 框选坐标空间修复
     const { findByBounds } = EditSelectHelper
-    // 线段与矩形是否相交（Liang-Barsky）
     const segHitsRect = (ax: number, ay: number, bx: number, by: number,
                          rx: number, ry: number, rw: number, rh: number): boolean => {
       const rx2 = rx + rw, ry2 = ry + rh
@@ -223,10 +200,14 @@ onMounted(() => {
       if (this.editor.dragging) return this.onDragEnd(e)
       if (this.dragging) {
         const editor = this.editor
+        // 框选期间隐藏 editBox，避免闪烁
+        if (!(this as any).__boxHidden) {
+          ;(editor as any).editBox.visible = false
+          ;(this as any).__boxHidden = true
+        }
         const total = e.getInnerTotal(this)
         const dragBounds = this.bounds.clone().unsign()
 
-        // 世界空间边界 = 起点(local→world) + 当前指针(e.x/e.y 世界坐标)
         const worldBounds = dragBounds.clone()
         const sw = (this as any).__world
         if (sw) {
@@ -241,7 +222,6 @@ onMounted(() => {
         }
         const wr = worldBounds.get()
         const candidates = findByBounds(editor.app, worldBounds)
-        // Path 元素：精确路径碰撞 → 非 Path：保留默认 AABB
         const list = (candidates as any[]).filter((el: any) => {
           if (el.id?.startsWith?.('section-border-')) return false
           if (el.tag === 'Path') return pathHitsRect(el, wr.x, wr.y, wr.width, wr.height)
@@ -252,6 +232,7 @@ onMounted(() => {
         this.bounds.width = total.x
         this.bounds.height = total.y
         this.selectArea.setBounds(dragBounds.get())
+
         if (leafList.length) {
           const selectList: any[] = []
           this.originList.forEach((item: any) => { if (!leafList.has(item)) selectList.push(item) })
@@ -268,7 +249,7 @@ onMounted(() => {
 
   leafer.add(editor as any)
 
-  // === 拖拽/旋转时选择框跟手 + 边框同步 + 旋转烘焙 ===
+  // 拖拽/旋转时选择框跟手 + 边框同步 + 旋转烘焙
   const syncBorder = () => {
     if (currentBorder && currentBorderBody) {
       currentBorder.x = currentBorderBody.x
@@ -279,8 +260,14 @@ onMounted(() => {
   let didRotate = false
   editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update(); syncBorder() })
   editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder(); didRotate = true })
-  // 旋转结束后把角度烘焙进 path，归零 rotation
   leafer.on(LP.UP, () => {
+    // 框选结束后恢复 editBox
+    const sel = (editor as any)?.selector
+    if (sel?.__boxHidden) {
+      ;(editor as any).editBox.visible = true
+      ;(editor as any).editBox.update()
+      sel.__boxHidden = false
+    }
     if (!didRotate) return
     didRotate = false
     const list: any[] = (editor as any)?.list ?? []
@@ -298,42 +285,19 @@ onMounted(() => {
     ;(editor as any).editBox?.update()
   })
 
-  // === 框选时刷新 clientBounds，修复 Vue 布局偏移 ===
+  // 框选时刷新 clientBounds
   leafer.on(LP.DOWN, () => {
     try { ;(leafer as any).canvas?.getClientBounds?.(true) } catch (_) {}
   })
+  // 首次渲染
+  renderAll(props.venueData)
 
-  // 批量创建多边形（边框层由 SELECT 事件按需动态创建/移除）
-  polygons.forEach((p) => {
-    const body = new Path({
-      id: p.id,
-      path: p.path,
-      x: p.x, y: p.y,
-      fill: p.fill,
-      stroke: p.fill.replace('0.2', '0.7'),
-      strokeWidth: 2,
-      strokeAlign: 'inside',
-      editable: true,
-      draggable: true,
-      hittable: true,
-    })
-    leafer!.add(body)
-    allPaths.push(body)
-
-    // 主体双击 → 分区编辑模式（边框双击由 currentBorder 独立处理）
-    body.on_(LP.DOUBLE_TAP, () => {
-      console.log('双击主体，切换分区编辑模式')
-    })
-  })
-
-  // 监听选中变化 → 管理边框层生命周期（仅单选分区时创建边框层）
+  // 选中变化 → 边框层管理
   editor.on(EditorEvent.SELECT, () => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
 
-    // 顶点编辑模式下保留边框，不清除
     if (!isEditing.value) {
-      // 移除旧边框层
       if (currentBorder) {
         currentBorder.remove()
         currentBorder = null
@@ -341,38 +305,33 @@ onMounted(() => {
       }
     }
 
-    // 仅单选分区时创建边框层（多选或无选中不创建）
-    if (!isEditing.value && list.length === 1 && list[0]?.tag === 'Path') {
-      const body = list[0]
-      const border = new Path({
-        id: `section-border-${body.id}`,
-        path: body.path,
-        x: body.x, y: body.y,
-        rotation: body.rotation,
-        fill: 'transparent',
-        stroke: '#3b82f6',
-        strokeWidth: 1 / scale.value,
-        hitFill: 'none' as any,
-        hitStroke: 'all' as any,
-        editable: false,
-        draggable: false,
-        hittable: true,
-        cursor: 'pointer',
-      })
-      leafer!.add(border)
-      currentBorder = border
-      currentBorderBody = body
+    // if (list.length === 1 && list[0]?.tag === 'Path') {
+    //   const body = list[0]
+    //   const border = new Path({
+    //     id: `section-border-${body.id}`,
+    //     path: body.path,
+    //     x: body.x, y: body.y,
+    //     rotation: body.rotation,
+    //     fill: 'transparent',
+    //     stroke: '#3b82f6',
+    //     strokeWidth: 1 / scale.value,
+    //     hitFill: 'none' as any,
+    //     hitStroke: 'all' as any,
+    //     editable: false,
+    //     draggable: false,
+    //     hittable: true,
+    //     cursor: 'pointer',
+    //   })
+    //   leafer!.add(border)
+    //   currentBorder = border
+    //   currentBorderBody = body
 
-      // 边框双击 → 顶点编辑
-      border.on_(LP.DOUBLE_TAP, () => {
-        console.log('双击边框，切换顶点编辑模式')
-        if (vertexEditTarget === body) {
-          exitVertexEdit()
-        } else {
-          if (vertexEditTarget) exitVertexEdit()
-          enterVertexEdit(body)
-        }
-      })
+    // }
+
+    // 处于 node 模式时，选中分区自动进入/切换顶点编辑（enterVertexEdit 内部处理清理）
+    if (props.currentTool === 'node' && list.length === 1 && list[0]?.tag === 'Path' && vertexEditTarget !== list[0]) {
+      enterVertexEdit(list[0])
+      return
     }
   })
 
@@ -390,7 +349,6 @@ onMounted(() => {
     }
     canvas.addEventListener('wheel', boundWheel, { passive: false })
 
-    // Escape 退出顶点编辑
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && vertexEditTarget) exitVertexEdit() }
     document.addEventListener('keydown', onKey)
     ;(leafer as any).__onKey = onKey
@@ -404,14 +362,108 @@ onMounted(() => {
     if (currentBorder) currentBorder.strokeWidth = 1 / s
   })
 
+  emit('ready', leafer, editor)
 })
+
+watch(() => props.venueData, (newVal) => {
+  renderAll(newVal)
+})
+
+watch(() => props.currentTool, (tool) => {
+  if (tool === 'node') {
+    const list: any[] = (editor as any)?.list ?? []
+    if (!isEditing.value && list.length === 1 && list[0]?.tag === 'Path') {
+      enterVertexEdit(list[0])
+    }
+  } else if (isEditing.value) {
+    exitVertexEdit()
+  }
+})
+
+// 将十六进制颜色加深
+function darkenColor(hex: string, percent: number): string {
+  let r = parseInt(hex.slice(1, 3), 16)
+  let g = parseInt(hex.slice(3, 5), 16)
+  let b = parseInt(hex.slice(5, 7), 16)
+  r = Math.floor(r * (1 - percent / 100))
+  g = Math.floor(g * (1 - percent / 100))
+  b = Math.floor(b * (1 - percent / 100))
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`
+}
+
+function createPolygonItem(p: { id: string; path: string; x: number; y: number; fill: string; stroke?: string; strokeWidth?: number; name?: string }) {
+ 
+  const body = new Path({
+    id: p.id,
+    path: p.path,
+    x: p.x, y: p.y,
+    fill: p.fill,
+    stroke: p.stroke || darkenColor(p.fill, 20),
+    strokeWidth: p.strokeWidth ?? 1,
+    strokeAlign: 'inside',
+    zIndex: 0,
+    editable: true,
+    draggable: true,
+    hittable: true,
+  })
+  leafer!.add(body)
+  allPaths.push(body)
+
+  body.on_(LP.DOUBLE_TAP, () => {
+    emit('body-double-tap', body)
+  })
+}
+
+function clearAllPaths() {
+  allPaths.forEach(p => {
+    try { leafer!.remove(p) } catch (_) {}
+  })
+  allPaths = []
+  edgeCache = new WeakMap<object, number[][]>()
+}
+
+function renderAll(data: VenueData): void {
+  clearAllPaths()
+
+  const sections = data?.sections ?? []
+  sections.forEach((s: any) => {
+    if (s.type === 'path' && s.path) {
+      createPolygonItem(s)
+    }
+  })
+
+  if (editor) {
+    editor.cancel()
+    ;(editor as any).zIndex = 999
+  }
+
+  // setTimeout(() => fitContent(), 100)
+}
+
+function exportPaths(): VenueData['sections'] {
+  return allPaths.map((p: any) => ({
+    type: 'path',
+    id: p.id,
+    name: p.name || p.id,
+    path: p.path,
+    x: p.x,
+    y: p.y,
+    fill: p.fill,
+    stroke: p.stroke,
+    strokeWidth: p.strokeWidth,
+    rotation: p.rotation ?? 0,
+    rows: [],
+  }))
+
+  // setTimeout(() => fitContent(), 100)
+}
 
 
 function getS(): number {
   return (leafer as any)?.scaleX ?? (leafer as any)?.__zoomLayer?.scaleX ?? 1
 }
 
-// 对 SVG 圆弧 (rx=ry=R, x-rotation=0) 采样 n+1 个点
+// SVG 圆弧采样
 function sampleArc(x1: number, y1: number, x2: number, y2: number, R: number, sweep: number, n: number): {x:number,y:number}[] {
   const chord = Math.hypot(x2 - x1, y2 - y1)
   if (chord < 0.001 || R * 2 < chord) return [{x:x1,y:y1},{x:x2,y:y2}]
@@ -436,15 +488,20 @@ function sampleArc(x1: number, y1: number, x2: number, y2: number, R: number, sw
 // ==================== 顶点编辑 ====================
 
 function enterVertexEdit(pathEl: any): void {
+  // 清理旧的顶点编辑状态（handle、边框等）
+  vertexHandles.forEach(h => h.remove())
+  edgeHandles.forEach(h => h.remove())
+  vertexHandles = []
+  edgeHandles = []
+  editVerts = []
+  editArcDepths = []
   vertexEditTarget = pathEl
   isEditing.value = true
-  editor!.cancel() // 取消已有选中，隐藏选择框
-  // locked 阻断 LeafHelper.draggable() 和 EditBox，比 draggable=false 更彻底
-  // （draggable=false 会被 editable=true 兜底，locked 是无条件阻断）
+  emit('vertex-edit-change', true)
+  editor!.cancel()
   allPaths.forEach((p: any) => { p.locked = true })
   setPanEnabled(false)
 
-  // 提取顶点和弧线深度（支持 M/L/C/A 命令）
   const d: string = pathEl.path
   editVerts = []
   editArcDepths = []
@@ -463,12 +520,11 @@ function enterVertexEdit(pathEl: any): void {
         px = nums[0]; py = nums[1]
       } else if (type === 'C') {
         editVerts.push({ x: nums[4], y: nums[5] })
-        editArcDepths.push(0) // 贝塞尔边当作直边处理
+        editArcDepths.push(0)
         px = nums[4]; py = nums[5]
       } else if (type === 'A') {
         const x2 = nums[5], y2 = nums[6]
         editVerts.push({ x: x2, y: y2 })
-        // 从 SVG arc 参数逆算弧度深度
         const R = nums[0], sweep = nums[4]
         const chord = Math.hypot(x2 - px, y2 - py) || 1
         const half = chord / 2
@@ -481,17 +537,12 @@ function enterVertexEdit(pathEl: any): void {
         px = x2; py = y2
       }
     }
-    // Z 闭合：最后一条边（末顶点→首顶点）弧深为 0
     if (editArcDepths.length < editVerts.length) {
       editArcDepths.push(0)
     }
   }
-  // 确保 arcDepths 与 verts 长度一致（原始路径 Z 闭合需补齐）
   while (editArcDepths.length < editVerts.length) editArcDepths.push(0)
 
-  // rebuildPath 格式：最后一条边显式连回首顶点 v0 再追加 Z，
-  // 导致首顶点在列表尾重复（M 起始 + 末边终点）。
-  // 去掉重复顶点及其对应的退化 arcDepth 条目。
   if (editVerts.length > 1) {
     const first = editVerts[0], last = editVerts[editVerts.length - 1]
     if (Math.abs(first.x - last.x) < 0.01 && Math.abs(first.y - last.y) < 0.01) {
@@ -504,8 +555,8 @@ function enterVertexEdit(pathEl: any): void {
   createAllHandles()
 }
 
-function exitVertexEdit(): void {
-  const editedBody = vertexEditTarget // 保存引用，在清空后用于恢复选中
+function exitVertexEdit(silent?: boolean): void {
+  const editedBody = vertexEditTarget
   vertexHandles.forEach(h => h.remove())
   edgeHandles.forEach(h => h.remove())
   vertexHandles = []
@@ -516,9 +567,12 @@ function exitVertexEdit(): void {
   isEditing.value = false
   allPaths.forEach((p: any) => { p.locked = false })
   setPanEnabled(true)
-  // 重新选中 → SELECT 事件创建新的边框层（path 已是变形后的最新值）
   if (editedBody && editor) {
     editor.target = editedBody
+  }
+  if (!silent) {
+    emit('update:currentTool', 'select')
+    emit('vertex-edit-change', false)
   }
 }
 
@@ -527,7 +581,6 @@ function setPanEnabled(enabled: boolean): void {
   if (app?.config?.move) app.config.move.disabled = !enabled
 }
 
-// 手柄放在 leafer 根下，需将 body 局部坐标转为世界坐标（考虑旋转）
 function toWorld(lx: number, ly: number, ox: number, oy: number, rad: number) {
   const c = Math.cos(rad), s = Math.sin(rad)
   return { x: ox + lx * c - ly * s, y: oy + lx * s + ly * c }
@@ -548,7 +601,6 @@ function createAllHandles(): void {
   const handleSize = 6 / hs
   const handleStroke = 1 / hs
 
-  // 顶点手柄
   for (let i = 0; i < n; i++) {
     const v = editVerts[i]
     const wp = toWorld(v.x, v.y, ox, oy, angle)
@@ -572,7 +624,6 @@ function createAllHandles(): void {
     vertexHandles.push(h)
   }
 
-  // 边弧手柄：全部运算在局部空间，只在设置 h.x/h.y 时转到父空间
   for (let i = 0; i < n; i++) {
     const a = editVerts[i], b = editVerts[(i + 1) % n]
     const midW = toWorld((a.x + b.x) / 2, (a.y + b.y) / 2, ox, oy, angle)
@@ -615,7 +666,6 @@ function createAllHandles(): void {
     edgeHandles.push(h)
   }
 
-  // 根据已恢复的 editArcDepths 把手柄从初始中点偏移到正确弧顶位置
   for (let i = 0; i < n; i++) repositionEdgeHandles(i)
 }
 
@@ -667,7 +717,6 @@ function rebuildPath(): void {
   d += 'Z'
   try { el.path = d } catch (_) { el.setAttr?.('path', d) }
   if (currentBorder) currentBorder.path = d
-  // 清除边缓存，下次框选时重建
   edgeCache.delete(el)
 }
 
@@ -760,6 +809,12 @@ function downloadURL(url: string, filename: string): void {
   document.body.removeChild(a)
 }
 
+defineExpose({ fitContent, resetView, getScale: getS, exportJSON, exportPNG, exportSVG, getLeafer: () => leafer, getEditor: () => editor,
+  toggleVertexEdit: () => { isEditing.value ? exitVertexEdit() : enterVertexEdit((editor as any)?.list?.[0]) },
+  isVertexEditActive: () => isEditing.value,
+  exportPaths,
+})
+
 onUnmounted(() => {
   if (canvas && boundWheel) { canvas.removeEventListener('wheel', boundWheel); boundWheel = null }
   const onKey = (leafer as any)?.__onKey
@@ -770,18 +825,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.pst { display: flex; flex-direction: column; height: 100vh; background: #f8fafc; }
-.pst-bar {
+.pe { display: flex; flex-direction: column; height: 100vh; background: #f8fafc; }
+.pe--embedded { height: 100%; background: transparent; }
+.pe-bar {
   display: flex; align-items: center; gap: 10px; padding: 6px 16px;
   background: #fff; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
 }
-.pst-title { font-weight: 600; font-size: 13px; color: #1e293b; }
-.pst-bar button {
+.pe-title { font-weight: 600; font-size: 13px; color: #1e293b; }
+.pe-bar button {
   padding: 4px 10px; font-size: 11px; border: 1px solid #d1d5db;
   border-radius: 4px; background: #fff; cursor: pointer;
 }
-.pst-bar button:hover { background: #f1f5f9; }
-.pst-btn-exit { background: #fef2f2 !important; color: #dc2626 !important; border-color: #fecaca !important; }
-.pst-info { font-size: 11px; color: #64748b; margin-left: auto; }
-.pst-canvas { flex: 1; overflow: hidden; background: #fff; }
+.pe-bar button:hover { background: #f1f5f9; }
+.pe-btn-exit { background: #fef2f2 !important; color: #dc2626 !important; border-color: #fecaca !important; }
+.pe-info { font-size: 11px; color: #64748b; margin-left: auto; }
+.pe-canvas { flex: 1; overflow: hidden; background: #fff; }
 </style>

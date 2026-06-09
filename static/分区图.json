@@ -1,7 +1,4 @@
-{
-  "version": "1.0",
-  "exportTime": "2026-04-24T09:13:05.671Z",
-  "venue": {
+ {
     "id": "b60259waty8z8q7zfm4nu",
     "name": "未命名座位图",
     "venueType": "SIMPLE",
@@ -2964,4 +2961,3 @@
       "rowGap": 24
     }
   }
-}

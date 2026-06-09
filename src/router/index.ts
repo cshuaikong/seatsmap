@@ -4,7 +4,8 @@ import type { RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/editor'
+    name: 'Home',
+    component: () => import('../components/IndexPage.vue')
   },
   {
     path: '/editor',
@@ -37,15 +38,15 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../components/PolygonTest.vue')
   },
   {
-    path: '/path-select-test',
-    name: 'PathSelectTest',
-    component: () => import('../components/PathSelectTest.vue')
+    path: '/path-editor',
+    name: 'PathEditor',
+    component: () => import('../components/PathEditor.vue')
   },
   {
-    path: '/editor-v2',
-    name: 'SeatMapEditor',
-    component: () => import('../components/SeatMapEditor.vue'),
-    props: { dataUrl: '/static/分区座位 全_path.json' }
+    path: '/seatmap-designer',
+    name: 'SeatMapDesigner',
+    component: () => import('../components/SeatMapDesigner.vue'),
+    props: { dataUrl: '/分区座位 全_path.json' }
   }
 ]
 

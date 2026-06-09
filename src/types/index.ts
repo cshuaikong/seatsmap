@@ -1,3 +1,15 @@
+// 分区多边形数据（PathEditor 通用格式）
+export interface EditorPolygon {
+  id: string
+  path: string
+  x: number
+  y: number
+  fill: string
+  stroke?: string
+  strokeWidth?: number
+  name?: string
+}
+
 export interface Position {
   x: number
   y: number

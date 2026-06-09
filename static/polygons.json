@@ -1,0 +1,99 @@
+{
+    "id": "b60259waty8z8q7zfm4nu",
+    "name": "未命名座位图",
+    "venueType": "SIMPLE",
+    "categories": [
+      {
+        "key": 1,
+        "label": "普通区",
+        "color": "#A5D6A7",
+        "accessible": false,
+        "price": 380
+      },
+      {
+        "key": 2,
+        "label": "VIP区",
+        "color": "#FF8A80",
+        "accessible": false,
+        "price": 880
+      },
+      {
+        "key": 3,
+        "label": "轮椅区",
+        "color": "#90CAF9",
+        "accessible": true,
+        "price": 280
+      }
+    ],
+    "sections": [
+  {
+    "id": "star",
+    "name":"101",
+    "type":"path",
+    "path": "M0,-60 L14,-18 L58,-18 L22,10 L36,54 L0,28 L-36,54 L-22,10 L-58,-18 L-14,-18 Z",
+    "x": 300,
+    "y": 300,
+    "fill": "rgba(239,68,68,0.2)",
+    "stroke": "rgba(239,68,68,0.7)"
+    
+  },
+  {
+    "id": "hexagon",
+    "name":"101",
+    "type":"path",
+    "path": "M-36.59,34.07L-47.6,-14.43L-11.01,-48.51L36.59,-34.07L79.14,-6.87A43.9,43.9 0 0 1 11.01,48.51A24.87,24.87 0 0 1 -36.59,34.07Z",
+    "x": 650,
+    "y": 260,
+    "fill": "rgba(59,130,246,0.2)",
+    "stroke": "rgba(59,130,246,0.7)"
+  },
+  {
+    "id": "arrow",
+    "name":"101",
+    "type":"path",
+    "path": "M0,-50 L40,0 L20,0 L20,50 L-20,50 L-20,0 L-40,0 Z",
+    "x": 500,
+    "y": 500,
+    "fill": "rgba(34,197,94,0.2)",
+    "stroke": "rgba(34,197,94,0.7)"
+  },
+  {
+    "id": "blob",
+    "name":"101",
+    "type":"path",
+    "path": "M0,-40 C30,-50 60,-20 55,10 C50,40 25,55 -10,45 C-45,35 -55,0 -45,-25 C-35,-50 -15,-45 0,-40 Z",
+    "x": 200,
+    "y": 500,
+    "fill": "rgba(168,85,247,0.2)",
+    "stroke": "rgba(168,85,247,0.7)"
+  },
+  {
+    "id": "diamond",
+    "name":"101",
+    "type":"path",
+    "path": "M12.34,-58.72L34.25,7.2L-12.34,58.72L-34.25,-7.2Z",
+    "x": 750,
+    "y": 480,
+    "fill": "rgba(251,146,60,0.2)",
+    "stroke": "rgba(251,146,60,0.7)"
+  },
+  {
+    "id": "trapezoid",
+    "name":"101",
+    "type":"path",
+    "path": "M-40,-35 L40,-35 L25,35 L-25,35 Z",
+    "x": 450,
+    "y": 120,
+    "fill": "rgba(236,72,153,0.2)",
+    "stroke": "rgba(236,72,153,0.7)"
+  }
+],
+    "baseScale": 1,
+    "visualConfig": {
+      "radius": 6,
+      "gap": 18,
+      "rowGap": 24,
+      "width": 2
+    }
+}
+
