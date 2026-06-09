@@ -687,8 +687,7 @@ function updateDrawPreview(mx: number, my: number): void {
     fill: 'rgba(59,130,246,0.12)',
     stroke: '#3b82f6',
     strokeWidth: 1.5 / hs,
-    dashPattern: [6 / hs, 4 / hs],
-    editable: false, draggable: false, hittable: false,
+editable: false, draggable: false, hittable: false,
   })
   leafer!.add(drawPreviewPath)
 }
@@ -706,7 +705,7 @@ function finishDrawPolygon(): void {
     id,
     path: d,
     x: 0, y: 0,
-    fill: 'rgba(59,130,246,0.2)',
+    fill: '#d1d5db',
     name: `分区 ${allPaths.length + 1}`,
   })
   exitDrawPolygon()
