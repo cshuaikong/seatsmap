@@ -39,7 +39,7 @@ export type ToolMode =
   | 'row-straight'
   | 'section'
   | 'section-diagonal'
-  | 'drawCircle' | 'drawRect' | 'drawPolygon' | 'drawPolyline' | 'drawSector'
+  | 'drawCircle' | 'drawRect' | 'drawPolygon' | 'drawPolyline' | 'drawSector'| 'drawSection'
   | 'text' | 'image'
   | 'drawRow' | 'drawSegmentRow' | 'drawMultiRow' | 'selectseat'
   | 'drawLine' | 'restroom' | 'drawRoundTable'

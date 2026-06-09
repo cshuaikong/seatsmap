@@ -66,7 +66,18 @@
 
     <!-- 6-11. 座位区工具 -->
     <div class="toolbar-section">
-      <!-- 矩形 -->
+
+      <!-- 分区 -->
+      <button 
+        class="tool-item"
+        :class="{ active: modelValue === 'drawSection' }"
+        title="分区绘制"
+        @click="onToolChange('drawSection')"
+      >
+        <i class="iconfont icon-xianduan tool-iconfont"></i>
+      </button>
+
+            <!-- 矩形 -->
       <button 
         class="tool-item"
         :class="{ active: modelValue === 'drawRect' }"
@@ -83,15 +94,6 @@
         @click="onToolChange('drawPolygon')"
       >
         <i class="iconfont icon-duobianxing tool-iconfont"></i>
-      </button>
-      <!-- 折线 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawPolyline' }"
-        title="折线"
-        @click="onToolChange('drawPolyline')"
-      >
-        <i class="iconfont icon-xianduan tool-iconfont"></i>
       </button>
     </div>
     <div class="toolbar-divider"></div>

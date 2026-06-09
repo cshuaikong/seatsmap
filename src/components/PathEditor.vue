@@ -62,6 +62,12 @@ let editVerts: { x: number; y: number }[] = []
 let editArcDepths: number[] = []
 let allPaths: any[] = []
 
+// 多边形绘制状态
+let drawPolygonPoints: { x: number; y: number }[] = []
+let drawPreviewPath: any = null
+let drawVertexDots: any[] = []
+const DRAW_CLOSE_THRESHOLD = 15
+
 // Path 轮廓边缓存
 let edgeCache = new WeakMap<object, number[][]>()
 
@@ -260,6 +266,11 @@ onMounted(() => {
   let didRotate = false
   editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update(); syncBorder() })
   editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder(); didRotate = true })
+  leafer.on(LP.MOVE, (e: any) => {
+    if (props.currentTool !== 'drawPolygon' || drawPolygonPoints.length === 0) return
+    const w = canvasToWorld(e.x, e.y)
+    updateDrawPreview(w.x, w.y)
+  })
   leafer.on(LP.UP, () => {
     // 框选结束后恢复 editBox
     const sel = (editor as any)?.selector
@@ -288,6 +299,17 @@ onMounted(() => {
   // 框选时刷新 clientBounds
   leafer.on(LP.DOWN, () => {
     try { ;(leafer as any).canvas?.getClientBounds?.(true) } catch (_) {}
+  })
+  // 多边形绘制：点击添加顶点或闭合
+  leafer.on(LP.CLICK, (e: any) => {
+    if (props.currentTool !== 'drawPolygon') return
+    const w = canvasToWorld(e.x, e.y)
+    if (drawPolygonPoints.length >= 3 && isNearFirstPoint(w.x, w.y)) {
+      finishDrawPolygon()
+    } else {
+      addDrawPoint(w.x, w.y)
+      if (drawPolygonPoints.length === 1) updateDrawPreview(w.x, w.y)
+    }
   })
   // 首次渲染
   renderAll(props.venueData)
@@ -349,7 +371,12 @@ onMounted(() => {
     }
     canvas.addEventListener('wheel', boundWheel, { passive: false })
 
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && vertexEditTarget) exitVertexEdit() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (drawPolygonPoints.length > 0) { cancelDrawPolygon(); return }
+        if (vertexEditTarget) exitVertexEdit()
+      }
+    }
     document.addEventListener('keydown', onKey)
     ;(leafer as any).__onKey = onKey
   })
@@ -377,6 +404,12 @@ watch(() => props.currentTool, (tool) => {
     }
   } else if (isEditing.value) {
     exitVertexEdit()
+  }
+
+  if (tool === 'drawPolygon') {
+    enterDrawPolygon()
+  } else if (drawPolygonPoints.length > 0) {
+    cancelDrawPolygon()
   }
 })
 
@@ -461,6 +494,16 @@ function exportPaths(): VenueData['sections'] {
 
 function getS(): number {
   return (leafer as any)?.scaleX ?? (leafer as any)?.__zoomLayer?.scaleX ?? 1
+}
+
+function canvasToWorld(x: number, y: number): { x: number; y: number } {
+  const l = leafer as any
+  const zl = l?.__zoomLayer
+  const sx = l?.scaleX ?? zl?.scaleX ?? 1
+  const sy = l?.scaleY ?? zl?.scaleY ?? 1
+  const px = l?.x ?? zl?.x ?? 0
+  const py = l?.y ?? zl?.y ?? 0
+  return { x: (x - px) / sx, y: (y - py) / sy }
 }
 
 // SVG 圆弧采样
@@ -579,6 +622,99 @@ function exitVertexEdit(silent?: boolean): void {
 function setPanEnabled(enabled: boolean): void {
   const app = (leafer as any)?.app
   if (app?.config?.move) app.config.move.disabled = !enabled
+}
+
+// ==================== 多边形绘制 ====================
+
+function enterDrawPolygon(): void {
+  allPaths.forEach((p: any) => { p.hittable = false })
+  if (editor) (editor as any).hittable = false
+  editor?.cancel()
+  setPanEnabled(false)
+  if (canvas) canvas.style.cursor = 'crosshair'
+}
+
+function exitDrawPolygon(): void {
+  drawPreviewPath?.remove()
+  drawPreviewPath = null
+  drawVertexDots.forEach(d => d.remove())
+  drawVertexDots = []
+  drawPolygonPoints = []
+  allPaths.forEach((p: any) => { p.hittable = true })
+  if (editor) (editor as any).hittable = true
+  setPanEnabled(true)
+  if (canvas) canvas.style.cursor = ''
+}
+
+function isNearFirstPoint(x: number, y: number): boolean {
+  if (drawPolygonPoints.length < 3) return false
+  const first = drawPolygonPoints[0]
+  return Math.hypot(x - first.x, y - first.y) < DRAW_CLOSE_THRESHOLD
+}
+
+function addDrawPoint(x: number, y: number): void {
+  drawPolygonPoints.push({ x, y })
+  const hs = Math.max(getS(), 0.02)
+  const size = 6 / hs
+  const dot = new Rect({
+    width: size, height: size,
+    fill: '#3b82f6', stroke: '#fff', strokeWidth: 1.5 / hs,
+    x, y,
+    around: 'center',
+    draggable: false, hittable: false,
+  })
+  leafer!.add(dot)
+  drawVertexDots.push(dot)
+}
+
+function updateDrawPreview(mx: number, my: number): void {
+  drawPreviewPath?.remove()
+  drawPreviewPath = null
+  if (drawPolygonPoints.length === 0) return
+
+  const pts = [...drawPolygonPoints, { x: mx, y: my }]
+  let d = `M${r(pts[0].x)},${r(pts[0].y)}`
+  for (let i = 1; i < pts.length; i++) {
+    d += `L${r(pts[i].x)},${r(pts[i].y)}`
+  }
+  if (drawPolygonPoints.length > 2 && isNearFirstPoint(mx, my)) {
+    d += 'Z'
+  }
+
+  const hs = Math.max(getS(), 0.02)
+  drawPreviewPath = new Path({
+    path: d,
+    fill: 'rgba(59,130,246,0.12)',
+    stroke: '#3b82f6',
+    strokeWidth: 1.5 / hs,
+    dashPattern: [6 / hs, 4 / hs],
+    editable: false, draggable: false, hittable: false,
+  })
+  leafer!.add(drawPreviewPath)
+}
+
+function finishDrawPolygon(): void {
+  const pts = drawPolygonPoints
+  let d = `M${r(pts[0].x)},${r(pts[0].y)}`
+  for (let i = 1; i < pts.length; i++) {
+    d += `L${r(pts[i].x)},${r(pts[i].y)}`
+  }
+  d += 'Z'
+
+  const id = `section-${Date.now()}`
+  createPolygonItem({
+    id,
+    path: d,
+    x: 0, y: 0,
+    fill: 'rgba(59,130,246,0.2)',
+    name: `分区 ${allPaths.length + 1}`,
+  })
+  exitDrawPolygon()
+  emit('update:currentTool', 'select')
+}
+
+function cancelDrawPolygon(): void {
+  exitDrawPolygon()
 }
 
 function toWorld(lx: number, ly: number, ox: number, oy: number, rad: number) {
