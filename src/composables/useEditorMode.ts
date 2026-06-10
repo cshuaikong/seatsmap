@@ -17,7 +17,6 @@ export function useEditorMode(onToolChange: (tool: string) => void) {
   function switchTo(name: string): void {
     if (current === name) return
     const old = tools.get(current)
-    if (old?.isActive?.()) return
     old?.exit?.()
     current = name
     tools.get(name)?.enter?.()
