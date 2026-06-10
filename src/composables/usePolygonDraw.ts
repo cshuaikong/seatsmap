@@ -18,8 +18,10 @@ export function usePolygonDraw(ctx: PolygonDrawCtx) {
   let points: { x: number; y: number }[] = []
   let previewPath: any = null
   let vertexDots: any[] = []
+  let engaged = false
 
   function enter(): void {
+    engaged = true
     const allPaths = ctx.getAllPaths()
     allPaths.forEach((p: any) => { p.hittable = false })
     const editor = ctx.getEditor()
@@ -31,6 +33,7 @@ export function usePolygonDraw(ctx: PolygonDrawCtx) {
   }
 
   function exit(): void {
+    engaged = false
     previewPath?.remove()
     previewPath = null
     vertexDots.forEach(d => d.remove())
@@ -133,7 +136,7 @@ export function usePolygonDraw(ctx: PolygonDrawCtx) {
     cancel,
     handleClick,
     handleMove,
-    isActive: () => points.length > 0,
+    isActive: () => engaged,
     getPoints: () => points,
   }
 }

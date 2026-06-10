@@ -26,11 +26,15 @@ export function useEditorMode(onToolChange: (tool: string) => void) {
   function handleClick(x: number, y: number): boolean {
     const h = tools.get(current)
     if (!h?.onClick) return false
+    if (h.isActive && !h.isActive()) return false
     return h.onClick(x, y)
   }
 
   function handleMove(x: number, y: number): void {
-    tools.get(current)?.onMove?.(x, y)
+    const h = tools.get(current)
+    if (!h?.onMove) return
+    if (h.isActive && !h.isActive()) return
+    h.onMove(x, y)
   }
 
   function cancelCurrent(): void {
