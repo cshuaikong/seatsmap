@@ -149,7 +149,6 @@
 </template>
 
 <script setup lang="ts">
-import { Icon } from '@iconify/vue'
 
 type ToolMode = 'select' | 'node' | 'selectseat'
   | 'seat-row' | 'seat-section' | 'seat-diagonal'
