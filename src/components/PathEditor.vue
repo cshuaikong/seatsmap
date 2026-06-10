@@ -28,7 +28,7 @@ import { darkenColor, rotatePath, sampleArc } from '../utils/pathUtils'
 import { usePolygonDraw } from '../composables/usePolygonDraw'
 import { useVertexEdit } from '../composables/useVertexEdit'
 import { exportJSON, exportPNG, exportSVG } from '../composables/usePathExport'
-
+import { useEditorMode } from '../composables/useEditorMode'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
   seatList?: any[]
@@ -182,6 +182,22 @@ const vertexEdit = useVertexEdit({
 })
 
 watch(() => vertexEdit.isEditing.value, (v) => emit('vertex-edit-change', v))
+
+// ==================== 工具调度中心 ====================
+
+const mode = useEditorMode((tool) => emit('update:currentTool', tool))
+
+mode.register('drawPolygon', {
+  enter: () => polygonDraw.enter(),
+  exit: () => polygonDraw.cancel(),
+  onClick: (x, y) => { polygonDraw.handleClick(x, y); return true },
+  onMove: (x, y) => polygonDraw.handleMove(x, y),
+  isActive: () => polygonDraw.isActive(),
+})
+
+mode.register('node', {
+  exit: () => { if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit() },
+})
 
 // ==================== 视图控制 ====================
 
@@ -397,10 +413,8 @@ onMounted(() => {
   editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update(); syncBorder() })
   editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder(); didRotate = true })
   leafer.on(LP.MOVE, (e: any) => {
-    if (props.currentTool === 'drawPolygon' && polygonDraw.isActive()) {
-      const w = canvasToWorld(e.x, e.y)
-      polygonDraw.handleMove(w.x, w.y)
-    }
+    const w = canvasToWorld(e.x, e.y)
+    mode.handleMove(w.x, w.y)
   })
   leafer.on(LP.UP, () => {
     const sel2 = (editor as any)?.selector
@@ -430,11 +444,9 @@ onMounted(() => {
   leafer.on(LP.DOWN, () => {
     try { ;(leafer as any).canvas?.getClientBounds?.(true) } catch (_) {}
   })
-  // 多边形绘制：点击添加顶点或闭合
   leafer.on(LP.CLICK, (e: any) => {
-    if (props.currentTool !== 'drawPolygon') return
     const w = canvasToWorld(e.x, e.y)
-    polygonDraw.handleClick(w.x, w.y)
+    mode.handleClick(w.x, w.y)
   })
 
   renderAll(props.venueData)
@@ -474,8 +486,7 @@ onMounted(() => {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (polygonDraw.isActive()) { polygonDraw.cancel(); return }
-        if (vertexEdit.getTarget()) vertexEdit.exitVertexEdit()
+        mode.cancelCurrent()
       }
     }
     document.addEventListener('keydown', onKey)
@@ -508,20 +519,18 @@ watch(() => props.venueData, (newVal) => {
 })
 
 watch(() => props.currentTool, (tool) => {
+  // node 模式特殊处理：如果已有选中 path，直接进入顶点编辑
   if (tool === 'node') {
     const list: any[] = (editor as any)?.list ?? []
     if (!vertexEdit.isEditing.value && list.length === 1 && list[0]?.tag === 'Path') {
       vertexEdit.enterVertexEdit(list[0])
+      return
     }
   } else if (vertexEdit.isEditing.value) {
     vertexEdit.exitVertexEdit()
   }
 
-  if (tool === 'drawPolygon') {
-    polygonDraw.enter()
-  } else if (polygonDraw.isActive()) {
-    polygonDraw.cancel()
-  }
+  mode.switchTo(tool)
 })
 
 // ==================== Expose ====================
