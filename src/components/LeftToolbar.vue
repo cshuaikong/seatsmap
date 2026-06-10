@@ -36,27 +36,27 @@
       <!-- 单行座位 row-straight：两点式直行 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'row-straight' }"
+        :class="{ active: modelValue === 'seat-row' }"
         title="单行座位"
-        @click="onToolChange('row-straight')"
+        @click="onToolChange('seat-row')"
       >
         <i class="iconfont icon-dorwrow tool-iconfont"></i>
       </button>
       <!-- 分段座位 section：三点式折线行 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'section' }"
+        :class="{ active: modelValue === 'seat-section' }"
         title="分段座位"
-        @click="onToolChange('section')"
+        @click="onToolChange('seat-section')"
       >
         <i class="iconfont icon-drowseatswithsegment tool-iconfont"></i>
       </button>
       <!-- 多行座位 section-diagonal：对角区块 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'section-diagonal' }"
+        :class="{ active: modelValue === 'seat-diagonal' }"
         title="多行座位"
-        @click="onToolChange('section-diagonal')"
+        @click="onToolChange('seat-diagonal')"
       >
         <i class="iconfont icon-drowmultrows tool-iconfont"></i>
       </button>
@@ -70,9 +70,9 @@
       <!-- 分区 -->
       <button 
         class="tool-item"
-        :class="{ active: modelValue === 'drawSection' }"
-        title="分区绘制"
-        @click="onToolChange('drawSection')"
+        :class="{ active: modelValue === 'drawline' }"
+        title="绘制线条"
+        @click="onToolChange('drawline')"
       >
         <i class="iconfont icon-xianduan tool-iconfont"></i>
       </button>
@@ -81,7 +81,7 @@
       <button 
         class="tool-item"
         :class="{ active: modelValue === 'drawRect' }"
-        title="方形区域"
+        title="绘制矩形"
         @click="onToolChange('drawRect')"
       >
         <i class="iconfont icon-rect tool-iconfont"></i>
@@ -90,7 +90,7 @@
       <button 
         class="tool-item"
         :class="{ active: modelValue === 'drawPolygon' }"
-        title="多边形"
+        title="绘制分区"
         @click="onToolChange('drawPolygon')"
       >
         <i class="iconfont icon-duobianxing tool-iconfont"></i>
@@ -104,7 +104,7 @@
       <button 
         class="tool-item"
         :class="{ active: modelValue === 'text' }"
-        title="文字标注"
+        title="文字"
         @click="onToolChange('text')"
       >
         <i class="iconfont icon-wenzi tool-iconfont"></i>
@@ -113,7 +113,7 @@
       <button 
         class="tool-item"
         :class="{ active: modelValue === 'image' }"
-        title="底图"
+        title="图片"
         @click="onImageClick"
       >
         <i class="iconfont icon-tupian tool-iconfont"></i>
@@ -150,7 +150,11 @@
 
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
-import type { ToolMode } from '../composables/useKonvaDrawing'
+
+type ToolMode = 'select' | 'node' | 'selectseat'
+  | 'seat-row' | 'seat-section' | 'seat-diagonal'
+  | 'drawline' | 'drawRect' | 'drawPolygon'
+  | 'text' | 'image'
 
 defineProps<{
   modelValue: ToolMode
