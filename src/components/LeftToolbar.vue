@@ -43,14 +43,14 @@
         <i class="iconfont icon-dorwrow tool-iconfont"></i>
       </button>
       <!-- 分段座位 section：三点式折线行 -->
-      <button 
+      <!-- <button 
         class="tool-item"
         :class="{ active: modelValue === 'seat-section' }"
         title="分段座位"
         @click="onToolChange('seat-section')"
       >
         <i class="iconfont icon-drowseatswithsegment tool-iconfont"></i>
-      </button>
+      </button> -->
       <!-- 多行座位 section-diagonal：对角区块 -->
       <button 
         class="tool-item"

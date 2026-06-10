@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Leafer, Path, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
+import { Leafer, Path, Ellipse, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
 import '@leafer-in/view'
 import '@leafer-in/viewport'
 import '@leafer-in/editor'
@@ -29,6 +29,8 @@ import { useVertexEdit } from '../composables/useVertexEdit'
 import { exportJSON, exportPNG, exportSVG } from '../composables/usePathExport'
 import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
+import { useSeatDraw } from '../composables/useSeatDraw'
+import type { SeatDrawRowData } from '../composables/useSeatDraw'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
   seatList?: any[]
@@ -58,6 +60,7 @@ let canvas: HTMLCanvasElement | null = null
 let boundWheel: ((e: WheelEvent) => void) | null = null
 
 let allPaths: any[] = []
+let seatElements: any[] = []
 let edgeCache = new WeakMap<object, number[][]>()
 let currentBorder: any = null
 let currentBorderBody: any = null
@@ -113,6 +116,7 @@ function clearAllPaths() {
   })
   allPaths = []
   edgeCache = new WeakMap<object, number[][]>()
+  clearSeatElements()
 }
 
 function renderAll(data: VenueData): void {
@@ -168,6 +172,51 @@ const polygonDraw = usePolygonDraw({
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
+// ==================== 座位绘制 ====================
+
+function createSeatElements(rows: SeatDrawRowData[]): void {
+  const bs = seatDraw.getBaseScale()
+  const radius = 6 / Math.max(bs, 0.02)
+  const size = radius * 2
+  rows.forEach(row => {
+    for (let i = 0; i < row.count; i++) {
+      const sx = row.x + row.ux * row.spacing * i
+      const sy = row.y + row.uy * row.spacing * i
+      const el = new Ellipse({
+        x: sx, y: sy,
+        width: size, height: size,
+        fill: '#A5D6A7',
+        stroke: '#81C784',
+        strokeWidth: 1 / Math.max(bs, 0.02),
+        around: 'center',
+        hittable: false,
+        draggable: false,
+      })
+      leafer!.add(el)
+      seatElements.push(el)
+    }
+  })
+}
+
+function clearSeatElements(): void {
+  seatElements.forEach(el => { try { el.remove() } catch (_) {} })
+  seatElements = []
+  seatDraw.resetBaseScale()
+}
+
+const seatDraw = useSeatDraw({
+  getLeafer: () => leafer,
+  getEditor: () => editor,
+  getCanvas: () => canvas,
+  getAllPaths: () => allPaths,
+  getS,
+  setPanEnabled,
+  onFinish: (data) => {
+    createSeatElements(data.rows)
+  },
+  onToolChange: (tool) => emit('update:currentTool', tool),
+})
+
 // ==================== 顶点编辑 ====================
 
 const vertexEdit = useVertexEdit({
@@ -197,6 +246,30 @@ mode.register('drawPolygon', {
 
 mode.register('node', {
   exit: () => { if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit() },
+})
+
+mode.register('seat-row', {
+  enter: () => seatDraw.seatRow.enter(),
+  exit: () => seatDraw.seatRow.exit(),
+  onClick: (x, y) => { seatDraw.seatRow.onClick(x, y); return true },
+  onMove: (x, y) => seatDraw.seatRow.onMove(x, y),
+  isActive: () => seatDraw.seatRow.isActive(),
+})
+
+mode.register('seat-section', {
+  enter: () => seatDraw.seatSection.enter(),
+  exit: () => seatDraw.seatSection.exit(),
+  onClick: (x, y) => { seatDraw.seatSection.onClick(x, y); return true },
+  onMove: (x, y) => seatDraw.seatSection.onMove(x, y),
+  isActive: () => seatDraw.seatSection.isActive(),
+})
+
+mode.register('seat-diagonal', {
+  enter: () => seatDraw.seatDiagonal.enter(),
+  exit: () => seatDraw.seatDiagonal.exit(),
+  onClick: (x, y) => { seatDraw.seatDiagonal.onClick(x, y); return true },
+  onMove: (x, y) => seatDraw.seatDiagonal.onMove(x, y),
+  isActive: () => seatDraw.seatDiagonal.isActive(),
 })
 
 // ==================== 视图控制 ====================
