@@ -9,6 +9,11 @@
       <button @click="onExportPNG">PNG</button>
       <button @click="onExportSVG">SVG</button>
       <button v-if="vertexEdit.isEditing.value" @click="vertexEdit.exitVertexEdit()" class="pe-btn-exit">退出编辑 (Esc)</button>
+      <button v-if="focusedSectionId" @click="exitSectionFocus()" class="pe-btn-exit">退出分区编辑</button>
+      <button v-if="!focusedSectionId && selectedCount === 1 && !vertexEdit.isEditing.value && !seatVertexEdit.isEditing.value"
+        @click="enterSectionFocus((editor as any)?.list?.[0]?.id)">
+        分区编辑
+      </button>
     </div>
     <div ref="containerRef" class="pe-canvas" />
   </div>
@@ -26,6 +31,7 @@ import type { VenueData } from '../types'
 import { darkenColor, rotatePath } from '../utils/pathUtils'
 import { usePolygonDraw } from '../composables/usePolygonDraw'
 import { useVertexEdit } from '../composables/useVertexEdit'
+import { useSeatVertexEdit } from '../composables/useSeatVertexEdit'
 import { exportJSON, exportPNG, exportSVG } from '../composables/usePathExport'
 import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
@@ -42,6 +48,8 @@ const props = withDefaults(defineProps<{
   currentTool: 'select',
 })
 const title = ref('座位图设计器')
+const focusedSectionId = ref<string | null>(null)
+const focusedSectionName = ref('')
 const emit = defineEmits<{
   (e: 'body-double-tap', body: any): void
   (e: 'ready', leafer: any, editor: any): void
@@ -104,6 +112,7 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
   allPaths.push(body)
 
   body.on_(LP.DOUBLE_TAP, () => {
+    enterSectionFocus(p.id)
     emit('body-double-tap', body)
   })
 }
@@ -149,6 +158,9 @@ function renderAll(data: VenueData): void {
       createPolygonItem(s)
     }
   })
+
+  // 从 venue data 渲染座位（sections[].rows[].seats[]），优先使用数据中的 baseScale
+  seatModule.createSeatsFromVenueData(sections, data?.baseScale)
 
   if (editor) {
     editor.cancel()
@@ -218,7 +230,19 @@ const vertexEdit = useVertexEdit({
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
-watch(() => vertexEdit.isEditing.value, (v) => emit('vertex-edit-change', v))
+// ==================== 座位排顶点编辑 ====================
+
+const seatVertexEdit = useSeatVertexEdit({
+  getLeafer: () => leafer,
+  getEditor: () => editor,
+  getAllPaths: () => [...allPaths, ...seatModule.seatRowGroups],
+  getS,
+  setPanEnabled,
+  onRebuild: (group, newData, endCenter, anchorFromEnd) => seatModule.rebuildSeatRow(group, newData, endCenter, anchorFromEnd),
+  onToolChange: (tool) => emit('update:currentTool', tool),
+})
+
+watch(() => vertexEdit.isEditing.value || seatVertexEdit.isEditing.value, (v) => emit('vertex-edit-change', v))
 
 // ==================== 工具调度中心 ====================
 
@@ -237,6 +261,88 @@ mode.register('node', {
 })
 
 Object.entries(seatModule.modeHandlers).forEach(([name, handler]) => mode.register(name, handler))
+
+// ==================== 分区编辑（Section Focus） ====================
+
+function enterSectionFocus(sectionId: string): void {
+  if (!leafer) return
+  const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
+  if (!section) return
+
+  focusedSectionId.value = sectionId
+  focusedSectionName.value = section.name || sectionId
+  title.value = `分区编辑 — ${focusedSectionName.value}`
+
+  editor?.cancel()
+  if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+  if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+
+  // 定位到分区中心
+  const cx = section.x ?? 0
+  const cy = section.y ?? 0
+  const baseScale = props.venueData?.baseScale
+  const currentS = getS()
+  const targetScale = baseScale ?? currentS
+
+  if (Math.abs(targetScale - currentS) > 0.001) {
+    leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
+    setTimeout(() => {
+      scale.value = getS()
+      leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any)
+    }, 350)
+  }
+
+  // 聚焦分区不可选中/移动，其他分区变淡
+  allPaths.forEach((p: any) => {
+    if (p.id === sectionId) {
+      p.editable = false
+      p.draggable = false
+      p.hittable = false
+    } else {
+      p.opacity = 0.25
+      p.hittable = false
+      p.editable = false
+      p.draggable = false
+    }
+  })
+
+  // 聚焦分区内的座位排可选中/编辑
+  seatModule.seatRowGroups.forEach((g: any) => {
+    const gid = (g as any).__sectionId
+    if (gid === sectionId) {
+      g.hittable = true
+      g.editable = true
+    } else {
+      g.hittable = false
+      g.editable = false
+    }
+  })
+  seatModule.updateSeatLOD()
+}
+
+function exitSectionFocus(): void {
+  if (!leafer) return
+  focusedSectionId.value = null
+  focusedSectionName.value = ''
+  title.value = '座位图设计器'
+
+  if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+  if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+
+  allPaths.forEach((p: any) => {
+    p.opacity = 1
+    p.hittable = true
+    p.editable = true
+    p.draggable = true
+  })
+  // 退出后座位排恢复不可交互
+  seatModule.seatRowGroups.forEach((g: any) => {
+    g.hittable = false
+    g.editable = false
+  })
+  seatModule.updateSeatLOD()
+  ;(leafer as any)?.__updateViewPort?.()
+}
 
 // ==================== 视图控制 ====================
 
@@ -365,9 +471,15 @@ onMounted(() => {
       ;(editor as any).editBox.visible = false
     }
 
-    if (props.currentTool === 'node' && list.length === 1 && list[0]?.tag === 'Path' && vertexEdit.getTarget() !== list[0]) {
-      vertexEdit.enterVertexEdit(list[0])
-      return
+    if (props.currentTool === 'node' && list.length === 1 && !vertexEdit.isEditing.value && !seatVertexEdit.isEditing.value) {
+      if (list[0]?.__seatRow && seatVertexEdit.getTarget() !== list[0]) {
+        seatVertexEdit.enter(list[0])
+        return
+      }
+      if (list[0]?.tag === 'Path' && vertexEdit.getTarget() !== list[0]) {
+        vertexEdit.enterVertexEdit(list[0])
+        return
+      }
     }
   })
 
@@ -387,9 +499,18 @@ onMounted(() => {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (focusedSectionId.value) {
+          exitSectionFocus()
+          return
+        }
+        if (seatVertexEdit.isEditing.value) {
+          seatVertexEdit.exit()
+          return
+        }
         mode.cancelCurrent()
       }
       if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (seatVertexEdit.isEditing.value) return
         deleteSelected()
       }
     }
@@ -402,6 +523,7 @@ onMounted(() => {
     const s = getS()
     const handles = vertexEdit.getTarget() ? [...vertexEdit.getHandles(), ...vertexEdit.getEdgeHandles()] : undefined
     compensateZoom(editor, s, handles)
+    if (seatVertexEdit.isEditing.value) seatVertexEdit.updateHandleSize()
     if (currentBorder) currentBorder.strokeWidth = 1 / s
     seatModule.updateSeatLOD()
   })
@@ -424,15 +546,24 @@ watch(() => props.venueData, (newVal) => {
 })
 
 watch(() => props.currentTool, (tool) => {
-  // node 模式特殊处理：如果已有选中 path，直接进入顶点编辑
+  // node 模式特殊处理：如果已有选中元素，直接进入对应顶点编辑
   if (tool === 'node') {
     const list: any[] = (editor as any)?.list ?? []
-    if (!vertexEdit.isEditing.value && list.length === 1 && list[0]?.tag === 'Path') {
-      vertexEdit.enterVertexEdit(list[0])
-      return
+    if (!vertexEdit.isEditing.value && !seatVertexEdit.isEditing.value) {
+      if (list.length === 1) {
+        if (list[0]?.__seatRow) {
+          seatVertexEdit.enter(list[0])
+          return
+        }
+        if (list[0]?.tag === 'Path') {
+          vertexEdit.enterVertexEdit(list[0])
+          return
+        }
+      }
     }
-  } else if (vertexEdit.isEditing.value) {
-    vertexEdit.exitVertexEdit()
+  } else {
+    if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+    if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
   }
 
   mode.switchTo(tool)
@@ -445,10 +576,14 @@ defineExpose({
   getScale: getS,
   exportJSON: onExportJSON, exportPNG: onExportPNG, exportSVG: onExportSVG,
   getLeafer: () => leafer, getEditor: () => editor,
+  isVertexEditActive: () => vertexEdit.isEditing.value,
+  isSeatVertexEditActive: () => seatVertexEdit.isEditing.value,
+  isSectionFocusActive: () => !!focusedSectionId.value,
   toggleVertexEdit: () => {
     vertexEdit.isEditing.value ? vertexEdit.exitVertexEdit() : vertexEdit.enterVertexEdit((editor as any)?.list?.[0])
   },
-  isVertexEditActive: () => vertexEdit.isEditing.value,
+  enterSectionFocus,
+  exitSectionFocus,
   deleteSelected,
   exportPaths,
   drawnSeatCount: seatModule.drawnSeatCount,

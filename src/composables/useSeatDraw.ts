@@ -109,6 +109,10 @@ export function useSeatDraw(ctx: SeatDrawCtx) {
     }
   }
 
+  function setBaseScale(v: number): void {
+    baseScale = v
+  }
+
   function logicalSize(visual: number): number {
     return visual / Math.max(getBaseScale(), 0.02)
   }
@@ -378,5 +382,5 @@ export function useSeatDraw(ctx: SeatDrawCtx) {
     isActive,
   }
 
-  return { seatRow, seatSection, seatDiagonal, getBaseScale, resetBaseScale: () => { baseScale = null } }
+  return { seatRow, seatSection, seatDiagonal, getBaseScale, lockBaseScale, setBaseScale, resetBaseScale: () => { baseScale = null } }
 }

@@ -29,9 +29,21 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       if (Array.isArray(target)) {
         target = target.filter((el: any) => !el.__seatRow)
       } else if (target?.__seatRow) {
-        target = null
+        return
       }
       _origSetTarget(target, style)
+    }
+  }
+
+  // ⓪① editBox.update 包装：防止 __seatRow 导致 getLayoutBounds 崩溃
+  const editBox = (editor as any).editBox
+  if (editBox) {
+    const _origUpdate = editBox.update.bind(editBox)
+    editBox.update = function () {
+      const list: any[] = (editor as any)?.list ?? []
+      if (list.length > 0 && list.every((el: any) => el.__seatRow)) return
+      if (list.length === 0) return
+      try { _origUpdate() } catch (_) {}
     }
   }
 
