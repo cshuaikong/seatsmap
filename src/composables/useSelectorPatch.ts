@@ -8,6 +8,10 @@ export interface SelectorPatchCtx {
   getVertexTarget: () => any
   getCurrentBorder: () => any
   getCurrentBorderBody: () => any
+  /** 框选完成后通知座位排选中变化 */
+  onSeatRowsSelected?: (groups: any[]) => void
+  /** 获取所有座位排 Group（用于 findOne 无法命中容器的问题） */
+  getSeatRowGroups?: () => any[]
 }
 
 export function useSelectorPatch(ctx: SelectorPatchCtx): void {
@@ -16,6 +20,20 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
 
   const sel = (editor as any).selector
   if (!sel) return
+
+  // ⓪ targetStroker setTarget 拦截：过滤 __seatRow，不画单个座位排的包围描边
+  const targetStroker = sel.targetStroker
+  if (targetStroker) {
+    const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
+    targetStroker.setTarget = function (target: any, style?: any) {
+      if (Array.isArray(target)) {
+        target = target.filter((el: any) => !el.__seatRow)
+      } else if (target?.__seatRow) {
+        target = null
+      }
+      _origSetTarget(target, style)
+    }
+  }
 
   // ① allow 覆盖：顶点编辑时只允许选中 Rect/Ellipse
   const _origAllow = sel.allow.bind(sel)
@@ -34,14 +52,23 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return _origAllow(target)
   }
 
-  // ② findUI 覆盖：点击边框元素时转发到 body
+  // ② findUI 覆盖：点击边框→body，点击座位排子元素→父Group
   const _origFindUI = sel.findUI.bind(sel)
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
     if (result === ctx.getCurrentBorder() && ctx.getCurrentBorderBody()) {
       return ctx.getCurrentBorderBody()
     }
-    return result
+    if (result) return result
+    // findOne 要求 editable=true，Group 子元素(Line/Path)都不满足，
+    // 但 Group 本身是 isBranch 容器不会被 findOne 返回。
+    // 这里扫描命中路径，找到 __seatRow Group 作为选中目标。
+    const path = e.path?.list ?? e.path ?? []
+    for (const leaf of path) {
+      const p = leaf.parent
+      if (p?.__seatRow) return p
+    }
+    return null
   }
 
   // ③ checkAndSelect 覆盖
@@ -133,6 +160,23 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return false
   }
 
+  const groupHitsRect = (el: any, rx: number, ry: number, rw: number, rh: number): boolean => {
+    const w = el.__world
+    if (!w || !el.children) return false
+    let line: any = null
+    for (let i = 0; i < el.children.length; i++) {
+      if (el.children[i].tag === 'Line') { line = el.children[i]; break }
+    }
+    if (!line?.points || line.points.length < 4) return false
+    const r = (line.strokeWidth ?? 0) / 2
+    if (r <= 0) return false
+    const ax = line.points[0] * w.a + line.points[1] * w.c + w.e
+    const ay = line.points[0] * w.b + line.points[1] * w.d + w.f
+    const bx = line.points[2] * w.a + line.points[3] * w.c + w.e
+    const by = line.points[2] * w.b + line.points[3] * w.d + w.f
+    return segHitsRect(ax, ay, bx, by, rx - r, ry - r, rw + r + r, rh + r + r)
+  }
+
   sel.onDrag = function (e: any) {
     if (e.multiTouch) return
     if (this.editor.dragging) return this.onDragEnd(e)
@@ -158,10 +202,32 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         )
       }
       const wr = worldBounds.get()
-      const candidates = findByBounds(ed.app, worldBounds)
+      const candidates = findByBounds(ed.app, worldBounds) as any[]
+
+      // findOne/eachFind 无法命中容器型 Group（isBranch），
+      // 手动补充 __seatRow Group 碰撞检测
+      const seatGroups = ctx.getSeatRowGroups?.() ?? []
+      for (const g of seatGroups) {
+        if (!g.__world || !g.visible || g.locked) continue
+        const gw = g.__world
+        const gx = gw.e, gy = gw.f
+        // 用 worldBounds 快速粗筛（再靠 groupHitsRect 精判）
+        if (
+          gx + (g.children?.[0]?.strokeWidth ?? 0) >= wr.x &&
+          gy + (g.children?.[0]?.strokeWidth ?? 0) >= wr.y
+        ) {
+          if (groupHitsRect(g, wr.x, wr.y, wr.width, wr.height)) {
+            candidates.push(g)
+          }
+        }
+      }
+
       const list = (candidates as any[]).filter((el: any) => {
         if (el.id?.startsWith?.('section-border-')) return false
+        // 座位排子元素（Line/Path）重定向到父 Group
+        if (el.parent?.__seatRow) return false
         if (el.tag === 'Path') return pathHitsRect(el, wr.x, wr.y, wr.width, wr.height)
+        if (el.tag === 'Group') return groupHitsRect(el, wr.x, wr.y, wr.width, wr.height)
         return true
       })
       const leafList = new LeafList(list)
@@ -169,6 +235,9 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       this.bounds.width = total.x
       this.bounds.height = total.y
       this.selectArea.setBounds(dragBounds.get())
+
+      // 通知 bar 变色：提取命中的座位排 Group
+      ctx.onSeatRowsSelected?.(list.filter((el: any) => el.__seatRow))
 
       if (leafList.length) {
         const selectList: any[] = []
@@ -182,4 +251,5 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       }
     }
   }
+
 }

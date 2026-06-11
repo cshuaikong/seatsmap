@@ -1,8 +1,14 @@
 import { Ellipse, Line, Text, Group } from 'leafer-ui'
 
-const SEAT_SPACING = 18
-const ROW_SPACING = 24
-const SEAT_RADIUS = 6
+export const SEAT_CONFIG = {
+  radius: 6,       // 座位半径（逻辑像素）
+  spacing: 18,     // 座位间距
+  rowSpacing: 24,  // 排间距
+} as const
+
+const SEAT_SPACING = SEAT_CONFIG.spacing
+const ROW_SPACING = SEAT_CONFIG.rowSpacing
+const SEAT_RADIUS = SEAT_CONFIG.radius
 const CLOSE_THRESHOLD = 15
 
 const PREVIEW_FILL = 'rgba(59,130,246,0.18)'
@@ -158,13 +164,16 @@ export function useSeatDraw(ctx: SeatDrawCtx) {
     const size = radius * 2
     const count = Math.max(1, Math.round(dist / spacing))
     const pts: number[] = []
+    const dot = radius * ctx.getS() > 3 // LOD: 视觉半径 > 3px 才画圆
 
     for (let i = 0; i < count; i++) {
       const px = sx + ux * spacing * i
       const py = sy + uy * spacing * i
       pts.push(px, py)
-      const d = acquireE()
-      d.set({ x: px, y: py, width: size, height: size, fill: PREVIEW_FILL, stroke: PREVIEW_STROKE, strokeWidth: 1 })
+      if (dot) {
+        const d = acquireE()
+        d.set({ x: px, y: py, width: size, height: size, fill: PREVIEW_FILL, stroke: PREVIEW_STROKE, strokeWidth: 1 })
+      }
     }
     const line = acquireL()
     line.set({ points: pts, stroke: PREVIEW_STROKE, strokeWidth: size, strokeCap: 'round', opacity: 0.8 })
@@ -191,6 +200,8 @@ export function useSeatDraw(ctx: SeatDrawCtx) {
     const actualPerpX = depthSign > 0 ? perpX : -perpX
     const actualPerpY = depthSign > 0 ? perpY : -perpY
 
+    const dot = radius * ctx.getS() > 3 // LOD: 视觉半径 > 3px 才画圆
+
     for (let r = 0; r < rowCount; r++) {
       const ox = actualPerpX * rowSpacing * r
       const oy = actualPerpY * rowSpacing * r
@@ -199,8 +210,10 @@ export function useSeatDraw(ctx: SeatDrawCtx) {
         const sx = startPos.x + ux * spacing * i + ox
         const sy = startPos.y + uy * spacing * i + oy
         pts.push(sx, sy)
-        const d = acquireE()
-        d.set({ x: sx, y: sy, width: size, height: size, fill: PREVIEW_FILL, stroke: MULTI_STROKE, strokeWidth: 1 })
+        if (dot) {
+          const d = acquireE()
+          d.set({ x: sx, y: sy, width: size, height: size, fill: PREVIEW_FILL, stroke: MULTI_STROKE, strokeWidth: 1 })
+        }
       }
       const line = acquireL()
       line.set({ points: pts, stroke: MULTI_STROKE, strokeWidth: size, strokeCap: 'round', opacity: 0.8 })

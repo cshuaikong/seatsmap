@@ -75,7 +75,7 @@
           <div class="status-bar">
             <span class="status-item">
               <Icon icon="lucide:shapes" class="status-icon" />
-              图形总数: {{ polygonCount }}
+              座位总数: {{ seatCount }}
             </span>
             <span class="status-item">
               当前工具: {{ currentToolLabel }}
@@ -149,7 +149,17 @@ onMounted(() => {
 
 // ==================== 统计 ====================
 
-const polygonCount = computed(() => props.venueData.sections?.length || 0)
+const seatCount = computed(() => {
+  let count = 0
+  for (const s of props.venueData.sections ?? []) {
+    for (const r of s.rows ?? []) {
+      count += r.seats?.length ?? 0
+    }
+  }
+  // 加上 PathEditor 中绘制的座位
+  count += rendererRef.value?.drawnSeatCount ?? 0
+  return count
+})
 
 const currentToolLabel = computed(() => {
   const labels: Record<string, string> = {

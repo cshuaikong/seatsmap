@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { Leafer, Path, Ellipse, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
+import { Leafer, Path, Line, Group, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
 import '@leafer-in/view'
 import '@leafer-in/viewport'
 import '@leafer-in/editor'
@@ -29,7 +29,7 @@ import { useVertexEdit } from '../composables/useVertexEdit'
 import { exportJSON, exportPNG, exportSVG } from '../composables/usePathExport'
 import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
-import { useSeatDraw } from '../composables/useSeatDraw'
+import { useSeatDraw, SEAT_CONFIG } from '../composables/useSeatDraw'
 import type { SeatDrawRowData } from '../composables/useSeatDraw'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
@@ -60,7 +60,8 @@ let canvas: HTMLCanvasElement | null = null
 let boundWheel: ((e: WheelEvent) => void) | null = null
 
 let allPaths: any[] = []
-let seatElements: any[] = []
+let seatRowGroups: any[] = []
+const drawnSeatCount = ref(0)
 let edgeCache = new WeakMap<object, number[][]>()
 let currentBorder: any = null
 let currentBorderBody: any = null
@@ -157,7 +158,7 @@ const polygonDraw = usePolygonDraw({
   getLeafer: () => leafer,
   getEditor: () => editor,
   getCanvas: () => canvas,
-  getAllPaths: () => allPaths,
+  getAllPaths: () => [...allPaths, ...seatRowGroups],
   getS,
   setPanEnabled,
   onFinish: (data) => {
@@ -176,39 +177,96 @@ const polygonDraw = usePolygonDraw({
 
 function createSeatElements(rows: SeatDrawRowData[]): void {
   const bs = seatDraw.getBaseScale()
-  const radius = 6 / Math.max(bs, 0.02)
+  const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
   const size = radius * 2
+  const r = +radius.toFixed(2)
+  const sw = 1 / Math.max(bs, 0.02)
+  let totalSeats = 0
+
   rows.forEach(row => {
+    const group = new Group({
+      editable: true,
+      hittable: true,
+    })
+    ;(group as any).__seatRow = true
+
+    // 背景条：粗线 = 座位排底色带
+    const lastIdx = row.count - 1
+    const bar = new Line({
+      points: [
+        row.x, row.y,
+        row.x + row.ux * row.spacing * lastIdx,
+        row.y + row.uy * row.spacing * lastIdx,
+      ],
+      stroke: '#81C784',
+      strokeWidth: size,
+      strokeCap: 'round',
+      opacity: 0.25,
+      hittable: true,
+      draggable: false,
+    })
+    group.add(bar)
+
+    // 座位圆：一个 Path 拼所有圆，替代 N 个 Ellipse
+    let d = ''
     for (let i = 0; i < row.count; i++) {
-      const sx = row.x + row.ux * row.spacing * i
-      const sy = row.y + row.uy * row.spacing * i
-      const el = new Ellipse({
-        x: sx, y: sy,
-        width: size, height: size,
-        fill: '#A5D6A7',
-        stroke: '#81C784',
-        strokeWidth: 1 / Math.max(bs, 0.02),
-        around: 'center',
-        hittable: false,
-        draggable: false,
-      })
-      leafer!.add(el)
-      seatElements.push(el)
+      const cx = +(row.x + row.ux * row.spacing * i).toFixed(2)
+      const cy = +(row.y + row.uy * row.spacing * i).toFixed(2)
+      d += `M${cx - r},${cy} A${r},${r} 0 1,0 ${cx + r},${cy} A${r},${r} 0 1,0 ${cx - r},${cy} `
     }
+    const circles = new Path({
+      path: d,
+      fill: '#A5D6A7',
+      stroke: '#81C784',
+      strokeWidth: sw,
+      hittable: true,
+      draggable: false,
+    })
+    group.add(circles)
+
+    // LOD: 记录引用，缩放/选中时动态切换 bar ↔ circles
+    ;(group as any).__seatRadius = radius
+    ;(group as any).__circles = circles
+    ;(group as any).__bar = bar
+
+    leafer!.add(group)
+    seatRowGroups.push(group)
+    totalSeats += row.count
   })
+  drawnSeatCount.value = totalSeats
+  updateSeatLOD()
 }
 
 function clearSeatElements(): void {
-  seatElements.forEach(el => { try { el.remove() } catch (_) {} })
-  seatElements = []
+  seatRowGroups.forEach(g => { try { g.remove() } catch (_) {} })
+  seatRowGroups = []
+  drawnSeatCount.value = 0
   seatDraw.resetBaseScale()
+}
+
+function updateSeatLOD(): void {
+  const s = getS()
+  const threshold = 3 // 视觉半径阈值（px）
+  const selectedSet = new Set((editor as any)?.list ?? [])
+  for (const g of seatRowGroups) {
+    const r = (g as any).__seatRadius as number | undefined
+    const circles = (g as any).__circles as any
+    const bar = (g as any).__bar as any
+    if (r == null || !circles || !bar) continue
+    const sel = selectedSet.has(g)
+    const detail = r * s > threshold
+    circles.visible = detail
+    bar.visible = !detail || sel
+    bar.stroke = sel ? '#3b82f6' : '#81C784'
+    bar.opacity = sel ? 0.6 : 0.25
+  }
 }
 
 const seatDraw = useSeatDraw({
   getLeafer: () => leafer,
   getEditor: () => editor,
   getCanvas: () => canvas,
-  getAllPaths: () => allPaths,
+  getAllPaths: () => [...allPaths, ...seatRowGroups],
   getS,
   setPanEnabled,
   onFinish: (data) => {
@@ -222,7 +280,7 @@ const seatDraw = useSeatDraw({
 const vertexEdit = useVertexEdit({
   getLeafer: () => leafer,
   getEditor: () => editor,
-  getAllPaths: () => allPaths,
+  getAllPaths: () => [...allPaths, ...seatRowGroups],
   getS,
   setPanEnabled,
   getEdgeCache: () => edgeCache,
@@ -317,6 +375,10 @@ onMounted(() => {
     getVertexTarget: () => vertexEdit.getTarget(),
     getCurrentBorder: () => currentBorder,
     getCurrentBorderBody: () => currentBorderBody,
+    onSeatRowsSelected: (_groups: any[]) => {
+      updateSeatLOD()
+    },
+    getSeatRowGroups: () => seatRowGroups,
   })
   leafer.add(editor as any)
 
@@ -338,8 +400,12 @@ onMounted(() => {
   leafer.on(LP.UP, () => {
     const sel2 = (editor as any)?.selector
     if (sel2?.__boxHidden) {
-      ;(editor as any).editBox.visible = true
-      ;(editor as any).editBox.update()
+      const list: any[] = (editor as any)?.list ?? []
+      const allSeat = list.length > 0 && list.every((el: any) => el.__seatRow)
+      if (!allSeat) {
+        ;(editor as any).editBox.visible = true
+        ;(editor as any).editBox.update()
+      }
       sel2.__boxHidden = false
     }
     if (!didRotate) return
@@ -383,6 +449,14 @@ onMounted(() => {
       }
     }
 
+    // 选中变化时刷新座位条高亮
+    updateSeatLOD()
+
+    // 全为座位排时隐藏包围盒
+    if (list.length > 0 && list.every((el: any) => el.__seatRow)) {
+      ;(editor as any).editBox.visible = false
+    }
+
     if (props.currentTool === 'node' && list.length === 1 && list[0]?.tag === 'Path' && vertexEdit.getTarget() !== list[0]) {
       vertexEdit.enterVertexEdit(list[0])
       return
@@ -418,6 +492,7 @@ onMounted(() => {
     const handles = vertexEdit.getTarget() ? [...vertexEdit.getHandles(), ...vertexEdit.getEdgeHandles()] : undefined
     compensateZoom(editor, s, handles)
     if (currentBorder) currentBorder.strokeWidth = 1 / s
+    updateSeatLOD()
   })
 
   emit('ready', leafer, editor)
@@ -464,6 +539,7 @@ defineExpose({
   },
   isVertexEditActive: () => vertexEdit.isEditing.value,
   exportPaths,
+  drawnSeatCount,
 })
 </script>
 
