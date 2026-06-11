@@ -117,6 +117,29 @@ function clearAllPaths() {
   seatModule.clearSeatElements()
 }
 
+function deleteSelected() {
+  const list: any[] = (editor as any)?.list ?? []
+  if (list.length === 0) return
+
+  list.forEach((el: any) => {
+    if (el.__seatRow) {
+      const idx = seatModule.seatRowGroups.indexOf(el)
+      if (idx !== -1) seatModule.seatRowGroups.splice(idx, 1)
+      try { leafer!.remove(el) } catch (_) {}
+    } else if (el.tag === 'Path') {
+      const idx = allPaths.indexOf(el)
+      if (idx !== -1) allPaths.splice(idx, 1)
+      try { leafer!.remove(el) } catch (_) {}
+    }
+    // 如果是顶点编辑中的 handles (Rect/Ellipse)，跳过删除
+    // 边框元素 (section-border-) 也跳过
+  })
+
+  edgeCache = new WeakMap<object, number[][]>()
+  editor?.cancel()
+  seatModule.updateSeatLOD()
+}
+
 function renderAll(data: VenueData): void {
   clearAllPaths()
 
@@ -366,6 +389,9 @@ onMounted(() => {
       if (e.key === 'Escape') {
         mode.cancelCurrent()
       }
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        deleteSelected()
+      }
     }
     document.addEventListener('keydown', onKey)
     ;(leafer as any).__onKey = onKey
@@ -423,6 +449,7 @@ defineExpose({
     vertexEdit.isEditing.value ? vertexEdit.exitVertexEdit() : vertexEdit.enterVertexEdit((editor as any)?.list?.[0])
   },
   isVertexEditActive: () => vertexEdit.isEditing.value,
+  deleteSelected,
   exportPaths,
   drawnSeatCount: seatModule.drawnSeatCount,
 })
