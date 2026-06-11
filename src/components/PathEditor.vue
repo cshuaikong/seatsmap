@@ -219,6 +219,7 @@ function createSeatElements(rows: SeatDrawRowData[]): void {
       fill: '#A5D6A7',
       stroke: '#81C784',
       strokeWidth: sw,
+      strokeAlign: 'inside',
       hittable: true,
       draggable: false,
     })
