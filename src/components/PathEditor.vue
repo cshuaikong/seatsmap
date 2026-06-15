@@ -160,7 +160,7 @@ function renderAll(data: VenueData): void {
   })
 
   // 从 venue data 渲染座位（sections[].rows[].seats[]），优先使用数据中的 baseScale
-  seatModule.createSeatsFromVenueData(sections, data?.baseScale)
+  seatModule.createSeatsFromVenueData(sections, data?.baseScale, data?.categories)
 
   if (editor) {
     editor.cancel()
@@ -376,6 +376,7 @@ onMounted(() => {
   leafer = new Leafer({
     view: containerRef.value,
     width: w, height: h,
+    pixelRatio: window.devicePixelRatio || 2,
     move: { scroll: true, disabled: false, holdSpaceKey: true, holdMiddleKey: true },
     wheel: { preventDefault: true },
     zoom: { min: 0.05, max: 20 },

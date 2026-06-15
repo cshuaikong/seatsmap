@@ -150,7 +150,6 @@
             "rotation": 113.70640108135238,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "d71y35ray9l5q085ydq4bk",
             "categoryId": "1",
             "rowSpacing": 4
@@ -254,7 +253,6 @@
             "rotation": 113.70640108135238,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xkmmqtmpdwkncivomwek",
             "categoryId": "1",
             "rowSpacing": 4
@@ -358,7 +356,6 @@
             "rotation": 113.70640108135238,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "42ku5jdifqus5io5o2da4l",
             "categoryId": "1",
             "rowSpacing": 4
@@ -462,7 +459,6 @@
             "rotation": 113.70640108135238,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "3c36kwovuc8zcvrqndloo",
             "categoryId": "1",
             "rowSpacing": 4
@@ -578,7 +574,6 @@
             "rotation": 132.1066463904129,
             "curve": -25,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ns9ulbt9r74fprqtf3pp",
             "categoryId": "1",
             "rowSpacing": 4
@@ -682,7 +677,6 @@
             "rotation": 132.1066463904129,
             "curve": -25,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "b5a41u33m9l4ct1bx8n55o",
             "categoryId": "1",
             "rowSpacing": 4
@@ -786,7 +780,6 @@
             "rotation": 132.1066463904129,
             "curve": -25,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "osb96mzh520i85u6wck20m",
             "categoryId": "1",
             "rowSpacing": 4
@@ -890,7 +883,6 @@
             "rotation": 132.1066463904129,
             "curve": -25,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "pcbmrh542cfg7u2ou5huk5",
             "categoryId": "1",
             "rowSpacing": 4
@@ -994,7 +986,6 @@
             "rotation": 132.1066463904129,
             "curve": -25,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t57iir37x2jsonans1ss6q",
             "categoryId": "1",
             "rowSpacing": 4
@@ -1103,7 +1094,6 @@
             "rotation": 149.38413509807253,
             "curve": -35,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "rz2akcw598nrkdm86lcljd",
             "categoryId": "1"
           },
@@ -1197,7 +1187,6 @@
             "rotation": 149.38413509807253,
             "curve": -35,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "x9fofy8ajcq2ibsa4cggqj",
             "categoryId": "1"
           },
@@ -1291,7 +1280,6 @@
             "rotation": 149.38413509807253,
             "curve": -35,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "a3rywl23jy7flvj0dt642",
             "categoryId": "1"
           },
@@ -1385,7 +1373,6 @@
             "rotation": 149.38413509807253,
             "curve": -35,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tf61knbk52ab8jmjaw3kes",
             "categoryId": "1"
           },
@@ -1479,7 +1466,6 @@
             "rotation": 149.38413509807253,
             "curve": -35,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "h6zj30slis6snoayi16ni8",
             "categoryId": "1"
           }
@@ -1596,7 +1582,6 @@
             "rotation": -9.953855710688998,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "brb8kssziaumvxhx5dxksh",
             "categoryId": "1"
           },
@@ -1699,7 +1684,6 @@
             "rotation": -9.953855710688998,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "169odcjtd0vixnk2fh3m7n",
             "categoryId": "1"
           },
@@ -1802,7 +1786,6 @@
             "rotation": -9.953855710688998,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tvjpuss2shd70mtk52oda",
             "categoryId": "1"
           },
@@ -1905,7 +1888,6 @@
             "rotation": -9.953855710688998,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fixxp6xau7sns6hn7opq8j",
             "categoryId": "1"
           },
@@ -2008,7 +1990,6 @@
             "rotation": -9.953855710688998,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4k1nh8kd3uwzdyi5qtbepf",
             "categoryId": "1"
           },
@@ -2111,7 +2092,6 @@
             "rotation": -9.953855710688998,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "qs27fbf20rx4uzh1r2cei",
             "categoryId": "1"
           }
@@ -2210,7 +2190,6 @@
             "rotation": -0.46392329862608295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t3wdyfxf3y3i7j37ywbj5",
             "categoryId": "1",
             "rowSpacing": 4
@@ -2296,7 +2275,6 @@
             "rotation": -0.46392329862608295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4ofs10v3xnvvvgt671tys",
             "categoryId": "1",
             "rowSpacing": 4
@@ -2382,7 +2360,6 @@
             "rotation": -0.46392329862608295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "m1y49k50ynij9pa2lmco6j",
             "categoryId": "1",
             "rowSpacing": 4
@@ -2468,7 +2445,6 @@
             "rotation": -0.46392329862608295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "apk4wjo0u6fvrecluan8gi",
             "categoryId": "1",
             "rowSpacing": 4
@@ -2554,7 +2530,6 @@
             "rotation": -0.46392329862608295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "0ol06hjim8fjbma15l7nsx4",
             "categoryId": "1",
             "rowSpacing": 4
@@ -2640,7 +2615,6 @@
             "rotation": -0.46392329862608295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jmhk5hm24i8g8rgd7t9vy5",
             "categoryId": "1",
             "rowSpacing": 4
@@ -2777,7 +2751,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "hi7hgzgf2xepkx3pooc2o8",
             "categoryId": "1"
           },
@@ -2898,7 +2871,6 @@
             "rotation": 0.2963548373798955,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "qy564k2z4kgq73ch0qd3wm",
             "categoryId": "1"
           },
@@ -3010,7 +2982,6 @@
             "rotation": 0.10955202617653222,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vico7x7omow3c9sbyx8x8",
             "categoryId": "1"
           },
@@ -3122,7 +3093,6 @@
             "rotation": 0.10955202617653222,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "btax0f4g8roncjq7ulrhcl",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3235,7 +3205,6 @@
             "rotation": 0.10955202617653222,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ue524x5rrdonnldyt0o2",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3348,7 +3317,6 @@
             "rotation": 0.10955202617653222,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8byysqz0g5xyxa3i751urn",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3448,7 +3416,6 @@
             "rotation": 0.47845050299857383,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mojjal3eh7ibb7o0r12t6m",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3534,7 +3501,6 @@
             "rotation": 0.47845050299857383,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "0qcy7fr3et3sbygroixajo7",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3620,7 +3586,6 @@
             "rotation": 0.47845050299857383,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "h14qe0gihv2x8xbbwj9zl",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3706,7 +3671,6 @@
             "rotation": 0.47845050299857383,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t4czbodppmck2yiqctfi6",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3792,7 +3756,6 @@
             "rotation": 0.47845050299857383,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "22c9u81g0itjd2yp7uqdch",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -3878,7 +3841,6 @@
             "rotation": 0.47845050299857383,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vo9ncmb0wm5wkatgr6bs9",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -4006,7 +3968,6 @@
             "rotation": 11.198592195372278,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mbqpkhk2c1ll9lgats52",
             "categoryId": "1"
           },
@@ -4118,7 +4079,6 @@
             "rotation": 11.589194825602869,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "kydvp4h0nr7tas0dz4fjq",
             "categoryId": "1"
           },
@@ -4230,7 +4190,6 @@
             "rotation": 12.086378051112032,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "67w146zqkpvonsv2ui18vq",
             "categoryId": "1"
           },
@@ -4342,7 +4301,6 @@
             "rotation": 11.97613244420335,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "rt13pevyqrpb7i3vnw1gc9",
             "categoryId": "1"
           },
@@ -4445,7 +4403,6 @@
             "rotation": 11.7736471831519,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4zvatipehi92ek27z3yrtp",
             "categoryId": "1"
           },
@@ -4548,7 +4505,6 @@
             "rotation": 10.652598080927001,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "sc6t9fbfypzznl7g6txsn",
             "categoryId": "1"
           }
@@ -4665,7 +4621,6 @@
             "rotation": 34.89941569443582,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5gzice3goitnfjhrgdh1ys",
             "categoryId": "1"
           },
@@ -4768,7 +4723,6 @@
             "rotation": 34.09292183693423,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5cbg9mmfqpx81n0rmqvny9",
             "categoryId": "1"
           },
@@ -4871,7 +4825,6 @@
             "rotation": 33.376244015934354,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "16204593git2rhq3g2urxn",
             "categoryId": "1"
           },
@@ -4974,7 +4927,6 @@
             "rotation": 32.96940390346213,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4upkku37klojgihmaqszb",
             "categoryId": "1"
           },
@@ -5077,7 +5029,6 @@
             "rotation": 34.3172050389081,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gi71xupl6jgewc688opgw6",
             "categoryId": "1"
           },
@@ -5171,7 +5122,6 @@
             "rotation": 32.52283335799433,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jezrfxtd5djdsafrofsggb",
             "categoryId": "1"
           }
@@ -5288,7 +5238,6 @@
             "rotation": 50.1753303152711,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9ywy4spti6kn3xm0u6iia",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -5392,7 +5341,6 @@
             "rotation": 50.1753303152711,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8ijmt9bm2k6okdbo62qcg",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -5496,7 +5444,6 @@
             "rotation": 50.1753303152711,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "l0sl19y2hkau6ghw9o40qs",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -5600,7 +5547,6 @@
             "rotation": 50.1753303152711,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5vxe3fe59ojcuj1m71oiaa",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -5704,7 +5650,6 @@
             "rotation": 50.1753303152711,
             "curve": 20,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "i9nax4l458c79ty5zxhe7n",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -5831,7 +5776,6 @@
             "rotation": 66.0567055907048,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q6i3co24wgkm9y451w6nub",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -5944,7 +5888,6 @@
             "rotation": 66.0567055907048,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "spqxl2pogahg4hkh75gdoj",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6057,7 +6000,6 @@
             "rotation": 66.0567055907048,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "wv25ljco18gihiz1lqxe5",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6170,7 +6112,6 @@
             "rotation": 66.0567055907048,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "158l4vewevqtmols2fwwo",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6297,7 +6238,6 @@
             "rotation": -95.03678270952264,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tnwk4h6fp3qv0e0cye8b1c",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6401,7 +6341,6 @@
             "rotation": -95.03678270952264,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "cd2nwx03hip74v9rvmt6fn",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6505,7 +6444,6 @@
             "rotation": -95.03678270952264,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nzgijs6td1o3t5dakcn3ut",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6600,7 +6538,6 @@
             "rotation": -95.03678270952264,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "3hm2jtnwdquch9r4p7z16",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6700,7 +6637,6 @@
             "rotation": 89.29268063145567,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zjn42gql7slzm6te3s4hi",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6786,7 +6722,6 @@
             "rotation": 89.29268063145567,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jsv3113vi6fr4t3bt8uh7p",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6872,7 +6807,6 @@
             "rotation": 89.29268063145567,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "0dkwn2a7ruhepdffzu0cx9",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -6958,7 +6892,6 @@
             "rotation": 89.29268063145567,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "lotykwn3mjtsdt9wm2cot",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7077,7 +7010,6 @@
             "rotation": 97.01837715893176,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "g51no481zzg7xemvw2mbjk",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7181,7 +7113,6 @@
             "rotation": 97.01837715893176,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "rav75gvrgvj2l3yrupvj",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7285,7 +7216,6 @@
             "rotation": 97.01837715893176,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4tnki7h41axooul45p0sqj",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7389,7 +7319,6 @@
             "rotation": 97.01837715893176,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nenp2a8e2idwcun4bcvgsp",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7516,7 +7445,6 @@
             "rotation": 112.04747508078255,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xinotzmazy5rj2xpjigl",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7629,7 +7557,6 @@
             "rotation": 112.04747508078255,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "yl66ng5j2djm0gmpkzrkkg",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7742,7 +7669,6 @@
             "rotation": 112.04747508078255,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "h6vtqlri3gfbtcq8d0vfgq",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7846,7 +7772,6 @@
             "rotation": 112.04747508078255,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nfix859faw8d657hts02br",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -7964,7 +7889,6 @@
             "rotation": 133.91395417399355,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jv46t4d3j6ssdhr12gexd",
             "categoryId": "1"
           },
@@ -8067,7 +7991,6 @@
             "rotation": 133.91395417399355,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ppgwfwgs3kd9jnqamzc5ei",
             "categoryId": "1"
           },
@@ -8170,7 +8093,6 @@
             "rotation": 133.91395417399355,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ojrx6tmkc1504vqbbqkx6",
             "categoryId": "1"
           },
@@ -8273,7 +8195,6 @@
             "rotation": 133.91395417399355,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jq49fyjsu1q4vwe0dv0n1",
             "categoryId": "1"
           }
@@ -8381,7 +8302,6 @@
             "rotation": 151.54298340456253,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "np2iwehbf42o7g3e5adn",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -8476,7 +8396,6 @@
             "rotation": 151.54298340456253,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4ukief6m5umjyer0dhb7y",
             "categoryId": "1",
             "rowSpacing": 4
@@ -8571,7 +8490,6 @@
             "rotation": 151.54298340456253,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "qjgtzllgusd3ngvun1zree",
             "categoryId": "1",
             "rowSpacing": 4
@@ -8666,7 +8584,6 @@
             "rotation": 151.54298340456253,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "02h97y1zg5ubh0ukqh070ea",
             "categoryId": "1",
             "rowSpacing": 4
@@ -8761,7 +8678,6 @@
             "rotation": 151.54298340456253,
             "curve": 15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q9r7guwj6sasnh2j3pb1m",
             "categoryId": "1",
             "rowSpacing": 4
@@ -8879,7 +8795,6 @@
             "rotation": -9.13017648227866,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "3ngqz9mi5cjsylr45wl55t",
             "categoryId": "1"
           },
@@ -8982,7 +8897,6 @@
             "rotation": -9.72757855140171,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "uepo9ovojjswwzttaa024c",
             "categoryId": "1"
           },
@@ -9085,7 +8999,6 @@
             "rotation": -9.72757855140171,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "bj6pv77dsfg0r48rjcu5ge",
             "categoryId": "1"
           },
@@ -9188,7 +9101,6 @@
             "rotation": -9.72757855140171,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9o1upkd5enmukj41h6rth8",
             "categoryId": "1"
           },
@@ -9291,7 +9203,6 @@
             "rotation": -9.72757855140171,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "db0fzdh6gjvibluigigel",
             "categoryId": "1"
           }
@@ -9390,7 +9301,6 @@
             "rotation": -0.189720430825326,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nr6ocw32pslim4rto7ex8",
             "categoryId": "1"
           },
@@ -9475,7 +9385,6 @@
             "rotation": -0.189720430825326,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8pbnwdqflkp8l5lvs5korg",
             "categoryId": "1"
           },
@@ -9560,7 +9469,6 @@
             "rotation": -0.189720430825326,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ld4e5f3ourqplc9r3ni2fd",
             "categoryId": "1"
           },
@@ -9645,7 +9553,6 @@
             "rotation": -0.189720430825326,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "e81z2dgmzw2j7t0n4wj73",
             "categoryId": "1"
           },
@@ -9730,7 +9637,6 @@
             "rotation": -0.189720430825326,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "iyxhwgtv8jsmeosg4xl8m8",
             "categoryId": "1"
           }
@@ -9857,7 +9763,6 @@
             "rotation": 0.4814658058383432,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ouozinc8gwe9a3r252bqq",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -9970,7 +9875,6 @@
             "rotation": 0.4814658058383432,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ohdshyt5t0e3i7u1jc1nf4",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10083,7 +9987,6 @@
             "rotation": 0.4814658058383432,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5w0v42j1tf8zhx6nyrinj",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10196,7 +10099,6 @@
             "rotation": 0.4814658058383432,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "okrnaxacgtmwgyy70rncc",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10309,7 +10211,6 @@
             "rotation": 0.4814658058383432,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "v2zm97mta4ccmxuhh36aqf",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10422,7 +10323,6 @@
             "rotation": 0.4814658058383432,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t6k9dhpujujixqep6spmd",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10523,7 +10423,6 @@
             "rotation": 0.7787296315225696,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "dvo4pp7k0161oatsq9ja3",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10609,7 +10508,6 @@
             "rotation": 0.7787296315225696,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "pqcr65n1bck6cdgqgki3c8",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10695,7 +10593,6 @@
             "rotation": 0.7787296315225696,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "oh5rscviqqg47oyhig9p1c",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10781,7 +10678,6 @@
             "rotation": 0.7787296315225696,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "wvu4bfkaxtm7l2fnxere",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10867,7 +10763,6 @@
             "rotation": 0.7787296315225696,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "rxmy8mkphvkjhws7priv6i",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -10953,7 +10848,6 @@
             "rotation": 0.7787296315225696,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ln9tlipqayfbaknpeykbr9",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11071,7 +10965,6 @@
             "rotation": 7.801763372385137,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "u5gbn4uzaah0wilrqn27oj",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11175,7 +11068,6 @@
             "rotation": 7.801763372385137,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "qtux0l8h8s2esbelt3d57",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11279,7 +11171,6 @@
             "rotation": 7.801763372385137,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "x0a5ay9hs80xsnusoj1cv",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11383,7 +11274,6 @@
             "rotation": 7.801763372385137,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "odsyyc29fiqn8gw4ts97h",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11487,7 +11377,6 @@
             "rotation": 7.801763372385137,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "eq45vvyi4ikzieocyqcp",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11609,7 +11498,6 @@
             "rotation": 7.801763372385137,
             "curve": -15,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "g7lkpyy30j4sloh5y7jus",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -11718,7 +11606,6 @@
             "rotation": 27.863725496424003,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "c1wg981t4xhuetdj1hvbns",
             "categoryId": "1",
             "rowSpacing": 5
@@ -11813,7 +11700,6 @@
             "rotation": 27.863725496424003,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ah7be1wx3tu6mvlvqz06r6",
             "categoryId": "1",
             "rowSpacing": 5
@@ -11908,7 +11794,6 @@
             "rotation": 27.863725496424003,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "cv0xmvs35149aruaxqx6m",
             "categoryId": "1",
             "rowSpacing": 5
@@ -12003,7 +11888,6 @@
             "rotation": 27.863725496424003,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "b8flxohxptrqvguoizc8gb",
             "categoryId": "1",
             "rowSpacing": 5
@@ -12098,7 +11982,6 @@
             "rotation": 27.863725496424003,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "v7q1cgfig1oqh9kzkp3c9",
             "categoryId": "1",
             "rowSpacing": 5
@@ -12216,7 +12099,6 @@
             "rotation": 45.315386426570996,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gnx7a5b2exeufjubt3am3",
             "categoryId": "1"
           },
@@ -12319,7 +12201,6 @@
             "rotation": 45.315386426570996,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9dvrjxskpa5mhdgnu2fuo",
             "categoryId": "1"
           },
@@ -12422,7 +12303,6 @@
             "rotation": 45.315386426570996,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q58ltt8cl3jzsmmwo1an8",
             "categoryId": "1"
           },
@@ -12525,7 +12405,6 @@
             "rotation": 45.315386426570996,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jy6moxqf5vkco8mojtws",
             "categoryId": "1"
           }
@@ -12642,7 +12521,6 @@
             "rotation": 64.13792924565757,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "aqazaberw0ctinmqg7zpe",
             "categoryId": "1"
           },
@@ -12745,7 +12623,6 @@
             "rotation": 63.16595652922554,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gf89b0t9v0g2gs5t5u2is7",
             "categoryId": "1"
           },
@@ -12848,7 +12725,6 @@
             "rotation": 63.16595652922554,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "k5kw09v4twd5akpg95q412",
             "categoryId": "1"
           },
@@ -12951,7 +12827,6 @@
             "rotation": 63.16595652922554,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gco315hg4rjknjhvq5wkr",
             "categoryId": "1"
           }
@@ -13068,7 +12943,6 @@
             "rotation": 82.60599135740175,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "7c4r30gjpzjxbeyy0tnug8",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -13172,7 +13046,6 @@
             "rotation": 82.60599135740175,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ngteyjosnpqqaol3u22mwa",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -13276,7 +13149,6 @@
             "rotation": 82.60599135740175,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1dvwmordztsl1mqqbp0rbd",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -13380,7 +13252,6 @@
             "rotation": 82.60599135740175,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "pcd51xvipmmhf3v34w3hti",
             "rowSpacing": 4,
             "categoryId": "1"
@@ -13489,7 +13360,6 @@
             "rotation": 89.54041804247004,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6oqj57tsmg7fvrxxe5h2ok",
             "categoryId": "1"
           },
@@ -13583,7 +13453,6 @@
             "rotation": 89.54041804247004,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xazjbi52rbdl662nkf4wzn",
             "categoryId": "1"
           },
@@ -13677,7 +13546,6 @@
             "rotation": 89.54041804247004,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vmmzab2vburuyjjpvozf",
             "categoryId": "1"
           },
@@ -13771,7 +13639,6 @@
             "rotation": 89.54041804247004,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5mdf1w8km4oez3dry1a8sj",
             "categoryId": "1"
           }
@@ -13888,7 +13755,6 @@
             "rotation": 96.925727484713,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1z50zfhg5qajpp2rzzprpp",
             "categoryId": "1",
             "rowSpacing": 4
@@ -13992,7 +13858,6 @@
             "rotation": 96.925727484713,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "94pe9o5pd78vb1pfv46wea",
             "categoryId": "1",
             "rowSpacing": 4
@@ -14096,7 +13961,6 @@
             "rotation": 96.925727484713,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "wm0eqj73npvho056srzzn",
             "categoryId": "1",
             "rowSpacing": 4
@@ -14200,7 +14064,6 @@
             "rotation": 96.925727484713,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fz8ukpdpr7eedoqqm4d3",
             "categoryId": "1",
             "rowSpacing": 4
@@ -14291,7 +14154,6 @@
             "rotation": -0.38452965958452295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "niqx7f5zrt6hnzsmc47f8",
             "categoryId": "2"
           },
@@ -14367,7 +14229,6 @@
             "rotation": -0.38452965958452295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gwxy5a15tvq50519xqld5j",
             "categoryId": "2"
           },
@@ -14443,7 +14304,6 @@
             "rotation": -0.38452965958452295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "l9jui0noix986bre71d2v4",
             "categoryId": "2"
           },
@@ -14519,7 +14379,6 @@
             "rotation": -0.38452965958452295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "rluk4ccmta5gt2r4zvyzo",
             "categoryId": "2"
           },
@@ -14595,7 +14454,6 @@
             "rotation": -0.38452965958452295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "s896eolbirpz8k9ull3ei",
             "categoryId": "2"
           },
@@ -14671,7 +14529,6 @@
             "rotation": -0.38452965958452295,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mdh0w54864b441fhxhnir",
             "categoryId": "2"
           }
@@ -14753,7 +14610,6 @@
             "rotation": 1.0139787227853594,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "engna1a85au8nqo71pj8su",
             "categoryId": "1"
           },
@@ -14820,7 +14676,6 @@
             "rotation": 1.0139787227853594,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mdbj4u162v1oq4dns9315",
             "categoryId": "1"
           },
@@ -14887,7 +14742,6 @@
             "rotation": 1.0139787227853594,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "r6ef81t6o9fgymhq9cdql",
             "categoryId": "1"
           },
@@ -14954,7 +14808,6 @@
             "rotation": 1.0139787227853594,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "trrs8niygkikfo8e7iixg",
             "categoryId": "1"
           },
@@ -15021,7 +14874,6 @@
             "rotation": 1.0139787227853594,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9hidpue1bwce1yhhad9ao",
             "categoryId": "1"
           },
@@ -15088,7 +14940,6 @@
             "rotation": 1.0139787227853594,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "eksomxmwvks9opq85eyf7p",
             "categoryId": "1"
           }
@@ -15187,7 +15038,6 @@
             "rotation": 3.5486819739044293,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fgy4bthxnxa8tl92vk1o9",
             "categoryId": "2"
           },
@@ -15272,7 +15122,6 @@
             "rotation": 3.5486819739044293,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q2yzltx47fmh7oupeky5b",
             "categoryId": "2"
           },
@@ -15357,7 +15206,6 @@
             "rotation": 3.5486819739044293,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "07ialxuo48fb9357qrpye7l",
             "categoryId": "2"
           },
@@ -15442,7 +15290,6 @@
             "rotation": 3.5486819739044293,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ej2d3cd6x0wsg1bhbd2mdg",
             "categoryId": "2"
           },
@@ -15527,7 +15374,6 @@
             "rotation": 3.5486819739044293,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "a9ls2epjrz6q2dgnk4zgo",
             "categoryId": "2"
           },
@@ -15612,7 +15458,6 @@
             "rotation": 3.5486819739044293,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zjdt8za8x38f5yvn9vpezb",
             "categoryId": "2"
           }
@@ -15702,7 +15547,6 @@
             "rotation": 25.958769261560526,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ybzcia4hpyhwgbuvzn1or",
             "categoryId": "2"
           },
@@ -15778,7 +15622,6 @@
             "rotation": 25.958769261560526,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "utoe4oyhwgdj3v8oeuln1",
             "categoryId": "2"
           },
@@ -15854,7 +15697,6 @@
             "rotation": 25.958769261560526,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jzmzk8l957g1qfkuaej2n",
             "categoryId": "2"
           },
@@ -15930,7 +15772,6 @@
             "rotation": 25.958769261560526,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "n2jsznd80wjsm8tc4rl08",
             "categoryId": "2"
           },
@@ -16006,7 +15847,6 @@
             "rotation": 25.958769261560526,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xjno7fxnu6gtvypmjl1mk",
             "categoryId": "2"
           },
@@ -16082,7 +15922,6 @@
             "rotation": 25.958769261560526,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tmm0jevncwj7bm6p4kf41x",
             "categoryId": "2"
           }
@@ -16163,7 +16002,6 @@
             "rotation": 42.98540121212926,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4vuyb3t9zs9eg9yhy985qn",
             "categoryId": "2"
           },
@@ -16230,7 +16068,6 @@
             "rotation": 42.98540121212926,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9b6yc2agwikwf4vhyhv2s",
             "categoryId": "2"
           },
@@ -16297,7 +16134,6 @@
             "rotation": 42.98540121212926,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "omu47xcgymscef2788lup8",
             "categoryId": "2"
           },
@@ -16364,7 +16200,6 @@
             "rotation": 42.98540121212926,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "hrltxfzezy9fetfmjo6ywr",
             "categoryId": "2"
           },
@@ -16431,7 +16266,6 @@
             "rotation": 42.98540121212926,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "767etp47iyteo7surtgs3s",
             "categoryId": "2"
           },
@@ -16498,7 +16332,6 @@
             "rotation": 42.98540121212926,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "iv4tzu8bo9zda6qmgu17r",
             "categoryId": "2"
           }
@@ -16579,7 +16412,6 @@
             "rotation": 66.52900688183902,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "636tm2lyyxnuyyndmm6xr",
             "categoryId": "1"
           },
@@ -16646,7 +16478,6 @@
             "rotation": 66.52900688183902,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ahf31e0fd9abb5blbq8ipq",
             "categoryId": "1"
           },
@@ -16713,7 +16544,6 @@
             "rotation": 66.52900688183902,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "oj2m8r3keboynq4p3evmqa",
             "categoryId": "1"
           },
@@ -16780,7 +16610,6 @@
             "rotation": 66.52900688183902,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "kj3rika07uosuz7hi3up",
             "categoryId": "1"
           },
@@ -16847,7 +16676,6 @@
             "rotation": 66.52900688183902,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xxcw0hc6cimm7m90umo2l",
             "categoryId": "1"
           },
@@ -16914,7 +16742,6 @@
             "rotation": 66.52900688183902,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "597fg5uu68y6po301a8ok5",
             "categoryId": "1"
           }
@@ -16995,7 +16822,6 @@
             "rotation": 85.93847732268948,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xi7s07h7lybpx1tyap2v9",
             "categoryId": "2"
           },
@@ -17062,7 +16888,6 @@
             "rotation": 85.93847732268948,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "eekx0en6qd5jdccorz7nbh",
             "categoryId": "2"
           },
@@ -17129,7 +16954,6 @@
             "rotation": 85.93847732268948,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1w9e5rv8mzqiwml08ht72i",
             "categoryId": "2"
           },
@@ -17196,7 +17020,6 @@
             "rotation": 85.93847732268948,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xeefugpfi8amidm4dkat0o",
             "categoryId": "2"
           },
@@ -17272,7 +17095,6 @@
             "rotation": 85.93847732268948,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "y5dypnlzc31rpe5afxg3n",
             "categoryId": "2"
           },
@@ -17357,7 +17179,6 @@
             "rotation": 85.93847732268948,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "kau570yrf9ni745s9h0pgo",
             "categoryId": "2"
           }
@@ -17456,7 +17277,6 @@
             "rotation": 91.66028236898279,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4iynhb6no5yom538rmwfr8",
             "categoryId": "2"
           },
@@ -17541,7 +17361,6 @@
             "rotation": 91.66028236898279,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q9mfifcwkznmofytmbq86e",
             "categoryId": "2"
           },
@@ -17626,7 +17445,6 @@
             "rotation": 91.66028236898279,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tco90f13odci3aeonztse",
             "categoryId": "2"
           },
@@ -17711,7 +17529,6 @@
             "rotation": 91.66028236898279,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6wl0kjqvlhtbg6m0r7gg18",
             "categoryId": "2"
           },
@@ -17796,7 +17613,6 @@
             "rotation": 91.66028236898279,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9lzgve4cbtc9arocoepu3j",
             "categoryId": "2"
           },
@@ -17881,7 +17697,6 @@
             "rotation": 91.66028236898279,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5t8zwe8xe3j1395xprsib",
             "categoryId": "2"
           }
@@ -17962,7 +17777,6 @@
             "rotation": 95.74866341728791,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8c24mpr6dwf76k0sjdz2k",
             "categoryId": "2"
           },
@@ -18029,7 +17843,6 @@
             "rotation": 95.74866341728791,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "elacrtf08qctd5051egn3t",
             "categoryId": "2"
           },
@@ -18096,7 +17909,6 @@
             "rotation": 95.74866341728791,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zeu9kvm2st788tjy0mt1v",
             "categoryId": "2"
           },
@@ -18172,7 +17984,6 @@
             "rotation": 95.74866341728791,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "0r06jwnhqjcnwwdyy4j389j",
             "categoryId": "2"
           },
@@ -18248,7 +18059,6 @@
             "rotation": 95.74866341728791,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8hix61kodku4oy1du6vuk",
             "categoryId": "2"
           },
@@ -18333,7 +18143,6 @@
             "rotation": 95.74866341728791,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "e9l60dfu8orj5yqlglwax",
             "categoryId": "2"
           }
@@ -18414,7 +18223,6 @@
             "rotation": 116.81634684428694,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xva2d90zwho5f8pd80bv4y",
             "categoryId": "2"
           },
@@ -18481,7 +18289,6 @@
             "rotation": 116.81634684428694,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ahrakc2082qkdpyi391w",
             "categoryId": "2"
           },
@@ -18557,7 +18364,6 @@
             "rotation": 116.81634684428694,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fszapsbcs2fq455qtdozq",
             "categoryId": "2"
           },
@@ -18633,7 +18439,6 @@
             "rotation": 116.81634684428694,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ug1hlluzhzkkxq75vps8",
             "categoryId": "2"
           },
@@ -18718,7 +18523,6 @@
             "rotation": 116.81634684428694,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "u2t8mq5pm80q0rpnge07eh",
             "categoryId": "2"
           },
@@ -18803,7 +18607,6 @@
             "rotation": 116.81634684428694,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ex8lhblo2oj1q91e4p4ba",
             "categoryId": "2"
           }
@@ -18884,7 +18687,6 @@
             "rotation": 136.10881212776005,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zbgj8njx9fas5f6koyxop",
             "categoryId": "2"
           },
@@ -18951,7 +18753,6 @@
             "rotation": 136.10881212776005,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ol394rofncfrc64lzyfga",
             "categoryId": "2"
           },
@@ -19027,7 +18828,6 @@
             "rotation": 136.10881212776005,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ty6lm248b4hokhcv1flt09",
             "categoryId": "2"
           },
@@ -19103,7 +18903,6 @@
             "rotation": 136.10881212776005,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gcfk90mqoanm611xknkn",
             "categoryId": "2"
           },
@@ -19179,7 +18978,6 @@
             "rotation": 136.10881212776005,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "48rcgk89ldvuvbi2pu4t3i",
             "categoryId": "2"
           },
@@ -19264,7 +19062,6 @@
             "rotation": 136.10881212776005,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fke7ombkr8a794exmvxp7j",
             "categoryId": "2"
           }
@@ -19345,7 +19142,6 @@
             "rotation": 156.75020683732538,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "pg39lsnif2k6hee7lsh7b",
             "categoryId": "2"
           },
@@ -19421,7 +19217,6 @@
             "rotation": 156.75020683732538,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t86t1x3p61vzoaf5ea4nc",
             "categoryId": "2"
           },
@@ -19497,7 +19292,6 @@
             "rotation": 156.75020683732538,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "751gsz170elzsq33lb551k",
             "categoryId": "2"
           },
@@ -19582,7 +19376,6 @@
             "rotation": 156.75020683732538,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "h83c31pbjwkh4s4vx9wvl",
             "categoryId": "2"
           },
@@ -19667,7 +19460,6 @@
             "rotation": 156.75020683732538,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "box41q1zn3jge3xbyqsiw",
             "categoryId": "2"
           },
@@ -19752,7 +19544,6 @@
             "rotation": 156.75020683732538,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "r2129k6vypqibl9oitmlal",
             "categoryId": "2"
           }
@@ -19842,7 +19633,6 @@
             "rotation": -3.218061283794129,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "wah8uiasc9xqc45n3oqos",
             "categoryId": "2"
           },
@@ -19918,7 +19708,6 @@
             "rotation": -3.218061283794129,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "641yst00zskzz6ebuef19s",
             "categoryId": "2"
           },
@@ -20003,7 +19792,6 @@
             "rotation": -3.218061283794129,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "47kkgbmhort7qd6t5h05qx",
             "categoryId": "2"
           },
@@ -20088,7 +19876,6 @@
             "rotation": -3.218061283794129,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "lnru8u8xxqt4ew57rpiqv1",
             "categoryId": "2"
           },
@@ -20173,7 +19960,6 @@
             "rotation": -3.218061283794129,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "91dy1tpytigledj2l18hz",
             "categoryId": "2"
           },
@@ -20267,7 +20053,6 @@
             "rotation": -3.218061283794129,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "068vy7db730somwu4viesrm",
             "categoryId": "2"
           }
@@ -20357,7 +20142,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "3ui3bi3jq9baznm1ba5v76",
             "categoryId": "2"
           },
@@ -20433,7 +20217,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "bnbcaa90yoqyg9b1fld5",
             "categoryId": "2"
           },
@@ -20509,7 +20292,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "2hchmq4tuxq8cfza5ont0b",
             "categoryId": "2"
           },
@@ -20585,7 +20367,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4oc16y2t9h22qyjnfvhxo",
             "categoryId": "2"
           },
@@ -20661,7 +20442,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mvg4vpgg6zeyljvny2gsr",
             "categoryId": "2"
           },
@@ -20737,7 +20517,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ggijrr1sb597s5skjiu7cj",
             "categoryId": "2"
           },
@@ -20813,7 +20592,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ukbrln3vgmp6gzknaapyq",
             "categoryId": "2"
           },
@@ -20889,7 +20667,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gp5ewgjhfjt4lz19p2x0ue",
             "categoryId": "2"
           },
@@ -20965,7 +20742,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "2t9qpj3ttv2eqr5zieaa6w",
             "categoryId": "2"
           },
@@ -21041,7 +20817,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ap6lqesv8r44800bw8vdyq",
             "categoryId": "2"
           },
@@ -21117,7 +20892,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vrfbiwnen98c1fl8goqoa6",
             "categoryId": "2"
           },
@@ -21193,7 +20967,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ihqac6x58gp34kj51o7aai",
             "categoryId": "2"
           },
@@ -21269,7 +21042,6 @@
             "rotation": 0.8126515942537583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vyn65zjfualup2qudyuuoq",
             "categoryId": "2"
           }
@@ -21359,7 +21131,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vpi1wzp9c3ghcee9v27ur",
             "categoryId": "2"
           },
@@ -21435,7 +21206,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ydgpss6a5yp68auxhzbxph",
             "categoryId": "2"
           },
@@ -21511,7 +21281,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "taqnudfd7hphwb1yfab4c",
             "categoryId": "2"
           },
@@ -21587,7 +21356,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mnqmwec6tqfocr0443l92s",
             "categoryId": "2"
           },
@@ -21663,7 +21431,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zpg18tvrdtff2kffia2rrh",
             "categoryId": "2"
           },
@@ -21739,7 +21506,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4cdc54mqoc6pw5zyinmsql",
             "categoryId": "2"
           },
@@ -21815,7 +21581,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nb7w9uo36nk9fs5hfe8e",
             "categoryId": "2"
           },
@@ -21891,7 +21656,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "b9tvvhhnauhejbhkbnn9dh",
             "categoryId": "2"
           },
@@ -21967,7 +21731,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nw7g5e6hcssieomw202v",
             "categoryId": "2"
           },
@@ -22043,7 +21806,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "n93tf2dt3xu0hz6qshfc",
             "categoryId": "2"
           },
@@ -22119,7 +21881,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "eqw4cihnpjpfrzyc8x8pec",
             "categoryId": "2"
           },
@@ -22195,7 +21956,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tmcwruf3p5ryqrvfz4etgm",
             "categoryId": "2"
           },
@@ -22271,7 +22031,6 @@
             "rotation": 0.3515034398733809,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "3vz1v3c8kxr6sbgpvrdj",
             "categoryId": "2"
           }
@@ -22361,7 +22120,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "yuwnkxoji48tv9oo4s13jf",
             "categoryId": "2"
           },
@@ -22437,7 +22195,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6kyrej0z90ccm7cvm9pryu",
             "categoryId": "2"
           },
@@ -22513,7 +22270,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "coblvp7p0ba7amxkd24j8h",
             "categoryId": "2"
           },
@@ -22589,7 +22345,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "lz9zeanxkyhkzoi86a65a",
             "categoryId": "2"
           },
@@ -22665,7 +22420,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "cowro5i8el9j924mgveffs",
             "categoryId": "2"
           },
@@ -22741,7 +22495,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "3l2dvzwwxzxw0wp3lxy7l",
             "categoryId": "2"
           },
@@ -22817,7 +22570,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "2d22grj0m3mah09nr8l31k",
             "categoryId": "2"
           },
@@ -22893,7 +22645,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "w4b9v0x2x9iquqdte3nu7",
             "categoryId": "2"
           },
@@ -22969,7 +22720,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "x8zwmob8u7lmc776mprwq",
             "categoryId": "2"
           },
@@ -23045,7 +22795,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8srmf5exejss0p0ku18qus",
             "categoryId": "2"
           },
@@ -23121,7 +22870,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zbfo6g8spkktlbschamllo",
             "categoryId": "2"
           },
@@ -23197,7 +22945,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xv29h16hscrq0t449i3rz",
             "categoryId": "2"
           },
@@ -23273,7 +23020,6 @@
             "rotation": -0.9093804491991203,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ttzjiea3g8i926j86x557l",
             "categoryId": "2"
           }
@@ -23354,7 +23100,6 @@
             "rotation": -179.59933674420776,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8cjkzc5uw8651pn3j3xnjx",
             "categoryId": "2"
           },
@@ -23421,7 +23166,6 @@
             "rotation": -179.59933674420776,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "whhbex1m5xhde5bgxjgriu",
             "categoryId": "2"
           },
@@ -23497,7 +23241,6 @@
             "rotation": -179.59933674420776,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gvtbcquc266oki6nojdk2a",
             "categoryId": "2"
           },
@@ -23573,7 +23316,6 @@
             "rotation": -179.59933674420776,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "y355vvbugsgxk2w449t1g",
             "categoryId": "2"
           },
@@ -23658,7 +23400,6 @@
             "rotation": -179.59933674420776,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "oepfddosxfnok1qc42a38h",
             "categoryId": "2"
           },
@@ -23743,7 +23484,6 @@
             "rotation": -179.59933674420776,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4a2gm6t7qci1k8s7cbus58h",
             "categoryId": "2"
           }
@@ -23824,7 +23564,6 @@
             "rotation": 23.484115290504956,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "chnhf1i6fro12psmfc2n44g",
             "categoryId": "2"
           },
@@ -23891,7 +23630,6 @@
             "rotation": 23.484115290504956,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "7m0iyht5gngs1i3rq39h9",
             "categoryId": "2"
           },
@@ -23958,7 +23696,6 @@
             "rotation": 23.484115290504956,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "s7knns08qmsn0hbfvxzzy",
             "categoryId": "2"
           },
@@ -24034,7 +23771,6 @@
             "rotation": 23.484115290504956,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5vzmkzabybe09e2w5nkifgk",
             "categoryId": "2"
           },
@@ -24119,7 +23855,6 @@
             "rotation": 23.484115290504956,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4wd20iarib9na3t0vs5ago",
             "categoryId": "2"
           },
@@ -24204,7 +23939,6 @@
             "rotation": 23.484115290504956,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6oggs0ewqks6tadqd6ehvs",
             "categoryId": "2"
           }
@@ -24285,7 +24019,6 @@
             "rotation": 42.83308531681325,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "r1nhqwovmdvh3ltqf9vtc",
             "categoryId": "2"
           },
@@ -24352,7 +24085,6 @@
             "rotation": 42.83308531681325,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fkmxhb1ncwc9ff28o1sm2h",
             "categoryId": "2"
           },
@@ -24419,7 +24151,6 @@
             "rotation": 42.83308531681325,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "brrr21gizlf10jghurkgzyj",
             "categoryId": "2"
           },
@@ -24495,7 +24226,6 @@
             "rotation": 42.83308531681325,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "0uqwy1aa07hrejbcnww1",
             "categoryId": "2"
           },
@@ -24571,7 +24301,6 @@
             "rotation": 42.83308531681325,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "713wsvmstm8adfai0oc7e",
             "categoryId": "2"
           },
@@ -24656,7 +24385,6 @@
             "rotation": 42.83308531681325,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "0e9xcp9e83jv1bt5a0iqmk9",
             "categoryId": "2"
           }
@@ -24737,7 +24465,6 @@
             "rotation": 65.11963314081825,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "c7sy4thlbli4m1twbui75i",
             "categoryId": "1"
           },
@@ -24804,7 +24531,6 @@
             "rotation": 65.11963314081825,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9hezvrgtcklo6q6mfty5",
             "categoryId": "1"
           },
@@ -24880,7 +24606,6 @@
             "rotation": 65.11963314081825,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "p5akhumq6vuzbddbrumma",
             "categoryId": "1"
           },
@@ -24956,7 +24681,6 @@
             "rotation": 65.11963314081825,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "u3etchwioy7rsn6r7e33u8",
             "categoryId": "1"
           },
@@ -25041,7 +24765,6 @@
             "rotation": 65.11963314081825,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "7m05q65n46ntscw3n90dj",
             "categoryId": "1"
           },
@@ -25126,7 +24849,6 @@
             "rotation": 65.11963314081825,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "62t27x2a975lqkysn3qpim",
             "categoryId": "1"
           }
@@ -25207,7 +24929,6 @@
             "rotation": 84.24543466889781,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "reuopvzlum8hw9sh1qn5i",
             "categoryId": "1"
           },
@@ -25274,7 +24995,6 @@
             "rotation": 84.24543466889781,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "id1juwf1wrqwj0o42d5wa",
             "categoryId": "1"
           },
@@ -25341,7 +25061,6 @@
             "rotation": 84.24543466889781,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "b170tgl3zjkp645rkk1p",
             "categoryId": "1"
           },
@@ -25417,7 +25136,6 @@
             "rotation": 84.24543466889781,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "n7xplfyrpbg9dwu2wpt7",
             "categoryId": "1"
           },
@@ -25493,7 +25211,6 @@
             "rotation": 84.24543466889781,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xfcnlvo4t389amnescvzrf",
             "categoryId": "1"
           },
@@ -25578,7 +25295,6 @@
             "rotation": 84.24543466889781,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5l2kxyttye79virfag0s5",
             "categoryId": "1"
           }
@@ -25668,7 +25384,6 @@
             "rotation": 89.51238811707506,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "8bv5g833swe3wouqj3krty",
             "categoryId": "1"
           },
@@ -25744,7 +25459,6 @@
             "rotation": 89.51238811707506,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "eix6xpzsxjtzkdhz47wfdo",
             "categoryId": "1"
           },
@@ -25820,7 +25534,6 @@
             "rotation": 89.51238811707506,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "d1muq7bjta8qsmj6a50us",
             "categoryId": "1"
           },
@@ -25896,7 +25609,6 @@
             "rotation": 89.51238811707506,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xpee56zogrjssuvhbfwt2",
             "categoryId": "1"
           },
@@ -25972,7 +25684,6 @@
             "rotation": 89.51238811707506,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "pksg9pdzc65ugqd0tdeje",
             "categoryId": "1"
           },
@@ -26048,7 +25759,6 @@
             "rotation": 89.51238811707506,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "i6sk0kf8z4dm1sn22b80p",
             "categoryId": "1"
           }
@@ -26129,7 +25839,6 @@
             "rotation": 96.0617887887286,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t6cforlsooehlrfsnevtqc",
             "categoryId": "1"
           },
@@ -26196,7 +25905,6 @@
             "rotation": 96.0617887887286,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "dk30h3swewpu80s8xduzbs",
             "categoryId": "1"
           },
@@ -26263,7 +25971,6 @@
             "rotation": 96.0617887887286,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "e4aysio1p9vauixc4d0vkg",
             "categoryId": "1"
           },
@@ -26339,7 +26046,6 @@
             "rotation": 96.0617887887286,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gjldqry3j1acw4r8ocj85",
             "categoryId": "1"
           },
@@ -26415,7 +26121,6 @@
             "rotation": 96.0617887887286,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zd4qbumctgmtwyxgof88v",
             "categoryId": "1"
           },
@@ -26500,7 +26205,6 @@
             "rotation": 96.0617887887286,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "hqh2rfq41eeoeo4uopkgo",
             "categoryId": "1"
           }
@@ -26572,7 +26276,6 @@
             "rotation": -69.7751405688319,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6kekda8qy9glewusm2anyk",
             "categoryId": "2"
           },
@@ -26639,7 +26342,6 @@
             "rotation": -69.7751405688319,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1ya4u2h8aaxwjxbaj0an77",
             "categoryId": "2"
           },
@@ -26706,7 +26408,6 @@
             "rotation": -69.7751405688319,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ebh41l73ffkzicngg5fstk",
             "categoryId": "2"
           },
@@ -26782,7 +26483,6 @@
             "rotation": -69.7751405688319,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tkgz0vn33jd1r14b7my3r",
             "categoryId": "2"
           },
@@ -26858,7 +26558,6 @@
             "rotation": -69.7751405688319,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "o0ctducck2dprzsm3h4h5",
             "categoryId": "2"
           },
@@ -26943,7 +26642,6 @@
             "rotation": -69.7751405688319,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "u0jta3o3jgo9lxv0n3o9q",
             "categoryId": "2"
           }
@@ -27033,7 +26731,6 @@
             "rotation": 134.53794727856925,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ygzxxdb9gwgt88h2yv6xtk",
             "categoryId": "1"
           },
@@ -27109,7 +26806,6 @@
             "rotation": 134.53794727856925,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6yg075wjo7dazpyzy86ehi",
             "categoryId": "1"
           },
@@ -27185,7 +26881,6 @@
             "rotation": 134.53794727856925,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "e3ib5qluc2aocwypr2gcv",
             "categoryId": "1"
           },
@@ -27261,7 +26956,6 @@
             "rotation": 134.53794727856925,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "trnkpgxx91n7hncympq3",
             "categoryId": "1"
           },
@@ -27337,7 +27031,6 @@
             "rotation": 134.53794727856925,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "psiwyc0zo8r7km2y8onobx",
             "categoryId": "1"
           },
@@ -27413,7 +27106,6 @@
             "rotation": 134.53794727856925,
             "curve": -10,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1ccbuypjtq3nc3nng86gnj",
             "categoryId": "1"
           }
@@ -27495,7 +27187,6 @@
             "rotation": -20.600586306640952,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "nyhpe5xk1rca6d4mda7e6w",
             "categoryId": "2"
           },
@@ -27562,7 +27253,6 @@
             "rotation": -20.600586306640952,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6npi81wojgd1roev8tcf94",
             "categoryId": "2"
           },
@@ -27629,7 +27319,6 @@
             "rotation": -20.600586306640952,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "u3ylvlnq1nkrqfhuqk8pvc",
             "categoryId": "2"
           },
@@ -27696,7 +27385,6 @@
             "rotation": -20.600586306640952,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "6vaowplf2i8czkfd44teus",
             "categoryId": "2"
           },
@@ -27763,7 +27451,6 @@
             "rotation": -20.600586306640952,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gnebryx09k2yg2swfi4h1",
             "categoryId": "2"
           },
@@ -27830,7 +27517,6 @@
             "rotation": -20.600586306640952,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "28bni8988ruqtbua2mgz7",
             "categoryId": "2"
           }
@@ -27920,7 +27606,6 @@
             "rotation": -0.8519200683804281,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "bvz0ua8dtts9731je1eur",
             "categoryId": "2"
           },
@@ -27996,7 +27681,6 @@
             "rotation": -0.8519200683804281,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "bh6lhidc6w59k2pzyoi7r7",
             "categoryId": "2"
           },
@@ -28072,7 +27756,6 @@
             "rotation": -0.8519200683804281,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1wfiti3d19di6t53k0ken7",
             "categoryId": "2"
           },
@@ -28148,7 +27831,6 @@
             "rotation": -0.8519200683804281,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "fsu1dh8gii400iwjb04nl",
             "categoryId": "2"
           },
@@ -28224,7 +27906,6 @@
             "rotation": -0.8519200683804281,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "j4wtaw76xjjdh0wic596o",
             "categoryId": "2"
           },
@@ -28300,7 +27981,6 @@
             "rotation": -0.8519200683804281,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "1856zlo2h5rpmnctnstq3",
             "categoryId": "2"
           }
@@ -28381,7 +28061,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ig4a133wyljkb7e4i51qfh",
             "categoryId": "2"
           },
@@ -28448,7 +28127,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "clxc4fxhinu9w0dh8ab769",
             "categoryId": "2"
           },
@@ -28515,7 +28193,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zji3d6u16ar4dhx6x7xql2",
             "categoryId": "2"
           },
@@ -28582,7 +28259,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "wsv79ald84sa4021mmzluf",
             "categoryId": "2"
           },
@@ -28649,7 +28325,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "7shth2m06wqf8ei3mca3u",
             "categoryId": "2"
           },
@@ -28716,7 +28391,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "whxm4smp71r3fnhe04o5ei",
             "categoryId": "2"
           }
@@ -28833,7 +28507,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "w8vlq9hg1jax4wr3c7cqm",
             "categoryId": "2"
           },
@@ -28936,7 +28609,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q7t6dx5sd6ky08ncgfwne",
             "categoryId": "2"
           },
@@ -29039,7 +28711,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "wcikcu0jrwp4psx1ghdszt",
             "categoryId": "2"
           },
@@ -29142,7 +28813,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "uokoknwwpy50yxzyug8iy",
             "categoryId": "2"
           },
@@ -29245,7 +28915,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "k5npu4d764ec5v0q68uyoh",
             "categoryId": "2"
           }
@@ -29371,7 +29040,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "5kfat3bss199h6rzi2s1ac",
             "categoryId": "2"
           },
@@ -29483,7 +29151,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "bgf32ryhtchbqc5gtmmmu",
             "categoryId": "2"
           },
@@ -29595,7 +29262,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4f76g3tq4dcrn8bjttp14",
             "categoryId": "2"
           },
@@ -29707,7 +29373,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4kfwgqwwk7skumuly14er",
             "categoryId": "2"
           },
@@ -29819,7 +29484,6 @@
             "rotation": 0,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "c4na4knu5y7cvfqz2ex84i",
             "categoryId": "2"
           }
@@ -29882,7 +29546,6 @@
             "rotation": 50.82634202955583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ikdnw0i867cplo90lv6o3j",
             "categoryId": "2"
           },
@@ -29931,7 +29594,6 @@
             "rotation": 50.82634202955583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "btv7y3qhuklppx42i8nnw",
             "categoryId": "2"
           },
@@ -29989,7 +29651,6 @@
             "rotation": 50.82634202955583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gng6vfxs817ct6wuukxqbk",
             "categoryId": "2"
           },
@@ -30047,7 +29708,6 @@
             "rotation": 50.82634202955583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "cvbdcqs0iym3u8n4vd0r2o",
             "categoryId": "2"
           },
@@ -30114,7 +29774,6 @@
             "rotation": 50.82634202955583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4oe61saiv6q7b0v4tadop",
             "categoryId": "2"
           }
@@ -30213,7 +29872,6 @@
             "rotation": 90.72829695307635,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "tsx7qd26txog8wvh54yljf",
             "categoryId": "2"
           },
@@ -30298,7 +29956,6 @@
             "rotation": 90.72829695307635,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "q4oa904ruksstkocxs0gj",
             "categoryId": "2"
           },
@@ -30383,7 +30040,6 @@
             "rotation": 90.72829695307635,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4dtlzsf9hwucp9wh5zyq4b",
             "categoryId": "2"
           },
@@ -30468,7 +30124,6 @@
             "rotation": 90.72829695307635,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "mptpbkx9egn6pxi6l3l0lr",
             "categoryId": "2"
           },
@@ -30553,7 +30208,6 @@
             "rotation": 90.72829695307635,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "qrc6sf38zcdjuxag9hc29",
             "categoryId": "2"
           },
@@ -30638,7 +30292,6 @@
             "rotation": 90.72829695307635,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "eelov84szsi9rivgndtmaq",
             "categoryId": "2"
           },
@@ -30678,7 +30331,6 @@
             "rotation": 69.73430252905273,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "709atbw0pq4eiineqik8us",
             "categoryId": "2"
           },
@@ -30718,7 +30370,6 @@
             "rotation": 69.73430252905273,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ps01t8grammv5ufkxvsd",
             "categoryId": "2"
           },
@@ -30767,7 +30418,6 @@
             "rotation": 69.73430252905273,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4ilt0d7oh4hxcu62rnft8c",
             "categoryId": "2"
           },
@@ -30825,7 +30475,6 @@
             "rotation": 69.73430252905273,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "z873ptkgfhhtslmbbjnjt",
             "categoryId": "2"
           },
@@ -30892,7 +30541,6 @@
             "rotation": 69.73430252905273,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9g49ykijesvq45olx1ye9",
             "categoryId": "2"
           },
@@ -30968,7 +30616,6 @@
             "rotation": 69.73430252905273,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gjzjvvuiexe4unxcjuyu",
             "categoryId": "2"
           }
@@ -31107,7 +30754,6 @@
               0,
               7
             ],
-            "baseScale": 5.19,
             "id": "m9ec4zuk7rdflf9kyroe6",
             "categoryId": "2"
           },
@@ -31232,7 +30878,6 @@
               0,
               7
             ],
-            "baseScale": 5.19,
             "id": "cpxztkk9xqh1qnlwce49wj",
             "categoryId": "2"
           },
@@ -31366,7 +31011,6 @@
               0,
               8
             ],
-            "baseScale": 5.19,
             "id": "4pdqfrwotfmdmvmd0igyj",
             "categoryId": "2"
           },
@@ -31509,7 +31153,6 @@
               0,
               8
             ],
-            "baseScale": 5.19,
             "id": "xtg1bl9t6hby24knsm2nk",
             "categoryId": "2"
           },
@@ -31661,7 +31304,6 @@
               0,
               8
             ],
-            "baseScale": 5.19,
             "id": "956stt5c8t7mnl3dobw1u",
             "categoryId": "2"
           },
@@ -31822,7 +31464,6 @@
               0,
               8
             ],
-            "baseScale": 5.19,
             "id": "tglystzkrar720ewg53mr",
             "categoryId": "2"
           }
@@ -31886,7 +31527,6 @@
             "rotation": -42.76882539196873,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "7mtankcstbozrwo4zshghm",
             "categoryId": "2"
           },
@@ -31935,7 +31575,6 @@
             "rotation": -39.69267315066883,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4ms9y2swwm31v7jwdl2nqg",
             "categoryId": "2"
           },
@@ -31984,7 +31623,6 @@
             "rotation": -41.53177074108299,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "zbumgyi947j0s7epndgf4n",
             "categoryId": "2"
           },
@@ -32033,7 +31671,6 @@
             "rotation": -43.13232116056583,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "xb5slq90erg3r91x67w7xg",
             "categoryId": "2"
           },
@@ -32091,7 +31728,6 @@
             "rotation": -41.98721249581664,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "4t0xab6onqxrgmfuenltp",
             "categoryId": "2"
           },
@@ -32149,7 +31785,6 @@
             "rotation": -42.38665372469065,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "m23ze83hupo1d983f4bxpb",
             "categoryId": "2"
           },
@@ -32207,7 +31842,6 @@
             "rotation": -43.36342295838323,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "va7iubebiloaobffjw41oh",
             "categoryId": "2"
           }
@@ -32270,7 +31904,6 @@
             "rotation": 45.74405920288869,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9hemufk4fevf9qazjueb0d",
             "categoryId": "2"
           },
@@ -32319,7 +31952,6 @@
             "rotation": 42.84343732528525,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "jx43e4uc4d8btypuyw80bj",
             "categoryId": "2"
           },
@@ -32368,7 +32000,6 @@
             "rotation": 42.78795799795169,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "snq4b8bepkvdxeu226yg",
             "categoryId": "2"
           },
@@ -32426,7 +32057,6 @@
             "rotation": 44.45778483505366,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "7d906s3j5blm7lk1kfg2fi",
             "categoryId": "2"
           },
@@ -32484,7 +32114,6 @@
             "rotation": 44.82478409509468,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "vkfgd6f1bkhqsgvzqp5jn",
             "categoryId": "2"
           },
@@ -32551,7 +32180,6 @@
             "rotation": 45.333111243921294,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "bn1hyunywbbv73eghp51bn",
             "categoryId": "2"
           },
@@ -32618,7 +32246,6 @@
             "rotation": 44.84302565436207,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "ls5a1g5u5sc5qn3o01iqh",
             "categoryId": "2"
           }
@@ -32760,7 +32387,6 @@
             "segmentIndices": [
               0
             ],
-            "baseScale": 5.19,
             "id": "h7voxsu4z588xyfqqpm2zy",
             "categoryId": "2"
           },
@@ -32884,7 +32510,6 @@
             "segmentIndices": [
               0
             ],
-            "baseScale": 5.19,
             "id": "mjx05ldixkay1q4rmqsvj",
             "categoryId": "2"
           },
@@ -33014,7 +32639,6 @@
             "rotation": -89.48383577023516,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "l2uo4ue242bhk7q3y0ong",
             "categoryId": "2"
           },
@@ -33153,7 +32777,6 @@
             "rotation": -88.68685965908249,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "gsc1l9a4kt5s7v755icng",
             "categoryId": "2"
           },
@@ -33301,7 +32924,6 @@
             "rotation": -87.78896883145435,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "2013lfgvg3ufx66kea3la",
             "categoryId": "2"
           },
@@ -33422,7 +33044,6 @@
             "rotation": -88.82054763815229,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "iqi2zjb7rjla35kt9xv1rq",
             "categoryId": "2"
           },
@@ -33547,7 +33168,6 @@
               0,
               8
             ],
-            "baseScale": 5.19,
             "id": "9jk6ah2z9wh58rhl9zp8tg",
             "categoryId": "2"
           },
@@ -33681,7 +33301,6 @@
               0,
               8
             ],
-            "baseScale": 5.19,
             "id": "zkl239oae67ewdqachx5w",
             "categoryId": "2"
           },
@@ -33815,7 +33434,6 @@
               0,
               9
             ],
-            "baseScale": 5.19,
             "id": "jdp8ynfz8da4z32tm5m3",
             "categoryId": "2"
           },
@@ -33958,7 +33576,6 @@
               0,
               9
             ],
-            "baseScale": 5.19,
             "id": "8ugcs8dlm0ot0nnlymg42c",
             "categoryId": "2"
           },
@@ -34110,7 +33727,6 @@
               0,
               9
             ],
-            "baseScale": 5.19,
             "id": "oljzkgt1hoid6jtfdz3ts",
             "categoryId": "2"
           },
@@ -34271,7 +33887,6 @@
               0,
               9
             ],
-            "baseScale": 5.19,
             "id": "xfbvuqx3jhou3dv9dzw60b",
             "categoryId": "2"
           }
@@ -34352,7 +33967,6 @@
             "rotation": -45.61605990839924,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "z1jdpjhk1wh7kiajvziwk",
             "categoryId": "2"
           },
@@ -34419,7 +34033,6 @@
             "rotation": -44.111764504760174,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "kh9iuxfgip8n65xq4uf45f",
             "categoryId": "2"
           },
@@ -34486,7 +34099,6 @@
             "rotation": -44.773535647658775,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "evysifbjbisbmcb2lfxrb",
             "categoryId": "2"
           },
@@ -34544,7 +34156,6 @@
             "rotation": -45.000000000000085,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "t5jevo7sz68msz09t4ahu",
             "categoryId": "2"
           },
@@ -34602,7 +34213,6 @@
             "rotation": -43.589059179617145,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "9laox5ppr2vt8cjp30m2i",
             "categoryId": "2"
           },
@@ -34651,7 +34261,6 @@
             "rotation": -44.672599109155456,
             "curve": 0,
             "seatSpacing": 3.4682080924855487,
-            "baseScale": 5.19,
             "id": "purp519h5cj6i9z6b3lo3e",
             "categoryId": "2"
           }
@@ -34661,11 +34270,8 @@
         "y": 311.802868704806,
         "fill": "#03a800",
         "id": "5bzvi1h4tghx38cmunyqt",
-        
-
-        
         "path": "M15.002270425051279,3.322412775274472A42.66135657242144,42.66135657242144 0 0 0 4.080546296065279,16.213370616366035L-17.253851257578702,-0.9201694683907249A63.96422881989247,63.96422881989247 0 0 1 0.07472922816324967,-19.39851244631052Z"
       }
     ],
-    "baseScale": 5.19
+    "baseScale": 5.2
 }

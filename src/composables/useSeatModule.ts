@@ -1,8 +1,10 @@
 import { ref } from 'vue'
-import { Group, Line, Path } from 'leafer-ui'
+import { Group, Line, Ellipse } from 'leafer-ui'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
+import { calculateCurvedPositions } from '../viewer/geometry'
+import { getCategoryColor, darkenColor } from '../utils/color'
 
 export interface SeatModuleCtx {
   getLeafer: () => any
@@ -24,7 +26,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const bs = seatDraw.getBaseScale()
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
-    const r = +radius.toFixed(2)
     const sw = 1 / Math.max(bs, 0.02)
     let totalSeats = 0
 
@@ -51,25 +52,26 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       })
       group.add(bar)
 
-      let d = ''
+      const ellipses: any[] = []
       for (let i = 0; i < row.count; i++) {
         const cx = +(row.x + row.ux * row.spacing * i).toFixed(2)
         const cy = +(row.y + row.uy * row.spacing * i).toFixed(2)
-        d += `M${cx - r},${cy} A${r},${r} 0 1,0 ${cx + r},${cy} A${r},${r} 0 1,0 ${cx - r},${cy} `
+        const ell = new Ellipse({
+          x: cx, y: cy,
+          width: size, height: size,
+          fill: '#A5D6A7',
+          stroke: '#81C784',
+          strokeWidth: sw,
+          around: 'center',
+          hittable: true,
+          draggable: false,
+        })
+        group.add(ell)
+        ellipses.push(ell)
       }
-      const circles = new Path({
-        path: d,
-        fill: '#A5D6A7',
-        stroke: '#81C784',
-        strokeWidth: sw,
-        strokeAlign: 'inside',
-        hittable: true,
-        draggable: false,
-      })
-      group.add(circles)
 
       ;(group as any).__seatRadius = radius
-      ;(group as any).__circles = circles
+      ;(group as any).__seatEllipses = ellipses
       ;(group as any).__bar = bar
       ;(group as any).__seatRowData = { ...row }
 
@@ -88,16 +90,20 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     seatDraw.resetBaseScale()
   }
 
-  /** 从 venue data 的 sections[].rows[].seats[] 渲染座位排 */
-  function createSeatsFromVenueData(sections: any[], venueBaseScale?: number | null): void {
-    // 优先使用数据中携带的 baseScale
+  /** 从 venue data 的 sections[].rows[].seats[] 渲染座位排
+   *  将 rotation/curve 烘焙到 seat.x/y，然后按独立 Ellipse 绘制
+   */
+  function createSeatsFromVenueData(sections: any[], venueBaseScale?: number | null, categories?: any[]): void {
     if (venueBaseScale != null) {
       seatDraw.setBaseScale(venueBaseScale)
     } else {
       seatDraw.lockBaseScale()
     }
     const bs = seatDraw.getBaseScale()
-    const lineWidth = (SEAT_CONFIG.radius * 2) / Math.max(bs, 0.02)
+    const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
+    const size = radius * 2
+    const lineWidth = size
+    const sw = 1 / Math.max(bs, 0.02)
     let totalSeats = 0
 
     for (const section of sections) {
@@ -111,22 +117,37 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const rot = (row.rotation ?? 0) * Math.PI / 180
         const cos = Math.cos(rot)
         const sin = Math.sin(rot)
+        const curve = row.curve ?? 0
 
-        // 首个和最后一个座位世界坐标 + 生成所有圆圈 path
-        let firstSX = 0, firstSY = 0, lastSX = 0, lastSY = 0
-        let circlesD = ''
-        const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
-        const r = +radius.toFixed(2)
-        const sw = 1 / Math.max(bs, 0.02)
-
+        // ---- 烘焙：curve + rotation → seat.x/y，第一个座位固定在 (0,0) ----
+        const curved = calculateCurvedPositions(row.seats, curve)
+        const worldPositions: { x: number; y: number }[] = []
         for (let i = 0; i < row.seats.length; i++) {
-          const seat = row.seats[i]
-          const sx = rowX + seat.x * cos - seat.y * sin
-          const sy = rowY + seat.x * sin + seat.y * cos
-          if (i === 0) { firstSX = sx; firstSY = sy }
-          if (i === row.seats.length - 1) { lastSX = sx; lastSY = sy }
-          circlesD += `M${+(sx - r).toFixed(2)},${+sy.toFixed(2)} A${r},${r} 0 1,0 ${+(sx + r).toFixed(2)},${+sy.toFixed(2)} A${r},${r} 0 1,0 ${+(sx - r).toFixed(2)},${+sy.toFixed(2)} `
+          const pos = curved[i]
+          worldPositions.push({
+            x: pos.x * cos - pos.y * sin,
+            y: pos.x * sin + pos.y * cos,
+          })
         }
+
+        // 第一个座位的世界位置作为新的排原点
+        const firstWX = worldPositions[0].x
+        const firstWY = worldPositions[0].y
+        row.x = +(rowX + firstWX).toFixed(2)
+        row.y = +(rowY + firstWY).toFixed(2)
+
+        // 所有座位相对于第一个座位
+        for (let i = 0; i < row.seats.length; i++) {
+          row.seats[i].x = +(worldPositions[i].x - firstWX).toFixed(2)
+          row.seats[i].y = +(worldPositions[i].y - firstWY).toFixed(2)
+        }
+        row.rotation = 0
+        row.curve = 0
+
+        // ---- 渲染 ----
+        const newRowX = row.x!
+        const newRowY = row.y!
+        let firstSX = 0, firstSY = 0, lastSX = 0, lastSY = 0
 
         const group = new Group({
           editable: false,
@@ -136,17 +157,35 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         ;(group as any).__isVenueDataSeat = true
         ;(group as any).__sectionId = section.id
 
-        const circles = new Path({
-          path: circlesD,
-          fill: '#A5D6A7',
-          stroke: '#81C784',
-          strokeWidth: sw,
-          strokeAlign: 'inside',
-          hittable: true,
-          draggable: false,
-        })
-        circles.visible = false  // 初始由 LOD bar 模式决定
-        group.add(circles)
+        const ellipses: any[] = []
+        for (let i = 0; i < row.seats.length; i++) {
+          const seat = row.seats[i]
+          const sx = +(newRowX + seat.x).toFixed(2)
+          const sy = +(newRowY + seat.y).toFixed(2)
+
+          if (i === 0) { firstSX = sx; firstSY = sy }
+          if (i === row.seats.length - 1) { lastSX = sx; lastSY = sy }
+
+          const color = categories
+            ? getCategoryColor(seat.categoryKey, categories)
+            : '#A5D6A7'
+
+          const ell = new Ellipse({
+            x: sx, y: sy,
+            width: size, height: size,
+            fill: color,
+            stroke: darkenColor(color, 30),
+            strokeWidth: sw,
+            around: 'center',
+            hittable: true,
+            draggable: false,
+            visible: false,
+          })
+          ;(ell as any).__seatId = seat.id
+          ;(ell as any).__categoryKey = seat.categoryKey
+          group.add(ell)
+          ellipses.push(ell)
+        }
 
         const bar = new Line({
           points: [firstSX, firstSY, lastSX, lastSY],
@@ -160,11 +199,16 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         group.add(bar)
 
         ;(group as any).__seatRadius = radius
-        ;(group as any).__circles = circles
+        ;(group as any).__seatEllipses = ellipses
         ;(group as any).__bar = bar
         ;(group as any).__seatRowData = {
           x: firstSX, y: firstSY,
-          ux: cos, uy: sin,
+          ux: lastSX !== firstSX || lastSY !== firstSY
+            ? (lastSX - firstSX) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
+            : 1,
+          uy: lastSX !== firstSX || lastSY !== firstSY
+            ? (lastSY - firstSY) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
+            : 0,
           count: row.seats.length,
           spacing: row.seats.length > 1
             ? Math.hypot(lastSX - firstSX, lastSY - firstSY) / (row.seats.length - 1)
@@ -182,16 +226,14 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
   function rebuildSeatRow(group: any, newData: SeatDrawRowData, endCenter?: { x: number; y: number }, anchorFromEnd?: boolean): void {
     const bar = (group as any).__bar
-    const circles = (group as any).__circles
+    const ellipses = (group as any).__seatEllipses as any[] | undefined
 
     const bs = seatDraw.getBaseScale()
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
-    const r = +radius.toFixed(2)
     const sw = 1 / Math.max(bs, 0.02)
     const { x, y, ux, uy, count, spacing } = newData
 
-    // bar 末端：优先使用连续坐标(endCenter)，避免离散 count 造成的跳动
     const barEndX = endCenter ? endCenter.x : x + ux * spacing * (count - 1)
     const barEndY = endCenter ? endCenter.y : y + uy * spacing * (count - 1)
 
@@ -200,26 +242,40 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       bar.strokeWidth = size
     }
 
-    // circles：锚定方向决定从哪端对齐
-    if (circles) {
-      let d = ''
-      if (anchorFromEnd && endCenter) {
-        // 拖首端手柄 → 末端固定 → 圆从末端反向排列
-        for (let i = count - 1; i >= 0; i--) {
-          const cx = +(endCenter.x - ux * spacing * i).toFixed(2)
-          const cy = +(endCenter.y - uy * spacing * i).toFixed(2)
-          d += `M${cx - r},${cy} A${r},${r} 0 1,0 ${cx + r},${cy} A${r},${r} 0 1,0 ${cx - r},${cy} `
-        }
-      } else {
-        // 拖尾端手柄或最终状态 → 首端固定 → 圆从首端正向排列
-        for (let i = 0; i < count; i++) {
-          const cx = +(x + ux * spacing * i).toFixed(2)
-          const cy = +(y + uy * spacing * i).toFixed(2)
-          d += `M${cx - r},${cy} A${r},${r} 0 1,0 ${cx + r},${cy} A${r},${r} 0 1,0 ${cx - r},${cy} `
+    if (ellipses) {
+      const anchorX = anchorFromEnd && endCenter ? endCenter.x : x
+      const anchorY = anchorFromEnd && endCenter ? endCenter.y : y
+      const dir = anchorFromEnd ? -1 : 1
+
+      for (let i = 0; i < count; i++) {
+        const cx = +(anchorX + ux * dir * spacing * i).toFixed(2)
+        const cy = +(anchorY + uy * dir * spacing * i).toFixed(2)
+        if (ellipses[i]) {
+          ellipses[i].x = cx
+          ellipses[i].y = cy
+          ellipses[i].width = size
+          ellipses[i].height = size
         }
       }
-      circles.path = d
-      circles.strokeWidth = sw
+      // 增减 Ellipse
+      while (ellipses.length > count) {
+        const e = ellipses.pop()
+        try { e?.remove() } catch (_) {}
+      }
+      while (ellipses.length < count) {
+        const i = ellipses.length
+        const cx = +(anchorX + ux * dir * spacing * i).toFixed(2)
+        const cy = +(anchorY + uy * dir * spacing * i).toFixed(2)
+        const ell = new Ellipse({
+          x: cx, y: cy,
+          width: size, height: size,
+          fill: '#A5D6A7', stroke: '#81C784',
+          strokeWidth: sw, around: 'center',
+          hittable: true, draggable: false,
+        })
+        group.add(ell)
+        ellipses.push(ell)
+      }
     }
 
     ;(group as any).__seatRowData = { ...newData }
@@ -236,13 +292,13 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const selectedSet = new Set((ctx.getEditor() as any)?.list ?? [])
     for (const g of seatRowGroups) {
       const r = (g as any).__seatRadius as number | undefined
-      const circles = (g as any).__circles as any
       const bar = (g as any).__bar as any
+      const ellipses = (g as any).__seatEllipses as any[] | undefined
       if (r == null || !bar) continue
       const sel = selectedSet.has(g)
-      if (circles) {
-        const detail = r * s > threshold
-        circles.visible = detail
+      const detail = r * s > threshold
+      if (ellipses && ellipses.length > 0) {
+        for (const e of ellipses) e.visible = detail
         bar.visible = !detail || sel
       } else {
         bar.visible = true
