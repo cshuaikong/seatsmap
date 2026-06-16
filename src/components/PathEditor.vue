@@ -32,7 +32,7 @@ import { darkenColor, rotatePath } from '../utils/pathUtils'
 import { usePolygonDraw } from '../composables/usePolygonDraw'
 import { useVertexEdit } from '../composables/useVertexEdit'
 import { useSeatVertexEdit } from '../composables/useSeatVertexEdit'
-import { exportJSON, exportPNG, exportSVG } from '../composables/usePathExport'
+import { exportPNG, exportSVG } from '../composables/usePathExport'
 import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
@@ -150,38 +150,185 @@ function deleteSelected() {
 }
 
 function renderAll(data: VenueData): void {
-  clearAllPaths()
+  console.log('[renderAll] called, sections count:', (data as any)?.sections?.length ?? 0, 'keys:', Object.keys(data || {}))
+  try {
+    clearAllPaths()
 
-  const sections = data?.sections ?? []
-  sections.forEach((s: any) => {
-    if (s.type === 'path' && s.path) {
-      createPolygonItem(s)
+    const sections = data?.sections ?? []
+    let polygonCount = 0
+    sections.forEach((s: any) => {
+      if (s.type === 'path' && s.path) {
+        createPolygonItem(s)
+        polygonCount++
+      }
+    })
+    console.log('[renderAll] polygons created:', polygonCount)
+
+    // 从 venue data 渲染座位（sections[].rows[].seats[]），兼容 API 的 scale 字段
+    const raw: any = data
+    const bs = raw?.baseScale ?? raw?.scale
+    seatModule.createSeatsFromVenueData(sections, bs != null ? parseFloat(bs) : bs, data?.categories)
+    console.log('[renderAll] seats rendered, count:', seatModule.drawnSeatCount.value)
+
+    if (editor) {
+      editor.cancel()
+      ;(editor as any).zIndex = 999
     }
-  })
-
-  // 从 venue data 渲染座位（sections[].rows[].seats[]），优先使用数据中的 baseScale
-  seatModule.createSeatsFromVenueData(sections, data?.baseScale, data?.categories)
-
-  if (editor) {
-    editor.cancel()
-    ;(editor as any).zIndex = 999
+  } catch (e) {
+    console.error('[renderAll] error:', e)
   }
 }
 
-function exportPaths(): VenueData['sections'] {
-  return allPaths.map((p: any) => ({
-    type: 'path',
-    id: p.id,
-    name: p.name || p.id,
-    path: p.path,
-    x: p.x,
-    y: p.y,
-    fill: p.fill,
-    stroke: p.stroke,
-    strokeWidth: p.strokeWidth,
-    rotation: p.rotation ?? 0,
-    rows: [],
-  }))
+function buildVenueData(): VenueData {
+  // 从 allPaths 构建 section 查找表
+  const pathSectionMap = new Map<string, any>()
+  allPaths.forEach((p: any) => {
+    pathSectionMap.set(p.id, {
+      type: 'path',
+      id: p.id,
+      name: p.name || p.id,
+      path: p.path,
+      x: +(p.x ?? 0).toFixed(2),
+      y: +(p.y ?? 0).toFixed(2),
+      fill: p.fill,
+      stroke: p.stroke,
+      strokeWidth: p.strokeWidth ?? 2,
+      rotation: p.rotation ?? 0,
+      rows: [] as any[],
+    })
+  })
+
+  // 从 seatRowGroups 构建 row→section 关系
+  const sectionRowsMap = new Map<string, any[]>()
+  const sectionRowLookup = new Map<string, Map<string, any>>()
+
+  seatModule.seatRowGroups.forEach((g: any) => {
+    const sectionId = g.__sectionId
+    if (!sectionId) return
+
+    if (!sectionRowsMap.has(sectionId)) sectionRowsMap.set(sectionId, [])
+    if (!sectionRowLookup.has(sectionId)) sectionRowLookup.set(sectionId, new Map())
+
+    const rowLookup = sectionRowLookup.get(sectionId)!
+    const rowId = g.__rowId || `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const ellipses = (g.__seatEllipses || []) as any[]
+    const rowData = g.__seatRowData
+
+    const isVenueSeat = g.__isVenueDataSeat
+    if (!rowLookup.has(rowId)) {
+      const row: any = {
+        id: rowId,
+        label: g.__rowLabel || '',
+        // 有原始参数时使用原始 rowOrigin，否则用 rowData 的位置
+        x: +(isVenueSeat ? (g.__rowOriginX ?? rowData?.x ?? 0) : (rowData?.x ?? 0)).toFixed(2),
+        y: +(isVenueSeat ? (g.__rowOriginY ?? rowData?.y ?? 0) : (rowData?.y ?? 0)).toFixed(2),
+        rotation: +(g.__rotation ?? 0).toFixed(2),
+        curve: +(g.__curve ?? 0).toFixed(2),
+        seats: [],
+      }
+      rowLookup.set(rowId, row)
+      sectionRowsMap.get(sectionId)!.push(row)
+    }
+
+    const row = rowLookup.get(rowId)!
+    if (isVenueSeat && g.__rawSeats) {
+      // 保留原始相对位置（未烘焙），搭配 curve/rotation 使用
+      g.__rawSeats.forEach((src: any) => {
+        row.seats.push({
+          id: src.id,
+          label: src.label || '',
+          x: +(typeof src.x === 'string' ? parseFloat(src.x) : (src.x || 0)).toFixed(2),
+          y: +(typeof src.y === 'string' ? parseFloat(src.y) : (src.y || 0)).toFixed(2),
+          categoryKey: src.cat_id ?? src.categoryKey ?? 1,
+          status: src.status || 'available',
+          objectType: src.objectType || 'seat',
+        })
+      })
+    } else {
+      ellipses.forEach((ell: any) => {
+        const src = ell.__sourceSeat
+        if (src) {
+          row.seats.push({
+            id: ell.__seatId || src.id,
+            label: src.label || '',
+            x: +(src.x ?? 0).toFixed(2),
+            y: +(src.y ?? 0).toFixed(2),
+            categoryKey: ell.__categoryKey ?? src.categoryKey,
+            status: src.status || 'available',
+            objectType: src.objectType || 'seat',
+          })
+        } else {
+          row.seats.push({
+            id: ell.__seatId || `seat_${Date.now()}`,
+            label: '',
+            x: +(ell.x ?? 0).toFixed(2) - +(rowData?.x ?? 0).toFixed(2),
+            y: +(ell.y ?? 0).toFixed(2) - +(rowData?.y ?? 0).toFixed(2),
+            categoryKey: ell.__categoryKey ?? 1,
+            status: 'available',
+            objectType: 'seat',
+          })
+        }
+      })
+    }
+  })
+
+  // 合并：有 path 的 section 直接输出，仅有 seats 的 section 从原始数据补齐
+  const sections: any[] = []
+  const seenSectionIds = new Set<string>()
+
+  for (const p of allPaths) {
+    const sec = pathSectionMap.get(p.id)
+    if (!sec) continue
+    if (sectionRowsMap.has(p.id)) {
+      sec.rows = sectionRowsMap.get(p.id)!
+    }
+    sections.push(sec)
+    seenSectionIds.add(p.id)
+  }
+
+  // 补充只有座位没有边框的 section（从原始 venueData）
+  const origSections = props.venueData?.sections ?? []
+  for (const orig of origSections) {
+    if (seenSectionIds.has(orig.id)) continue
+    if (!sectionRowsMap.has(orig.id)) continue
+    sections.push({
+      type: orig.borderType || 'path',
+      id: orig.id,
+      name: orig.name,
+      x: +(orig.x ?? 0).toFixed(2),
+      y: +(orig.y ?? 0).toFixed(2),
+      fill: orig.fill || '#dbdbdb',
+      stroke: orig.stroke || '#81C784',
+      strokeWidth: 2,
+      rotation: 0,
+      rows: sectionRowsMap.get(orig.id) || [],
+    })
+    seenSectionIds.add(orig.id)
+  }
+
+  const raw: any = props.venueData || {}
+  return {
+    id: raw.id || raw.venue_id || '',
+    name: raw.name || '',
+    type: raw.type || 'SIMPLE',
+    categories: raw.categories ?? [],
+    baseScale: raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null),
+    sections,
+  }
+}
+
+function onExportJSON() {
+  const data = buildVenueData()
+  downloadFile('venue-data.json', JSON.stringify(data, null, 2))
+}
+
+function downloadFile(filename: string, content: string): void {
+  const blob = new Blob([content], { type: 'application/json' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  document.body.appendChild(a); a.click()
+  document.body.removeChild(a)
 }
 
 // ==================== 多边形绘制 ====================
@@ -280,7 +427,8 @@ function enterSectionFocus(sectionId: string): void {
   // 定位到分区中心
   const cx = section.x ?? 0
   const cy = section.y ?? 0
-  const baseScale = props.venueData?.baseScale
+  const raw: any = props.venueData || {}
+  const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
   const currentS = getS()
   const targetScale = baseScale ?? currentS
 
@@ -362,7 +510,6 @@ function resetView(): void {
 
 // ==================== 导出 ====================
 
-function onExportJSON() { exportJSON(allPaths) }
 function onExportPNG() { exportPNG(leafer) }
 function onExportSVG() { exportSVG(leafer, allPaths) }
 
@@ -449,6 +596,7 @@ onMounted(() => {
     mode.handleClick(w.x, w.y)
   })
 
+  console.log('[PathEditor] mount renderAll, venueData keys:', Object.keys(props.venueData || {}))
   renderAll(props.venueData)
 
   // 选中变化 → 边框层管理
@@ -543,6 +691,7 @@ onUnmounted(() => {
 // ==================== Watch ====================
 
 watch(() => props.venueData, (newVal) => {
+  console.log('[PathEditor] watch fired, venueData keys:', Object.keys(newVal || {}), 'sections:', (newVal as any)?.sections?.length)
   renderAll(newVal)
 })
 
@@ -586,7 +735,7 @@ defineExpose({
   enterSectionFocus,
   exitSectionFocus,
   deleteSelected,
-  exportPaths,
+  buildVenueData,
   drawnSeatCount: seatModule.drawnSeatCount,
 })
 </script>

@@ -211,7 +211,8 @@ const importTip = ref('')
 let importTipTimer: ReturnType<typeof setTimeout> | null = null
 
 const onExportData = async () => {
-  const result = await exportSeatMap(venueStore.venue, `${venueStore.venue.name || 'seatmap'}.json`)
+  const venue = rendererRef.value?.buildVenueData?.() || venueStore.venue
+  const result = await exportSeatMap(venue, `${venue.name || 'seatmap'}.json`)
   if (result.success) {
     exportStatus.value = 'success'
     if (result.method === 'download') {

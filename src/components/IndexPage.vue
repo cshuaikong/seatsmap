@@ -13,16 +13,16 @@
       <aside class="sidebar">
         <div
           v-for="(item, i) in seatMaps"
-          :key="item.id"
+          :key="getVenueId(item)"
           class="venue-card"
           :class="{ 'venue-card--active': i === activeIndex }"
           @click="onCardClick(i)"
         >
-          <div class="venue-preview" :style="{ background: item.color }">
+          <div class="venue-preview" :style="{ background: item.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length] }">
             <Icon icon="lucide:map-pin" class="venue-icon" />
           </div>
           <div class="venue-name">{{ item.name }}</div>
-          <div class="venue-badge" v-if="!item.dataUrl">新建</div>
+
         </div>
       </aside>
 
@@ -42,19 +42,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import SeatMapDesigner from './SeatMapDesigner.vue'
+import { fetchSeatMaps, fetchSeatMapData, getVenueId, type SeatMapEntry } from '../api/seatMap'
 
-interface SeatMapEntry {
-  id: string
-  name: string
-  dataUrl?: string
-  color: string
-}
+const DEFAULT_COLORS = ['#e0f2fe', '#fef3c7', '#f1f5f9', '#fce7f3', '#e0e7ff', '#d1fae5']
 
-const seatMaps: SeatMapEntry[] = [
-  { id: 'venue-a', name: '工人体育馆',  dataUrl: '/工人体育馆.json',       color: '#e0f2fe' },
-  { id: 'venue-b', name: '五棵松场馆',  dataUrl: '/五棵松场馆.json',  color: '#fef3c7' },
-  { id: 'venue-c', name: '新建座位图',  dataUrl: '/polygons.json', color: '#f1f5f9' },
-]
+const seatMaps = ref<SeatMapEntry[]>([])
 
 const route = useRoute()
 const router = useRouter()
@@ -62,7 +54,7 @@ const router = useRouter()
 const activeIndex = computed(() => {
   const id = route.query.venue
   if (!id) return 0
-  const idx = seatMaps.findIndex(m => m.id === id)
+  const idx = seatMaps.value.findIndex(m => getVenueId(m) === id)
   return idx >= 0 ? idx : 0
 })
 
@@ -70,37 +62,41 @@ const venueData = ref<any>({})
 const loading = ref(false)
 
 function onCardClick(index: number) {
-  const item = seatMaps[index]
-  router.push({ query: { venue: item.id } })
-}
-
-async function loadSeatMapData(dataUrl: string) {
-  const response = await fetch(dataUrl)
-  if (!response.ok) {
-    console.error('Failed to load seat map data:', dataUrl)
-    return {}
-  }
-  return await response.json()
+  const vid = getVenueId(seatMaps.value[index])
+  router.push({ query: { venue: vid } })
 }
 
 async function refreshCurrentData() {
-  const entry = seatMaps[activeIndex.value]
-  if (!entry?.dataUrl) {
+  const entry = seatMaps.value[activeIndex.value]
+  if (!entry) {
     venueData.value = {}
     return
   }
+  const vid = getVenueId(entry)
+  if (!vid) {
+    console.warn('[IndexPage] 列表项缺少 ID 字段:', entry)
+    venueData.value = {}
+    return
+  }
+  console.log('[IndexPage] fetchSeatMapData, venue_id:', vid)
   loading.value = true
   try {
-    venueData.value = await loadSeatMapData(entry.dataUrl)
+    venueData.value = await fetchSeatMapData(vid)
+    console.log('[IndexPage] venueData 加载成功, sections:', (venueData.value as any)?.sections?.length)
   } catch (e) {
-    console.error('加载座位图数据失败:', e)
+    console.error('[IndexPage] 加载座位图数据失败:', e)
     venueData.value = {}
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    seatMaps.value = await fetchSeatMaps()
+  } catch (e) {
+    console.error('加载座位图列表失败:', e)
+  }
   refreshCurrentData()
 })
 

@@ -25,7 +25,7 @@ export const useVenueStore = defineStore('venue', () => {
   const venue = ref<VenueData>({
     id: generateId(),
     name: '未命名座位图',
-    venueType: 'SIMPLE',
+    type: 'SIMPLE',
     categories: [
       { key: 1, label: '普通区', color: '#A5D6A7', accessible: false },  // 中绿
       { key: 2, label: 'VIP区', color: '#FF8A80', accessible: false },   // 中红
@@ -940,7 +940,7 @@ export const useVenueStore = defineStore('venue', () => {
     venue.value = {
       id: data.id || generateId(),
       name: data.name || '未命名座位图',
-      venueType: data.venueType || 'SIMPLE',
+      type: data.type || 'SIMPLE',
       categories: data.categories.length > 0 ? data.categories : [
         { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
         { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
@@ -1034,7 +1034,7 @@ export const useVenueStore = defineStore('venue', () => {
     return {
       id: generateId(),
       name: data.name || '导入的座位图',
-      venueType: 'SIMPLE',
+      type: 'SIMPLE',
       categories: categories.length > 0 ? categories : [
         { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
         { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
@@ -1052,7 +1052,7 @@ export const useVenueStore = defineStore('venue', () => {
     return {
       id: generateId(),
       name: '未命名座位图',
-      venueType: 'SIMPLE',
+      type: 'SIMPLE',
       categories: [
         { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
         { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },

@@ -38,66 +38,15 @@ export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
 // 绘制模式
 export type SeatDrawMode = 'single-seat' | 'row-straight' | 'row-curved' | 'row-segments' | 'section' | 'section-diagonal'
 
-// 旧类型定义（保持兼容性）
-export interface SeatLegacy {
-  id: string
-  label: string
-  x: number
-  y: number
-  radius: number
-  status: SeatStatus
-  type: SeatType
-  category: string
-  categoryId: string
-  rowId: string
-  sectionId: string
-  rowNumber: string
-  seatNumber: string
-  isWheelchair: boolean
-  isCompanion: boolean
-}
 
-export interface RowLegacy {
-  id: string
-  label: string
-  x: number
-  y: number
-  rotation: number
-  seats: SeatLegacy[]
-}
-
-export interface SectionLegacy {
-  id: string
-  name: string
-  x: number
-  y: number
-  rotation: number
-  rows: RowLegacy[]
-}
-
-export interface CategoryLegacy {
-  id: string
-  name: string
-  color: string
-  accessible: boolean
-}
-
-export interface ChartData {
-  name: string
-  width: number
-  height: number
-  sections: Section[]
-  categories: Category[]
-}
 
 // 数据驱动架构的核心类型
 export interface VenueData {
   id: string
   name: string
-  venueType: 'SIMPLE' | 'WITH_SECTIONS' | 'WITH_SECTIONS_AND_FLOORS'
+  type: 'SIMPLE' | 'WITH_SECTIONS' | 'WITH_SECTIONS_AND_FLOORS'
   categories: Category[]
   sections: Section[]
-  focalPoint?: Position
   baseScale?: number | null  // 座位绘制基准缩放，随数据源持久化
 }
 

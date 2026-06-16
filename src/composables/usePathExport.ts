@@ -2,17 +2,6 @@ import { rotatePath } from '../utils/pathUtils'
 
 const r = (n: number) => +n.toFixed(2)
 
-export function exportJSON(allPaths: any[]): void {
-  const data = allPaths.map((p: any) => ({
-    id: p.id,
-    path: rotatePath(p.path, p.rotation ?? 0),
-    x: r(p.x), y: r(p.y),
-    fill: p.fill,
-    stroke: p.stroke,
-  }))
-  downloadFile('polygons.json', JSON.stringify(data, null, 2))
-}
-
 export function exportPNG(leafer: any): void {
   const cv = leafer?.canvas?.view as HTMLCanvasElement | undefined
   if (!cv) return

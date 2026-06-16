@@ -68,10 +68,9 @@ function sampleArcPoints(arc: ReturnType<typeof getArcGeometry>, count: number, 
   const { cx, cy, r, startAngle, endAngle } = arc
 
   let delta = endAngle - startAngle
-  // sweepFlag=1 (depth>0) → 顺时针 → delta 应 ≤ 0
-  // sweepFlag=0 (depth<0) → 逆时针 → delta 应 ≥ 0
-  if (depth > 0 && delta > 0) delta -= Math.PI * 2
-  else if (depth < 0 && delta < 0) delta += Math.PI * 2
+  // 始终走短弧方向
+  if (delta > Math.PI) delta -= Math.PI * 2
+  else if (delta < -Math.PI) delta += Math.PI * 2
 
   const points: Array<{ x: number; y: number }> = []
   for (let i = 0; i < count; i++) {
@@ -319,6 +318,7 @@ function _isNearPathBorder(
 
 /**
  * 计算弧形排的座位位置
+ * 每个座位根据其原始位置在弦上的比例映射到弧线上，保留原始间距关系
  */
 export function calculateCurvedPositions(
   seats: Seat[],
@@ -328,17 +328,17 @@ export function calculateCurvedPositions(
     return seats.map(seat => ({ x: seat.x, y: seat.y }))
   }
 
-  const count = seats.length
-  const firstSeat = seats[0]
-  const lastSeat = seats[count - 1]
+  // 找出排的左右极值座位（按 x 坐标）
+  const sorted = [...seats].sort((a, b) => (a.x || 0) - (b.x || 0))
+  const firstSeat = sorted[0]
+  const lastSeat = sorted[sorted.length - 1]
 
   const dx = lastSeat.x - firstSeat.x
   const dy = lastSeat.y - firstSeat.y
-  const length = Math.sqrt(dx * dx + dy * dy)
+  const chordLength = Math.sqrt(dx * dx + dy * dy)
   const baseAngle = Math.atan2(dy, dx)
 
   const maxCurveAngle = curve * (Math.PI / 180)
-  const chordLength = length
   const curveAngle = Math.abs(maxCurveAngle)
   const radius = curveAngle > 0.001
     ? chordLength / (2 * Math.sin(curveAngle / 2))
@@ -350,19 +350,26 @@ export function calculateCurvedPositions(
   const perpX = -Math.sin(baseAngle) * (curve > 0 ? 1 : -1)
   const perpY = Math.cos(baseAngle) * (curve > 0 ? 1 : -1)
 
-  const centerX = midX + perpX * Math.sqrt(
+  const sagitta = Math.sqrt(
     Math.max(0, radius * radius - (chordLength / 2) * (chordLength / 2))
   )
-  const centerY = midY + perpY * Math.sqrt(
-    Math.max(0, radius * radius - (chordLength / 2) * (chordLength / 2))
-  )
+  const centerX = midX + perpX * sagitta
+  const centerY = midY + perpY * sagitta
 
   const startAngle = Math.atan2(firstSeat.y - centerY, firstSeat.x - centerX)
   const endAngle = Math.atan2(lastSeat.y - centerY, lastSeat.x - centerX)
-  const angleStep = (endAngle - startAngle) / (count - 1)
+  let delta = endAngle - startAngle
+  // 始终走短弧方向
+  if (delta > Math.PI) delta -= Math.PI * 2
+  else if (delta < -Math.PI) delta += Math.PI * 2
 
-  return seats.map((_, index) => {
-    const angle = startAngle + angleStep * index
+  // 每个座位按其原始位置在弦上的比例映射到弧线（保序，保留间距关系）
+  return seats.map(seat => {
+    const sx = seat.x - firstSeat.x
+    const sy = seat.y - firstSeat.y
+    const proj = sx * Math.cos(baseAngle) + sy * Math.sin(baseAngle)
+    const t = chordLength > 0 ? Math.max(0, Math.min(1, proj / chordLength)) : 0
+    const angle = startAngle + delta * t
     return {
       x: centerX + radius * Math.cos(angle),
       y: centerY + radius * Math.sin(angle)

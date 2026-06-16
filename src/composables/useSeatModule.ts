@@ -91,7 +91,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
   }
 
   /** 从 venue data 的 sections[].rows[].seats[] 渲染座位排
-   *  将 rotation/curve 烘焙到 seat.x/y，然后按独立 Ellipse 绘制
+   *  动态计算 rotation/curve 的世界位置，不修改原始数据，按独立 Ellipse 绘制
    */
   function createSeatsFromVenueData(sections: any[], venueBaseScale?: number | null, categories?: any[]): void {
     if (venueBaseScale != null) {
@@ -119,36 +119,30 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const sin = Math.sin(rot)
         const curve = row.curve ?? 0
 
-        // ---- 烘焙：curve + rotation → seat.x/y，第一个座位固定在 (0,0) ----
-        const curved = calculateCurvedPositions(row.seats, curve)
+        // 排序副本用于计算弦端点，不修改原始 seats
+        const sortedSeats = [...row.seats].sort((a: any, b: any) => {
+          const ax = typeof a.x === 'string' ? parseFloat(a.x) : (a.x || 0)
+          const bx = typeof b.x === 'string' ? parseFloat(b.x) : (b.x || 0)
+          return ax - bx
+        })
+
+        // 动态计算弧线世界位置（不烘焙到 seat.x/y，保留原始 curve/rotation）
+        const curved = calculateCurvedPositions(sortedSeats, curve)
         const worldPositions: { x: number; y: number }[] = []
-        for (let i = 0; i < row.seats.length; i++) {
+        for (let i = 0; i < sortedSeats.length; i++) {
           const pos = curved[i]
           worldPositions.push({
-            x: pos.x * cos - pos.y * sin,
-            y: pos.x * sin + pos.y * cos,
+            x: +(rowX + pos.x * cos - pos.y * sin).toFixed(2),
+            y: +(rowY + pos.x * sin + pos.y * cos).toFixed(2),
           })
         }
 
-        // 第一个座位的世界位置作为新的排原点
-        const firstWX = worldPositions[0].x
-        const firstWY = worldPositions[0].y
-        row.x = +(rowX + firstWX).toFixed(2)
-        row.y = +(rowY + firstWY).toFixed(2)
-
-        // 所有座位相对于第一个座位
-        for (let i = 0; i < row.seats.length; i++) {
-          row.seats[i].x = +(worldPositions[i].x - firstWX).toFixed(2)
-          row.seats[i].y = +(worldPositions[i].y - firstWY).toFixed(2)
-        }
-        row.rotation = 0
-        row.curve = 0
+        const firstW = worldPositions[0]
+        const lastW = worldPositions[worldPositions.length - 1]
+        const firstSX = firstW.x, firstSY = firstW.y
+        const lastSX = lastW.x, lastSY = lastW.y
 
         // ---- 渲染 ----
-        const newRowX = row.x!
-        const newRowY = row.y!
-        let firstSX = 0, firstSY = 0, lastSX = 0, lastSY = 0
-
         const group = new Group({
           editable: false,
           hittable: false,
@@ -156,18 +150,24 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         ;(group as any).__seatRow = true
         ;(group as any).__isVenueDataSeat = true
         ;(group as any).__sectionId = section.id
+        ;(group as any).__rowId = row.id
+        ;(group as any).__rowLabel = row.label || ''
+        // 保留弧度和旋转参数，供编辑/导出使用
+        ;(group as any).__curve = curve
+        ;(group as any).__rotation = row.rotation ?? 0
+        ;(group as any).__rowOriginX = rowX
+        ;(group as any).__rowOriginY = rowY
+        ;(group as any).__rawSeats = sortedSeats
 
         const ellipses: any[] = []
-        for (let i = 0; i < row.seats.length; i++) {
-          const seat = row.seats[i]
-          const sx = +(newRowX + seat.x).toFixed(2)
-          const sy = +(newRowY + seat.y).toFixed(2)
+        for (let i = 0; i < sortedSeats.length; i++) {
+          const seat = sortedSeats[i]
+          const sx = worldPositions[i].x
+          const sy = worldPositions[i].y
 
-          if (i === 0) { firstSX = sx; firstSY = sy }
-          if (i === row.seats.length - 1) { lastSX = sx; lastSY = sy }
-
+          const ck = seat.cat_id ?? seat.categoryKey
           const color = categories
-            ? getCategoryColor(seat.categoryKey, categories)
+            ? getCategoryColor(ck, categories)
             : '#A5D6A7'
 
           const ell = new Ellipse({
@@ -182,7 +182,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             visible: false,
           })
           ;(ell as any).__seatId = seat.id
-          ;(ell as any).__categoryKey = seat.categoryKey
+          ;(ell as any).__categoryKey = ck
+          ;(ell as any).__sourceSeat = seat
           group.add(ell)
           ellipses.push(ell)
         }
@@ -209,9 +210,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           uy: lastSX !== firstSX || lastSY !== firstSY
             ? (lastSY - firstSY) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
             : 0,
-          count: row.seats.length,
-          spacing: row.seats.length > 1
-            ? Math.hypot(lastSX - firstSX, lastSY - firstSY) / (row.seats.length - 1)
+          count: sortedSeats.length,
+          spacing: sortedSeats.length > 1
+            ? Math.hypot(lastSX - firstSX, lastSY - firstSY) / (sortedSeats.length - 1)
             : SEAT_CONFIG.spacing / Math.max(bs, 0.02),
         } as SeatDrawRowData
 
@@ -246,13 +247,36 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const anchorX = anchorFromEnd && endCenter ? endCenter.x : x
       const anchorY = anchorFromEnd && endCenter ? endCenter.y : y
       const dir = anchorFromEnd ? -1 : 1
+      const groupCurve = (group as any).__curve ?? 0
+
+      // 动态计算每个座位沿弦/弧的位置（支持 rowData 和 itemX/itemY 两种模式）
+      const positions: Array<{ x: number; y: number }> = []
+      if (Math.abs(groupCurve) > 0.001) {
+        // 弧线排：沿弦创建等间距虚拟座位点，映射到弧线
+        const virtualSeats: Array<{ x: number; y: number }> = []
+        for (let i = 0; i < count; i++) {
+          virtualSeats.push({
+            x: anchorX + ux * dir * spacing * i,
+            y: anchorY + uy * dir * spacing * i,
+          })
+        }
+        const curved = calculateCurvedPositions(virtualSeats as any[], groupCurve)
+        for (let i = 0; i < count; i++) {
+          positions.push({ x: +curved[i].x.toFixed(2), y: +curved[i].y.toFixed(2) })
+        }
+      } else {
+        for (let i = 0; i < count; i++) {
+          positions.push({
+            x: +(anchorX + ux * dir * spacing * i).toFixed(2),
+            y: +(anchorY + uy * dir * spacing * i).toFixed(2),
+          })
+        }
+      }
 
       for (let i = 0; i < count; i++) {
-        const cx = +(anchorX + ux * dir * spacing * i).toFixed(2)
-        const cy = +(anchorY + uy * dir * spacing * i).toFixed(2)
         if (ellipses[i]) {
-          ellipses[i].x = cx
-          ellipses[i].y = cy
+          ellipses[i].x = positions[i].x
+          ellipses[i].y = positions[i].y
           ellipses[i].width = size
           ellipses[i].height = size
         }
@@ -264,10 +288,10 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       }
       while (ellipses.length < count) {
         const i = ellipses.length
-        const cx = +(anchorX + ux * dir * spacing * i).toFixed(2)
-        const cy = +(anchorY + uy * dir * spacing * i).toFixed(2)
+        const px = positions[i]?.x ?? +(anchorX + ux * dir * spacing * i).toFixed(2)
+        const py = positions[i]?.y ?? +(anchorY + uy * dir * spacing * i).toFixed(2)
         const ell = new Ellipse({
-          x: cx, y: cy,
+          x: px, y: py,
           width: size, height: size,
           fill: '#A5D6A7', stroke: '#81C784',
           strokeWidth: sw, around: 'center',

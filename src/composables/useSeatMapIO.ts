@@ -1,29 +1,16 @@
 import { ref } from 'vue'
-import type { VenueData, Section, SeatRow, Seat, Category } from '../types'
+import type { VenueData, Section, SeatRow, Seat } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 
-// 导出数据格式
-export interface SeatMapExportData {
-  version: string
-  exportTime: string
-  venue: VenueData & {
-    baseScale?: number
-    visualConfig?: {
-      radius: number
-      gap: number
-      rowGap: number
-    }
-  }
-}
-
-// 验证导入数据
-function validateImportData(data: any): data is SeatMapExportData {
+// 验证导入数据 — 兼容旧格式 { version, venue } 和新格式 (venue 直接)
+function validateImportData(data: any): data is VenueData {
   if (!data || typeof data !== 'object') return false
-  if (data.version !== '1.0') return false
-  if (!data.venue || typeof data.venue !== 'object') return false
-  if (!Array.isArray(data.venue.sections)) return false
-  if (!Array.isArray(data.venue.categories)) return false
-  return true
+  // 旧格式：{ version, venue }
+  if (data.version === '1.0' && data.venue) {
+    return Array.isArray(data.venue.sections) && Array.isArray(data.venue.categories)
+  }
+  // 新格式：venue 直接
+  return Array.isArray(data.sections) && Array.isArray(data.categories)
 }
 
 export function useSeatMapIO() {
@@ -33,25 +20,15 @@ export function useSeatMapIO() {
   // 导出座位图数据为 JSON 文件
   const exportSeatMap = async (venue: VenueData, fileName?: string): Promise<{ success: boolean; method: 'picker' | 'download' | null }> => {
     try {
-      // 获取 store 中的 baseScale 和 visualConfig
+      // 深拷贝，baseScale 优先使用 venue 自带的，否则从 store 取
       const store = useVenueStore()
-      const baseScale = store.getBaseScale()
-      const visualConfig = store.visualConfig
-
-      // 深拷贝 venue 并添加 baseScale 和 visualConfig
-      const venueWithMeta = {
-        ...JSON.parse(JSON.stringify(venue)),
-        baseScale,
-        visualConfig
+      const venueCopy: any = JSON.parse(JSON.stringify(venue))
+      if (venueCopy.baseScale == null) {
+        venueCopy.baseScale = store.getBaseScale()
       }
+      venueCopy.visualConfig = store.visualConfig
 
-      const exportData: SeatMapExportData = {
-        version: '1.0',
-        exportTime: new Date().toISOString(),
-        venue: venueWithMeta
-      }
-
-      const jsonStr = JSON.stringify(exportData, null, 2)
+      const jsonStr = JSON.stringify(venueCopy, null, 2)
       const blob = new Blob([jsonStr], { type: 'application/json' })
       const defaultName = fileName || `seatmap-${venue.name || 'export'}-${Date.now()}.json`
 
@@ -113,9 +90,10 @@ export function useSeatMapIO() {
       if (!validateImportData(data)) {
         throw new Error('无效的数据格式')
       }
-      
-      // 验证必要字段
-      const venue = data.venue
+
+      // 兼容旧格式 { version, venue } 和新格式 (venue 直接)
+      const raw: any = data
+      const venue: VenueData = raw.version === '1.0' && raw.venue ? raw.venue : raw
       if (!venue.id || !venue.name) {
         throw new Error('数据缺少必要字段')
       }
