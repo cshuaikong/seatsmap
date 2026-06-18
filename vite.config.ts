@@ -8,5 +8,13 @@ export default defineConfig({
       '@': '/src'
     }
   },
-  publicDir: 'static'  // 设置静态资源目录
+  publicDir: 'static',
+  server: {
+    proxy: {
+      '/venue': {
+        target: 'http://seatmap.web.jinsc.cn',
+        changeOrigin: true,
+      }
+    }
+  }
 })

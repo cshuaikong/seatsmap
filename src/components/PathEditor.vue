@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Leafer, Path, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
 import '@leafer-in/view'
 import '@leafer-in/viewport'
@@ -55,6 +55,7 @@ const emit = defineEmits<{
   (e: 'ready', leafer: any, editor: any): void
   (e: 'update:currentTool', tool: string): void
   (e: 'vertex-edit-change', active: boolean): void
+  (e: 'section-focus-change', focused: boolean, sectionName?: string): void
 }>()
 
 const containerRef = ref<HTMLDivElement>()
@@ -170,6 +171,15 @@ function renderAll(data: VenueData): void {
     seatModule.createSeatsFromVenueData(sections, bs != null ? parseFloat(bs) : bs, data?.categories)
     console.log('[renderAll] seats rendered, count:', seatModule.drawnSeatCount.value)
 
+    // SIMPLE 模式：自动进入默认分区聚焦，座位工具直接可用
+    const venueType: string = (data as any)?.type ?? 'SIMPLE'
+    if (venueType === 'SIMPLE') {
+      const defaultSection = sections.find((s: any) => s.borderType === 'none' || !s.path) || sections[0]
+      if (defaultSection) {
+        nextTick(() => enterSectionFocus(defaultSection.id))
+      }
+    }
+
     if (editor) {
       editor.cancel()
       ;(editor as any).zIndex = 999
@@ -179,23 +189,26 @@ function renderAll(data: VenueData): void {
   }
 }
 
-function buildVenueData(): VenueData {
+function buildVenueData(): any {
+  const raw: any = props.venueData || {}
+
   // 从 allPaths 构建 section 查找表
   const pathSectionMap = new Map<string, any>()
   allPaths.forEach((p: any) => {
-    pathSectionMap.set(p.id, {
-      type: 'path',
-      id: p.id,
+    const sec: any = {
       name: p.name || p.id,
-      path: p.path,
+      rows: [] as any[],
+      type: 'path',
       x: +(p.x ?? 0).toFixed(2),
       y: +(p.y ?? 0).toFixed(2),
       fill: p.fill,
       stroke: p.stroke,
-      strokeWidth: p.strokeWidth ?? 2,
-      rotation: p.rotation ?? 0,
-      rows: [] as any[],
-    })
+      id: p.id,
+      path: p.path,
+    }
+    if (p.rotation) sec.rotation = +(p.rotation ?? 0).toFixed(2)
+    if (p.zIndex != null) sec.zIndex = p.zIndex
+    pathSectionMap.set(p.id, sec)
   })
 
   // 从 seatRowGroups 构建 row→section 关系
@@ -213,59 +226,71 @@ function buildVenueData(): VenueData {
     const rowId = g.__rowId || `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const ellipses = (g.__seatEllipses || []) as any[]
     const rowData = g.__seatRowData
+    const rowLabel = g.__rowLabel || ''
 
     const isVenueSeat = g.__isVenueDataSeat
     if (!rowLookup.has(rowId)) {
       const row: any = {
         id: rowId,
-        label: g.__rowLabel || '',
-        // 有原始参数时使用原始 rowOrigin，否则用 rowData 的位置
+        label: rowLabel,
         x: +(isVenueSeat ? (g.__rowOriginX ?? rowData?.x ?? 0) : (rowData?.x ?? 0)).toFixed(2),
         y: +(isVenueSeat ? (g.__rowOriginY ?? rowData?.y ?? 0) : (rowData?.y ?? 0)).toFixed(2),
         rotation: +(g.__rotation ?? 0).toFixed(2),
         curve: +(g.__curve ?? 0).toFixed(2),
         seats: [],
       }
+      if (g.__seatSpacing != null) row.seatSpacing = +g.__seatSpacing.toFixed(2)
+      if (g.__rowSpacing != null) row.rowSpacing = +g.__rowSpacing.toFixed(2)
+      if (g.__categoryId != null) row.categoryId = g.__categoryId
       rowLookup.set(rowId, row)
       sectionRowsMap.get(sectionId)!.push(row)
     }
 
     const row = rowLookup.get(rowId)!
+    const statusMap: Record<string, number> = { available: 0, sold: 1, reserved: 2 }
+    const toStatus = (s: string) => statusMap[s] ?? 0
+    const typeMap: Record<string, number> = { seat: 1 }
+    const toType = (s: string) => typeMap[s] ?? 1
+
+    const pushSeat = (seat: any) => {
+      seat.ven_id = raw.id || ''
+      row.seats.push(seat)
+    }
+
     if (isVenueSeat && g.__rawSeats) {
-      // 保留原始相对位置（未烘焙），搭配 curve/rotation 使用
       g.__rawSeats.forEach((src: any) => {
-        row.seats.push({
+        pushSeat({
           id: src.id,
           label: src.label || '',
           x: +(typeof src.x === 'string' ? parseFloat(src.x) : (src.x || 0)).toFixed(2),
           y: +(typeof src.y === 'string' ? parseFloat(src.y) : (src.y || 0)).toFixed(2),
-          categoryKey: src.cat_id ?? src.categoryKey ?? 1,
-          status: src.status || 'available',
-          objectType: src.objectType || 'seat',
+          cat_id: src.cat_id ?? src.categoryKey ?? 1,
+          status: toStatus(src.status || 'available'),
+          type: toType(src.objectType || 'seat'),
         })
       })
     } else {
       ellipses.forEach((ell: any) => {
         const src = ell.__sourceSeat
         if (src) {
-          row.seats.push({
+          pushSeat({
             id: ell.__seatId || src.id,
             label: src.label || '',
             x: +(src.x ?? 0).toFixed(2),
             y: +(src.y ?? 0).toFixed(2),
-            categoryKey: ell.__categoryKey ?? src.categoryKey,
-            status: src.status || 'available',
-            objectType: src.objectType || 'seat',
+            cat_id: ell.__categoryKey ?? src.categoryKey,
+            status: toStatus(src.status || 'available'),
+            type: toType(src.objectType || 'seat'),
           })
         } else {
-          row.seats.push({
+          pushSeat({
             id: ell.__seatId || `seat_${Date.now()}`,
             label: '',
             x: +(ell.x ?? 0).toFixed(2) - +(rowData?.x ?? 0).toFixed(2),
             y: +(ell.y ?? 0).toFixed(2) - +(rowData?.y ?? 0).toFixed(2),
-            categoryKey: ell.__categoryKey ?? 1,
-            status: 'available',
-            objectType: 'seat',
+            cat_id: ell.__categoryKey ?? 1,
+            status: 0,
+            type: 1,
           })
         }
       })
@@ -292,28 +317,26 @@ function buildVenueData(): VenueData {
     if (seenSectionIds.has(orig.id)) continue
     if (!sectionRowsMap.has(orig.id)) continue
     sections.push({
-      type: orig.borderType || 'path',
-      id: orig.id,
       name: orig.name,
+      rows: sectionRowsMap.get(orig.id)!,
+      type: orig.borderType || 'path',
       x: +(orig.x ?? 0).toFixed(2),
       y: +(orig.y ?? 0).toFixed(2),
       fill: orig.fill || '#dbdbdb',
       stroke: orig.stroke || '#81C784',
-      strokeWidth: 2,
-      rotation: 0,
-      rows: sectionRowsMap.get(orig.id) || [],
+      id: orig.id,
     })
     seenSectionIds.add(orig.id)
   }
-
-  const raw: any = props.venueData || {}
   return {
-    id: raw.id || raw.venue_id || '',
-    name: raw.name || '',
-    type: raw.type || 'SIMPLE',
-    categories: raw.categories ?? [],
-    baseScale: raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null),
-    sections,
+    venue:{
+      id: raw.id,
+      name: raw.name,
+      type: raw.type,
+      categories: raw.categories ?? [],
+      scale: +(raw.scale ?? 1),
+      sections
+    }
   }
 }
 
@@ -419,6 +442,7 @@ function enterSectionFocus(sectionId: string): void {
   focusedSectionId.value = sectionId
   focusedSectionName.value = section.name || sectionId
   title.value = `分区编辑 — ${focusedSectionName.value}`
+  emit('section-focus-change', true, focusedSectionName.value)
 
   editor?.cancel()
   if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
@@ -473,6 +497,7 @@ function exitSectionFocus(): void {
   focusedSectionId.value = null
   focusedSectionName.value = ''
   title.value = '座位图设计器'
+  emit('section-focus-change', false)
 
   if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
   if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
@@ -553,7 +578,30 @@ onMounted(() => {
     }
   }
   let didRotate = false
-  editor.on(EditorMoveEvent.MOVE, () => { ;(editor as any).editBox?.update(); syncBorder() })
+  editor.on(EditorMoveEvent.MOVE, () => {
+    ;(editor as any).editBox?.update()
+    syncBorder()
+    // 分区移动时，同步位移到关联的座位排
+    const list: any[] = (editor as any)?.list ?? []
+    for (const el of list) {
+      if (el.tag !== 'Path') continue
+      const prevX: number = (el as any).__prevX ?? el.x
+      const prevY: number = (el as any).__prevY ?? el.y
+      const dx = el.x - prevX
+      const dy = el.y - prevY
+      if (dx === 0 && dy === 0) continue
+      seatModule.seatRowGroups.forEach((g: any) => {
+        if (g.__sectionId === el.id) {
+          g.x = (g.x || 0) + dx
+          g.y = (g.y || 0) + dy
+          if (g.__rowOriginX != null) g.__rowOriginX += dx
+          if (g.__rowOriginY != null) g.__rowOriginY += dy
+        }
+      })
+      ;(el as any).__prevX = el.x
+      ;(el as any).__prevY = el.y
+    }
+  })
   editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder(); didRotate = true })
   leafer.on(LP.MOVE, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
@@ -570,6 +618,8 @@ onMounted(() => {
       }
       sel2.__boxHidden = false
     }
+    // 清理分区位移追踪
+    ;(editor as any)?.list?.forEach((el: any) => { delete (el as any).__prevX; delete (el as any).__prevY })
     if (!didRotate) return
     didRotate = false
     const list: any[] = (editor as any)?.list ?? []
@@ -729,6 +779,7 @@ defineExpose({
   isVertexEditActive: () => vertexEdit.isEditing.value,
   isSeatVertexEditActive: () => seatVertexEdit.isEditing.value,
   isSectionFocusActive: () => !!focusedSectionId.value,
+  focusedSectionName: () => focusedSectionName.value,
   toggleVertexEdit: () => {
     vertexEdit.isEditing.value ? vertexEdit.exitVertexEdit() : vertexEdit.enterVertexEdit((editor as any)?.list?.[0])
   },

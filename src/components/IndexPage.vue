@@ -31,6 +31,7 @@
           :venue-data="venueData"
           :options="{}"
           embedded
+          @save="onSaveVenue"
         />
       </main>
     </div>
@@ -42,7 +43,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import SeatMapDesigner from './SeatMapDesigner.vue'
-import { fetchSeatMaps, fetchSeatMapData, getVenueId, type SeatMapEntry } from '../api/seatMap'
+import { fetchSeatMaps, fetchSeatMapData, editVenue, getVenueId, type SeatMapEntry } from '../api/seatMap'
 
 const DEFAULT_COLORS = ['#e0f2fe', '#fef3c7', '#f1f5f9', '#fce7f3', '#e0e7ff', '#d1fae5']
 
@@ -103,6 +104,17 @@ onMounted(async () => {
 watch(() => route.query.venue, () => {
   refreshCurrentData()
 })
+
+async function onSaveVenue(data: any) {
+  try {
+    await editVenue(data)
+    console.log('[IndexPage] 保存成功')
+    alert('保存成功')
+  } catch (e) {
+    console.error('[IndexPage] 保存失败:', e)
+    alert('保存失败：' + (e instanceof Error ? e.message : '未知错误'))
+  }
+}
 </script>
 
 <style scoped>

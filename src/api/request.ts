@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE || 'http://seatmap.web.jinsc.cn'
+const BASE_URL = import.meta.env.VITE_API_BASE || ''
 
 interface ApiResponse<T> {
   code: number

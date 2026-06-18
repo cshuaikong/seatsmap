@@ -21,3 +21,10 @@ export async function fetchSeatMapData(venueId: string): Promise<any> {
   // 后端返回 { venue: {...} }，提取内层
   return raw.venue || raw
 }
+
+export function editVenue(data: any): Promise<any> {
+  return request('/venue/edit', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}

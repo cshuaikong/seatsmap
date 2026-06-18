@@ -2,7 +2,7 @@
   <div class="left-toolbar">
     <!-- 1. 选择工具 -->
     <div class="toolbar-section">
-      <button 
+      <button
         class="tool-item"
         :class="{ active: modelValue === 'select' }"
         title="选择工具 (V)"
@@ -19,7 +19,7 @@
       >
         <i class="iconfont icon-a-4404035571 tool-iconfont"></i>
       </button>
-      <button 
+      <button
         class="tool-item"
         :class="{ active: modelValue === 'selectseat' }"
         title="选择座位"
@@ -31,77 +31,65 @@
 
     <div class="toolbar-divider"></div>
 
-    <!-- 2-5. 绘制工具区 - 三种座位排列方式 -->
+    <!-- 2. 座位绘制工具区 -->
+    <!-- SIMPLE: 始终显示 | WITH_SECTIONS: 仅分区聚焦后显示 -->
+    <template v-if="showSeatTools">
+      <div class="toolbar-section">
+        <button
+          class="tool-item"
+          :class="{ active: modelValue === 'seat-row' }"
+          title="单行座位"
+          @click="onToolChange('seat-row')"
+        >
+          <i class="iconfont icon-dorwrow tool-iconfont"></i>
+        </button>
+        <button
+          class="tool-item"
+          :class="{ active: modelValue === 'seat-diagonal' }"
+          title="多行座位"
+          @click="onToolChange('seat-diagonal')"
+        >
+          <i class="iconfont icon-drowmultrows tool-iconfont"></i>
+        </button>
+      </div>
+      <div class="toolbar-divider"></div>
+    </template>
+
+    <!-- 3. 分区绘制工具区 -->
+    <!-- SIMPLE: 隐藏 | WITH_SECTIONS: 始终显示 -->
+    <template v-if="showSectionTools">
+      <div class="toolbar-section">
+        <button
+          class="tool-item"
+          :class="{ active: modelValue === 'drawline' }"
+          title="绘制线条"
+          @click="onToolChange('drawline')"
+        >
+          <i class="iconfont icon-xianduan tool-iconfont"></i>
+        </button>
+        <button
+          class="tool-item"
+          :class="{ active: modelValue === 'drawRect' }"
+          title="绘制矩形"
+          @click="onToolChange('drawRect')"
+        >
+          <i class="iconfont icon-rect tool-iconfont"></i>
+        </button>
+        <button
+          class="tool-item"
+          :class="{ active: modelValue === 'drawPolygon' }"
+          title="绘制分区"
+          @click="onToolChange('drawPolygon')"
+        >
+          <i class="iconfont icon-duobianxing tool-iconfont"></i>
+        </button>
+      </div>
+      <div class="toolbar-divider"></div>
+    </template>
+
+    <!-- 4. 标注工具 -->
     <div class="toolbar-section">
-      <!-- 单行座位 row-straight：两点式直行 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'seat-row' }"
-        title="单行座位"
-        @click="onToolChange('seat-row')"
-      >
-        <i class="iconfont icon-dorwrow tool-iconfont"></i>
-      </button>
-      <!-- 分段座位 section：三点式折线行 -->
-      <!-- <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'seat-section' }"
-        title="分段座位"
-        @click="onToolChange('seat-section')"
-      >
-        <i class="iconfont icon-drowseatswithsegment tool-iconfont"></i>
-      </button> -->
-      <!-- 多行座位 section-diagonal：对角区块 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'seat-diagonal' }"
-        title="多行座位"
-        @click="onToolChange('seat-diagonal')"
-      >
-        <i class="iconfont icon-drowmultrows tool-iconfont"></i>
-      </button>
-    </div>
-
-    <div class="toolbar-divider"></div>
-
-    <!-- 6-11. 座位区工具 -->
-    <div class="toolbar-section">
-
-      <!-- 分区 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawline' }"
-        title="绘制线条"
-        @click="onToolChange('drawline')"
-      >
-        <i class="iconfont icon-xianduan tool-iconfont"></i>
-      </button>
-
-            <!-- 矩形 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawRect' }"
-        title="绘制矩形"
-        @click="onToolChange('drawRect')"
-      >
-        <i class="iconfont icon-rect tool-iconfont"></i>
-      </button>
-      <!-- 多边形 -->
-      <button 
-        class="tool-item"
-        :class="{ active: modelValue === 'drawPolygon' }"
-        title="绘制分区"
-        @click="onToolChange('drawPolygon')"
-      >
-        <i class="iconfont icon-duobianxing tool-iconfont"></i>
-      </button>
-    </div>
-    <div class="toolbar-divider"></div>
-
-    <!-- 13-15. 标注工具 -->
-    <div class="toolbar-section">
-      <!-- 文字 -->
-      <button 
+      <button
         class="tool-item"
         :class="{ active: modelValue === 'text' }"
         title="文字"
@@ -109,8 +97,7 @@
       >
         <i class="iconfont icon-wenzi tool-iconfont"></i>
       </button>
-      <!-- 图片 -->
-      <button 
+      <button
         class="tool-item"
         :class="{ active: modelValue === 'image' }"
         title="图片"
@@ -149,14 +136,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 
 type ToolMode = 'select' | 'node' | 'selectseat'
   | 'seat-row' | 'seat-section' | 'seat-diagonal'
   | 'drawline' | 'drawRect' | 'drawPolygon'
   | 'text' | 'image'
 
-defineProps<{
+const props = defineProps<{
   modelValue: ToolMode
+  venueType?: string
+  sectionFocused?: boolean
 }>()
 
 // Emits
@@ -169,19 +159,26 @@ const emit = defineEmits<{
   'delete': []
 }>()
 
+const isSimple = computed(() => props.venueType === 'SIMPLE')
+
+/** 座位绘制工具：SIMPLE 始终显示，WITH_SECTIONS 仅分区聚焦后显示 */
+const showSeatTools = computed(() => isSimple.value || !!props.sectionFocused)
+
+/** 分区绘制工具：仅 WITH_SECTIONS 显示 */
+const showSectionTools = computed(() => !isSimple.value)
+
 // 工具切换
 const onToolChange = (tool: ToolMode) => {
   emit('update:modelValue', tool)
 }
 
-// 图片按钮点击：切换到 image 工具模式
+// 图片按钮点击
 const onImageClick = () => {
   emit('update:modelValue', 'image')
 }
 </script>
 
 <style scoped>
-/* 左侧工具栏 */
 .left-toolbar {
   display: flex;
   flex-direction: column;
@@ -239,13 +236,11 @@ const onImageClick = () => {
   color: #dc2626;
 }
 
-/* Iconify 图标 */
 .tool-icon {
   width: 18px;
   height: 18px;
 }
 
-/* Iconfont 图标 */
 .tool-iconfont {
   font-size: 18px;
 }

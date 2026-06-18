@@ -64,22 +64,20 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return _origAllow(target)
   }
 
-  // ② findUI 覆盖：点击边框→body，点击座位排子元素→父Group
+  // ② findUI 覆盖：座位排子元素优先 → 边框→body 重定向 → 分区图形
   const _origFindUI = sel.findUI.bind(sel)
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
     if (result === ctx.getCurrentBorder() && ctx.getCurrentBorderBody()) {
       return ctx.getCurrentBorderBody()
     }
-    if (result) return result
-    // findOne 要求 editable=true，Group 子元素(Line/Path)都不满足，
-    // 但 Group 本身是 isBranch 容器不会被 findOne 返回。
-    // 这里扫描命中路径，找到 __seatRow Group 作为选中目标。
+    // 优先扫描命中路径中的 __seatRow Group，防止被分区图形拦截
     const path = e.path?.list ?? e.path ?? []
     for (const leaf of path) {
       const p = leaf.parent
       if (p?.__seatRow) return p
     }
+    if (result) return result
     return null
   }
 

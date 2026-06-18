@@ -52,6 +52,8 @@
     <div class="designer-main">
       <LeftToolbar
         v-model="currentTool as any"
+        :venue-type="props.venueData?.type"
+        :section-focused="sectionFocused"
         @undo="onUndo"
         @redo="onRedo"
         @copy="onCopy"
@@ -70,6 +72,7 @@
             @body-double-tap="onPathDoubleTap"
             @update:current-tool="(tool: string) => currentTool = tool"
             @vertex-edit-change="(active: boolean) => vertexEditActive = active"
+            @section-focus-change="onSectionFocusChange"
           />
 
           <div class="status-bar">
@@ -124,6 +127,10 @@ import { useVenueStore } from '../stores/venueStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
 import PreviewModal from './PreviewModal.vue'
+
+const emit = defineEmits<{
+  (e: 'save', data: any): void
+}>()
 
 const props = withDefaults(defineProps<{
   venueData?: VenueData
@@ -181,9 +188,15 @@ const currentToolLabel = computed(() => {
 // ==================== 分区聚焦 ====================
 
 const focusedSectionName = ref<string | null>(null)
+const sectionFocused = ref(false)
+
+const onSectionFocusChange = (focused: boolean, sectionName?: string) => {
+  sectionFocused.value = focused
+  focusedSectionName.value = focused ? (sectionName ?? null) : null
+}
 
 const onExitSectionFocus = () => {
-  focusedSectionName.value = null
+  rendererRef.value?.exitSectionFocus?.()
 }
 
 // ==================== Categories ====================
@@ -250,42 +263,9 @@ const onPreview = () => {
   showPreview.value = true
 }
 
-const onSave = async () => {
-  try {
-    const paths = (rendererRef.value as any)?.exportPaths?.() ?? []
-    const data = { ...props.venueData, name: chartName.value, sections: paths }
-    const snapshot = JSON.stringify(data)
-    if ('showSaveFilePicker' in window) {
-      try {
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: '分区座位 全.json',
-          types: [{
-            description: 'JSON 文件',
-            accept: { 'application/json': ['.json'] }
-          }]
-        })
-        const writable = await handle.createWritable()
-        await writable.write(snapshot)
-        await writable.close()
-        return
-      } catch (err: any) {
-        if (err.name === 'AbortError') return
-        console.warn('File System Access API 失败，使用下载方式:', err)
-      }
-    }
-    const blob = new Blob([snapshot], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = '分区座位 全.json'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('保存失败:', error)
-    alert('保存失败：' + (error instanceof Error ? error.message : '未知错误'))
-  }
+const onSave = () => {
+  const venue = rendererRef.value?.buildVenueData?.() 
+  emit('save', venue)
 }
 
 // ==================== 操作 ====================
