@@ -21,27 +21,15 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const sel = (editor as any).selector
   if (!sel) return
 
-  // ⓪ targetStroker 过滤：座位排不画选中高亮描边
-  //    SectionGroup → 替换为内部 Path 做描边，贴合分区形状（而非 Group 矩形 AABB）
+  // ⓪ targetStroker 过滤：座位排/分区都不画默认描边（分区走 currentBorder 贴合形状）
   const targetStroker = sel.targetStroker
   if (targetStroker) {
     const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
     targetStroker.setTarget = function (target: any, style?: any) {
       if (Array.isArray(target)) {
-        target = target
-          .filter((el: any) => !el.__seatRow)
-          .map((el: any) => {
-            if (el.__sectionGroup === true) {
-              const pathChild = el.children?.find((c: any) => c.tag === 'Path')
-              return pathChild || el
-            }
-            return el
-          })
-      } else if (target?.__seatRow) {
+        target = target.filter((el: any) => !el.__seatRow && !el.__sectionGroup)
+      } else if (target?.__seatRow || target?.__sectionGroup) {
         return
-      } else if (target?.__sectionGroup === true) {
-        const pathChild = target.children?.find((c: any) => c.tag === 'Path')
-        target = pathChild || target
       }
       _origSetTarget(target, style)
     }
