@@ -211,15 +211,20 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const sx = section.x ?? 0
         const sy = section.y ?? 0
 
-        if (parentGroup && (sx !== 0 || sy !== 0)) {
-          // 将世界坐标转为相对 Group 的局部坐标
+        // 自动检测：row 远小于 section → 已是局部坐标，无需再转
+        const rowAbsMax = Math.max(Math.abs(firstSX), Math.abs(firstSY), Math.abs(lastSX), Math.abs(lastSY))
+        const secAbsMax = Math.max(Math.abs(sx), Math.abs(sy))
+        const dataIsLocal = parentGroup && secAbsMax > 10 && rowAbsMax < secAbsMax * 0.4
+        const needConvert = parentGroup && (sx !== 0 || sy !== 0) && !dataIsLocal
+
+        if (needConvert) {
           bar.points = [firstSX - sx, firstSY - sy, lastSX - sx, lastSY - sy]
           for (const ell of ellipses) { ell.x -= sx; ell.y -= sy }
         }
 
         ;(group as any).__seatRowData = {
-          x: (parentGroup ? firstSX - sx : firstSX),
-          y: (parentGroup ? firstSY - sy : firstSY),
+          x: needConvert ? firstSX - sx : firstSX,
+          y: needConvert ? firstSY - sy : firstSY,
           ux: lastSX !== firstSX || lastSY !== firstSY
             ? (lastSX - firstSX) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
             : 1,
@@ -232,9 +237,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             : SEAT_CONFIG.spacing / Math.max(bs, 0.02),
         } as SeatDrawRowData
 
-        // 也转 __rowOriginX/Y
-        if ((group as any).__rowOriginX != null && parentGroup) (group as any).__rowOriginX -= sx
-        if ((group as any).__rowOriginY != null && parentGroup) (group as any).__rowOriginY -= sy
+        // __rowOriginX/Y 保留世界坐标（导出时直接使用），不转局部
 
         const addTarget = parentGroup || ctx.getLeafer()!
         addTarget.add(group)

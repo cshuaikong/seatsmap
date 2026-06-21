@@ -44,7 +44,6 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const list: any[] = (editor as any)?.list ?? []
       if (list.length === 0) return
       if (list.every((el: any) => el.__seatRow)) return
-      if (list.length === 1 && list[0]?.__sectionGroup) return
       try { _origUpdate() } catch (_) {}
     }
   }

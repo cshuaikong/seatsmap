@@ -107,6 +107,7 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
       editable: true,
       draggable: true,
       hittable: true,
+      hitChildren: false,
       zIndex: 0,
     })
     ;(sectionGroup as any).__sectionGroup = true
@@ -273,11 +274,14 @@ function buildVenueData(): any {
 
     const isVenueSeat = g.__isVenueDataSeat
     if (!rowLookup.has(rowId)) {
+      // rowData.x/y 始终是局部坐标（相对于 SectionGroup），直接导出
+      const rx = rowData?.x ?? 0
+      const ry = rowData?.y ?? 0
       const row: any = {
         id: rowId,
         label: rowLabel,
-        x: +(isVenueSeat ? (g.__rowOriginX ?? rowData?.x ?? 0) : (rowData?.x ?? 0)).toFixed(2),
-        y: +(isVenueSeat ? (g.__rowOriginY ?? rowData?.y ?? 0) : (rowData?.y ?? 0)).toFixed(2),
+        x: +rx.toFixed(2),
+        y: +ry.toFixed(2),
         rotation: +(g.__rotation ?? 0).toFixed(2),
         curve: +(g.__curve ?? 0).toFixed(2),
         seats: [],
@@ -688,18 +692,14 @@ onMounted(() => {
     if (sel2?.__boxHidden) {
       const list: any[] = (editor as any)?.list ?? []
       const allSeat = list.length > 0 && list.every((el: any) => el.__seatRow)
-      const isSingleSection = list.length === 1 && list[0]?.__sectionGroup
-      if (!allSeat && !isSingleSection) {
+      if (!allSeat) {
         ;(editor as any).editBox.visible = true
         ;(editor as any).editBox.update()
       }
       sel2.__boxHidden = false
     }
-    // 单个分区不更新包围盒
-    const list2: any[] = (editor as any)?.list ?? []
-    if (!(list2.length === 1 && list2[0]?.__sectionGroup)) {
-      ;(editor as any).editBox?.update()
-    }
+    // 统一更新包围盒（分区也需要旋转手柄）
+    ;(editor as any).editBox?.update()
   })
 
   // 框选时刷新 clientBounds
@@ -709,6 +709,14 @@ onMounted(() => {
   leafer.on(LP.CLICK, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
     mode.handleClick(w.x, w.y)
+  })
+
+  // 双击分区 Group → 手动调用 openGroup（绕过 EditBox / border 层级拦截）
+  leafer.on(LP.DOUBLE_TAP, () => {
+    const list: any[] = (editor as any)?.list ?? []
+    if (list.length === 1 && list[0]?.__sectionGroup === true) {
+      editor?.openGroup(list[0])
+    }
   })
 
   console.log('[PathEditor] mount renderAll, venueData keys:', Object.keys(props.venueData || {}))
@@ -759,11 +767,8 @@ onMounted(() => {
     // 选中变化时刷新座位条高亮
     seatModule.updateSeatLOD()
 
-    // 座位排 或 单个分区 → 隐藏包围盒
-    if (list.length > 0 && (
-      list.every((el: any) => el.__seatRow) ||
-      (list.length === 1 && list[0]?.__sectionGroup)
-    )) {
+    // 座位排 → 隐藏包围盒（分区保留，需要旋转手柄）
+    if (list.length > 0 && list.every((el: any) => el.__seatRow)) {
       ;(editor as any).editBox.visible = false
     }
 
