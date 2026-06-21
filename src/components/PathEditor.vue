@@ -707,6 +707,7 @@ onMounted(() => {
   editor.on(EditorEvent.SELECT, () => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
+    console.log('[SELECT] len:', list.length, 'el0.tag:', list[0]?.tag, '__sectionGroup:', list[0]?.__sectionGroup, 'el0.id:', list[0]?.id)
 
     if (!vertexEdit.isEditing.value) {
       if (currentBorder) {
@@ -725,6 +726,7 @@ onMounted(() => {
       const pathChild = isGroup
         ? group.children?.find((c: any) => c.tag === 'Path')
         : el
+      console.log('[SELECT] isGroup:', isGroup, 'group:', !!group, 'pathChild:', !!pathChild, 'leafer:', !!leafer)
       if (pathChild && group && leafer) {
         const s = getS()
         currentBorderBody = group
@@ -743,6 +745,9 @@ onMounted(() => {
           zIndex: 998,
         })
         leafer.add(currentBorder)
+        console.log('[SELECT] currentBorder created, id:', currentBorder.id)
+      } else {
+        console.log('[SELECT] SKIP: pathChild, group, or leafer falsy')
       }
     }
 

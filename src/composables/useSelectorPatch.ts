@@ -69,6 +69,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const _origFindUI = sel.findUI.bind(sel)
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
+    console.log('[findUI] orig result:', result?.tag, result?.id, '__sectionGroup:', result?.__sectionGroup)
     if (result === ctx.getCurrentBorder() && ctx.getCurrentBorderBody()) {
       return ctx.getCurrentBorderBody()
     }
@@ -76,12 +77,14 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     const path = e.path?.list ?? e.path ?? []
     for (const leaf of path) {
       const p = leaf.parent
-      if (p?.__seatRow) return p
+      if (p?.__seatRow) { console.log('[findUI] -> seatRow'); return p }
     }
     // 命中分区内部 Path → 重定向到父 SectionGroup（hitChildren 兜底）
     if (result?.__sectionGroup && result.__sectionGroup !== true) {
+      console.log('[findUI] -> redirect to parent Group:', result.__sectionGroup?.id)
       return result.__sectionGroup
     }
+    console.log('[findUI] -> return:', result?.tag, result?.id)
     if (result) return result
     return null
   }
