@@ -6,8 +6,8 @@ export interface SelectorPatchCtx {
   getEditor: () => any
   getEdgeCache: () => WeakMap<object, number[][]>
   getVertexTarget: () => any
-  getCurrentBorder: () => any
-  getCurrentBorderBody: () => any
+  /** 判断 el 是否是分区边框，是则返回关联的 SectionGroup */
+  getBorderGroup: (el: any) => any
   /** 框选完成后通知座位排选中变化 */
   onSeatRowsSelected?: (groups: any[]) => void
   /** 获取分区 Group 映射（findByBounds 无法命中容器型 Group） */
@@ -21,16 +21,17 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const sel = (editor as any).selector
   if (!sel) return
 
-  // ⓪ targetStroker 过滤：座位排/分区都不画默认描边（分区走 currentBorder 贴合形状）
+  // ⓪ targetStroker 过滤：只过滤座位排，分区保留原生描边（currentBorder 层叠其上）
   const targetStroker = sel.targetStroker
   if (targetStroker) {
     const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
     targetStroker.setTarget = function (target: any, style?: any) {
       if (Array.isArray(target)) {
-        target = target.filter((el: any) => !el.__seatRow && !el.__sectionGroup)
-      } else if (target?.__seatRow || target?.__sectionGroup) {
+        target = target.filter((el: any) => !el.__seatRow)
+      } else if (target?.__seatRow) {
         return
       }
+      if (Array.isArray(target) && target.length === 0) return
       _origSetTarget(target, style)
     }
   }
@@ -69,22 +70,19 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const _origFindUI = sel.findUI.bind(sel)
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
-    console.log('[findUI] orig result:', result?.tag, result?.id, '__sectionGroup:', result?.__sectionGroup)
-    if (result === ctx.getCurrentBorder() && ctx.getCurrentBorderBody()) {
-      return ctx.getCurrentBorderBody()
-    }
+    // 命中分区边框 → 重定向到关联的 SectionGroup
+    const borderGroup = ctx.getBorderGroup(result)
+    if (borderGroup) return borderGroup
     // 优先返回 __seatRow Group（防止被分区图形拦截）
     const path = e.path?.list ?? e.path ?? []
     for (const leaf of path) {
       const p = leaf.parent
-      if (p?.__seatRow) { console.log('[findUI] -> seatRow'); return p }
+      if (p?.__seatRow) return p
     }
-    // 命中分区内部 Path → 重定向到父 SectionGroup（hitChildren 兜底）
+    // 命中分区内部 Path → 重定向到父 SectionGroup
     if (result?.__sectionGroup && result.__sectionGroup !== true) {
-      console.log('[findUI] -> redirect to parent Group:', result.__sectionGroup?.id)
       return result.__sectionGroup
     }
-    console.log('[findUI] -> return:', result?.tag, result?.id)
     if (result) return result
     return null
   }

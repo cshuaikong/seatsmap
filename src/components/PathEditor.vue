@@ -70,8 +70,7 @@ let boundWheel: ((e: WheelEvent) => void) | null = null
 let allPaths: any[] = []
 let sectionGroupMap = new Map<string, any>()
 let edgeCache = new WeakMap<object, number[][]>()
-let currentBorder: any = null
-let currentBorderBody: any = null
+let sectionBorders: Array<{ border: any; group: any }> = []
 
 // ==================== 工具函数 ====================
 
@@ -454,7 +453,17 @@ const vertexEdit = useVertexEdit({
   getS,
   setPanEnabled,
   getEdgeCache: () => edgeCache,
-  getCurrentBorder: () => currentBorder,
+  getCurrentBorder: () => {
+    const target = vertexEdit.getTarget()
+    if (target) {
+      const pg = (target as any).__sectionGroup
+      if (pg) {
+        const entry = sectionBorders.find(b => b.group === pg)
+        if (entry) return entry.border
+      }
+    }
+    return sectionBorders[0]?.border ?? null
+  },
   getParentGroup: () => {
     const tgt = vertexEdit.getTarget()
     return tgt ? (tgt as any).__sectionGroup ?? null : null
@@ -585,8 +594,10 @@ onMounted(() => {
     getEditor: () => editor,
     getEdgeCache: () => edgeCache,
     getVertexTarget: () => vertexEdit.getTarget(),
-    getCurrentBorder: () => currentBorder,
-    getCurrentBorderBody: () => currentBorderBody,
+    getBorderGroup: (el: any) => {
+      const entry = sectionBorders.find(b => b.border === el)
+      return entry?.group ?? null
+    },
     onSeatRowsSelected: (_groups: any[]) => {
       seatModule.updateSeatLOD()
     },
@@ -654,11 +665,11 @@ onMounted(() => {
 
   // 拖拽/旋转时选择框跟手 + 边框同步（Group 嵌套自动处理子元素跟随）
   const syncBorder = () => {
-    if (currentBorder && currentBorderBody) {
-      currentBorder.x = currentBorderBody.x
-      currentBorder.y = currentBorderBody.y
-      currentBorder.rotation = currentBorderBody.rotation
-    }
+    sectionBorders.forEach(({ border, group }) => {
+      border.x = group.x
+      border.y = group.y
+      border.rotation = group.rotation
+    })
   }
   editor.on(EditorMoveEvent.MOVE, () => {
     ;(editor as any).editBox?.update()
@@ -707,30 +718,26 @@ onMounted(() => {
   editor.on(EditorEvent.SELECT, () => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
-    console.log('[SELECT] len:', list.length, 'el0.tag:', list[0]?.tag, '__sectionGroup:', list[0]?.__sectionGroup, 'el0.id:', list[0]?.id)
 
+    // 清理旧边框
     if (!vertexEdit.isEditing.value) {
-      if (currentBorder) {
-        currentBorder.remove()
-        currentBorder = null
-        currentBorderBody = null
-      }
+      sectionBorders.forEach(b => b.border.remove())
+      sectionBorders = []
     }
 
-    // 选中单个分区时，绘制贴合分区形状的蓝色边框
-    // 兼容两种选中情况：SectionGroup（__sectionGroup===true）或内部 Path（__sectionGroup 指向父 Group）
-    if (list.length === 1 && list[0]?.__sectionGroup) {
-      const el = list[0]
-      const isGroup = el.__sectionGroup === true
-      const group = isGroup ? el : el.__sectionGroup
-      const pathChild = isGroup
-        ? group.children?.find((c: any) => c.tag === 'Path')
-        : el
-      console.log('[SELECT] isGroup:', isGroup, 'group:', !!group, 'pathChild:', !!pathChild, 'leafer:', !!leafer)
-      if (pathChild && group && leafer) {
-        const s = getS()
-        currentBorderBody = group
-        currentBorder = new Path({
+    // 为所有选中分区绘制贴合形状的蓝色边框
+    if (list.length > 0 && leafer) {
+      const s = getS()
+      for (const el of list) {
+        // 兼容两种选中情况：SectionGroup（__sectionGroup===true）或内部 Path（__sectionGroup指向父Group）
+        if (!el?.__sectionGroup) continue
+        const isGroup = el.__sectionGroup === true
+        const group = isGroup ? el : el.__sectionGroup
+        const pathChild = isGroup
+          ? group.children?.find((c: any) => c.tag === 'Path')
+          : el
+        if (!pathChild || !group) continue
+        const border = new Path({
           id: `section-border-${group.__sectionId}`,
           path: pathChild.path,
           x: group.x ?? 0,
@@ -744,10 +751,8 @@ onMounted(() => {
           hittable: true,
           zIndex: 998,
         })
-        leafer.add(currentBorder)
-        console.log('[SELECT] currentBorder created, id:', currentBorder.id)
-      } else {
-        console.log('[SELECT] SKIP: pathChild, group, or leafer falsy')
+        leafer.add(border)
+        sectionBorders.push({ border, group })
       }
     }
 
@@ -819,7 +824,7 @@ onMounted(() => {
     const handles = vertexEdit.getTarget() ? [...vertexEdit.getHandles(), ...vertexEdit.getEdgeHandles()] : undefined
     compensateZoom(editor, s, handles)
     if (seatVertexEdit.isEditing.value) seatVertexEdit.updateHandleSize()
-    if (currentBorder) currentBorder.strokeWidth = 1 / s
+    sectionBorders.forEach(b => b.border.strokeWidth = 2 / s)
     seatModule.updateSeatLOD()
   })
 
