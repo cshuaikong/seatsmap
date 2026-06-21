@@ -135,11 +135,6 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
   ;(body as any).__sectionGroup = sectionGroup
   sectionGroup.add(body)
   allPaths.push(body)
-
-  sectionGroup.on_(LP.DOUBLE_TAP, () => {
-    enterSectionFocus(p.id)
-    emit('body-double-tap', body)
-  })
 }
 
 function clearAllPaths() {
@@ -514,75 +509,38 @@ Object.entries(seatModule.modeHandlers).forEach(([name, handler]) => mode.regist
 // ==================== 分区编辑（Section Focus） ====================
 
 function enterSectionFocus(sectionId: string): void {
-  if (!leafer) return
+  const group = sectionGroupMap.get(sectionId)
+  if (group) {
+    editor?.openGroup(group)
+    return
+  }
+  // 无 SectionGroup 的分区（如 borderType=none）：手动执行 setup
   const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
-  if (!section) return
-
+  if (!section || !leafer) return
   focusedSectionId.value = sectionId
   focusedSectionName.value = section.name || sectionId
   title.value = `分区编辑 — ${focusedSectionName.value}`
   emit('section-focus-change', true, focusedSectionName.value)
-
   editor?.cancel()
   if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
   if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-
-  // 定位到分区中心
-  const cx = section.x ?? 0
-  const cy = section.y ?? 0
+  const cx = section.x ?? 0; const cy = section.y ?? 0
   const raw: any = props.venueData || {}
   const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
   const currentS = getS()
   const targetScale = baseScale ?? currentS
-
   if (Math.abs(targetScale - currentS) > 0.001) {
     leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
-    setTimeout(() => {
-      scale.value = getS()
-      leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any)
-    }, 350)
+    setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
   }
-
-  // Leafer 原生 openGroup：自动将 hitChildren 置为 true，允许编辑子元素
-  const group = sectionGroupMap.get(sectionId)
-  if (group) {
-    editor.openGroup(group)
-  }
-
-  // 其他分区变淡（openGroup 不处理这个）
   sectionGroupMap.forEach((g, id) => {
-    if (id !== sectionId) {
-      g.opacity = 0.25
-      g.hittable = false
-      g.editable = false
-      g.draggable = false
-    }
+    if (id !== sectionId) { g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false }
   })
   seatModule.updateSeatLOD()
 }
 
 function exitSectionFocus(): void {
-  if (!leafer) return
-  focusedSectionId.value = null
-  focusedSectionName.value = ''
-  title.value = '座位图设计器'
-  emit('section-focus-change', false)
-
-  if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
-  if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-
-  // Leafer 原生 closeGroup：自动恢复 hitChildren 为 false
   editor?.closeGroup()
-
-  // 恢复所有分区
-  sectionGroupMap.forEach((group) => {
-    group.opacity = 1
-    group.hittable = true
-    group.editable = true
-    group.draggable = true
-  })
-  seatModule.updateSeatLOD()
-  ;(leafer as any)?.__updateViewPort?.()
 }
 
 // ==================== 视图控制 ====================
@@ -636,6 +594,64 @@ onMounted(() => {
     getSectionGroupMap: () => sectionGroupMap,
   })
   leafer.add(editor as any)
+
+  // 钩子：拦截 editor.openGroup / closeGroup，注入分区聚焦自定义行为（变淡 + 缩放 + 标题）
+  const _origOpenGroup = editor.openGroup.bind(editor)
+  editor.openGroup = function (group: any) {
+    const sectionId = group?.__sectionId
+    if (sectionId) {
+      focusedSectionId.value = sectionId
+      focusedSectionName.value = group.__sectionName || sectionId
+      title.value = `分区编辑 — ${focusedSectionName.value}`
+      emit('section-focus-change', true, focusedSectionName.value)
+      const pathBody = group.children?.find((c: any) => c.tag === 'Path')
+      if (pathBody) emit('body-double-tap', pathBody)
+      editor?.cancel()
+      if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+      if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+
+      const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
+      const cx = section?.x ?? group.x ?? 0
+      const cy = section?.y ?? group.y ?? 0
+      const raw: any = props.venueData || {}
+      const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
+      const currentS = getS()
+      const targetScale = baseScale ?? currentS
+      if (Math.abs(targetScale - currentS) > 0.001) {
+        leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
+        setTimeout(() => {
+          scale.value = getS()
+          leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any)
+        }, 350)
+      }
+
+      sectionGroupMap.forEach((g, id) => {
+        if (id !== sectionId) {
+          g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false
+        }
+      })
+      seatModule.updateSeatLOD()
+    }
+    _origOpenGroup(group)
+  }
+
+  const _origCloseGroup = editor.closeGroup.bind(editor)
+  editor.closeGroup = function () {
+    if (focusedSectionId.value) {
+      focusedSectionId.value = null
+      focusedSectionName.value = ''
+      title.value = '座位图设计器'
+      emit('section-focus-change', false)
+      if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+      if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+    }
+    _origCloseGroup()
+    sectionGroupMap.forEach((group) => {
+      group.opacity = 1; group.hittable = true; group.editable = true; group.draggable = true
+    })
+    seatModule.updateSeatLOD()
+    ;(leafer as any)?.__updateViewPort?.()
+  }
 
   // 拖拽/旋转时选择框跟手 + 边框同步（Group 嵌套自动处理子元素跟随）
   const syncBorder = () => {
