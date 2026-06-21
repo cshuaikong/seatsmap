@@ -136,7 +136,7 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
   sectionGroup.add(body)
   allPaths.push(body)
 
-  body.on_(LP.DOUBLE_TAP, () => {
+  sectionGroup.on_(LP.DOUBLE_TAP, () => {
     enterSectionFocus(p.id)
     emit('body-double-tap', body)
   })
