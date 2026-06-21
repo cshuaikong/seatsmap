@@ -108,7 +108,6 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
       editable: true,
       draggable: true,
       hittable: true,
-      hitChildren: false,
       zIndex: 0,
     })
     ;(sectionGroup as any).__sectionGroup = true
