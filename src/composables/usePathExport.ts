@@ -1,5 +1,3 @@
-import { rotatePath } from '../utils/pathUtils'
-
 const r = (n: number) => +n.toFixed(2)
 
 export function exportPNG(leafer: any): void {
@@ -9,13 +7,21 @@ export function exportPNG(leafer: any): void {
   downloadURL(url, 'canvas.png')
 }
 
-export function exportSVG(leafer: any, allPaths: any[]): void {
+export function exportSVG(leafer: any, sectionGroupMap: Map<string, any>): void {
   const w = leafer?.width ?? 1000, h = leafer?.height ?? 700
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
-  for (const p of allPaths) {
-    const d = rotatePath(p.path, p.rotation ?? 0)
-    svg += `<path d="${d}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="2" transform="translate(${r(p.x)},${r(p.y)})"/>`
-  }
+  sectionGroupMap.forEach((group) => {
+    const pathChild = group.children?.find((c: any) => c.tag === 'Path')
+    if (!pathChild) return
+    const d = pathChild.path
+    const gx = r(group.x ?? 0)
+    const gy = r(group.y ?? 0)
+    const rot = r(group.rotation ?? 0)
+    const transform = rot !== 0
+      ? `translate(${gx},${gy}) rotate(${rot})`
+      : `translate(${gx},${gy})`
+    svg += `<path d="${d}" fill="${pathChild.fill}" stroke="${pathChild.stroke}" stroke-width="2" transform="${transform}"/>`
+  })
   svg += '</svg>'
   downloadFile('canvas.svg', svg)
 }

@@ -13,6 +13,8 @@ export interface SeatModuleCtx {
   getS: () => number
   setPanEnabled: (v: boolean) => void
   getAllNonSeatPaths: () => any[]
+  getSectionGroupMap: () => Map<string, any>
+  getFocusedSectionId?: () => string | null
   onToolChange: (tool: string) => void
 }
 
@@ -22,7 +24,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
   // ---- 创建座位元素 ----
 
-  function createSeatElements(rows: SeatDrawRowData[]): void {
+  function createSeatElements(rows: SeatDrawRowData[], targetGroup?: any): void {
     const bs = seatDraw.getBaseScale()
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
@@ -75,7 +77,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       ;(group as any).__bar = bar
       ;(group as any).__seatRowData = { ...row }
 
-      ctx.getLeafer()!.add(group)
+      const addTarget = targetGroup || ctx.getLeafer()!
+      addTarget.add(group)
       seatRowGroups.push(group)
       totalSeats += row.count
     })
@@ -202,8 +205,26 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         ;(group as any).__seatRadius = radius
         ;(group as any).__seatEllipses = ellipses
         ;(group as any).__bar = bar
+
+        // 确定归属 SectionGroup 并转局部坐标
+        const parentGroup = ctx.getSectionGroupMap().get(section.id)
+        const sx = section.x ?? 0
+        const sy = section.y ?? 0
+
+        // 自动检测：row 远小于 section → 已是局部坐标，无需再转
+        const rowAbsMax = Math.max(Math.abs(firstSX), Math.abs(firstSY), Math.abs(lastSX), Math.abs(lastSY))
+        const secAbsMax = Math.max(Math.abs(sx), Math.abs(sy))
+        const dataIsLocal = parentGroup && secAbsMax > 10 && rowAbsMax < secAbsMax * 0.4
+        const needConvert = parentGroup && (sx !== 0 || sy !== 0) && !dataIsLocal
+
+        if (needConvert) {
+          bar.points = [firstSX - sx, firstSY - sy, lastSX - sx, lastSY - sy]
+          for (const ell of ellipses) { ell.x -= sx; ell.y -= sy }
+        }
+
         ;(group as any).__seatRowData = {
-          x: firstSX, y: firstSY,
+          x: needConvert ? firstSX - sx : firstSX,
+          y: needConvert ? firstSY - sy : firstSY,
           ux: lastSX !== firstSX || lastSY !== firstSY
             ? (lastSX - firstSX) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
             : 1,
@@ -216,7 +237,10 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             : SEAT_CONFIG.spacing / Math.max(bs, 0.02),
         } as SeatDrawRowData
 
-        ctx.getLeafer()!.add(group)
+        // __rowOriginX/Y 保留世界坐标（导出时直接使用），不转局部
+
+        const addTarget = parentGroup || ctx.getLeafer()!
+        addTarget.add(group)
         seatRowGroups.push(group)
         totalSeats += row.seats.length
       }
@@ -341,7 +365,23 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     getAllPaths: () => [...ctx.getAllNonSeatPaths(), ...seatRowGroups],
     getS: ctx.getS,
     setPanEnabled: ctx.setPanEnabled,
-    onFinish: (data) => createSeatElements(data.rows),
+    onFinish: (data) => {
+      const focusedId = ctx.getFocusedSectionId?.()
+      const targetGroup = focusedId ? ctx.getSectionGroupMap().get(focusedId) : undefined
+      if (targetGroup) {
+        // 绘图工具产生世界坐标，需转 Group 局部坐标
+        const sx = targetGroup.x ?? 0
+        const sy = targetGroup.y ?? 0
+        const adjusted = data.rows.map(row => ({
+          ...row,
+          x: row.x - sx,
+          y: row.y - sy,
+        }))
+        createSeatElements(adjusted, targetGroup)
+      } else {
+        createSeatElements(data.rows)
+      }
+    },
     onToolChange: ctx.onToolChange,
   })
 

@@ -11,7 +11,7 @@
       <button v-if="vertexEdit.isEditing.value" @click="vertexEdit.exitVertexEdit()" class="pe-btn-exit">退出编辑 (Esc)</button>
       <button v-if="focusedSectionId" @click="exitSectionFocus()" class="pe-btn-exit">退出分区编辑</button>
       <button v-if="!focusedSectionId && selectedCount === 1 && !vertexEdit.isEditing.value && !seatVertexEdit.isEditing.value"
-        @click="enterSectionFocus((editor as any)?.list?.[0]?.id)">
+        @click="enterSectionFocus((editor as any)?.list?.[0]?.__sectionId || (editor as any)?.list?.[0]?.id)">
         分区编辑
       </button>
     </div>
@@ -21,14 +21,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Leafer, Path, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
+import { Leafer, Path, Group, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
 import '@leafer-in/view'
 import '@leafer-in/viewport'
 import '@leafer-in/editor'
 import { Editor, EditorEvent, EditorMoveEvent, EditorRotateEvent } from '@leafer-in/editor'
 import { compensateZoom } from '../utils/zoomCompensation'
 import type { VenueData } from '../types'
-import { darkenColor, rotatePath } from '../utils/pathUtils'
+import { darkenColor } from '../utils/pathUtils'
 import { usePolygonDraw } from '../composables/usePolygonDraw'
 import { useVertexEdit } from '../composables/useVertexEdit'
 import { useSeatVertexEdit } from '../composables/useSeatVertexEdit'
@@ -68,9 +68,9 @@ let canvas: HTMLCanvasElement | null = null
 let boundWheel: ((e: WheelEvent) => void) | null = null
 
 let allPaths: any[] = []
+let sectionGroupMap = new Map<string, any>()
 let edgeCache = new WeakMap<object, number[][]>()
-let currentBorder: any = null
-let currentBorderBody: any = null
+let sectionBorders: Array<{ border: any; group: any }> = []
 
 // ==================== 工具函数 ====================
 
@@ -95,27 +95,45 @@ function setPanEnabled(enabled: boolean): void {
 
 // ==================== 渲染 ====================
 
-function createPolygonItem(p: { id: string; path: string; x: number; y: number; fill: string; stroke?: string; strokeWidth?: number; name?: string }) {
+function createPolygonItem(p: { id: string; path: string; x: number; y: number; fill: string; stroke?: string; strokeWidth?: number; name?: string; rotation?: number }) {
+  // 查找或创建 SectionGroup
+  let sectionGroup = sectionGroupMap.get(p.id)
+  if (!sectionGroup) {
+    sectionGroup = new Group({
+      id: `section-group-${p.id}`,
+      x: p.x ?? 0,
+      y: p.y ?? 0,
+      rotation: p.rotation ?? 0,
+      editable: true,
+      draggable: true,
+      hittable: true,
+      hitChildren: false,
+      zIndex: 0,
+    })
+    ;(sectionGroup as any).__sectionGroup = true
+    ;(sectionGroup as any).__sectionId = p.id
+    ;(sectionGroup as any).__sectionName = p.name || p.id
+    sectionGroupMap.set(p.id, sectionGroup)
+    leafer!.add(sectionGroup)
+  }
+
+  // 边框 Path 作为子元素，坐标相对 Group
   const body = new Path({
     id: p.id,
     path: p.path,
-    x: p.x, y: p.y,
+    x: 0, y: 0,
     fill: p.fill,
     stroke: p.stroke || darkenColor(p.fill, 20),
     strokeWidth: p.strokeWidth ?? 1,
     strokeAlign: 'inside',
     zIndex: 0,
-    editable: true,
-    draggable: true,
+    editable: false,
+    draggable: false,
     hittable: true,
   })
-  leafer!.add(body)
+  ;(body as any).__sectionGroup = sectionGroup
+  sectionGroup.add(body)
   allPaths.push(body)
-
-  body.on_(LP.DOUBLE_TAP, () => {
-    enterSectionFocus(p.id)
-    emit('body-double-tap', body)
-  })
 }
 
 function clearAllPaths() {
@@ -123,6 +141,10 @@ function clearAllPaths() {
     try { leafer!.remove(p) } catch (_) {}
   })
   allPaths = []
+  sectionGroupMap.forEach(g => {
+    try { leafer!.remove(g) } catch (_) {}
+  })
+  sectionGroupMap.clear()
   edgeCache = new WeakMap<object, number[][]>()
   seatModule.clearSeatElements()
 }
@@ -132,17 +154,37 @@ function deleteSelected() {
   if (list.length === 0) return
 
   list.forEach((el: any) => {
-    if (el.__seatRow) {
+    // 分区 Group（SectionGroup）
+    if (el.__sectionGroup) {
+      const sid = el.__sectionId
+      // 清理子元素引用
+      el.children?.slice().forEach((child: any) => {
+        try { el.remove(child) } catch (_) {}
+        if (child.__seatRow) {
+          const idx = seatModule.seatRowGroups.indexOf(child)
+          if (idx !== -1) seatModule.seatRowGroups.splice(idx, 1)
+        }
+        if (child.tag === 'Path') {
+          const idx = allPaths.indexOf(child)
+          if (idx !== -1) allPaths.splice(idx, 1)
+        }
+      })
+      sectionGroupMap.delete(sid)
+      try { leafer!.remove(el) } catch (_) {}
+    } else if (el.__seatRow) {
       const idx = seatModule.seatRowGroups.indexOf(el)
       if (idx !== -1) seatModule.seatRowGroups.splice(idx, 1)
-      try { leafer!.remove(el) } catch (_) {}
+      try { el.parent?.remove(el) } catch (_) {}
     } else if (el.tag === 'Path') {
       const idx = allPaths.indexOf(el)
       if (idx !== -1) allPaths.splice(idx, 1)
-      try { leafer!.remove(el) } catch (_) {}
+      const parentGroup = (el as any).__sectionGroup
+      if (parentGroup) {
+        try { parentGroup.remove(el) } catch (_) {}
+      } else {
+        try { leafer!.remove(el) } catch (_) {}
+      }
     }
-    // 如果是顶点编辑中的 handles (Rect/Ellipse)，跳过删除
-    // 边框元素 (section-border-) 也跳过
   })
 
   edgeCache = new WeakMap<object, number[][]>()
@@ -192,26 +234,28 @@ function renderAll(data: VenueData): void {
 function buildVenueData(): any {
   const raw: any = props.venueData || {}
 
-  // 从 allPaths 构建 section 查找表
+  // 从 sectionGroupMap 构建 section 数据（x/y/rotation 从 Group 读，path 从子 Path 读）
   const pathSectionMap = new Map<string, any>()
-  allPaths.forEach((p: any) => {
+  sectionGroupMap.forEach((group, sectionId) => {
+    const pathChild = group.children?.find((c: any) => c.tag === 'Path')
+    if (!pathChild) return
     const sec: any = {
-      name: p.name || p.id,
+      name: (group as any).__sectionName || pathChild.id,
       rows: [] as any[],
       type: 'path',
-      x: +(p.x ?? 0).toFixed(2),
-      y: +(p.y ?? 0).toFixed(2),
-      fill: p.fill,
-      stroke: p.stroke,
-      id: p.id,
-      path: p.path,
+      x: +(group.x ?? 0).toFixed(2),
+      y: +(group.y ?? 0).toFixed(2),
+      fill: pathChild.fill,
+      stroke: pathChild.stroke,
+      id: sectionId,
+      path: pathChild.path,
     }
-    if (p.rotation) sec.rotation = +(p.rotation ?? 0).toFixed(2)
-    if (p.zIndex != null) sec.zIndex = p.zIndex
-    pathSectionMap.set(p.id, sec)
+    if (group.rotation) sec.rotation = +(group.rotation ?? 0).toFixed(2)
+    if (group.zIndex != null) sec.zIndex = group.zIndex
+    pathSectionMap.set(sectionId, sec)
   })
 
-  // 从 seatRowGroups 构建 row→section 关系
+  // 从 seatRowGroups 构建 row→section 关系（坐标已为局部，直接使用）
   const sectionRowsMap = new Map<string, any[]>()
   const sectionRowLookup = new Map<string, Map<string, any>>()
 
@@ -230,11 +274,14 @@ function buildVenueData(): any {
 
     const isVenueSeat = g.__isVenueDataSeat
     if (!rowLookup.has(rowId)) {
+      // rowData.x/y 始终是局部坐标（相对于 SectionGroup），直接导出
+      const rx = rowData?.x ?? 0
+      const ry = rowData?.y ?? 0
       const row: any = {
         id: rowId,
         label: rowLabel,
-        x: +(isVenueSeat ? (g.__rowOriginX ?? rowData?.x ?? 0) : (rowData?.x ?? 0)).toFixed(2),
-        y: +(isVenueSeat ? (g.__rowOriginY ?? rowData?.y ?? 0) : (rowData?.y ?? 0)).toFixed(2),
+        x: +rx.toFixed(2),
+        y: +ry.toFixed(2),
         rotation: +(g.__rotation ?? 0).toFixed(2),
         curve: +(g.__curve ?? 0).toFixed(2),
         seats: [],
@@ -297,19 +344,19 @@ function buildVenueData(): any {
     }
   })
 
-  // 合并：有 path 的 section 直接输出，仅有 seats 的 section 从原始数据补齐
+  // 合并：有 Group 的 section 直接输出，仅有 seats 的 section 从原始数据补齐
   const sections: any[] = []
   const seenSectionIds = new Set<string>()
 
-  for (const p of allPaths) {
-    const sec = pathSectionMap.get(p.id)
-    if (!sec) continue
-    if (sectionRowsMap.has(p.id)) {
-      sec.rows = sectionRowsMap.get(p.id)!
+  sectionGroupMap.forEach((_group, sectionId) => {
+    const sec = pathSectionMap.get(sectionId)
+    if (!sec) return
+    if (sectionRowsMap.has(sectionId)) {
+      sec.rows = sectionRowsMap.get(sectionId)!
     }
     sections.push(sec)
-    seenSectionIds.add(p.id)
-  }
+    seenSectionIds.add(sectionId)
+  })
 
   // 补充只有座位没有边框的 section（从原始 venueData）
   const origSections = props.venueData?.sections ?? []
@@ -360,7 +407,11 @@ const polygonDraw = usePolygonDraw({
   getLeafer: () => leafer,
   getEditor: () => editor,
   getCanvas: () => canvas,
-  getAllPaths: () => [...allPaths, ...seatModule.seatRowGroups],
+  getAllPaths: () => {
+    const result: any[] = [...allPaths]
+    sectionGroupMap.forEach(g => result.push(g))
+    return result
+  },
   getS,
   setPanEnabled,
   onFinish: (data) => {
@@ -383,7 +434,13 @@ const seatModule = useSeatModule({
   getCanvas: () => canvas,
   getS,
   setPanEnabled,
-  getAllNonSeatPaths: () => allPaths,
+  getAllNonSeatPaths: () => {
+    const result: any[] = [...allPaths]
+    sectionGroupMap.forEach(g => result.push(g))
+    return result
+  },
+  getSectionGroupMap: () => sectionGroupMap,
+  getFocusedSectionId: () => focusedSectionId.value,
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
@@ -392,11 +449,29 @@ const seatModule = useSeatModule({
 const vertexEdit = useVertexEdit({
   getLeafer: () => leafer,
   getEditor: () => editor,
-  getAllPaths: () => [...allPaths, ...seatModule.seatRowGroups],
+  getAllPaths: () => {
+    const result: any[] = [...allPaths]
+    sectionGroupMap.forEach(g => result.push(g))
+    return result
+  },
   getS,
   setPanEnabled,
   getEdgeCache: () => edgeCache,
-  getCurrentBorder: () => currentBorder,
+  getCurrentBorder: () => {
+    const target = vertexEdit.getTarget()
+    if (target) {
+      const pg = (target as any).__sectionGroup
+      if (pg) {
+        const entry = sectionBorders.find(b => b.group === pg)
+        if (entry) return entry.border
+      }
+    }
+    return sectionBorders[0]?.border ?? null
+  },
+  getParentGroup: () => {
+    const tgt = vertexEdit.getTarget()
+    return tgt ? (tgt as any).__sectionGroup ?? null : null
+  },
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
@@ -405,9 +480,20 @@ const vertexEdit = useVertexEdit({
 const seatVertexEdit = useSeatVertexEdit({
   getLeafer: () => leafer,
   getEditor: () => editor,
-  getAllPaths: () => [...allPaths, ...seatModule.seatRowGroups],
+  getAllPaths: () => {
+    const result: any[] = [...allPaths]
+    sectionGroupMap.forEach(g => result.push(g))
+    return result
+  },
   getS,
   setPanEnabled,
+  getParentGroup: () => {
+    const tgt = seatVertexEdit.getTarget()
+    if (!tgt) return null
+    // 查找座位排 Group 的父级 SectionGroup
+    const sectionId = (tgt as any).__sectionId
+    return sectionId ? sectionGroupMap.get(sectionId) ?? null : null
+  },
   onRebuild: (group, newData, endCenter, anchorFromEnd) => seatModule.rebuildSeatRow(group, newData, endCenter, anchorFromEnd),
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
@@ -435,86 +521,38 @@ Object.entries(seatModule.modeHandlers).forEach(([name, handler]) => mode.regist
 // ==================== 分区编辑（Section Focus） ====================
 
 function enterSectionFocus(sectionId: string): void {
-  if (!leafer) return
+  const group = sectionGroupMap.get(sectionId)
+  if (group) {
+    editor?.openGroup(group)
+    return
+  }
+  // 无 SectionGroup 的分区（如 borderType=none）：手动执行 setup
   const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
-  if (!section) return
-
+  if (!section || !leafer) return
   focusedSectionId.value = sectionId
   focusedSectionName.value = section.name || sectionId
   title.value = `分区编辑 — ${focusedSectionName.value}`
   emit('section-focus-change', true, focusedSectionName.value)
-
   editor?.cancel()
   if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
   if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-
-  // 定位到分区中心
-  const cx = section.x ?? 0
-  const cy = section.y ?? 0
+  const cx = section.x ?? 0; const cy = section.y ?? 0
   const raw: any = props.venueData || {}
   const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
   const currentS = getS()
   const targetScale = baseScale ?? currentS
-
   if (Math.abs(targetScale - currentS) > 0.001) {
     leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
-    setTimeout(() => {
-      scale.value = getS()
-      leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any)
-    }, 350)
+    setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
   }
-
-  // 聚焦分区不可选中/移动，其他分区变淡
-  allPaths.forEach((p: any) => {
-    if (p.id === sectionId) {
-      p.editable = false
-      p.draggable = false
-      p.hittable = false
-    } else {
-      p.opacity = 0.25
-      p.hittable = false
-      p.editable = false
-      p.draggable = false
-    }
-  })
-
-  // 聚焦分区内的座位排可选中/编辑
-  seatModule.seatRowGroups.forEach((g: any) => {
-    const gid = (g as any).__sectionId
-    if (gid === sectionId) {
-      g.hittable = true
-      g.editable = true
-    } else {
-      g.hittable = false
-      g.editable = false
-    }
+  sectionGroupMap.forEach((g, id) => {
+    if (id !== sectionId) { g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false }
   })
   seatModule.updateSeatLOD()
 }
 
 function exitSectionFocus(): void {
-  if (!leafer) return
-  focusedSectionId.value = null
-  focusedSectionName.value = ''
-  title.value = '座位图设计器'
-  emit('section-focus-change', false)
-
-  if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
-  if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-
-  allPaths.forEach((p: any) => {
-    p.opacity = 1
-    p.hittable = true
-    p.editable = true
-    p.draggable = true
-  })
-  // 退出后座位排恢复不可交互
-  seatModule.seatRowGroups.forEach((g: any) => {
-    g.hittable = false
-    g.editable = false
-  })
-  seatModule.updateSeatLOD()
-  ;(leafer as any)?.__updateViewPort?.()
+  editor?.closeGroup()
 }
 
 // ==================== 视图控制 ====================
@@ -536,7 +574,7 @@ function resetView(): void {
 // ==================== 导出 ====================
 
 function onExportPNG() { exportPNG(leafer) }
-function onExportSVG() { exportSVG(leafer, allPaths) }
+function onExportSVG() { exportSVG(leafer, sectionGroupMap) }
 
 // ==================== 生命周期 ====================
 
@@ -560,49 +598,91 @@ onMounted(() => {
     getEditor: () => editor,
     getEdgeCache: () => edgeCache,
     getVertexTarget: () => vertexEdit.getTarget(),
-    getCurrentBorder: () => currentBorder,
-    getCurrentBorderBody: () => currentBorderBody,
+    getBorderGroup: (el: any) => {
+      const entry = sectionBorders.find(b => b.border === el)
+      return entry?.group ?? null
+    },
     onSeatRowsSelected: (_groups: any[]) => {
       seatModule.updateSeatLOD()
     },
-    getSeatRowGroups: () => seatModule.seatRowGroups,
+    getSectionGroupMap: () => sectionGroupMap,
   })
   leafer.add(editor as any)
 
-  // 拖拽/旋转时选择框跟手 + 边框同步 + 旋转烘焙
-  const syncBorder = () => {
-    if (currentBorder && currentBorderBody) {
-      currentBorder.x = currentBorderBody.x
-      currentBorder.y = currentBorderBody.y
-      currentBorder.rotation = currentBorderBody.rotation
+  // 钩子：拦截 editor.openGroup / closeGroup，注入分区聚焦自定义行为（变淡 + 缩放 + 标题）
+  const _origOpenGroup = editor.openGroup.bind(editor)
+  editor.openGroup = function (group: any) {
+    const sectionId = group?.__sectionId
+    if (sectionId) {
+      focusedSectionId.value = sectionId
+      focusedSectionName.value = group.__sectionName || sectionId
+      title.value = `分区编辑 — ${focusedSectionName.value}`
+      emit('section-focus-change', true, focusedSectionName.value)
+      const pathBody = group.children?.find((c: any) => c.tag === 'Path')
+      if (pathBody) emit('body-double-tap', pathBody)
+      editor?.cancel()
+      if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+      if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+
+      const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
+      const cx = section?.x ?? group.x ?? 0
+      const cy = section?.y ?? group.y ?? 0
+      const raw: any = props.venueData || {}
+      const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
+      const currentS = getS()
+      const targetScale = baseScale ?? currentS
+      if (Math.abs(targetScale - currentS) > 0.001) {
+        leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
+        setTimeout(() => {
+          scale.value = getS()
+          leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any)
+        }, 350)
+      }
+
+      sectionGroupMap.forEach((g, id) => {
+        if (id !== sectionId) {
+          g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false
+        }
+      })
+      seatModule.updateSeatLOD()
     }
+    _origOpenGroup(group)
   }
-  let didRotate = false
+
+  const _origCloseGroup = editor.closeGroup.bind(editor)
+  editor.closeGroup = function () {
+    if (focusedSectionId.value) {
+      focusedSectionId.value = null
+      focusedSectionName.value = ''
+      title.value = '座位图设计器'
+      emit('section-focus-change', false)
+      if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+      if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+    }
+    _origCloseGroup()
+    sectionGroupMap.forEach((group) => {
+      group.opacity = 1; group.hittable = true; group.editable = true; group.draggable = true
+    })
+    seatModule.updateSeatLOD()
+    ;(leafer as any)?.__updateViewPort?.()
+  }
+
+  // 拖拽/旋转时选择框跟手 + 边框同步（Group 嵌套自动处理子元素跟随）
+  const syncBorder = () => {
+    sectionBorders.forEach(({ border, group }) => {
+      border.x = group.x
+      border.y = group.y
+      border.rotation = group.rotation
+    })
+  }
   editor.on(EditorMoveEvent.MOVE, () => {
     ;(editor as any).editBox?.update()
     syncBorder()
-    // 分区移动时，同步位移到关联的座位排
-    const list: any[] = (editor as any)?.list ?? []
-    for (const el of list) {
-      if (el.tag !== 'Path') continue
-      const prevX: number = (el as any).__prevX ?? el.x
-      const prevY: number = (el as any).__prevY ?? el.y
-      const dx = el.x - prevX
-      const dy = el.y - prevY
-      if (dx === 0 && dy === 0) continue
-      seatModule.seatRowGroups.forEach((g: any) => {
-        if (g.__sectionId === el.id) {
-          g.x = (g.x || 0) + dx
-          g.y = (g.y || 0) + dy
-          if (g.__rowOriginX != null) g.__rowOriginX += dx
-          if (g.__rowOriginY != null) g.__rowOriginY += dy
-        }
-      })
-      ;(el as any).__prevX = el.x
-      ;(el as any).__prevY = el.y
-    }
   })
-  editor.on(EditorRotateEvent.ROTATE, () => { ;(editor as any).editBox?.update(); syncBorder(); didRotate = true })
+  editor.on(EditorRotateEvent.ROTATE, () => {
+    ;(editor as any).editBox?.update()
+    syncBorder()
+  })
   leafer.on(LP.MOVE, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
     mode.handleMove(w.x, w.y)
@@ -618,22 +698,7 @@ onMounted(() => {
       }
       sel2.__boxHidden = false
     }
-    // 清理分区位移追踪
-    ;(editor as any)?.list?.forEach((el: any) => { delete (el as any).__prevX; delete (el as any).__prevY })
-    if (!didRotate) return
-    didRotate = false
-    const list: any[] = (editor as any)?.list ?? []
-    list.forEach((el: any) => {
-      if (el.tag !== 'Path') return
-      const rot = el.rotation ?? 0
-      if (!rot) return
-      el.path = rotatePath(el.path, rot)
-      el.rotation = 0
-    })
-    if (currentBorder && currentBorderBody) {
-      currentBorder.path = currentBorderBody.path
-      currentBorder.rotation = 0
-    }
+    // 统一更新包围盒（分区也需要旋转手柄）
     ;(editor as any).editBox?.update()
   })
 
@@ -646,6 +711,14 @@ onMounted(() => {
     mode.handleClick(w.x, w.y)
   })
 
+  // 双击分区 Group → 手动调用 openGroup（绕过 EditBox / border 层级拦截）
+  leafer.on(LP.DOUBLE_TAP, () => {
+    const list: any[] = (editor as any)?.list ?? []
+    if (list.length === 1 && list[0]?.__sectionGroup === true) {
+      editor?.openGroup(list[0])
+    }
+  })
+
   console.log('[PathEditor] mount renderAll, venueData keys:', Object.keys(props.venueData || {}))
   renderAll(props.venueData)
 
@@ -654,18 +727,47 @@ onMounted(() => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
 
+    // 清理旧边框
     if (!vertexEdit.isEditing.value) {
-      if (currentBorder) {
-        currentBorder.remove()
-        currentBorder = null
-        currentBorderBody = null
+      sectionBorders.forEach(b => b.border.remove())
+      sectionBorders = []
+    }
+
+    // 为所有选中分区绘制贴合形状的蓝色边框
+    if (list.length > 0 && leafer) {
+      const s = getS()
+      for (const el of list) {
+        // 兼容两种选中情况：SectionGroup（__sectionGroup===true）或内部 Path（__sectionGroup指向父Group）
+        if (!el?.__sectionGroup) continue
+        const isGroup = el.__sectionGroup === true
+        const group = isGroup ? el : el.__sectionGroup
+        const pathChild = isGroup
+          ? group.children?.find((c: any) => c.tag === 'Path')
+          : el
+        if (!pathChild || !group) continue
+        const border = new Path({
+          id: `section-border-${group.__sectionId}`,
+          path: pathChild.path,
+          x: group.x ?? 0,
+          y: group.y ?? 0,
+          rotation: group.rotation ?? 0,
+          fill: 'transparent',
+          stroke: '#3b82f6',
+          strokeWidth: 2 / s,
+          editable: false,
+          draggable: false,
+          hittable: true,
+          zIndex: 998,
+        })
+        leafer.add(border)
+        sectionBorders.push({ border, group })
       }
     }
 
     // 选中变化时刷新座位条高亮
     seatModule.updateSeatLOD()
 
-    // 全为座位排时隐藏包围盒
+    // 座位排 → 隐藏包围盒（分区保留，需要旋转手柄）
     if (list.length > 0 && list.every((el: any) => el.__seatRow)) {
       ;(editor as any).editBox.visible = false
     }
@@ -675,8 +777,12 @@ onMounted(() => {
         seatVertexEdit.enter(list[0])
         return
       }
-      if (list[0]?.tag === 'Path' && vertexEdit.getTarget() !== list[0]) {
-        vertexEdit.enterVertexEdit(list[0])
+      // 可能选中了 Path 或 SectionGroup（Group 内嵌 Path）
+      const pathTarget = list[0]?.tag === 'Path'
+        ? list[0]
+        : (list[0]?.__sectionGroup ? list[0].children?.find((c: any) => c.tag === 'Path') : null)
+      if (pathTarget && vertexEdit.getTarget() !== pathTarget) {
+        vertexEdit.enterVertexEdit(pathTarget)
         return
       }
     }
@@ -723,7 +829,7 @@ onMounted(() => {
     const handles = vertexEdit.getTarget() ? [...vertexEdit.getHandles(), ...vertexEdit.getEdgeHandles()] : undefined
     compensateZoom(editor, s, handles)
     if (seatVertexEdit.isEditing.value) seatVertexEdit.updateHandleSize()
-    if (currentBorder) currentBorder.strokeWidth = 1 / s
+    sectionBorders.forEach(b => b.border.strokeWidth = 2 / s)
     seatModule.updateSeatLOD()
   })
 
@@ -755,8 +861,11 @@ watch(() => props.currentTool, (tool) => {
           seatVertexEdit.enter(list[0])
           return
         }
-        if (list[0]?.tag === 'Path') {
-          vertexEdit.enterVertexEdit(list[0])
+        const pathTarget = list[0]?.tag === 'Path'
+          ? list[0]
+          : (list[0]?.__sectionGroup ? list[0].children?.find((c: any) => c.tag === 'Path') : null)
+        if (pathTarget) {
+          vertexEdit.enterVertexEdit(pathTarget)
           return
         }
       }

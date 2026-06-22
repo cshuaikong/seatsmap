@@ -6,12 +6,12 @@ export interface SelectorPatchCtx {
   getEditor: () => any
   getEdgeCache: () => WeakMap<object, number[][]>
   getVertexTarget: () => any
-  getCurrentBorder: () => any
-  getCurrentBorderBody: () => any
+  /** 判断 el 是否是分区边框，是则返回关联的 SectionGroup */
+  getBorderGroup: (el: any) => any
   /** 框选完成后通知座位排选中变化 */
   onSeatRowsSelected?: (groups: any[]) => void
-  /** 获取所有座位排 Group（用于 findOne 无法命中容器的问题） */
-  getSeatRowGroups?: () => any[]
+  /** 获取分区 Group 映射（findByBounds 无法命中容器型 Group） */
+  getSectionGroupMap?: () => Map<string, any>
 }
 
 export function useSelectorPatch(ctx: SelectorPatchCtx): void {
@@ -21,7 +21,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const sel = (editor as any).selector
   if (!sel) return
 
-  // ⓪ targetStroker setTarget 拦截：过滤 __seatRow，不画单个座位排的包围描边
+  // ⓪ targetStroker 过滤：只过滤座位排，分区保留原生描边（currentBorder 层叠其上）
   const targetStroker = sel.targetStroker
   if (targetStroker) {
     const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
@@ -31,18 +31,19 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       } else if (target?.__seatRow) {
         return
       }
+      if (Array.isArray(target) && target.length === 0) return
       _origSetTarget(target, style)
     }
   }
 
-  // ⓪① editBox.update 包装：防止 __seatRow 导致 getLayoutBounds 崩溃
+  // ① editBox.update 包装：座位排/单个分区不显示包围盒
   const editBox = (editor as any).editBox
   if (editBox) {
     const _origUpdate = editBox.update.bind(editBox)
     editBox.update = function () {
       const list: any[] = (editor as any)?.list ?? []
-      if (list.length > 0 && list.every((el: any) => el.__seatRow)) return
       if (list.length === 0) return
+      if (list.every((el: any) => el.__seatRow)) return
       try { _origUpdate() } catch (_) {}
     }
   }
@@ -64,18 +65,22 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return _origAllow(target)
   }
 
-  // ② findUI 覆盖：座位排子元素优先 → 边框→body 重定向 → 分区图形
+  // ② findUI 覆盖：座位排优先 + 边框重定向 + 分区内部 Path→Group 兜底
   const _origFindUI = sel.findUI.bind(sel)
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
-    if (result === ctx.getCurrentBorder() && ctx.getCurrentBorderBody()) {
-      return ctx.getCurrentBorderBody()
-    }
-    // 优先扫描命中路径中的 __seatRow Group，防止被分区图形拦截
+    // 命中分区边框 → 重定向到关联的 SectionGroup
+    const borderGroup = ctx.getBorderGroup(result)
+    if (borderGroup) return borderGroup
+    // 优先返回 __seatRow Group（防止被分区图形拦截）
     const path = e.path?.list ?? e.path ?? []
     for (const leaf of path) {
       const p = leaf.parent
       if (p?.__seatRow) return p
+    }
+    // 命中分区内部 Path → 重定向到父 SectionGroup
+    if (result?.__sectionGroup && result.__sectionGroup !== true) {
+      return result.__sectionGroup
     }
     if (result) return result
     return null
@@ -89,7 +94,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     _origCheck(e)
   }
 
-  // ④ onDrag 覆盖：框选坐标空间修复 + Path 线段碰撞检测
+  // ④ onDrag 覆盖：AABB 粗筛 + pathHitsRect 精判
   const { findByBounds } = EditSelectHelper
 
   const segHitsRect = (
@@ -170,23 +175,6 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return false
   }
 
-  const groupHitsRect = (el: any, rx: number, ry: number, rw: number, rh: number): boolean => {
-    const w = el.__world
-    if (!w || !el.children) return false
-    let line: any = null
-    for (let i = 0; i < el.children.length; i++) {
-      if (el.children[i].tag === 'Line') { line = el.children[i]; break }
-    }
-    if (!line?.points || line.points.length < 4) return false
-    const r = (line.strokeWidth ?? 0) / 2
-    if (r <= 0) return false
-    const ax = line.points[0] * w.a + line.points[1] * w.c + w.e
-    const ay = line.points[0] * w.b + line.points[1] * w.d + w.f
-    const bx = line.points[2] * w.a + line.points[3] * w.c + w.e
-    const by = line.points[2] * w.b + line.points[3] * w.d + w.f
-    return segHitsRect(ax, ay, bx, by, rx - r, ry - r, rw + r + r, rh + r + r)
-  }
-
   sel.onDrag = function (e: any) {
     if (e.multiTouch) return
     if (this.editor.dragging) return this.onDragEnd(e)
@@ -212,42 +200,65 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         )
       }
       const wr = worldBounds.get()
+
+      // 第1步：findByBounds AABB 粗筛叶子节点
       const candidates = findByBounds(ed.app, worldBounds) as any[]
 
-      // findOne/eachFind 无法命中容器型 Group（isBranch），
-      // 手动补充 __seatRow Group 碰撞检测
-      const seatGroups = ctx.getSeatRowGroups?.() ?? []
-      for (const g of seatGroups) {
-        if (!g.__world || !g.visible || g.locked) continue
-        const gw = g.__world
-        const gx = gw.e, gy = gw.f
-        // 用 worldBounds 快速粗筛（再靠 groupHitsRect 精判）
-        if (
-          gx + (g.children?.[0]?.strokeWidth ?? 0) >= wr.x &&
-          gy + (g.children?.[0]?.strokeWidth ?? 0) >= wr.y
-        ) {
-          if (groupHitsRect(g, wr.x, wr.y, wr.width, wr.height)) {
-            candidates.push(g)
+      // 第2步：手动注入 SectionGroup（findByBounds 跳过容器型 Group）
+      //   用内部 Path 做 pathHitsRect 精判，命中则把 SectionGroup 加入候选
+      const sectionMap = ctx.getSectionGroupMap?.()
+      if (sectionMap) {
+        sectionMap.forEach((group: any) => {
+          if (!group.__world || !group.visible || group.locked) return
+          const pc = group.children?.find((c: any) => c.tag === 'Path')
+          if (!pc) return
+          if (pathHitsRect(pc, wr.x, wr.y, wr.width, wr.height)) {
+            candidates.push(group)
+          }
+        })
+      }
+
+      // 第3步：单次遍历 — 重定向 + 去重
+      // 注意：__sectionGroup 有两种值：
+      //   在 SectionGroup 上 → true（标记自己是分区）
+      //   在内部 Path 上 → 父 SectionGroup 对象（用于重定向）
+      const seen = new Set<any>()
+      const hits: any[] = []
+      for (const el of candidates) {
+        if (el.id?.startsWith?.('section-border-')) continue
+        if (el.parent?.__seatRow || el.__seatRow) continue
+
+        const isSection = el.__sectionGroup === true
+        const parentGroup = !isSection && el.__sectionGroup ? el.__sectionGroup : null
+        const target = parentGroup || el
+        if (seen.has(target)) continue
+
+        if (isSection) {
+          // 手动注入的 SectionGroup — 已在上面用 pathHitsRect 精判过
+          seen.add(target)
+          hits.push(target)
+        } else if (parentGroup) {
+          // 内部 Path → 重定向到父 SectionGroup
+          // findByBounds 查到的是叶子 Path，用 pathHitsRect 精判
+          if (pathHitsRect(el, wr.x, wr.y, wr.width, wr.height)) {
+            seen.add(target)
+            hits.push(target)
+          }
+        } else if (el.tag === 'Path') {
+          if (pathHitsRect(el, wr.x, wr.y, wr.width, wr.height)) {
+            seen.add(target)
+            hits.push(target)
           }
         }
       }
 
-      const list = (candidates as any[]).filter((el: any) => {
-        if (el.id?.startsWith?.('section-border-')) return false
-        // 座位排子元素（Line/Path）重定向到父 Group
-        if (el.parent?.__seatRow) return false
-        if (el.tag === 'Path') return pathHitsRect(el, wr.x, wr.y, wr.width, wr.height)
-        if (el.tag === 'Group') return groupHitsRect(el, wr.x, wr.y, wr.width, wr.height)
-        return true
-      })
-      const leafList = new LeafList(list)
+      const leafList = new LeafList(hits)
 
       this.bounds.width = total.x
       this.bounds.height = total.y
       this.selectArea.setBounds(dragBounds.get())
 
-      // 通知 bar 变色：提取命中的座位排 Group
-      ctx.onSeatRowsSelected?.(list.filter((el: any) => el.__seatRow))
+      ctx.onSeatRowsSelected?.([])
 
       if (leafList.length) {
         const selectList: any[] = []

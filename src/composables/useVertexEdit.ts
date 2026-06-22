@@ -12,6 +12,7 @@ export interface VertexEditCtx {
   setPanEnabled: (v: boolean) => void
   getEdgeCache: () => WeakMap<object, number[][]>
   getCurrentBorder: () => any
+  getParentGroup?: () => any | null
   onToolChange: (tool: string) => void
 }
 
@@ -114,13 +115,29 @@ export function useVertexEdit(ctx: VertexEditCtx) {
     }
   }
 
+  /** 获取 Path 在当前父级 Group 下的组合世界变换 */
+  function getCombinedTransform(): { ox: number; oy: number; angle: number } {
+    const parentGroup = ctx.getParentGroup?.()
+    if (parentGroup) {
+      return {
+        ox: (parentGroup.x ?? 0) + (target?.x ?? 0),
+        oy: (parentGroup.y ?? 0) + (target?.y ?? 0),
+        angle: ((parentGroup.rotation ?? 0) + (target?.rotation ?? 0)) * Math.PI / 180,
+      }
+    }
+    return {
+      ox: target?.x ?? 0,
+      oy: target?.y ?? 0,
+      angle: (target?.rotation ?? 0) * Math.PI / 180,
+    }
+  }
+
   function createAllHandles(): void {
     const el = target
     if (!el) return
     const leafer = ctx.getLeafer()
     if (!leafer) return
-    const ox = el.x ?? 0, oy = el.y ?? 0
-    const angle = ((el.rotation ?? 0) * Math.PI) / 180
+    const { ox, oy, angle } = getCombinedTransform()
     const n = verts.length
     const hs = Math.max(ctx.getS(), 0.02)
     const handleSize = 6 / hs
@@ -139,7 +156,8 @@ export function useVertexEdit(ctx: VertexEditCtx) {
       ;(h as any).__vi = i
 
       h.on_(DragEvent.DRAG, () => {
-        verts[i] = toLocal(h.x!, h.y!, ox, oy, angle)
+        const { ox: cox, oy: coy, angle: cangle } = getCombinedTransform()
+        verts[i] = toLocal(h.x!, h.y!, cox, coy, cangle)
         rebuildPath()
         repositionEdgeHandles(i)
         repositionEdgeHandles((i - 1 + n) % n)
@@ -162,7 +180,8 @@ export function useVertexEdit(ctx: VertexEditCtx) {
       ;(h as any).__ei = i
 
       h.on_(DragEvent.DRAG, () => {
-        const lp = toLocal(h.x!, h.y!, ox, oy, angle)
+        const { ox: cox, oy: coy, angle: cangle } = getCombinedTransform()
+        const lp = toLocal(h.x!, h.y!, cox, coy, cangle)
         const hlx = lp.x, hly = lp.y
         const ca = verts[i], cb = verts[(i + 1) % n]
         const cmx = (ca.x + cb.x) / 2, cmy = (ca.y + cb.y) / 2
@@ -185,8 +204,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
   function repositionEdgeHandles(edgeIndex: number): void {
     const el = target
     if (!el) return
-    const ox = el.x ?? 0, oy = el.y ?? 0
-    const angle = ((el.rotation ?? 0) * Math.PI) / 180
+    const { ox, oy, angle } = getCombinedTransform()
     const n = verts.length
     const ei = ((edgeIndex % n) + n) % n
     const h = edgeHandles[ei]
