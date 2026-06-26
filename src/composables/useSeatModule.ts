@@ -24,7 +24,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
   // ---- 创建座位元素 ----
 
-  function createSeatElements(rows: SeatDrawRowData[], targetGroup?: any): void {
+  function createSeatElements(rows: SeatDrawRowData[], targetGroup?: any, sectionId?: string | null): void {
     const bs = seatDraw.getBaseScale()
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
@@ -37,6 +37,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         hittable: true,
       })
       ;(group as any).__seatRow = true
+      if (sectionId) (group as any).__sectionId = sectionId
 
       const lastIdx = row.count - 1
       const bar = new Line({
@@ -111,12 +112,12 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
     for (const section of sections) {
       if (!section.rows || section.rows.length === 0) continue
-
+     
       for (const row of section.rows) {
         if (!row.seats || row.seats.length === 0) continue
 
-        const rowX = row.x ?? 0
-        const rowY = row.y ?? 0
+        const rowX = (row.x ?? 0) 
+        const rowY = (row.y ?? 0) 
         const rot = (row.rotation ?? 0) * Math.PI / 180
         const cos = Math.cos(rot)
         const sin = Math.sin(rot)
@@ -142,6 +143,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
         const firstW = worldPositions[0]
         const lastW = worldPositions[worldPositions.length - 1]
+
         const firstSX = firstW.x, firstSY = firstW.y
         const lastSX = lastW.x, lastSY = lastW.y
 
@@ -211,29 +213,49 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const sx = section.x ?? 0
         const sy = section.y ?? 0
 
-        // 自动检测：row 远小于 section → 已是局部坐标，无需再转
-        const rowAbsMax = Math.max(Math.abs(firstSX), Math.abs(firstSY), Math.abs(lastSX), Math.abs(lastSY))
-        const secAbsMax = Math.max(Math.abs(sx), Math.abs(sy))
-        const dataIsLocal = parentGroup && secAbsMax > 10 && rowAbsMax < secAbsMax * 0.4
+        // 自动检测：row 比 section 更靠近原点 → 已是局部坐标，无需再转
+        const dataIsLocal = parentGroup
+          && (sx === 0 || Math.abs(firstSX) < Math.abs(firstSX - sx))
+          && (sy === 0 || Math.abs(firstSY) < Math.abs(firstSY - sy))
         const needConvert = parentGroup && (sx !== 0 || sy !== 0) && !dataIsLocal
 
+        // 局部坐标（默认用世界坐标，needConvert 时做旋转感知转换）
+        let localFirstX = firstSX, localFirstY = firstSY
+        let localLastX = lastSX, localLastY = lastSY
+
         if (needConvert) {
-          bar.points = [firstSX - sx, firstSY - sy, lastSX - sx, lastSY - sy]
-          for (const ell of ellipses) { ell.x -= sx; ell.y -= sy }
+          // 世界→局部：考虑父 Group 的平移+旋转（之前只做了减法，旋转时手柄偏移）
+          const pgRot = (parentGroup.rotation ?? 0) * Math.PI / 180
+          const cosR = Math.cos(-pgRot), sinR = Math.sin(-pgRot)
+          const w2l = (wx: number, wy: number) => ({
+            x: +((wx - sx) * cosR - (wy - sy) * sinR).toFixed(2),
+            y: +((wx - sx) * sinR + (wy - sy) * cosR).toFixed(2),
+          })
+          const lf = w2l(firstSX, firstSY)
+          const ll = w2l(lastSX, lastSY)
+          localFirstX = lf.x; localFirstY = lf.y
+          localLastX = ll.x; localLastY = ll.y
+
+          bar.points = [localFirstX, localFirstY, localLastX, localLastY]
+          for (let i = 0; i < ellipses.length; i++) {
+            const lp = w2l(worldPositions[i].x, worldPositions[i].y)
+            ellipses[i].x = lp.x
+            ellipses[i].y = lp.y
+          }
         }
 
+        const ldx = localLastX - localFirstX
+        const ldy = localLastY - localFirstY
+        const ldist = Math.hypot(ldx, ldy)
+
         ;(group as any).__seatRowData = {
-          x: needConvert ? firstSX - sx : firstSX,
-          y: needConvert ? firstSY - sy : firstSY,
-          ux: lastSX !== firstSX || lastSY !== firstSY
-            ? (lastSX - firstSX) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
-            : 1,
-          uy: lastSX !== firstSX || lastSY !== firstSY
-            ? (lastSY - firstSY) / Math.hypot(lastSX - firstSX, lastSY - firstSY)
-            : 0,
+          x: localFirstX,
+          y: localFirstY,
+          ux: ldist > 0.001 ? ldx / ldist : 1,
+          uy: ldist > 0.001 ? ldy / ldist : 0,
           count: sortedSeats.length,
           spacing: sortedSeats.length > 1
-            ? Math.hypot(lastSX - firstSX, lastSY - firstSY) / (sortedSeats.length - 1)
+            ? ldist / (sortedSeats.length - 1)
             : SEAT_CONFIG.spacing / Math.max(bs, 0.02),
         } as SeatDrawRowData
 
@@ -268,15 +290,16 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     }
 
     if (ellipses) {
-      const anchorX = anchorFromEnd && endCenter ? endCenter.x : x
-      const anchorY = anchorFromEnd && endCenter ? endCenter.y : y
-      const dir = anchorFromEnd ? -1 : 1
       const groupCurve = (group as any).__curve ?? 0
+      const isCurved = Math.abs(groupCurve) > 0.001
 
-      // 动态计算每个座位沿弦/弧的位置（支持 rowData 和 itemX/itemY 两种模式）
-      const positions: Array<{ x: number; y: number }> = []
-      if (Math.abs(groupCurve) > 0.001) {
-        // 弧线排：沿弦创建等间距虚拟座位点，映射到弧线
+      if (isCurved) {
+        // === 弧线排 ===
+        const anchorX = anchorFromEnd && endCenter ? endCenter.x : x
+        const anchorY = anchorFromEnd && endCenter ? endCenter.y : y
+        const dir = anchorFromEnd ? -1 : 1
+
+        const positions: Array<{ x: number; y: number }> = []
         const virtualSeats: Array<{ x: number; y: number }> = []
         for (let i = 0; i < count; i++) {
           virtualSeats.push({
@@ -288,41 +311,81 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         for (let i = 0; i < count; i++) {
           positions.push({ x: +curved[i].x.toFixed(2), y: +curved[i].y.toFixed(2) })
         }
+
+        for (let i = 0; i < count; i++) {
+          if (ellipses[i]) {
+            ellipses[i].x = positions[i].x
+            ellipses[i].y = positions[i].y
+            ellipses[i].width = size
+            ellipses[i].height = size
+          }
+        }
+        while (ellipses.length > count) {
+          const e = ellipses.pop()
+          try { e?.remove() } catch (_) {}
+        }
+        while (ellipses.length < count) {
+          const i = ellipses.length
+          const px = positions[i]?.x ?? +(anchorX + ux * dir * spacing * i).toFixed(2)
+          const py = positions[i]?.y ?? +(anchorY + uy * dir * spacing * i).toFixed(2)
+          const ell = new Ellipse({
+            x: px, y: py,
+            width: size, height: size,
+            fill: '#A5D6A7', stroke: '#81C784',
+            strokeWidth: sw, around: 'center',
+            hittable: true, draggable: false,
+          })
+          group.add(ell)
+          ellipses.push(ell)
+        }
       } else {
+        // === 直线排 ===
+        const effEndX = endCenter ? endCenter.x : x + ux * spacing * (count - 1)
+        const effEndY = endCenter ? endCenter.y : y + uy * spacing * (count - 1)
+        const anchorX = anchorFromEnd ? effEndX : x
+        const anchorY = anchorFromEnd ? effEndY : y
+        const dir = anchorFromEnd ? -1 : 1
+
+        const positions: Array<{ x: number; y: number }> = []
         for (let i = 0; i < count; i++) {
           positions.push({
             x: +(anchorX + ux * dir * spacing * i).toFixed(2),
             y: +(anchorY + uy * dir * spacing * i).toFixed(2),
           })
         }
-      }
 
-      for (let i = 0; i < count; i++) {
-        if (ellipses[i]) {
-          ellipses[i].x = positions[i].x
-          ellipses[i].y = positions[i].y
-          ellipses[i].width = size
-          ellipses[i].height = size
+        const prevFromEnd = (group as any).__anchorFromEnd
+        if (anchorFromEnd !== prevFromEnd && prevFromEnd !== undefined) {
+          ellipses.reverse()
         }
-      }
-      // 增减 Ellipse
-      while (ellipses.length > count) {
-        const e = ellipses.pop()
-        try { e?.remove() } catch (_) {}
-      }
-      while (ellipses.length < count) {
-        const i = ellipses.length
-        const px = positions[i]?.x ?? +(anchorX + ux * dir * spacing * i).toFixed(2)
-        const py = positions[i]?.y ?? +(anchorY + uy * dir * spacing * i).toFixed(2)
-        const ell = new Ellipse({
-          x: px, y: py,
-          width: size, height: size,
-          fill: '#A5D6A7', stroke: '#81C784',
-          strokeWidth: sw, around: 'center',
-          hittable: true, draggable: false,
-        })
-        group.add(ell)
-        ellipses.push(ell)
+        ;(group as any).__anchorFromEnd = anchorFromEnd
+
+        for (let i = 0; i < count; i++) {
+          if (ellipses[i]) {
+            ellipses[i].x = positions[i].x
+            ellipses[i].y = positions[i].y
+            ellipses[i].width = size
+            ellipses[i].height = size
+          }
+        }
+        while (ellipses.length > count) {
+          const e = ellipses.pop()
+          try { e?.remove() } catch (_) {}
+        }
+        while (ellipses.length < count) {
+          const i = ellipses.length
+          const px = positions[i]?.x ?? +(anchorX + ux * dir * spacing * i).toFixed(2)
+          const py = positions[i]?.y ?? +(anchorY + uy * dir * spacing * i).toFixed(2)
+          const ell = new Ellipse({
+            x: px, y: py,
+            width: size, height: size,
+            fill: '#A5D6A7', stroke: '#81C784',
+            strokeWidth: sw, around: 'center',
+            hittable: true, draggable: false,
+          })
+          group.add(ell)
+          ellipses.push(ell)
+        }
       }
     }
 
@@ -369,17 +432,22 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const focusedId = ctx.getFocusedSectionId?.()
       const targetGroup = focusedId ? ctx.getSectionGroupMap().get(focusedId) : undefined
       if (targetGroup) {
-        // 绘图工具产生世界坐标，需转 Group 局部坐标
+        // 绘图工具产生世界坐标，需转 Group 局部坐标（含旋转）
         const sx = targetGroup.x ?? 0
         const sy = targetGroup.y ?? 0
+        const pgRot = (targetGroup.rotation ?? 0) * Math.PI / 180
+        const cosR = Math.cos(-pgRot)
+        const sinR = Math.sin(-pgRot)
         const adjusted = data.rows.map(row => ({
           ...row,
-          x: row.x - sx,
-          y: row.y - sy,
+          x: +((row.x - sx) * cosR - (row.y - sy) * sinR).toFixed(2),
+          y: +((row.x - sx) * sinR + (row.y - sy) * cosR).toFixed(2),
+          ux: +(row.ux * cosR - row.uy * sinR).toFixed(4),
+          uy: +(row.ux * sinR + row.uy * cosR).toFixed(4),
         }))
-        createSeatElements(adjusted, targetGroup)
+        createSeatElements(adjusted, targetGroup, focusedId)
       } else {
-        createSeatElements(data.rows)
+        createSeatElements(data.rows, undefined, undefined)
       }
     },
     onToolChange: ctx.onToolChange,

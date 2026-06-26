@@ -36,6 +36,7 @@ import { exportPNG, exportSVG } from '../composables/usePathExport'
 import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
+import { nanoid } from 'nanoid'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
   seatList?: any[]
@@ -255,7 +256,8 @@ function buildVenueData(): any {
     pathSectionMap.set(sectionId, sec)
   })
 
-  // 从 seatRowGroups 构建 row→section 关系（坐标已为局部，直接使用）
+  // 从 seatRowGroups 构建 row→section 关系
+  // barPts/ell 在 SectionGroup 局部空间，需用 SectionGroup 的世界变换转回世界坐标
   const sectionRowsMap = new Map<string, any[]>()
   const sectionRowLookup = new Map<string, Map<string, any>>()
 
@@ -267,22 +269,44 @@ function buildVenueData(): any {
     if (!sectionRowLookup.has(sectionId)) sectionRowLookup.set(sectionId, new Map())
 
     const rowLookup = sectionRowLookup.get(sectionId)!
-    const rowId = g.__rowId || `row_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const rowId = g.__rowId || nanoid(8)
     const ellipses = (g.__seatEllipses || []) as any[]
     const rowData = g.__seatRowData
     const rowLabel = g.__rowLabel || ''
+    const barPts = (g.__bar as any)?.points ?? []
 
-    const isVenueSeat = g.__isVenueDataSeat
+    // 获取 SectionGroup 世界变换（用于局部→世界）
+    const sectionGroup = sectionGroupMap.get(sectionId)
+    const sX = sectionGroup?.x ?? 0
+    const sY = sectionGroup?.y ?? 0
+    const sRot = ((sectionGroup?.rotation ?? 0) * Math.PI) / 180
+    const cosS = Math.cos(sRot)
+    const sinS = Math.sin(sRot)
+
+    // Row 原点：局部 → 世界
+    const rowLocalX = barPts[0] ?? rowData?.x ?? 0
+    const rowLocalY = barPts[1] ?? rowData?.y ?? 0
+    const rowWorldX = sX + rowLocalX * cosS - rowLocalY * sinS
+    const rowWorldY = sY + rowLocalX * sinS + rowLocalY * cosS
+
+    // 世界行方向（从 bar 端点局部→世界计算）
+    const fbX = rowData ? rowLocalX + rowData.ux * rowData.spacing * (rowData.count - 1) : rowLocalX
+    const fbY = rowData ? rowLocalY + rowData.uy * rowData.spacing * (rowData.count - 1) : rowLocalY
+    const beLX = barPts[2] ?? fbX
+    const beLY = barPts[3] ?? fbY
+    const beWX = sX + beLX * cosS - beLY * sinS
+    const beWY = sY + beLX * sinS + beLY * cosS
+    const wDX = beWX - rowWorldX
+    const wDY = beWY - rowWorldY
+    const worldRowRot = Math.atan2(wDY, wDX)
+
     if (!rowLookup.has(rowId)) {
-      // rowData.x/y 始终是局部坐标（相对于 SectionGroup），直接导出
-      const rx = rowData?.x ?? 0
-      const ry = rowData?.y ?? 0
       const row: any = {
         id: rowId,
         label: rowLabel,
-        x: +rx.toFixed(2),
-        y: +ry.toFixed(2),
-        rotation: +(g.__rotation ?? 0).toFixed(2),
+        x: +rowWorldX.toFixed(2),
+        y: +rowWorldY.toFixed(2),
+        rotation: +(worldRowRot * 180 / Math.PI).toFixed(2),
         curve: +(g.__curve ?? 0).toFixed(2),
         seats: [],
       }
@@ -304,44 +328,42 @@ function buildVenueData(): any {
       row.seats.push(seat)
     }
 
-    if (isVenueSeat && g.__rawSeats) {
-      g.__rawSeats.forEach((src: any) => {
+    // 世界行方向 → 行局部坐标逆旋转
+    const cosWRR = Math.cos(-worldRowRot)
+    const sinWRR = Math.sin(-worldRowRot)
+
+    ellipses.forEach((ell: any) => {
+      const src = ell.__sourceSeat
+      if (src) {
+        // 导入座位：src.x/y 已是行局部坐标（原始数据），无需转换
         pushSeat({
-          id: src.id,
+          id: ell.__seatId || src.id,
           label: src.label || '',
-          x: +(typeof src.x === 'string' ? parseFloat(src.x) : (src.x || 0)).toFixed(2),
-          y: +(typeof src.y === 'string' ? parseFloat(src.y) : (src.y || 0)).toFixed(2),
-          cat_id: src.cat_id ?? src.categoryKey ?? 1,
+          x: +(src.x ?? 0).toFixed(2),
+          y: +(src.y ?? 0).toFixed(2),
+          cat_id: ell.__categoryKey ?? src.categoryKey,
           status: toStatus(src.status || 'available'),
           type: toType(src.objectType || 'seat'),
         })
-      })
-    } else {
-      ellipses.forEach((ell: any) => {
-        const src = ell.__sourceSeat
-        if (src) {
-          pushSeat({
-            id: ell.__seatId || src.id,
-            label: src.label || '',
-            x: +(src.x ?? 0).toFixed(2),
-            y: +(src.y ?? 0).toFixed(2),
-            cat_id: ell.__categoryKey ?? src.categoryKey,
-            status: toStatus(src.status || 'available'),
-            type: toType(src.objectType || 'seat'),
-          })
-        } else {
-          pushSeat({
-            id: ell.__seatId || `seat_${Date.now()}`,
-            label: '',
-            x: +(ell.x ?? 0).toFixed(2) - +(rowData?.x ?? 0).toFixed(2),
-            y: +(ell.y ?? 0).toFixed(2) - +(rowData?.y ?? 0).toFixed(2),
-            cat_id: ell.__categoryKey ?? 1,
-            status: 0,
-            type: 1,
-          })
-        }
-      })
-    }
+      } else {
+        // 手绘座位：ell 局部 → 世界 → 行局部
+        const eWX = sX + (ell.x ?? 0) * cosS - (ell.y ?? 0) * sinS
+        const eWY = sY + (ell.x ?? 0) * sinS + (ell.y ?? 0) * cosS
+        const wx = eWX - rowWorldX
+        const wy = eWY - rowWorldY
+        const localX = wx * cosWRR - wy * sinWRR
+        const localY = wx * sinWRR + wy * cosWRR
+        pushSeat({
+          id: ell.__seatId || nanoid(8),
+          label: '',
+          x: +localX.toFixed(2),
+          y: +localY.toFixed(2),
+          cat_id: ell.__categoryKey ?? 1,
+          status: 0,
+          type: 1,
+        })
+      }
+    })
   })
 
   // 合并：有 Group 的 section 直接输出，仅有 seats 的 section 从原始数据补齐
@@ -520,23 +542,51 @@ Object.entries(seatModule.modeHandlers).forEach(([name, handler]) => mode.regist
 
 // ==================== 分区编辑（Section Focus） ====================
 
+let _origOpenGroupFn: ((group: any) => void) | null = null
+
 function enterSectionFocus(sectionId: string): void {
   const group = sectionGroupMap.get(sectionId)
-  if (group) {
-    editor?.openGroup(group)
+  if (!group) {
+    // 无 SectionGroup 的分区（如 borderType=none）：手动执行 setup
+    const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
+    if (!section || !leafer) return
+    focusedSectionId.value = sectionId
+    focusedSectionName.value = section.name || sectionId
+    title.value = `分区编辑 — ${focusedSectionName.value}`
+    emit('section-focus-change', true, focusedSectionName.value)
+    editor?.cancel()
+    if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+    if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+    const cx = section.x ?? 0; const cy = section.y ?? 0
+    const raw: any = props.venueData || {}
+    const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
+    const currentS = getS()
+    const targetScale = baseScale ?? currentS
+    if (Math.abs(targetScale - currentS) > 0.001) {
+      leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
+      setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
+    }
+    sectionGroupMap.forEach((g, id) => {
+      if (id !== sectionId) { g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false }
+    })
+    seatModule.updateSeatLOD()
     return
   }
-  // 无 SectionGroup 的分区（如 borderType=none）：手动执行 setup
-  const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
-  if (!section || !leafer) return
+
+  // 有 SectionGroup：手动设置状态 + 调用原版 openGroup + 覆盖属性 + 隐藏 editBox
   focusedSectionId.value = sectionId
-  focusedSectionName.value = section.name || sectionId
+  focusedSectionName.value = group.__sectionName || sectionId
   title.value = `分区编辑 — ${focusedSectionName.value}`
   emit('section-focus-change', true, focusedSectionName.value)
+  const pathBody = group.children?.find((c: any) => c.tag === 'Path')
+  if (pathBody) emit('body-double-tap', pathBody)
   editor?.cancel()
   if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
   if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-  const cx = section.x ?? 0; const cy = section.y ?? 0
+
+  const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
+  const cx = section?.x ?? group.x ?? 0
+  const cy = section?.y ?? group.y ?? 0
   const raw: any = props.venueData || {}
   const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
   const currentS = getS()
@@ -545,14 +595,39 @@ function enterSectionFocus(sectionId: string): void {
     leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
     setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
   }
+
+  // 调用原版 openGroup（直接调用保存的引用，绕过 intercept 防止递归）
+  _origOpenGroupFn?.(group)
+
+  // openGroup 之后覆盖 hittable/editable（防止被原版重置）+ 隐藏 editBox 防止拦截点击
   sectionGroupMap.forEach((g, id) => {
-    if (id !== sectionId) { g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false }
+    if (id !== sectionId) {
+      g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false
+    } else {
+      g.hittable = true; g.editable = false; g.draggable = false
+    }
   })
+  seatModule.seatRowGroups.forEach((g: any) => {
+    if (g.__sectionId === sectionId) {
+      g.hittable = true
+      g.editable = true
+      g.children?.forEach((c: any) => { c.hittable = true; c.editable = true })
+    }
+  })
+  const eb = (editor as any)?.editBox
+  if (eb) eb.visible = false
   seatModule.updateSeatLOD()
 }
 
 function exitSectionFocus(): void {
-  editor?.closeGroup()
+  if (!focusedSectionId.value) return
+  focusedSectionId.value = null
+  focusedSectionName.value = ''
+  title.value = '座位图设计器'
+  emit('section-focus-change', false)
+  if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
+  if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
+  ;(editor as any)?.closeGroup?.()
 }
 
 // ==================== 视图控制 ====================
@@ -606,62 +681,36 @@ onMounted(() => {
       seatModule.updateSeatLOD()
     },
     getSectionGroupMap: () => sectionGroupMap,
+    getFocusedSectionId: () => focusedSectionId.value,
   })
   leafer.add(editor as any)
 
-  // 钩子：拦截 editor.openGroup / closeGroup，注入分区聚焦自定义行为（变淡 + 缩放 + 标题）
+  // 钩子：拦截 editor.openGroup / closeGroup
   const _origOpenGroup = editor.openGroup.bind(editor)
+  _origOpenGroupFn = _origOpenGroup
   editor.openGroup = function (group: any) {
     const sectionId = group?.__sectionId
     if (sectionId) {
-      focusedSectionId.value = sectionId
-      focusedSectionName.value = group.__sectionName || sectionId
-      title.value = `分区编辑 — ${focusedSectionName.value}`
-      emit('section-focus-change', true, focusedSectionName.value)
-      const pathBody = group.children?.find((c: any) => c.tag === 'Path')
-      if (pathBody) emit('body-double-tap', pathBody)
-      editor?.cancel()
-      if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
-      if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-
-      const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
-      const cx = section?.x ?? group.x ?? 0
-      const cy = section?.y ?? group.y ?? 0
-      const raw: any = props.venueData || {}
-      const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
-      const currentS = getS()
-      const targetScale = baseScale ?? currentS
-      if (Math.abs(targetScale - currentS) > 0.001) {
-        leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
-        setTimeout(() => {
-          scale.value = getS()
-          leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any)
-        }, 350)
-      }
-
-      sectionGroupMap.forEach((g, id) => {
-        if (id !== sectionId) {
-          g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false
-        }
-      })
-      seatModule.updateSeatLOD()
+      enterSectionFocus(sectionId)
+      return
     }
     _origOpenGroup(group)
   }
 
   const _origCloseGroup = editor.closeGroup.bind(editor)
   editor.closeGroup = function () {
-    if (focusedSectionId.value) {
-      focusedSectionId.value = null
-      focusedSectionName.value = ''
-      title.value = '座位图设计器'
-      emit('section-focus-change', false)
-      if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
-      if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-    }
-    _origCloseGroup()
+    // 分区聚焦期间阻止自动 close（exitSectionFocus 会先清 focusedSectionId 再调用）
+    if (focusedSectionId.value) return
+    try { _origCloseGroup() } catch (_) {}
     sectionGroupMap.forEach((group) => {
       group.opacity = 1; group.hittable = true; group.editable = true; group.draggable = true
+    })
+    seatModule.seatRowGroups.forEach((g: any) => {
+      if (g.__isVenueDataSeat) {
+        g.hittable = false
+        g.editable = false
+        g.children?.forEach((c: any) => { c.hittable = true; c.editable = false })
+      }
     })
     seatModule.updateSeatLOD()
     ;(leafer as any)?.__updateViewPort?.()
@@ -772,7 +821,7 @@ onMounted(() => {
       ;(editor as any).editBox.visible = false
     }
 
-    if (props.currentTool === 'node' && list.length === 1 && !vertexEdit.isEditing.value && !seatVertexEdit.isEditing.value) {
+    if (props.currentTool === 'node' && list.length === 1 && !vertexEdit.isEditing.value) {
       if (list[0]?.__seatRow && seatVertexEdit.getTarget() !== list[0]) {
         seatVertexEdit.enter(list[0])
         return

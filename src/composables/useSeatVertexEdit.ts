@@ -66,6 +66,12 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
     seatRadius = getRadius()
     isEditing.value = true
 
+    const pg = ctx.getParentGroup?.()
+    console.log('[seatVertex enter] rowData=', JSON.stringify(rowData), 'radius=', seatRadius)
+    console.log('[seatVertex enter] parent=', pg ? { x: pg.x, y: pg.y, rot: pg.rotation, id: pg.id } : null)
+    const wp = toWorldSpace(rowData!.x, rowData!.y)
+    console.log('[seatVertex enter] toWorldSpace=', wp)
+
     ctx.getEditor()?.cancel()
     ctx.getAllPaths().forEach((p: any) => { p.locked = true })
     ctx.setPanEnabled(false)
@@ -76,6 +82,14 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
   function exit(silent?: boolean): void {
     handles.forEach(h => { try { h.remove() } catch (_) {} })
     handles = []
+    // 兜底：清理 leafer 上可能残留的手柄（防止 remove 静默失败导致重复）
+    const leafer = ctx.getLeafer()
+    if (leafer) {
+      const stray: any[] = []
+      leafer.children?.forEach((c: any) => { if (c.__seatHandleIdx != null) stray.push(c) })
+      stray.forEach(c => { try { leafer.remove(c) } catch (_) {} })
+      if (stray.length > 0) console.log('[seatVertex exit] 清理残留手柄:', stray.length)
+    }
     target = null
     rowData = null
     seatRadius = 0
@@ -241,9 +255,11 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
     const finalCount = Math.max(1, origRowData.count + delta)
 
     if (idx === 0) {
-      rowData.x = origRowData.x + ux * delta * spacing
-      rowData.y = origRowData.y + uy * delta * spacing
+      // 以原始 rowData 为基准，行首偏移 delta * spacing，保证右端不跳动
+      rowData.x = origRowData.x - ux * delta * spacing
+      rowData.y = origRowData.y - uy * delta * spacing
     }
+    // idx===1: 以静止的 handle[0] 为锚点，rowData.x/y 不变
     rowData.count = finalCount
 
     draggingIdx = -1
@@ -251,7 +267,8 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
     origHandle0 = null
     origHandle1 = null
 
-    ctx.onRebuild(target, { ...rowData })
+    ctx.onRebuild(target, { ...rowData }, undefined, idx === 0)
+    updateHandlePositions()
   }
 
   function updateHandlePositions(): void {

@@ -35,7 +35,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
     target = pathEl
     isEditing.value = true
     const editor = ctx.getEditor()
-    editor?.cancel()
+    ;(editor as any).editBox.visible = false
     const allPaths = ctx.getAllPaths()
     allPaths.forEach((p: any) => { p.locked = true })
     ctx.setPanEnabled(false)
@@ -94,7 +94,6 @@ export function useVertexEdit(ctx: VertexEditCtx) {
   }
 
   function exitVertexEdit(silent?: boolean): void {
-    const editedBody = target
     handles.forEach(h => h.remove())
     edgeHandles.forEach(h => h.remove())
     handles = []
@@ -106,10 +105,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
     const allPaths = ctx.getAllPaths()
     allPaths.forEach((p: any) => { p.locked = false })
     ctx.setPanEnabled(true)
-    const editor = ctx.getEditor()
-    if (editedBody && editor) {
-      editor.target = editedBody
-    }
+    ;(ctx.getEditor() as any).editBox.visible = true
     if (!silent) {
       ctx.onToolChange('select')
     }
@@ -156,6 +152,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
       ;(h as any).__vi = i
 
       h.on_(DragEvent.DRAG, () => {
+        if (i >= verts.length) return
         const { ox: cox, oy: coy, angle: cangle } = getCombinedTransform()
         verts[i] = toLocal(h.x!, h.y!, cox, coy, cangle)
         rebuildPath()
@@ -180,10 +177,11 @@ export function useVertexEdit(ctx: VertexEditCtx) {
       ;(h as any).__ei = i
 
       h.on_(DragEvent.DRAG, () => {
+        const ca = verts[i], cb = verts[(i + 1) % n]
+        if (!ca || !cb) return
         const { ox: cox, oy: coy, angle: cangle } = getCombinedTransform()
         const lp = toLocal(h.x!, h.y!, cox, coy, cangle)
         const hlx = lp.x, hly = lp.y
-        const ca = verts[i], cb = verts[(i + 1) % n]
         const cmx = (ca.x + cb.x) / 2, cmy = (ca.y + cb.y) / 2
         const cdx = cb.x - ca.x, cdy = cb.y - ca.y
         const cLen = Math.hypot(cdx, cdy) || 1

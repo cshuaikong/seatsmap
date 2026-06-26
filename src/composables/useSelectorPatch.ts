@@ -12,6 +12,8 @@ export interface SelectorPatchCtx {
   onSeatRowsSelected?: (groups: any[]) => void
   /** 获取分区 Group 映射（findByBounds 无法命中容器型 Group） */
   getSectionGroupMap?: () => Map<string, any>
+  /** 是否处于分区编辑模式 */
+  getFocusedSectionId?: () => string | null
 }
 
 export function useSelectorPatch(ctx: SelectorPatchCtx): void {
@@ -26,10 +28,12 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   if (targetStroker) {
     const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
     targetStroker.setTarget = function (target: any, style?: any) {
-      if (Array.isArray(target)) {
-        target = target.filter((el: any) => !el.__seatRow)
-      } else if (target?.__seatRow) {
-        return
+      if (!ctx.getFocusedSectionId?.()) {
+        if (Array.isArray(target)) {
+          target = target.filter((el: any) => !el.__seatRow)
+        } else if (target?.__seatRow) {
+          return
+        }
       }
       if (Array.isArray(target) && target.length === 0) return
       _origSetTarget(target, style)
@@ -43,18 +47,21 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     editBox.update = function () {
       const list: any[] = (editor as any)?.list ?? []
       if (list.length === 0) return
-      if (list.every((el: any) => el.__seatRow)) return
+      if (!ctx.getFocusedSectionId?.() && list.every((el: any) => el.__seatRow)) return
       try { _origUpdate() } catch (_) {}
     }
   }
 
-  // ① allow 覆盖：顶点编辑时只允许选中 Rect/Ellipse
+  // ① allow 覆盖：顶点编辑时允许手柄 + 分区切换，仅拦截边框和座位排
   const _origAllow = sel.allow.bind(sel)
   sel.allow = (target: any) => {
     if (ctx.getVertexTarget()) {
-      return target?.tag === 'Rect' || target?.tag === 'Ellipse'
+      if (target?.id?.startsWith?.('section-border-')) return false
+      if (target?.__seatRow) return false
+      return true
     }
     if (target?.id?.startsWith?.('section-border-')) return false
+    if (ctx.getFocusedSectionId?.() && target?.__sectionGroup === true) return false
     if (!target) return _origAllow(target)
     let node = target
     while (node) {
@@ -65,8 +72,9 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return _origAllow(target)
   }
 
-  // ② findUI 覆盖：座位排优先 + 边框重定向 + 分区内部 Path→Group 兜底
+  // ② findUI 覆盖：座位排优先 + 边框重定向 + 分区内部 Path→Group 兜底 + focus 模式 findByBounds 兜底
   const _origFindUI = sel.findUI.bind(sel)
+  const { findByBounds: _findByBoundsLocal } = EditSelectHelper
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
     // 命中分区边框 → 重定向到关联的 SectionGroup
@@ -78,11 +86,40 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const p = leaf.parent
       if (p?.__seatRow) return p
     }
-    // 命中分区内部 Path → 重定向到父 SectionGroup
+    // 命中分区内部 Path → 重定向到父 SectionGroup（非 focus 模式）
     if (result?.__sectionGroup && result.__sectionGroup !== true) {
+      if (ctx.getFocusedSectionId?.()) return null
       return result.__sectionGroup
     }
+    // 分区编辑模式下不返回 SectionGroup（原生 checkAndSelect 不调 allow，拦不住）
+    if (result?.__sectionGroup === true && ctx.getFocusedSectionId?.()) return null
     if (result) return result
+
+    // 分区编辑模式 fallback：用 findByBounds 直接查找座位排
+    // 仅在点击事件时触发，跳过 pointermove（光标跟踪不需要）
+    if (e.type !== 'pointermove') {
+      const focusedId = ctx.getFocusedSectionId?.()
+      if (focusedId) {
+        const sectionMap = ctx.getSectionGroupMap?.()
+        const focusedGroup = sectionMap?.get(focusedId)
+        if (focusedGroup) {
+          const px = e.x ?? 0
+          const py = e.y ?? 0
+          const wb = (sel as any).bounds.clone()
+          wb.set(px - 2, py - 2, 4, 4)
+          const candidates = _findByBoundsLocal(sel.editor.app, wb) as any[]
+          for (const el of candidates) {
+            if (el.parent?.__seatRow && el.parent.__sectionId === focusedId) {
+              return el.parent
+            }
+            if (el.__seatRow && el.__sectionId === focusedId) {
+              return el
+            }
+          }
+        }
+      }
+    }
+
     return null
   }
 
@@ -91,7 +128,37 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   sel.checkAndSelect = function (e: any) {
     const find = sel.findUI(e)
     if (find && sel.editor.hasItem(find) && sel.editor.multiple && !sel.isMultipleSelect(e)) return
+
+    // 分区编辑模式：拦截所有分区选中，原生 checkAndSelect 不调 allow 直接赋值 editor.target
+    if (find?.__sectionGroup === true && ctx.getFocusedSectionId?.()) return
+
+    // focus 模式：findByBounds fallback 查到的座位排（非直接命中），且当前无选中时，
+    // 不传给原生 — 否则 editor.target 被设置后 editing→true，allowDrag 返回 false，框选无法启动
+    // 若已有选中则放行，让原生 checkAndSelect 先清空选区再启动框选
+    if (find?.__seatRow && ctx.getFocusedSectionId?.() && !sel.editor.editing) {
+      const path = e.path?.list ?? e.path ?? []
+      let directlyHit = false
+      for (const leaf of path) {
+        if (leaf === find) { directlyHit = true; break }
+        if (leaf.parent === find) { directlyHit = true; break }
+      }
+      if (!directlyHit) return
+    }
+
     _origCheck(e)
+  }
+
+  // ③½ allowDrag 覆盖：focus 模式下 SectionGroup 填满视口，
+  // 原生 allow(e.target) 要求 target.leafer !== editor.leafer（即必须点在画布背景），
+  // 但 focus 时任何点击都命中 SectionGroup/子元素，框选根本无法启动
+  const _origAllowDrag = (sel as any).allowDrag.bind(sel)
+  ;(sel as any).allowDrag = function (e: any) {
+    if (ctx.getFocusedSectionId?.() && !this.dragging) {
+      // 座位排顶点手柄拖拽 — 走原生逻辑（手柄 draggable → 返回 false，不启框选）
+      if (e.target?.__seatHandleIdx != null) return _origAllowDrag(e)
+      return true
+    }
+    return _origAllowDrag(e)
   }
 
   // ④ onDrag 覆盖：AABB 粗筛 + pathHitsRect 精判
@@ -177,6 +244,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
 
   sel.onDrag = function (e: any) {
     if (e.multiTouch) return
+    if (ctx.getVertexTarget()) return
     if (this.editor.dragging) return this.onDragEnd(e)
     if (this.dragging) {
       const ed = this.editor
@@ -200,14 +268,15 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         )
       }
       const wr = worldBounds.get()
+      const focusedId = ctx.getFocusedSectionId?.()
 
       // 第1步：findByBounds AABB 粗筛叶子节点
+      const sectionMap = ctx.getSectionGroupMap?.()
       const candidates = findByBounds(ed.app, worldBounds) as any[]
 
       // 第2步：手动注入 SectionGroup（findByBounds 跳过容器型 Group）
-      //   用内部 Path 做 pathHitsRect 精判，命中则把 SectionGroup 加入候选
-      const sectionMap = ctx.getSectionGroupMap?.()
-      if (sectionMap) {
+      //   分区编辑模式下不注入，避免选中非聚焦分区导致退出
+      if (sectionMap && !focusedId) {
         sectionMap.forEach((group: any) => {
           if (!group.__world || !group.visible || group.locked) return
           const pc = group.children?.find((c: any) => c.tag === 'Path')
@@ -226,7 +295,25 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const hits: any[] = []
       for (const el of candidates) {
         if (el.id?.startsWith?.('section-border-')) continue
-        if (el.parent?.__seatRow || el.__seatRow) continue
+        // 分区编辑模式：座位排子元素重定向到父座位排 Group（仅当前分区）
+        if (el.parent?.__seatRow) {
+          if (focusedId && el.parent.__sectionId === focusedId && !seen.has(el.parent)) {
+            seen.add(el.parent)
+            hits.push(el.parent)
+          }
+          continue
+        }
+        if (el.__seatRow) {
+          // findByBounds 直接命中的座位排 Group
+          if (focusedId && el.__sectionId === focusedId && !seen.has(el)) {
+            seen.add(el)
+            hits.push(el)
+          }
+          continue
+        }
+
+        // 分区编辑模式：只放行座位排，拦截所有分区/Path
+        if (focusedId && el.__sectionGroup) continue
 
         const isSection = el.__sectionGroup === true
         const parentGroup = !isSection && el.__sectionGroup ? el.__sectionGroup : null
@@ -260,16 +347,35 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
 
       ctx.onSeatRowsSelected?.([])
 
+      const focusedGroup = focusedId && sectionMap ? sectionMap.get(focusedId) : null
+
       if (leafList.length) {
         const selectList: any[] = []
         this.originList.forEach((item: any) => { if (!leafList.has(item)) selectList.push(item) })
         leafList.forEach((item: any) => { if (!this.originList.has(item)) selectList.push(item) })
+        if (focusedGroup) {
+          for (let i = selectList.length - 1; i >= 0; i--) {
+            let p = selectList[i].parent
+            let inGroup = false
+            while (p) { if (p === focusedGroup) { inGroup = true; break } p = p.parent }
+            if (!inGroup) selectList.splice(i, 1)
+          }
+        }
         if (selectList.length !== ed.list.length || ed.list.some((c: any, i: number) => c !== selectList[i])) {
           ed.target = selectList as any
         }
-      } else {
+      } else if (!focusedGroup) {
         ed.target = this.originList.list
       }
+    }
+  }
+
+  // ⑤ checkOpenedGroups 拦截：分区编辑模式下禁止自动关闭
+  const _origCheckOpened = (editor as any).checkOpenedGroups?.bind(editor)
+  if (_origCheckOpened) {
+    (editor as any).checkOpenedGroups = function () {
+      if (ctx.getFocusedSectionId?.()) return
+      try { _origCheckOpened() } catch (_) {}
     }
   }
 
