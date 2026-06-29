@@ -283,17 +283,21 @@ function buildVenueData(): any {
     const cosS = Math.cos(sRot)
     const sinS = Math.sin(sRot)
 
-    // Row 原点：局部 → 世界
-    const rowLocalX = barPts[0] ?? rowData?.x ?? 0
-    const rowLocalY = barPts[1] ?? rowData?.y ?? 0
+    // Row 原点：局部 → 世界（barPts/ell 在 seat row Group 局部空间，需加 Group 偏移）
+    const rowGX = g.x ?? 0
+    const rowGY = g.y ?? 0
+    const _barPt0 = barPts[0] ?? rowData?.x ?? 0
+    const _barPt1 = barPts[1] ?? rowData?.y ?? 0
+    const rowLocalX = rowGX + _barPt0
+    const rowLocalY = rowGY + _barPt1
     const rowWorldX = sX + rowLocalX * cosS - rowLocalY * sinS
     const rowWorldY = sY + rowLocalX * sinS + rowLocalY * cosS
 
     // 世界行方向（从 bar 端点局部→世界计算）
-    const fbX = rowData ? rowLocalX + rowData.ux * rowData.spacing * (rowData.count - 1) : rowLocalX
-    const fbY = rowData ? rowLocalY + rowData.uy * rowData.spacing * (rowData.count - 1) : rowLocalY
-    const beLX = barPts[2] ?? fbX
-    const beLY = barPts[3] ?? fbY
+    const _fbX = rowData ? _barPt0 + rowData.ux * rowData.spacing * (rowData.count - 1) : _barPt0
+    const _fbY = rowData ? _barPt1 + rowData.uy * rowData.spacing * (rowData.count - 1) : _barPt1
+    const beLX = rowGX + (barPts[2] ?? _fbX)
+    const beLY = rowGY + (barPts[3] ?? _fbY)
     const beWX = sX + beLX * cosS - beLY * sinS
     const beWY = sY + beLX * sinS + beLY * cosS
     const wDX = beWX - rowWorldX
@@ -332,38 +336,32 @@ function buildVenueData(): any {
     const cosWRR = Math.cos(-worldRowRot)
     const sinWRR = Math.sin(-worldRowRot)
 
+    console.log(`[buildVenueData] section=${sectionId} row=${rowId} s=(${sX},${sY}) rot=${((sectionGroup?.rotation ?? 0)).toFixed(1)}deg rowG=(${rowGX},${rowGY}) barPts=[${barPts.join(',')}] rowWorld=(${rowWorldX.toFixed(1)},${rowWorldY.toFixed(1)}) worldRowRot=${(worldRowRot*180/Math.PI).toFixed(1)}deg`)
+
     ellipses.forEach((ell: any) => {
       const src = ell.__sourceSeat
-      if (src) {
-        // 导入座位：src.x/y 已是行局部坐标（原始数据），无需转换
-        pushSeat({
-          id: ell.__seatId || src.id,
-          label: src.label || '',
-          x: +(src.x ?? 0).toFixed(2),
-          y: +(src.y ?? 0).toFixed(2),
-          cat_id: ell.__categoryKey ?? src.categoryKey,
-          status: toStatus(src.status || 'available'),
-          type: toType(src.objectType || 'seat'),
-        })
-      } else {
-        // 手绘座位：ell 局部 → 世界 → 行局部
-        const eWX = sX + (ell.x ?? 0) * cosS - (ell.y ?? 0) * sinS
-        const eWY = sY + (ell.x ?? 0) * sinS + (ell.y ?? 0) * cosS
-        const wx = eWX - rowWorldX
-        const wy = eWY - rowWorldY
-        const localX = wx * cosWRR - wy * sinWRR
-        const localY = wx * sinWRR + wy * cosWRR
-        pushSeat({
-          id: ell.__seatId || nanoid(8),
-          label: '',
-          x: +localX.toFixed(2),
-          y: +localY.toFixed(2),
-          cat_id: ell.__categoryKey ?? 1,
-          status: 0,
-          type: 1,
-        })
+      const ellLocalX = rowGX + (ell.x ?? 0)
+      const ellLocalY = rowGY + (ell.y ?? 0)
+      const eWX = sX + ellLocalX * cosS - ellLocalY * sinS
+      const eWY = sY + ellLocalX * sinS + ellLocalY * cosS
+      const wx = eWX - rowWorldX
+      const wy = eWY - rowWorldY
+      const localX = wx * cosWRR - wy * sinWRR
+      const localY = wx * sinWRR + wy * cosWRR
+      if (row.seats.length === 0) {
+        console.log(`[buildVenueData] firstSeat: ell=(${(ell.x??0).toFixed(1)},${(ell.y??0).toFixed(1)}) ellLocal=(${ellLocalX.toFixed(1)},${ellLocalY.toFixed(1)}) eWorld=(${eWX.toFixed(1)},${eWY.toFixed(1)}) rowLocal=(${localX.toFixed(1)},${localY.toFixed(1)}) hasSrc=${!!src}`)
       }
+      pushSeat({
+        id: ell.__seatId || src?.id || nanoid(8),
+        label: src?.label || '',
+        x: +localX.toFixed(2),
+        y: +localY.toFixed(2),
+        cat_id: ell.__categoryKey ?? src?.categoryKey ?? 1,
+        status: src ? toStatus(src.status || 'available') : 0,
+        type: src ? toType(src.objectType || 'seat') : 1,
+      })
     })
+    console.log(`[buildVenueData] row=${rowId} exported ${row.seats.length} seats`)
   })
 
   // 合并：有 Group 的 section 直接输出，仅有 seats 的 section 从原始数据补齐
