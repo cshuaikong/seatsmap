@@ -70,6 +70,7 @@
           :nodes="selectedObjects.rows || []"
           :is-single="selectedIds.rows?.length === 1"
           :categories="categories as any"
+          :section-fill="parentSectionFill"
           @update-property="(key, val) => handlePropertyUpdate({ [key]: val })"
           @update-category="(catId) => handleCategoryChange(catId)"
           @manage-categories="emit('manage-categories')"
@@ -207,32 +208,32 @@ import { Icon } from '@iconify/vue'
 import { useVenueStore } from '../stores/venueStore'
 
 // 生成座位标签序列
-const generateSeatLabels = (scheme: string, count: number): string[] => {
+const generateSeatLabels = (scheme: string, count: number, start?: string, direction?: string): string[] => {
   const labels: string[] = []
-  
+
   if (!scheme) {
-    // 空方案：返回空字符串数组
     return Array(count).fill('')
   }
-  
-  if (scheme === '1-2-3') {
+
+  if (scheme === '1-2-3' || scheme === '1-3-5') {
+    const step = scheme === '1-3-5' ? 2 : 1
+    let startNum = parseInt(start || '') || 1
     for (let i = 0; i < count; i++) {
-      labels.push(String(i + 1))
-    }
-  } else if (scheme === '1-3-5') {
-    for (let i = 0; i < count; i++) {
-      labels.push(String(i * 2 + 1))
-    }
-  } else if (scheme === 'a-b-c') {
-    for (let i = 0; i < count; i++) {
-      labels.push(String.fromCharCode(97 + i)) // a = 97
+      labels.push(String(startNum + i * step))
     }
   } else if (scheme === 'A-B-C') {
+    let startCode = start ? start.toUpperCase().charCodeAt(0) : 65
     for (let i = 0; i < count; i++) {
-      labels.push(String.fromCharCode(65 + i)) // A = 65
+      labels.push(String.fromCharCode(startCode + i))
+    }
+  } else if (scheme === 'a-b-c') {
+    let startCode = start ? start.toLowerCase().charCodeAt(0) : 97
+    for (let i = 0; i < count; i++) {
+      labels.push(String.fromCharCode(startCode + i))
     }
   }
-  
+
+  if (direction === 'desc') labels.reverse()
   return labels
 }
 
@@ -298,6 +299,18 @@ const selectedSections = computed<Section[]>(() => {
 
 // 是否多选分区
 const isMultiSectionSelected = computed(() => selectedSections.value.length > 1)
+
+// 选中排所属分区的 fill 色（用于分类继承判断）
+const parentSectionFill = computed(() => {
+  const rowIds = venueStore.selectedRowIds
+  if (rowIds.length === 0) return ''
+  for (const section of venueStore.venue.sections) {
+    for (const row of section.rows) {
+      if (rowIds.includes(row.id)) return section.fill || ''
+    }
+  }
+  return ''
+})
 
 const activePathPointIndex = computed<number | null>(() => {
   const sectionId = venueStore.selectedSectionIds[0]
@@ -815,20 +828,39 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     return
   }
 
-  // 特殊处理排座位标签方案更新
-  if (type === 'row' && 'seatLabeling.labels' in updates) {
-    const labelScheme = updates['seatLabeling.labels'] as string
+  // 特殊处理排座位标签方案更新（新版：含起始值+方向）
+  if (type === 'row' && 'seatLabeling' in updates) {
+    const opts = updates.seatLabeling as { scheme: string; start: string; direction: string }
     const rowIds = venueStore.selectedRowIds
-    
+
     rowIds.forEach(rowId => {
       const row = venueStore.selectedRows.find(r => r.id === rowId)
       if (!row) return
-      
-      // 根据方案生成座位标签
+
+      const seats = row.seats
+      const labels = generateSeatLabels(opts.scheme || '', seats.length, opts.start, opts.direction)
+
+      seats.forEach((seat, index) => {
+        if (labels[index] !== undefined) {
+          venueStore.updateSeat(seat.id, { label: labels[index] || undefined })
+        }
+      })
+    })
+    return
+  }
+
+  // 特殊处理排座位标签方案更新（旧版兼容）
+  if (type === 'row' && 'seatLabeling.labels' in updates) {
+    const labelScheme = updates['seatLabeling.labels'] as string
+    const rowIds = venueStore.selectedRowIds
+
+    rowIds.forEach(rowId => {
+      const row = venueStore.selectedRows.find(r => r.id === rowId)
+      if (!row) return
+
       const seats = row.seats
       const labels = generateSeatLabels(labelScheme, seats.length)
-      
-      // 更新每个座位的标签
+
       seats.forEach((seat, index) => {
         if (labels[index] !== undefined) {
           venueStore.updateSeat(seat.id, { label: labels[index] || undefined })
@@ -860,6 +892,23 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     case 'area':
       ids = venueStore.selectedAreaIds
       break
+  }
+
+  // 排的分类变更：更新所有选中排中所有座位的分类
+  if (type === 'row' && 'categoryId' in updates) {
+    const allSeatIds: string[] = []
+    for (const rowId of ids) {
+      const row = venueStore.selectedRows.find(r => r.id === rowId)
+      if (row) {
+        for (const seat of row.seats) {
+          allSeatIds.push(seat.id)
+        }
+      }
+    }
+    if (allSeatIds.length > 0) {
+      venueStore.updateSeatsCategory(allSeatIds, updates['categoryId'])
+    }
+    return
   }
 
   // 批量更新所有选中对象

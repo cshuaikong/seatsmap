@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { Group, Line, Ellipse } from 'leafer-ui'
+import { Group, Line, Ellipse, Text } from 'leafer-ui'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
@@ -69,7 +69,22 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           hittable: true,
           draggable: false,
         })
+        // 座位标签文本（正中间）
+        const st = new Text({
+          text: '',
+          x: cx, y: cy,
+          fontSize: radius,
+          fill: '#1F2937',
+          textAlign: 'center',
+          verticalAlign: 'middle',
+          around: 'center',
+          editable: false,
+          hittable: false,
+        })
+        ;(st as any).__seatLabelText = true
         group.add(ell)
+        group.add(st)
+        ;(ell as any).__labelText = st
         ellipses.push(ell)
       }
 
@@ -77,6 +92,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       ;(group as any).__seatEllipses = ellipses
       ;(group as any).__bar = bar
       ;(group as any).__seatRowData = { ...row }
+      ;(group as any).__seatSpacing = row.spacing
+
+      addRowLabelText(group)
 
       const addTarget = targetGroup || ctx.getLeafer()!
       addTarget.add(group)
@@ -92,6 +110,41 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     seatRowGroups.length = 0
     drawnSeatCount.value = 0
     seatDraw.resetBaseScale()
+  }
+
+  /** 为排 Group 添加标签文本（排起点前移一个座位间距） */
+  function addRowLabelText(group: any): void {
+    const ellipses = (group.__seatEllipses || []) as any[]
+    if (ellipses.length <= 1) return
+    const bar = group.__bar as any
+    const pts: number[] = bar?.points ?? []
+    if (pts.length < 4) return
+    const fx = pts[0], fy = pts[1], lx = pts[2], ly = pts[3]
+    const dx = lx - fx
+    const dy = ly - fy
+    const len = Math.hypot(dx, dy) || 1
+    const ux = dx / len
+    const uy = dy / len
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+    const spacing = group.__seatSpacing ?? (group.__seatRowData?.spacing ?? 18)
+    const bs = seatDraw.getBaseScale()
+    const seatR = SEAT_CONFIG.radius / Math.max(bs, 0.02)
+    const labelText = new Text({
+      text: group.__rowLabel || '',
+      x: fx - ux * spacing * 0.8,
+      y: fy - uy * spacing * 0.8,
+      rotation: angle,
+      fontSize: seatR * 1.3,
+      fill: '#6B7280',
+      textAlign: 'center',
+      verticalAlign: 'middle',
+      around: 'center',
+      editable: false,
+      hittable: false,
+    })
+    ;(labelText as any).__rowLabelText = true
+    group.add(labelText)
+    ;(group as any).__labelText = labelText
   }
 
   /** 从 venue data 的 sections[].rows[].seats[] 渲染座位排
@@ -112,7 +165,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
     for (const section of sections) {
       if (!section.rows || section.rows.length === 0) continue
-     
+
       for (const row of section.rows) {
         if (!row.seats || row.seats.length === 0) continue
 
@@ -193,8 +246,10 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           ellipses.push(ell)
         }
 
+        const barPts: number[] = []
+        for (const wp of worldPositions) { barPts.push(wp.x, wp.y) }
         const bar = new Line({
-          points: [firstSX, firstSY, lastSX, lastSY],
+          points: barPts,
           stroke: '#81C784',
           strokeWidth: lineWidth,
           strokeCap: 'round',
@@ -239,12 +294,37 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           localFirstX = lf.x; localFirstY = lf.y
           localLastX = ll.x; localLastY = ll.y
 
-          bar.points = [localFirstX, localFirstY, localLastX, localLastY]
+          const barLocalPts: number[] = []
+          for (let i = 0; i < worldPositions.length; i++) {
+            const lp = w2l(worldPositions[i].x, worldPositions[i].y)
+            barLocalPts.push(lp.x, lp.y)
+          }
+          bar.points = barLocalPts
           for (let i = 0; i < ellipses.length; i++) {
             const lp = w2l(worldPositions[i].x, worldPositions[i].y)
             ellipses[i].x = lp.x
             ellipses[i].y = lp.y
           }
+        }
+
+        // 座位标签文本（正中间）
+        for (let i = 0; i < ellipses.length; i++) {
+          const ell = ellipses[i]
+          const seat = sortedSeats[i]
+          const st = new Text({
+            text: seat.label || '',
+            x: ell.x, y: ell.y,
+            fontSize: radius,
+            fill: '#1F2937',
+            textAlign: 'center',
+            verticalAlign: 'middle',
+            around: 'center',
+            editable: false,
+            hittable: false,
+          })
+          ;(st as any).__seatLabelText = true
+          group.add(st)
+          ;(ell as any).__labelText = st
         }
 
         const ldx = localLastX - localFirstX
@@ -264,7 +344,12 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             : SEAT_CONFIG.spacing / Math.max(bs, 0.02),
         } as SeatDrawRowData
 
+        // __seatSpacing 取 rowData.spacing 保证与 rebuildSeatRow 的 compare 一致
+        ;(group as any).__seatSpacing = (group as any).__seatRowData.spacing
+
         // __rowOriginX/Y 保留世界坐标（导出时直接使用），不转局部
+
+        addRowLabelText(group)
 
         const addTarget = parentGroup || ctx.getLeafer()!
         addTarget.add(group)
@@ -285,14 +370,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const size = radius * 2
     const sw = 1 / Math.max(bs, 0.02)
     const { x, y, ux, uy, count, spacing } = newData
-
-    const barEndX = endCenter ? endCenter.x : x + ux * spacing * (count - 1)
-    const barEndY = endCenter ? endCenter.y : y + uy * spacing * (count - 1)
-
-    if (bar) {
-      bar.points = [x, y, barEndX, barEndY]
-      bar.strokeWidth = size
-    }
 
     if (ellipses) {
       const groupCurve = (group as any).__curve ?? 0
@@ -315,6 +392,14 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const curved = calculateCurvedPositions(virtualSeats as any[], groupCurve)
         for (let i = 0; i < count; i++) {
           positions.push({ x: +curved[i].x.toFixed(2), y: +curved[i].y.toFixed(2) })
+        }
+
+        // bar 也跟随弧线
+        if (bar) {
+          const barPts: number[] = []
+          for (const p of positions) { barPts.push(p.x, p.y) }
+          bar.points = barPts
+          bar.strokeWidth = size
         }
 
         for (let i = 0; i < count; i++) {
@@ -359,6 +444,11 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           })
         }
 
+        if (bar) {
+          bar.points = [x, y, effEndX, effEndY]
+          bar.strokeWidth = size
+        }
+
         const prevFromEnd = (group as any).__anchorFromEnd
         if (anchorFromEnd !== prevFromEnd && prevFromEnd !== undefined) {
           ellipses.reverse()
@@ -397,6 +487,28 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     ;(group as any).__seatRowData = { ...newData }
     ;(group as any).__seatRadius = radius
 
+    // 更新排标签文本位置/旋转
+    const labelText = (group as any).__labelText
+    if (ellipses && ellipses.length > 1) {
+      if (labelText) {
+        const barPts = bar?.points ?? []
+        if (barPts.length >= 4) {
+          const fx2 = barPts[0], fy2 = barPts[1], lx2 = barPts[2], ly2 = barPts[3]
+          const dx2 = lx2 - fx2, dy2 = ly2 - fy2
+          const len2 = Math.hypot(dx2, dy2) || 1
+          const ux2 = dx2 / len2, uy2 = dy2 / len2
+          const sp = (group as any).__seatSpacing ?? ((group as any).__seatRowData?.spacing ?? 18)
+          labelText.x = fx2 - ux2 * sp * 0.8
+          labelText.y = fy2 - uy2 * sp * 0.8
+          labelText.rotation = Math.atan2(dy2, dx2) * 180 / Math.PI
+        }
+      } else {
+        addRowLabelText(group)
+      }
+    } else if (labelText) {
+      labelText.visible = false
+    }
+
     updateSeatLOD()
   }
 
@@ -414,10 +526,26 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const sel = selectedSet.has(g)
       const detail = r * s > threshold
       if (ellipses && ellipses.length > 0) {
-        for (const e of ellipses) e.visible = detail
+        for (const e of ellipses) {
+          e.visible = detail
+          // 座位标签：有内容且座位圆可见时显示
+          const st = (e as any).__labelText
+          if (st) {
+            const hasSeatLabel = String((e as any).__sourceSeat?.label || '').length > 0
+            st.visible = detail && hasSeatLabel
+            if (detail) st.fontSize = r
+          }
+        }
         bar.visible = !detail || sel
       } else {
         bar.visible = true
+      }
+      // 排标签：有标签内容就显示
+      const labelText = (g as any).__labelText
+      if (labelText) {
+        const hasLabel = String(g.__rowLabel || '').length > 0
+        labelText.visible = hasLabel && ellipses && ellipses.length > 1
+        if (detail) labelText.fontSize = r * 1.3
       }
       bar.stroke = sel ? '#3b82f6' : '#81C784'
       bar.opacity = sel ? 0.6 : 0.25

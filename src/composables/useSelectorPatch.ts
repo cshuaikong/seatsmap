@@ -23,17 +23,15 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const sel = (editor as any).selector
   if (!sel) return
 
-  // ⓪ targetStroker 过滤：只过滤座位排，分区保留原生描边（currentBorder 层叠其上）
+  // ⓪ targetStroker 过滤：座位排和分区 Group 均不显示原生描边（分区有 sectionBorder 蓝色边框替代）
   const targetStroker = sel.targetStroker
   if (targetStroker) {
     const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
     targetStroker.setTarget = function (target: any, style?: any) {
-      if (!ctx.getFocusedSectionId?.()) {
-        if (Array.isArray(target)) {
-          target = target.filter((el: any) => !el.__seatRow)
-        } else if (target?.__seatRow) {
-          return
-        }
+      if (Array.isArray(target)) {
+        target = target.filter((el: any) => !el.__seatRow && el.__sectionGroup !== true)
+      } else if (target?.__seatRow || target?.__sectionGroup === true) {
+        return
       }
       if (Array.isArray(target) && target.length === 0) return
       _origSetTarget(target, style)
@@ -186,6 +184,25 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return t0 <= t1
   }
 
+  // 遍历 bar 多段线逐段测试（直线排 2 点=1 段，弧线排 N 点=N-1 段）
+  const seatRowHitsRect = (rowGroup: any, rx: number, ry: number, rw: number, rh: number): boolean => {
+    const bar = rowGroup.__bar
+    const pts: number[] = bar?.points
+    if (!pts || pts.length < 4) return false
+    const w = rowGroup.__world
+    if (!w) return false
+    const r = rowGroup.__seatRadius ?? 0
+    const prx = rx - r, pry = ry - r, prw = rw + r * 2, prh = rh + r * 2
+    for (let i = 0; i < pts.length - 2; i += 2) {
+      const wx1 = pts[i] * w.a + pts[i + 1] * w.c + w.e
+      const wy1 = pts[i] * w.b + pts[i + 1] * w.d + w.f
+      const wx2 = pts[i + 2] * w.a + pts[i + 3] * w.c + w.e
+      const wy2 = pts[i + 2] * w.b + pts[i + 3] * w.d + w.f
+      if (segHitsRect(wx1, wy1, wx2, wy2, prx, pry, prw, prh)) return true
+    }
+    return false
+  }
+
   const pathHitsRect = (el: any, rx: number, ry: number, rw: number, rh: number): boolean => {
     const d: string = el.path
     if (!d) return false
@@ -297,7 +314,8 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         if (el.id?.startsWith?.('section-border-')) continue
         // 分区编辑模式：座位排子元素重定向到父座位排 Group（仅当前分区）
         if (el.parent?.__seatRow) {
-          if (focusedId && el.parent.__sectionId === focusedId && !seen.has(el.parent)) {
+          if (focusedId && el.parent.__sectionId === focusedId && !seen.has(el.parent)
+            && seatRowHitsRect(el.parent, wr.x, wr.y, wr.width, wr.height)) {
             seen.add(el.parent)
             hits.push(el.parent)
           }
@@ -305,7 +323,8 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         }
         if (el.__seatRow) {
           // findByBounds 直接命中的座位排 Group
-          if (focusedId && el.__sectionId === focusedId && !seen.has(el)) {
+          if (focusedId && el.__sectionId === focusedId && !seen.has(el)
+            && seatRowHitsRect(el, wr.x, wr.y, wr.width, wr.height)) {
             seen.add(el)
             hits.push(el)
           }
@@ -364,7 +383,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         if (selectList.length !== ed.list.length || ed.list.some((c: any, i: number) => c !== selectList[i])) {
           ed.target = selectList as any
         }
-      } else if (!focusedGroup) {
+      } else {
         ed.target = this.originList.list
       }
     }

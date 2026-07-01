@@ -21,7 +21,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { Leafer, Path, Group, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
+import { Leafer, Path, Group, Text, ZoomEvent, PointerEvent as LP } from 'leafer-ui'
 import '@leafer-in/view'
 import '@leafer-in/viewport'
 import '@leafer-in/editor'
@@ -36,6 +36,7 @@ import { exportPNG, exportSVG } from '../composables/usePathExport'
 import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
+import { usePathEditorSync } from '../composables/usePathEditorSync'
 import { nanoid } from 'nanoid'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
@@ -94,6 +95,53 @@ function setPanEnabled(enabled: boolean): void {
   if (app?.config?.move) app.config.move.disabled = !enabled
 }
 
+/** 从 SVG path 字符串中解析坐标范围，返回中心点 */
+function getPathCenterFromString(pathStr: string): { x: number; y: number } | null {
+  if (!pathStr) return null
+  const nums = pathStr.match(/[-+]?\d*\.?\d+/g)
+  if (!nums || nums.length < 2) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let i = 0; i < nums.length - 1; i += 2) {
+    const x = parseFloat(nums[i])
+    const y = parseFloat(nums[i + 1])
+    if (isNaN(x) || isNaN(y)) continue
+    if (x < minX) minX = x; if (x > maxX) maxX = x
+    if (y < minY) minY = y; if (y > maxY) maxY = y
+  }
+  if (!isFinite(minX)) return null
+  return { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2 }
+}
+
+function updateNameTextsLOD(): void {
+  const s = getS()
+  sectionGroupMap.forEach((group: any) => {
+    const nameText = group.__nameText
+    if (!nameText) return
+    if (s < 0.8) {
+      nameText.opacity = 0
+      return
+    }
+    // 优先用 LeaferJS boxBounds，不可用时从 path 字符串直接计算
+    const body = group.children?.find((c: any) => c.tag === 'Path' && (c as any).__sectionGroup === group)
+    let center: { x: number; y: number } | null = null
+    if (body?.boxBounds && (body.boxBounds.width > 0 || body.boxBounds.height > 0)) {
+      const bb = body.boxBounds
+      center = { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 }
+    } else {
+      const rawPath = (body as any)?.__rawPath as string | undefined
+      if (rawPath) {
+        center = getPathCenterFromString(rawPath)
+      }
+    }
+    if (center) {
+      nameText.x = center.x
+      nameText.y = center.y
+      nameText.fontSize = Math.max(8, Math.min(28, 14 / s))
+      nameText.opacity = 1
+    }
+  })
+}
+
 // ==================== 渲染 ====================
 
 function createPolygonItem(p: { id: string; path: string; x: number; y: number; fill: string; stroke?: string; strokeWidth?: number; name?: string; rotation?: number }) {
@@ -113,7 +161,7 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
     })
     ;(sectionGroup as any).__sectionGroup = true
     ;(sectionGroup as any).__sectionId = p.id
-    ;(sectionGroup as any).__sectionName = p.name || p.id
+    ;(sectionGroup as any).__sectionName = p.name 
     sectionGroupMap.set(p.id, sectionGroup)
     leafer!.add(sectionGroup)
   }
@@ -133,8 +181,27 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
     hittable: true,
   })
   ;(body as any).__sectionGroup = sectionGroup
+  ;(body as any).__rawPath = p.path
   sectionGroup.add(body)
   allPaths.push(body)
+
+  // 分区名称文本（不可选中，显示于分区中心，响应缩放，初始隐藏防闪烁）
+  const nameText = new Text({
+    text: p.name || '',
+    x: 0, y: 0,
+    fontSize: 14,
+    fill: '#374151',
+    fontWeight: '500',
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    editable: false,
+    hittable: false,
+    around: 'center',
+    opacity: 0,
+  })
+  ;(nameText as any).__sectionNameText = true
+  sectionGroup.add(nameText)
+  ;(sectionGroup as any).__nameText = nameText
 }
 
 function clearAllPaths() {
@@ -214,6 +281,9 @@ function renderAll(data: VenueData): void {
     seatModule.createSeatsFromVenueData(sections, bs != null ? parseFloat(bs) : bs, data?.categories)
     console.log('[renderAll] seats rendered, count:', seatModule.drawnSeatCount.value)
 
+    // 分区名称文本初始定位（rAF 确保 LeaferJS 布局就绪）
+    requestAnimationFrame(() => updateNameTextsLOD())
+
     // SIMPLE 模式：自动进入默认分区聚焦，座位工具直接可用
     const venueType: string = (data as any)?.type ?? 'SIMPLE'
     if (venueType === 'SIMPLE') {
@@ -241,7 +311,7 @@ function buildVenueData(): any {
     const pathChild = group.children?.find((c: any) => c.tag === 'Path')
     if (!pathChild) return
     const sec: any = {
-      name: (group as any).__sectionName || pathChild.id,
+      name: (group as any).__sectionName || '',
       rows: [] as any[],
       type: 'path',
       x: +(group.x ?? 0).toFixed(2),
@@ -464,6 +534,18 @@ const seatModule = useSeatModule({
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
+// ==================== 画布↔表单同步桥 ====================
+
+const pathEditorSync = usePathEditorSync({
+  getLeafer: () => leafer,
+  getEditor: () => editor,
+  getSectionGroupMap: () => sectionGroupMap,
+  getSeatRowGroups: () => seatModule.seatRowGroups,
+  getFocusedSectionId: () => focusedSectionId.value,
+  rebuildSeatRow: (group, newData, endCenter, anchorFromEnd) =>
+    seatModule.rebuildSeatRow(group, newData, endCenter, anchorFromEnd),
+})
+
 // ==================== 顶点编辑 ====================
 
 const vertexEdit = useVertexEdit({
@@ -573,7 +655,7 @@ function enterSectionFocus(sectionId: string): void {
 
   // 有 SectionGroup：手动设置状态 + 调用原版 openGroup + 覆盖属性 + 隐藏 editBox
   focusedSectionId.value = sectionId
-  focusedSectionName.value = group.__sectionName || sectionId
+  focusedSectionName.value = group.__sectionName || ''
   title.value = `分区编辑 — ${focusedSectionName.value}`
   emit('section-focus-change', true, focusedSectionName.value)
   const pathBody = group.children?.find((c: any) => c.tag === 'Path')
@@ -725,10 +807,12 @@ onMounted(() => {
   editor.on(EditorMoveEvent.MOVE, () => {
     ;(editor as any).editBox?.update()
     syncBorder()
+    pathEditorSync.syncTransformToStore()
   })
   editor.on(EditorRotateEvent.ROTATE, () => {
     ;(editor as any).editBox?.update()
     syncBorder()
+    pathEditorSync.syncTransformToStore()
   })
   leafer.on(LP.MOVE, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
@@ -768,6 +852,8 @@ onMounted(() => {
 
   console.log('[PathEditor] mount renderAll, venueData keys:', Object.keys(props.venueData || {}))
   renderAll(props.venueData)
+  // 初始同步：将画布 SectionGroup push 到 venueStore
+  nextTick(() => { pathEditorSync.syncAllSectionsToStore() })
 
   // 选中变化 → 边框层管理
   editor.on(EditorEvent.SELECT, () => {
@@ -833,6 +919,9 @@ onMounted(() => {
         return
       }
     }
+
+    // 画布选中 → 右侧表单同步
+    pathEditorSync.syncSelectionToStore()
   })
 
   // Ctrl+滚轮缩放
@@ -862,6 +951,9 @@ onMounted(() => {
         mode.cancelCurrent()
       }
       if (e.key === 'Backspace' || e.key === 'Delete') {
+        // 表单输入框中不触发画布删除
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
         if (seatVertexEdit.isEditing.value) return
         deleteSelected()
       }
@@ -878,7 +970,11 @@ onMounted(() => {
     if (seatVertexEdit.isEditing.value) seatVertexEdit.updateHandleSize()
     sectionBorders.forEach(b => b.border.strokeWidth = 2 / s)
     seatModule.updateSeatLOD()
+    updateNameTextsLOD()
   })
+
+  // 启动 venueStore → 画布同步监听
+  pathEditorSync.watchStoreAndApply()
 
   emit('ready', leafer, editor)
 })
@@ -896,6 +992,7 @@ onUnmounted(() => {
 watch(() => props.venueData, (newVal) => {
   console.log('[PathEditor] watch fired, venueData keys:', Object.keys(newVal || {}), 'sections:', (newVal as any)?.sections?.length)
   renderAll(newVal)
+  nextTick(() => pathEditorSync.syncAllSectionsToStore())
 })
 
 watch(() => props.currentTool, (tool) => {

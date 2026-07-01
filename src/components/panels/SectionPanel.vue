@@ -1,8 +1,19 @@
 <template>
   <div class="section-panel">
     <div class="panel-header">
-      <Icon icon="lucide:layout-grid" class="panel-header-icon" />
-      <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
+      <div class="header-left">
+        <Icon icon="lucide:layout-grid" class="panel-header-icon" />
+        <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
+      </div>
+      <button
+        v-if="!isMulti && section"
+        class="header-edit-btn"
+        title="进入分区编辑模式"
+        @click="emit('enter-section')"
+      >
+        <Icon icon="lucide:pen-square" class="btn-icon" />
+        编辑
+      </button>
     </div>
 
     <div class="panel-body" v-if="section">
@@ -18,36 +29,42 @@
 
       <!-- 批量重命名 - 多选时显示 -->
       <div v-if="isMulti" class="batch-rename-section">
-        <div class="panel-row">
-          <label class="panel-label">批量命名</label>
+        <div class="batch-rename-row">
+          <label class="panel-label">分区编号</label>
+          <select v-model="namingFormat" class="format-select">
+            <option value="number">1-2-3...</option>
+            <option value="letter">A-B-C...</option>
+          </select>
         </div>
         <div class="batch-rename-row">
+          <label class="panel-label">起始编号</label>
           <input
-            class="panel-input"
-            v-model="batchPrefix"
-            placeholder="前缀，如：A区、第"
-            style="width: 80px;"
-          />
-          <input
-            class="panel-input"
-            v-model="batchStartNum"
+            v-if="namingFormat === 'number'"
+            v-model.number="nameStartNum"
             type="number"
-            placeholder="起始"
-            style="width: 60px;"
+            min="1"
+            class="panel-input"
           />
           <input
+            v-else
+            :value="nameStartLetter"
             class="panel-input"
-            v-model="batchSuffix"
-            placeholder="后缀，如：区、排"
-            style="width: 60px;"
+            placeholder="A"
+            @input="onLetterInput"
           />
         </div>
-        <div class="batch-preview">
-          预览: {{ batchPreview }}
+        <div class="batch-rename-row">
+          <label class="panel-label">方向</label>
+          <button
+            class="dir-toggle-btn"
+            :title="namingAscending ? '正序' : '倒序'"
+            @click="namingAscending = !namingAscending"
+          >
+            <Icon :icon="namingAscending ? 'lucide:arrow-up' : 'lucide:arrow-down'" class="btn-icon" />
+            {{ namingAscending ? '正序' : '倒序' }}
+          </button>
+          <button class="batch-apply-btn" @click="applyBatchNaming">应用</button>
         </div>
-        <button class="batch-apply-btn" @click="applyBatchRename">
-          应用命名
-        </button>
       </div>
 
       <!-- 填充色 -->
@@ -129,9 +146,35 @@
           <Icon icon="lucide:rows-3" class="stat-icon" />
           <span>{{ section.rows.length }} 排</span>
         </div>
-        <div class="stat-item" v-if="!isMulti">
+        <div class="stat-item" v-if="isMulti">
+          <Icon icon="lucide:rows-3" class="stat-icon" />
+          <span>{{ totalRowCount }} 排</span>
+        </div>
+        <div class="stat-item">
           <Icon icon="lucide:armchair" class="stat-icon" />
-          <span>{{ seatCount }} 座</span>
+          <span>{{ totalSeatCount }} 座</span>
+        </div>
+      </div>
+
+      <!-- 座位分类属性 -->
+      <div v-if="sectionCategories.length > 0" class="categories-section">
+        <div class="section-label">座位分类</div>
+        <div
+          v-for="cat in sectionCategories"
+          :key="cat.key"
+          class="category-row"
+        >
+          <div class="category-left">
+            <input
+              type="color"
+              class="color-swatch small"
+              :value="cat.color"
+              @change="(e) => onCategoryColorChange(cat.key, (e.target as HTMLInputElement).value)"
+              title="修改分类颜色，所有同分类座位同步更新"
+            />
+            <span class="category-label">{{ cat.label }}</span>
+          </div>
+          <span class="category-count">{{ cat.seatCount }} 座</span>
         </div>
       </div>
 
@@ -232,6 +275,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { PathPoint, Section } from '../../types'
+import { useVenueStore } from '../../stores/venueStore'
 
 const props = defineProps<{
   section: Section | null
@@ -250,27 +294,51 @@ const emit = defineEmits<{
   'toggle-vertex-edit': []
 }>()
 
-// 批量重命名状态
-const batchPrefix = ref('')
-const batchStartNum = ref(1)
-const batchSuffix = ref('')
+// 批量重命名 — seats.io 风格：数字 123 / 字母 ABC，可设起始值，正序/倒序
+const namingFormat = ref<'number' | 'letter'>('number')
+const nameStartNum = ref(1)
+const nameStartLetter = ref('A')
+const namingAscending = ref(true)
 
-// 批量命名预览
-const batchPreview = computed(() => {
-  const start = batchStartNum.value || 1
-  return `${batchPrefix.value}${start}${batchSuffix.value}`
-})
+function numberToLetters(n: number): string {
+  let result = ''
+  let num = n
+  while (num > 0) {
+    num--
+    result = String.fromCharCode(65 + (num % 26)) + result
+    num = Math.floor(num / 26)
+  }
+  return result
+}
 
-// 应用批量命名
-const applyBatchRename = () => {
+function lettersToNumber(s: string): number {
+  let result = 0
+  for (let i = 0; i < s.length; i++) {
+    result = result * 26 + (s.charCodeAt(i) - 64)
+  }
+  return result
+}
+
+function resolveName(index: number): string {
+  if (namingFormat.value === 'number') {
+    const n = namingAscending.value ? nameStartNum.value + index : nameStartNum.value - index
+    return String(Math.max(1, n))
+  } else {
+    const letterNum = lettersToNumber(nameStartLetter.value)
+    const n = namingAscending.value ? letterNum + index : letterNum - index
+    return numberToLetters(Math.max(1, n))
+  }
+}
+
+function applyBatchNaming(): void {
   if (!props.selectedSections || props.selectedSections.length === 0) return
-  
-  const names = props.selectedSections.map((section, index) => {
-    const num = (batchStartNum.value || 1) + index
-    return `${batchPrefix.value}${num}${batchSuffix.value}`
-  })
-  
+  const names = props.selectedSections.map((_, i) => resolveName(i))
   emit('batch-update-names', names)
+}
+
+function onLetterInput(e: Event): void {
+  const val = (e.target as HTMLInputElement).value.toUpperCase().replace(/[^A-Z]/g, '')
+  nameStartLetter.value = val || 'A'
 }
 
 const activateSegment = (pointIndex: number) => {
@@ -319,10 +387,68 @@ const solidFill = computed(() => {
   return f
 })
 
+const venueStore = useVenueStore()
+
 const seatCount = computed(() => {
   if (!props.section) return 0
   return props.section.rows.reduce((sum, row) => sum + row.seats.length, 0)
 })
+
+const totalSeatCount = computed(() => {
+  if (props.isMulti && props.selectedSections) {
+    return props.selectedSections.reduce((sum, s) =>
+      sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
+  }
+  return seatCount.value
+})
+
+const totalRowCount = computed(() => {
+  if (props.isMulti && props.selectedSections) {
+    return props.selectedSections.reduce((sum, s) => sum + s.rows.length, 0)
+  }
+  return props.section?.rows.length ?? 0
+})
+
+/** 提取选中分区内所有唯一的座位分类，含 label/color/seatCount */
+const sectionCategories = computed(() => {
+  const sections = props.isMulti && props.selectedSections
+    ? props.selectedSections
+    : (props.section ? [props.section] : [])
+
+  const categoryMap = new Map<string, { key: string; label: string; color: string; seatCount: number }>()
+
+  for (const section of sections) {
+    for (const row of section.rows) {
+      for (const seat of row.seats) {
+        const key = String(seat.categoryKey ?? 1)
+        const existing = categoryMap.get(key)
+        if (existing) {
+          existing.seatCount++
+        } else {
+          categoryMap.set(key, { key, label: '', color: '#A5D6A7', seatCount: 1 })
+        }
+      }
+    }
+  }
+
+  // 从 venueStore 补全 label / color
+  const storeCategories = venueStore.venue.categories ?? []
+  for (const cat of categoryMap.values()) {
+    const storeCat = storeCategories.find(c => String(c.key) === cat.key)
+    if (storeCat) {
+      cat.label = storeCat.label
+      cat.color = storeCat.color
+    } else {
+      cat.label = `分类 ${cat.key}`
+    }
+  }
+
+  return Array.from(categoryMap.values())
+})
+
+function onCategoryColorChange(key: string, color: string): void {
+  venueStore.updateCategory(key, { color })
+}
 
 const borderTypeLabel = computed(() => {
   const type = props.section?.borderType
@@ -361,12 +487,42 @@ const pathSegments = computed(() => {
 .panel-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 12px 16px 10px;
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
   border-bottom: 1px solid var(--color-border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.header-edit-btn:hover {
+  opacity: 0.9;
+}
+.header-edit-btn .btn-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .panel-header-icon {
@@ -685,34 +841,122 @@ const pathSegments = computed(() => {
 
 .batch-rename-row {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.batch-preview {
+.batch-rename-row:last-child {
+  margin-bottom: 0;
+}
+
+.batch-rename-row .panel-label {
+  flex-shrink: 0;
+}
+
+.format-select {
+  padding: 5px 6px;
   font-size: 12px;
-  color: var(--color-text-secondary);
-  margin-bottom: 10px;
-  padding: 6px 8px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
   background: var(--color-bg);
-  border-radius: 4px;
+  color: var(--color-text);
+  outline: none;
+  cursor: pointer;
+  width: 56px;
+}
+
+.format-select:focus {
+  border-color: var(--color-accent);
+}
+
+.dir-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dir-toggle-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.dir-toggle-btn .btn-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .batch-apply-btn {
-  width: 100%;
-  padding: 8px 12px;
+  padding: 5px 14px;
   border: none;
   border-radius: 6px;
   background: var(--color-accent);
   color: white;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  margin-left: auto;
 }
 
 .batch-apply-btn:hover {
   opacity: 0.9;
+}
+
+/* 座位分类 */
+.categories-section {
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 8px;
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.category-row + .category-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.category-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-swatch.small {
+  width: 22px;
+  height: 22px;
+}
+
+.category-label {
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.category-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 </style>

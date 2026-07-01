@@ -1,14 +1,49 @@
 <template>
   <div class="row-panel">
     <!-- Category 分组 -->
-    <!-- EN: Category -->
-    <PanelSection title="分类" :collapsible="true" :defaultExpanded="true">
-      <CategorySelector
-        :modelValue="localCategoryId"
-        :categories="categories"
-        @update:modelValue="onCategoryChange"
-        @manage="emit('manage-categories')"
-      />
+    <PanelSection title="分类" :collapsible="false">
+      <template #header-extra>
+        <button class="manage-btn-sm" @click="emit('manage-categories')">
+          <Icon icon="lucide:settings" class="btn-icon-xs" />
+          管理
+        </button>
+      </template>
+      <div class="category-dropdown" :class="{ open: dropdownOpen }">
+        <div class="dropdown-trigger" @click="dropdownOpen = !dropdownOpen">
+          <div class="trigger-content">
+            <template v-if="activeCategories.length === 0">
+              <span class="trigger-placeholder">未分配</span>
+            </template>
+            <template v-else>
+              <span
+                v-for="cat in activeCategories"
+                :key="cat.id"
+                class="category-tag"
+                :style="{ backgroundColor: cat.color + '22', borderColor: cat.color }"
+              >
+                <span class="tag-dot" :style="{ backgroundColor: cat.color }"></span>
+                {{ cat.name }}
+              </span>
+            </template>
+          </div>
+          <Icon icon="lucide:chevron-down" class="dropdown-arrow" :class="{ open: dropdownOpen }" />
+        </div>
+        <div v-if="dropdownOpen" class="dropdown-panel">
+          <div
+            v-for="cat in categories"
+            :key="cat.id"
+            class="dropdown-item"
+            :class="{ active: isCategoryActive(cat) }"
+            @click="onCategoryClick(String(cat.key ?? cat.id))"
+          >
+            <div class="item-left">
+              <div class="color-dot" :style="{ backgroundColor: cat.color }"></div>
+              <span>{{ cat.name }}</span>
+            </div>
+            <Icon v-if="isCategoryActive(cat)" icon="lucide:check" class="check-icon" />
+          </div>
+        </div>
+      </div>
     </PanelSection>
 
     <!-- Row 分组 -->
@@ -18,15 +53,7 @@
         <!-- EN: Number of seats -->
         <label class="property-label">座位数</label>
         <div class="property-control">
-          <div class="seat-count-display">
-            <button class="step-btn" @click="onDecreaseSeatCount" :disabled="!canDecrease">
-              <Icon icon="lucide:minus" class="step-icon" />
-            </button>
-            <span class="count-text">{{ seatCountDisplay }}</span>
-            <button class="step-btn" @click="onIncreaseSeatCount" :disabled="!canIncrease">
-              <Icon icon="lucide:plus" class="step-icon" />
-            </button>
-          </div>
+          <span class="count-text readonly">{{ seatCountDisplay }}</span>
         </div>
       </div>
       <div class="property-row">
@@ -74,31 +101,6 @@
           </div>
         </div>
       </div>
-      
-      <!-- 扩展座位按钮 -->
-      <div class="property-row expand-seats-row">
-        <label class="property-label">扩展座位</label>
-        <div class="property-control">
-          <div class="expand-buttons">
-            <button class="expand-btn remove" @click="onRemoveSeatAtStart" title="移除开头座位">
-              <Icon icon="lucide:chevron-left" class="expand-icon" />
-              <span class="expand-text">-1</span>
-            </button>
-            <button class="expand-btn" @click="onAddSeatAtStart" title="在开头添加座位">
-              <Icon icon="lucide:chevron-left" class="expand-icon" />
-              <span class="expand-text">+1</span>
-            </button>
-            <button class="expand-btn" @click="onAddSeatAtEnd" title="在末尾添加座位">
-              <span class="expand-text">+1</span>
-              <Icon icon="lucide:chevron-right" class="expand-icon" />
-            </button>
-            <button class="expand-btn remove" @click="onRemoveSeatAtEnd" title="移除末尾座位">
-              <span class="expand-text">-1</span>
-              <Icon icon="lucide:chevron-right" class="expand-icon" />
-            </button>
-          </div>
-        </div>
-      </div>
     </PanelSection>
 
     <!-- Row labeling 分组 -->
@@ -127,25 +129,42 @@
       <!-- 多选：显示批量标签设置 -->
       <template v-else>
         <div class="property-row">
-          <label class="property-label">标签模式</label>
+          <label class="property-label">排编号</label>
           <div class="property-control">
             <select v-model="batchLabelMode" class="select-input">
               <option value="">无</option>
-              <option value="A-B-C">A-B-C</option>
-              <option value="a-b-c">a-b-c</option>
-              <option value="1-2-3">1-2-3</option>
+              <option value="1-2-3">1,2,3...</option>
+              <option value="A-B-C">A,B,C...</option>
+              <option value="a-b-c">a,b,c...</option>
             </select>
           </div>
         </div>
         <div class="property-row">
           <label class="property-label">起始值</label>
           <div class="property-control">
-            <input 
-              type="text" 
-              v-model="batchLabelStart" 
+            <input
+              type="text"
+              v-model="batchLabelStart"
               class="text-input"
               :placeholder="batchLabelStartPlaceholder"
             />
+          </div>
+        </div>
+        <div class="property-row">
+          <label class="property-label">顺序</label>
+          <div class="property-control">
+            <div class="direction-toggle">
+              <button
+                class="dir-btn"
+                :class="{ active: batchLabelDirection === 'asc' }"
+                @click="batchLabelDirection = 'asc'"
+              >正序</button>
+              <button
+                class="dir-btn"
+                :class="{ active: batchLabelDirection === 'desc' }"
+                @click="batchLabelDirection = 'desc'"
+              >倒序</button>
+            </div>
           </div>
         </div>
       </template>
@@ -167,20 +186,31 @@
         </div>
       </template>
       <div class="property-row">
-        <!-- EN: Labels -->
-        <label class="property-label">标签方案</label>
+        <!-- EN: Scheme -->
+        <label class="property-label">座位编号</label>
         <div class="property-control">
-          <select
-            :value="localSeatLabelingLabels"
-            @change="onUpdateProperty('seatLabeling.labels', ($event.target as HTMLSelectElement).value)"
-            class="select-input"
-          >
+          <select v-model="seatLabelScheme" class="select-input">
             <option value="">无</option>
-            <option value="1-2-3">1-2-3</option>
-            <option value="1-3-5">1-3-5</option>
-            <option value="a-b-c">a-b-c</option>
-            <option value="A-B-C">A-B-C</option>
+            <option value="1-2-3">1,2,3...</option>
+            <option value="1-3-5">1,3,5...</option>
+            <option value="a-b-c">a,b,c...</option>
+            <option value="A-B-C">A,B,C...</option>
           </select>
+        </div>
+      </div>
+      <div class="property-row">
+        <label class="property-label">起始值</label>
+        <div class="property-control">
+          <input type="text" v-model="seatLabelStart" class="text-input" :placeholder="seatLabelStartPlaceholder" />
+        </div>
+      </div>
+      <div class="property-row">
+        <label class="property-label">顺序</label>
+        <div class="property-control">
+          <div class="direction-toggle">
+            <button class="dir-btn" :class="{ active: seatLabelDirection === 'asc' }" @click="seatLabelDirection = 'asc'">正序</button>
+            <button class="dir-btn" :class="{ active: seatLabelDirection === 'desc' }" @click="seatLabelDirection = 'desc'">倒序</button>
+          </div>
         </div>
       </div>
     </PanelSection>
@@ -188,14 +218,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import PanelSection from './controls/PanelSection.vue'
-import CategorySelector from './controls/CategorySelector.vue'
-import NumberInput from './controls/NumberInput.vue'
 
 interface Category {
   id: string
+  key?: string
   name: string
   color: string
 }
@@ -204,6 +233,7 @@ const props = defineProps<{
   nodes: any[]
   isSingle: boolean
   categories: Category[]
+  sectionFill?: string
 }>()
 
 const emit = defineEmits<{
@@ -212,8 +242,21 @@ const emit = defineEmits<{
   'manage-categories': []
 }>()
 
+// 下拉状态
+const dropdownOpen = ref(false)
+
+// 所有选中座位涉及的所有分类（用于展示多选标签）
+const activeCategories = computed(() => {
+  const keys = new Set<string>()
+  props.nodes.forEach((row: any) => {
+    (row.seats || []).forEach((s: any) => {
+      keys.add(String(s.categoryKey ?? 1))
+    })
+  })
+  return (props.categories as any[]).filter(c => keys.has(String(c.key ?? c.id)))
+})
+
 // 本地 ref 管理属性值
-const localCategoryId = ref('')
 const localSeatCounts = ref<number[]>([])  // 多选时存储每个排的座位数
 const localCurves = ref<number[]>([])  // 多选时存储每个排的弧度
 const localSeatSpacings = ref<number[]>([])  // 多选时存储每个排的座位间距
@@ -224,12 +267,15 @@ const localRowLabelingLabel = ref('')
 const localRowLabelingLocked = ref(false)
 
 // 座位标签配置
-const localSeatLabelingLabels = ref('')
+const seatLabelScheme = ref('')
+const seatLabelStart = ref('')
+const seatLabelDirection = ref<'asc' | 'desc'>('asc')
 const localSeatLabelingLocked = ref(false)
 
 // 批量标签设置
 const batchLabelMode = ref<string>('')
 const batchLabelStart = ref('')
+const batchLabelDirection = ref<'asc' | 'desc'>('asc')
 
 
 
@@ -240,6 +286,36 @@ const batchLabelStartPlaceholder = computed(() => {
     case 'a-b-c': return '例如: a 或 c'
     case '1-2-3': return '例如: 1 或 5'
     default: return ''
+  }
+})
+
+// 切换格式时自动填充默认起始值
+watch(batchLabelMode, (mode) => {
+  switch (mode) {
+    case '1-2-3': batchLabelStart.value = '1'; break
+    case 'A-B-C': batchLabelStart.value = 'A'; break
+    case 'a-b-c': batchLabelStart.value = 'a'; break
+    default: batchLabelStart.value = ''; break
+  }
+})
+
+// 座位编号起始值占位符
+const seatLabelStartPlaceholder = computed(() => {
+  switch (seatLabelScheme.value) {
+    case 'A-B-C': return '例如: A'
+    case 'a-b-c': return '例如: a'
+    case '1-2-3': case '1-3-5': return '例如: 1'
+    default: return ''
+  }
+})
+
+// 切换座位编号格式时自动填充默认起始值
+watch(seatLabelScheme, (scheme) => {
+  switch (scheme) {
+    case '1-2-3': case '1-3-5': seatLabelStart.value = '1'; break
+    case 'A-B-C': seatLabelStart.value = 'A'; break
+    case 'a-b-c': seatLabelStart.value = 'a'; break
+    default: seatLabelStart.value = ''; break
   }
 })
 
@@ -278,13 +354,30 @@ const generateLabels = (mode: string, start: string, count: number): (string | n
 // 应用批量标签
 const applyBatchLabels = () => {
   const labels = generateLabels(batchLabelMode.value, batchLabelStart.value, props.nodes.length)
+  if (batchLabelDirection.value === 'desc') labels.reverse()
   emit('update-property', 'batchLabels', labels)
 }
 
 // 监听批量标签设置变化，自动应用
-watch([batchLabelMode, batchLabelStart], () => {
+watch([batchLabelMode, batchLabelStart, batchLabelDirection], () => {
   if (!props.isSingle && props.nodes.length > 0) {
     applyBatchLabels()
+  }
+})
+
+// 应用座位编号
+const applySeatLabels = () => {
+  emit('update-property', 'seatLabeling', {
+    scheme: seatLabelScheme.value,
+    start: seatLabelStart.value,
+    direction: seatLabelDirection.value,
+  })
+}
+
+// 监听座位编号设置变化，自动应用
+watch([seatLabelScheme, seatLabelStart, seatLabelDirection], () => {
+  if (props.nodes.length > 0) {
+    applySeatLabels()
   }
 })
 
@@ -294,16 +387,6 @@ const seatCountDisplay = computed(() => {
   if (localSeatCounts.value.length === 1) return String(localSeatCounts.value[0])
   // 多选时显示所有座位数，用逗号分隔
   return localSeatCounts.value.join(',')
-})
-
-// 是否可以减少座位
-const canDecrease = computed(() => {
-  return localSeatCounts.value.some(count => count > 1)
-})
-
-// 是否可以增加座位
-const canIncrease = computed(() => {
-  return localSeatCounts.value.length > 0
 })
 
 // 计算弧度显示文本（多选用逗号分隔）
@@ -334,7 +417,7 @@ const seatSpacingDisplay = computed(() => {
 
 // 是否可以减少座位间距
 const canDecreaseSpacing = computed(() => {
-  return localSeatSpacings.value.some(spacing => spacing > 1)
+  return localSeatSpacings.value.some(spacing => spacing > 0.2)
 })
 
 // 是否可以增加座位间距
@@ -345,19 +428,18 @@ const canIncreaseSpacing = computed(() => {
 // 计算行间距显示文本（多选用逗号分隔）
 const rowSpacingDisplay = computed(() => {
   if (localRowSpacings.value.length === 0) return '-'
-  if (localRowSpacings.value.length === 1) return String(localRowSpacings.value[0])
-  // 多选时显示所有行间距，用逗号分隔
-  return localRowSpacings.value.join(',')
+  const values = localRowSpacings.value.map(v => v != null ? String(v) : '-')
+  return values.join(',')
 })
 
 // 是否可以减少行间距
 const canDecreaseRowSpacing = computed(() => {
-  return localRowSpacings.value.some(spacing => spacing > 1)
+  return localRowSpacings.value.some(spacing => spacing != null && spacing > 0.2)
 })
 
 // 是否可以增加行间距
 const canIncreaseRowSpacing = computed(() => {
-  return localRowSpacings.value.length > 0
+  return localRowSpacings.value.some(spacing => spacing != null)
 })
 
 // 从节点读取属性的函数（读取所有节点）
@@ -387,16 +469,15 @@ const readFromNodes = () => {
   localRowSpacings.value = props.nodes.map(node => {
     const attrValue = node.getAttr?.('rowSpacing')
     const propValue = node.rowSpacing
-    // 优先使用 getAttr 的值，如果没有则使用属性值，如果没有则使用 24（默认行间距）
+    // 优先使用 getAttr 的值，如果没有则使用属性值
     if (attrValue !== undefined && attrValue !== null) return attrValue
     if (propValue !== undefined && propValue !== null) return propValue
-    return 24
+    return undefined as any
   })
   
   // 其他属性只读取第一个节点
   const node = props.nodes[0]
-  localCategoryId.value = node.getAttr?.('categoryId') || node.categoryId || ''
-  
+
   // 排标签配置
   const rowLabeling = node.getAttr?.('rowLabeling') || node.rowLabeling || {}
   localRowLabelingLabel.value = rowLabeling.label || node.getAttr?.('label') || node.label || ''
@@ -404,36 +485,33 @@ const readFromNodes = () => {
   
   // 座位标签配置
   const seatLabeling = node.getAttr?.('seatLabeling') || node.seatLabeling || {}
-  localSeatLabelingLabels.value = seatLabeling.labels || ''
+  seatLabelScheme.value = seatLabeling.scheme || seatLabeling.labels || ''
+  seatLabelStart.value = seatLabeling.start || ''
+  seatLabelDirection.value = seatLabeling.direction || 'asc'
   localSeatLabelingLocked.value = seatLabeling.locked || false
 }
 
 // 挂载时和 nodes 变化时读取
 watch(() => props.nodes, () => readFromNodes(), { immediate: true })
 
-function onCategoryChange(categoryId: string) {
-  localCategoryId.value = categoryId
-  emit('update-category', categoryId)
+function onDocumentClick(e: MouseEvent) {
+  const target = e.target as HTMLElement
+  if (!target.closest('.category-dropdown')) {
+    dropdownOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onUnmounted(() => document.removeEventListener('click', onDocumentClick))
+
+function isCategoryActive(cat: any): boolean {
+  return activeCategories.value.some(c => String(c.key ?? c.id) === String(cat.key ?? cat.id))
 }
 
-// 减少座位数
-function onDecreaseSeatCount() {
-  if (!canDecrease.value) return
-  // 每个选中的排都减少1个座位，但不能少于1
-  const newCounts = localSeatCounts.value.map(count => Math.max(1, count - 1))
-  localSeatCounts.value = newCounts
-  // 发送更新事件，包含所有排的座位数
-  emit('update-property', 'seatCount', newCounts)
-}
-
-// 增加座位数
-function onIncreaseSeatCount() {
-  if (!canIncrease.value) return
-  // 每个选中的排都增加1个座位
-  const newCounts = localSeatCounts.value.map(count => count + 1)
-  localSeatCounts.value = newCounts
-  // 发送更新事件，包含所有排的座位数
-  emit('update-property', 'seatCount', newCounts)
+function onCategoryClick(categoryId: string) {
+  if (!categoryId) return
+  dropdownOpen.value = false
+  // 更新所有选中排中所有座位的分类
+  emit('update-property', 'categoryId', categoryId)
 }
 
 // 减少弧度
@@ -459,61 +537,37 @@ function onIncreaseCurve() {
 // 减少座位间距
 function onDecreaseSpacing() {
   if (!canDecreaseSpacing.value) return
-  // 每个选中的排都减少1个单位的座位间距，但不能少于1
-  const newSpacings = localSeatSpacings.value.map(spacing => Math.max(1, spacing - 1))
+  // 每个选中的排都减少0.2个单位，不能少于0.2
+  const newSpacings = localSeatSpacings.value.map(spacing => Math.max(0.2, +(spacing - 0.2).toFixed(2)))
   localSeatSpacings.value = newSpacings
-  // 发送更新事件，包含所有排的座位间距，同时重置弧度为0
   emit('update-property', 'seatSpacing', { spacings: newSpacings, resetCurve: true })
 }
 
 // 增加座位间距
 function onIncreaseSpacing() {
   if (!canIncreaseSpacing.value) return
-  // 每个选中的排都增加1个单位的座位间距
-  const newSpacings = localSeatSpacings.value.map(spacing => spacing + 1)
+  const newSpacings = localSeatSpacings.value.map(spacing => +(spacing + 0.2).toFixed(2))
   localSeatSpacings.value = newSpacings
-  // 发送更新事件，包含所有排的座位间距，同时重置弧度为0
   emit('update-property', 'seatSpacing', { spacings: newSpacings, resetCurve: true })
 }
 
 // 减少行间距
 function onDecreaseRowSpacing() {
   if (!canDecreaseRowSpacing.value) return
-  // 每个选中的排都减少1个单位的行间距，但不能少于1
-  const newSpacings = localRowSpacings.value.map(spacing => Math.max(1, spacing - 1))
+  // 用第一个有效值作为 undefined 行的基准
+  const fallback = localRowSpacings.value.find(s => s != null) ?? 1
+  const newSpacings = localRowSpacings.value.map(spacing => Math.max(0.2, +((spacing != null ? spacing : fallback) - 0.2).toFixed(2)))
   localRowSpacings.value = newSpacings
-  // 发送更新事件，包含所有排的行间距
   emit('update-property', 'rowSpacing', newSpacings)
 }
 
 // 增加行间距
 function onIncreaseRowSpacing() {
   if (!canIncreaseRowSpacing.value) return
-  // 每个选中的排都增加1个单位的行间距
-  const newSpacings = localRowSpacings.value.map(spacing => spacing + 1)
+  const fallback = localRowSpacings.value.find(s => s != null) ?? 0.2
+  const newSpacings = localRowSpacings.value.map(spacing => +((spacing != null ? spacing : fallback) + 0.2).toFixed(2))
   localRowSpacings.value = newSpacings
-  // 发送更新事件，包含所有排的行间距
   emit('update-property', 'rowSpacing', newSpacings)
-}
-
-// 在开头添加座位
-function onAddSeatAtStart() {
-  emit('update-property', 'addSeatAtStart', true)
-}
-
-// 在末尾添加座位
-function onAddSeatAtEnd() {
-  emit('update-property', 'addSeatAtEnd', true)
-}
-
-// 移除开头座位
-function onRemoveSeatAtStart() {
-  emit('update-property', 'removeSeatAtStart', true)
-}
-
-// 移除末尾座位
-function onRemoveSeatAtEnd() {
-  emit('update-property', 'removeSeatAtEnd', true)
 }
 
 function onUpdateProperty(key: string, value: any) {
@@ -530,7 +584,6 @@ function onUpdateProperty(key: string, value: any) {
       break
     case 'rowLabeling.label': localRowLabelingLabel.value = value; break
     case 'rowLabeling.locked': localRowLabelingLocked.value = value; break
-    case 'seatLabeling.labels': localSeatLabelingLabels.value = value; break
     case 'seatLabeling.locked': localSeatLabelingLocked.value = value; break
   }
   if (key !== 'seatCount' && key !== 'curve') {
@@ -551,8 +604,9 @@ function toggleSeatLabelLock() {
 }
 
 function onClearSeatLabeling() {
-  localSeatLabelingLabels.value = ''
-  emit('update-property', 'seatLabeling.labels', '')
+  seatLabelScheme.value = ''
+  seatLabelStart.value = ''
+  applySeatLabels()
 }
 
 // 暴露 refresh 方法供外部调用
@@ -856,53 +910,185 @@ defineExpose({ refresh })
   height: 12px;
 }
 
-/* 扩展座位按钮 */
-.expand-buttons {
-  display: flex;
-  gap: 6px;
-  flex: 1;
+/* 分类下拉 */
+.category-dropdown {
+  position: relative;
 }
 
-.expand-btn {
+.manage-btn-sm {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
-  flex: 1;
-  height: 28px;
+  gap: 3px;
+  padding: 2px 8px;
   border: 1px solid #d0d0d0;
   border-radius: 4px;
   background: #fff;
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  color: #555;
-  transition: all 0.15s ease;
-  padding: 0 6px;
+  font-size: 11px;
+  color: #666;
+  transition: all 0.15s;
 }
 
-.expand-btn:hover {
-  background: #f0f7ff;
+.manage-btn-sm:hover {
   border-color: #4a90d9;
   color: #4a90d9;
 }
 
-.expand-btn.remove {
-  color: #999;
-}
-
-.expand-btn.remove:hover {
-  background: #fff5f5;
-  border-color: #e57373;
-  color: #e57373;
-}
-
-.expand-icon {
+.btn-icon-xs {
   width: 12px;
   height: 12px;
 }
 
-.expand-text {
-  font-family: 'SF Mono', Monaco, monospace;
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
+
+.dropdown-trigger:hover {
+  border-color: #4a90d9;
+}
+
+.category-dropdown.open .dropdown-trigger {
+  border-color: #4a90d9;
+}
+
+.trigger-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+}
+
+.trigger-placeholder {
+  font-size: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+.category-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #333;
+  border: 1px solid;
+}
+
+.tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dropdown-arrow {
+  width: 14px;
+  height: 14px;
+  color: #888;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.dropdown-item:hover {
+  background: #f5f5f5;
+}
+
+.dropdown-item.active {
+  background: #e8f0fe;
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #333;
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+
+.check-icon {
+  width: 14px;
+  height: 14px;
+  color: #4a90d9;
+}
+
+/* 方向切换按钮组 */
+.direction-toggle {
+  display: flex;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.dir-btn {
+  flex: 1;
+  height: 28px;
+  border: none;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  color: #666;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.dir-btn:first-child {
+  border-right: 1px solid #d0d0d0;
+}
+
+.dir-btn:hover {
+  background: #f5f5f5;
+}
+
+.dir-btn.active {
+  background: #4a90d9;
+  color: #fff;
+}
+
 </style>
