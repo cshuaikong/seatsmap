@@ -747,7 +747,7 @@ onMounted(() => {
     zoom: { min: 0.05, max: 20 },
   })
 
-  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, flipable: false, skewable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1, stroke: '#3b82f6', multiSelect: true })
+  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, flipable: false, skewable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1, stroke: '#3b82f6', multiSelect: true, area: { fill: 'rgba(128,128,128,0.2)', stroke: 'none' } })
 
   useSelectorPatch({
     getEditor: () => editor,

@@ -695,6 +695,7 @@ onMounted(() => {
     editorConfig: {
       stroke: '#836DFF',
       strokeWidth: EDITOR_BASE_STROKE_WIDTH,
+      area: { fill: 'rgba(128,128,128,0.2)', stroke: 'none' },
       pointSize: EDITOR_BASE_POINT_SIZE,
       circle: {},
       circleMargin: 2,
