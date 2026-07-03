@@ -392,9 +392,12 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
         nameText.text = section.name || ''
       }
     }
-    // 同步 opacity
+    // 同步 opacity — 分区编辑模式下非聚焦分区由 enterSectionFocus 管理视觉状态，跳过 store→canvas 回写
     if (section.opacity !== undefined && group.opacity !== section.opacity) {
-      group.opacity = section.opacity
+      const focusedId = ctx.getFocusedSectionId?.()
+      if (!focusedId || sectionId === focusedId) {
+        group.opacity = section.opacity
+      }
     }
     // 同步 zIndex
     if (section.zIndex !== undefined && group.zIndex !== section.zIndex) {

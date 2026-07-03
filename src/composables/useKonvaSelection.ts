@@ -135,7 +135,7 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
 
     // 反向缩放边框宽度，保持视觉大小恒定（1px）
     const stageScale = stage.scaleX()
-    
+
     selectionRect.setAttrs({
       x: startX,
       y: startY,
@@ -174,10 +174,10 @@ export function useKonvaSelection(options: UseKonvaSelectionOptions): UseKonvaSe
     console.log('[Selection] 框选框坐标:', { x, y, width, height, stageScale: scale })
 
     selectionRect.setAttrs({ x, y, width, height })
-    
+
     // 反向缩放边框宽度，保持视觉大小恒定（1px）
     selectionRect.strokeWidth(1 / scale)
-    
+
     overlayLayer?.batchDraw()
   }
 

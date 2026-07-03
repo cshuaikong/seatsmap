@@ -691,6 +691,7 @@ function enterSectionFocus(sectionId: string): void {
     if (g.__sectionId === sectionId) {
       g.hittable = true
       g.editable = true
+      g.draggable = true
       g.children?.forEach((c: any) => { c.hittable = true; c.editable = true })
     }
   })
@@ -747,7 +748,7 @@ onMounted(() => {
     zoom: { min: 0.05, max: 20 },
   })
 
-  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, flipable: false, skewable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1, stroke: '#3b82f6', multiSelect: true, area: { fill: 'rgba(128,128,128,0.2)', stroke: 'none' } })
+  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1, stroke: '#3b82f6', multiSelect: true, area: { fill: 'rgba(59,130,246,0.1)', strokeWidthFixed: true } })
 
   useSelectorPatch({
     getEditor: () => editor,
@@ -769,11 +770,13 @@ onMounted(() => {
   const _origOpenGroup = editor.openGroup.bind(editor)
   _origOpenGroupFn = _origOpenGroup
   editor.openGroup = function (group: any) {
-    const sectionId = group?.__sectionId
-    if (sectionId) {
-      enterSectionFocus(sectionId)
+    // 仅分区 Group 触发 enterSectionFocus，座位排不受影响
+    if (group?.__sectionGroup === true && group?.__sectionId) {
+      enterSectionFocus(group.__sectionId)
       return
     }
+    // 座位排不打开内部编辑（否则 children 变为独立可选，破坏整排选中模型）
+    if (group?.__seatRow) return
     _origOpenGroup(group)
   }
 
@@ -820,8 +823,8 @@ onMounted(() => {
   })
   leafer.on(LP.UP, () => {
     const sel2 = (editor as any)?.selector
+    const list: any[] = (editor as any)?.list ?? []
     if (sel2?.__boxHidden) {
-      const list: any[] = (editor as any)?.list ?? []
       const allSeat = list.length > 0 && list.every((el: any) => el.__seatRow)
       if (!allSeat) {
         ;(editor as any).editBox.visible = true
@@ -829,8 +832,15 @@ onMounted(() => {
       }
       sel2.__boxHidden = false
     }
-    // 统一更新包围盒（分区也需要旋转手柄）
-    ;(editor as any).editBox?.update()
+    // 分区选中时主动刷新包围盒（旋转手柄需要），座位排已由 onTarget→updateEditTool 更新
+    if (list.length > 0 && list.some((el: any) => el.__sectionGroup === true)) {
+      ;(editor as any).editBox?.update()
+    }
+    // 框选后 editBox 仍被隐藏的兜底恢复（仅恢复 visible，不调 update 防止已选中排重绘抖动）
+    const eb = (editor as any)?.editBox
+    if (eb && !eb.visible && list.length > 0) {
+      eb.visible = true
+    }
   })
 
   // 框选时刷新 clientBounds
@@ -839,6 +849,15 @@ onMounted(() => {
   })
   leafer.on(LP.CLICK, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
+    const list: any[] = (editor as any)?.list ?? []
+    console.log('[CLICK]', JSON.stringify({
+      clickCanvas: { x: e.x, y: e.y },
+      clickWorld: w,
+      selected: list.map((el: any) => ({
+        tag: el.tag, __seatRow: el.__seatRow, __rowId: el.__rowId, __sectionId: el.__sectionId,
+        x: el.x, y: el.y
+      }))
+    }))
     mode.handleClick(w.x, w.y)
   })
 
@@ -889,7 +908,7 @@ onMounted(() => {
           strokeWidth: 2 / s,
           editable: false,
           draggable: false,
-          hittable: true,
+          hittable: false,
           zIndex: 998,
         })
         leafer.add(border)

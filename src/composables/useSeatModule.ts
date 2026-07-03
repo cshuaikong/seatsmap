@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { Group, Line, Ellipse, Text } from 'leafer-ui'
+import { Group, Line, Ellipse, Text, PointerEvent } from 'leafer-ui'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
@@ -35,9 +35,23 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const group = new Group({
         editable: true,
         hittable: true,
+        draggable: true,
+        hitChildren: true,
       })
       ;(group as any).__seatRow = true
       if (sectionId) (group as any).__sectionId = sectionId
+      // 单击选中本座位排（Shift 加选/减选）
+      group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
+        const ed = ctx.getEditor()
+        if (ed && ctx.getFocusedSectionId?.()) {
+          if (e.shiftKey) {
+            ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
+          } else {
+            ed.target = group
+          }
+          e.stop()
+        }
+      })
 
       const lastIdx = row.count - 1
       const bar = new Line({
@@ -204,10 +218,23 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const group = new Group({
           editable: false,
           hittable: false,
+          draggable: false,
+          hitChildren: true,
         })
         ;(group as any).__seatRow = true
         ;(group as any).__isVenueDataSeat = true
         ;(group as any).__sectionId = section.id
+        group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
+          const ed = ctx.getEditor()
+          if (ed && ctx.getFocusedSectionId?.()) {
+            if (e.shiftKey) {
+              ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
+            } else {
+              ed.target = group
+            }
+            e.stop()
+          }
+        })
         ;(group as any).__rowId = row.id
         ;(group as any).__rowLabel = row.label || ''
         // 保留弧度和旋转参数，供编辑/导出使用
