@@ -684,7 +684,7 @@ function enterSectionFocus(sectionId: string): void {
     if (id !== sectionId) {
       g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false
     } else {
-      g.hittable = true; g.editable = false; g.draggable = false
+      g.hittable = true; g.editable = false; g.draggable = false; g.hitChildren = true
     }
   })
   seatModule.seatRowGroups.forEach((g: any) => {
@@ -849,15 +849,6 @@ onMounted(() => {
   })
   leafer.on(LP.CLICK, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
-    const list: any[] = (editor as any)?.list ?? []
-    console.log('[CLICK]', JSON.stringify({
-      clickCanvas: { x: e.x, y: e.y },
-      clickWorld: w,
-      selected: list.map((el: any) => ({
-        tag: el.tag, __seatRow: el.__seatRow, __rowId: el.__rowId, __sectionId: el.__sectionId,
-        x: el.x, y: el.y
-      }))
-    }))
     mode.handleClick(w.x, w.y)
   })
 

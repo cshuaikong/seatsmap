@@ -36,7 +36,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         editable: true,
         hittable: true,
         draggable: true,
-        hitChildren: true,
+        hitChildren: false,
       })
       ;(group as any).__seatRow = true
       if (sectionId) (group as any).__sectionId = sectionId
@@ -219,7 +219,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           editable: false,
           hittable: false,
           draggable: false,
-          hitChildren: true,
+          hitChildren: false,
         })
         ;(group as any).__seatRow = true
         ;(group as any).__isVenueDataSeat = true

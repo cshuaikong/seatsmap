@@ -43,14 +43,21 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const list: any[] = (editor as any)?.list ?? []
       if (list.length === 0) return
       try { _origUpdate() } catch (_) {}
-      if (list.every((el: any) => el.__seatRow)) {
+      const allSeats = list.every((el: any) => el.__seatRow)
+      if (allSeats) {
+        ;(editBox as any).hittable = false
         ;(editBox as any).hitSelf = false
         ;(editBox as any).hitChildren = false
+        ;(editor as any).hittable = false
         ;(editor as any).hitSelf = false
+        ;(editor as any).hitChildren = false
       } else {
+        ;(editBox as any).hittable = true
         ;(editBox as any).hitSelf = true
         ;(editBox as any).hitChildren = true
+        ;(editor as any).hittable = true
         ;(editor as any).hitSelf = true
+        ;(editor as any).hitChildren = true
       }
     }
   }
