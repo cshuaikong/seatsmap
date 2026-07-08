@@ -95,10 +95,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import SeatMapViewer from './SeatMapViewer.vue'
 import Minimap from './Minimap.vue'
 import { useVenueStore } from '../stores/venueStore'
+import { fetchSeatMapData } from '../api/seatMap'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
+
+const route = useRoute()
 
 const seatMapViewerRef = ref<InstanceType<typeof SeatMapViewer>>()
 const demoVenue = ref<VenueData | null>(null)
@@ -179,40 +183,26 @@ const clearSelectedSeats = () => {
   selectedSeats.value = []
 }
 
-// 从 JSON 文件加载数据
+// 加载座位图数据：优先使用 ?venue=xxx 参数请求后端，否则默认 ID
 onMounted(async () => {
   try {
-    console.log('开始加载座位图数据...')
-    // 使用分区座位数据
-    const response = await fetch('/分区座位 全.json')
-    console.log('响应状态:', response.status)
-    
-    if (!response.ok) {
-      throw new Error(`HTTP 错误: ${response.status} ${response.statusText}`)
-    }
-    
-    const jsonData = await response.json()
-    console.log('JSON 数据 keys:', Object.keys(jsonData))
-    
-    // 数据结构是 { version, exportTime, venue }，需要提取 venue
-    const data = jsonData.venue || jsonData
-    console.log('座位图数据:', data)
-    console.log('座位图数据 keys:', Object.keys(data))
-    
-    // 【关键】同步 visualConfig 到 store
+    const venueId = (route.query.venue as string) || 'b60259waty8z8q7zfm4nu'
+
+    const raw = await fetchSeatMapData(venueId)
+
+    // 与 venueStore.importVenueData 保持一致的数据规范化
     const store = useVenueStore()
-    if ((data as any).visualConfig) {
-      store.visualConfig = (data as any).visualConfig
-      console.log('已同步 visualConfig:', (data as any).visualConfig)
+    store.importVenueData(raw)
+
+    // 同步 visualConfig / baseScale（兼容 API 的 scale 字段）
+    if ((raw as any).visualConfig) {
+      store.visualConfig = (raw as any).visualConfig
     }
-    
-    // 【关键】同步 baseScale 到 venue
-    if (data.baseScale) {
-      data.baseScale = (data as any).baseScale
-      console.log('已设置 baseScale:', data.baseScale)
+    if ((raw as any).scale != null) {
+      store.venue.baseScale =  (raw as any).scale
     }
-    
-    demoVenue.value = data
+
+    demoVenue.value = store.venue
     loading.value = false
   } catch (err) {
     console.error('加载座位图数据失败:', err)

@@ -863,14 +863,16 @@ export function submitPolygon(points: PathPoint[]) {
     type: p.type ?? 'line',
     arcDepth: p.arcDepth
   }))
-  
+  const d = pathPointsToSvgPath(relativePathPoints)
+
   useVenueStore().addSection({
     name: '路径分区',
     rows: [],
-    borderType: 'path',
+    type: 'path',
     x: center.x,
     y: center.y,
     pathPoints: relativePathPoints,
+    path: d,
     fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
     stroke: '#808080'  // 默认灰色边框
   })

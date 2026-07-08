@@ -921,6 +921,7 @@ export const useVenueStore = defineStore('venue', () => {
 
     const normalizedSections: Section[] = data.sections.map(section => ({
       ...section,
+      borderType: section.borderType || (section as any).type || undefined,
       readonly: false,
       rows: Array.isArray(section.rows) ? section.rows : [],
       shapes: Array.isArray(section.shapes) ? section.shapes : [],
@@ -948,7 +949,7 @@ export const useVenueStore = defineStore('venue', () => {
       ],
       sections: normalizedSections,
       focalPoint: data.focalPoint,
-      baseScale: data.baseScale ?? null
+      baseScale: (data as any).scale ?? null
     }
   }
 

@@ -37,7 +37,8 @@ let isInitialFit = true
 
 const getRenderConfig = () => {
   const store = useVenueStore()
-  const baseScale = (props.venue as any).baseScale || store.getBaseScale?.() || 1
+  let baseScale = (props.venue as any).baseScale ?? store.getBaseScale?.() ?? 1
+  if (!baseScale || baseScale <= 0) baseScale = 1
   const visualConfig = (props.venue as any).visualConfig || store.visualConfig
 
   return {
@@ -59,7 +60,7 @@ const rebuildSectionLayers = () => {
   const leafer = engine.leafer
   sectionLayers.forEach(layer => leafer.remove(layer))
   sectionLayers = []
-
+// console.log(props.venue)
   props.venue.sections.forEach(section => {
     const sectionGroup = SectionRenderer.render(section)
     sectionLayers.push(sectionGroup)
@@ -103,8 +104,17 @@ const renderAll = () => {
 
   if (isInitialFit) {
     isInitialFit = false
-    nextTick(() => {
-      engine?.fitContent(50)
+    nextTick(async () => {
+      await engine?.fitContent(50)
+      // 不放大超过 scale=1，座位初始应保持较小（L1 线条），让用户手动放大
+      const s = engine?.scale ?? 1
+      if (s > 1) {
+        const l: any = (engine as any).leafer
+        const cx = l.width / 2
+        const cy = l.height / 2
+        l.scaleOfWorld?.({ x: cx, y: cy }, 1 / s)
+      }
+      updateViewState(engine?.scale ?? 1)
     })
   }
 }

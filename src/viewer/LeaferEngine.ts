@@ -153,7 +153,7 @@ export class LeaferEngine {
       this._boundWheel = null
     }
     if (this._doubleTapOff) {
-      this._doubleTapOff()
+      this.leafer.off_(this._doubleTapOff)
       this._doubleTapOff = null
     }
     this._canvas = null

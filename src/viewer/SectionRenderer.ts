@@ -43,7 +43,8 @@ export class SectionRenderer {
     }
 
     // 1. 边框（相对 group 在 0,0）
-    if (section.borderType && section.borderType !== 'none') {
+    const effectiveType = (section as any).type
+    if (effectiveType && effectiveType !== 'none') {
       if (dualLayer) {
         const dual = SectionRenderer.createDualBorder(section)
         if (dual) {
@@ -85,7 +86,7 @@ export class SectionRenderer {
     })
 
     // 5. 分区名称标签（转为相对坐标）
-    if (section.name && section.borderType && section.borderType !== 'none') {
+    if (section.name && effectiveType && effectiveType !== 'none') {
       const label = SectionRenderer.createSectionLabel(section, ox, oy)
       if (label) group.add(label)
     }
@@ -97,12 +98,13 @@ export class SectionRenderer {
   static createBorder(section: Section, editable: boolean): Rect | Ellipse | Path | null {
     const fill = section.fill || 'rgba(128,128,128,0.15)'
     const stroke = section.stroke || '#808080'
-    const strokeWidth = editable ? 0 : 0
+    const strokeWidth = editable ? 0 : 1.5
 
     const id = `section-border-${section.id}`
     const base = { id, fill, stroke, strokeWidth, opacity: section.opacity ?? 1, editable: false }
-
-    switch (section.borderType) {
+     console.log('createBorder',base)
+    const borderType = (section as any).type
+    switch (borderType) {
       case 'rect':
         return new Rect({
           ...base,
@@ -119,14 +121,11 @@ export class SectionRenderer {
           width: (section.radiusX ?? 50) * 2,
           height: (section.radiusY ?? 50) * 2,
         })
-      case 'path':
-        if (!section.pathPoints) return null
-        const d = pathPointsToSvgPath(section.pathPoints)
-        return new Path({
-          ...base,
-          x: 0, y: 0,
-          path: d,
-        })
+      case 'path': {
+        let d = (section as any).path
+        console.log('createBorder',d)
+        return new Path({ ...base, x: 0, y: 0, path: d })
+      }
       default:
         return null
     }
@@ -144,7 +143,9 @@ export class SectionRenderer {
     // strokeWidth: 4 提供点击命中区；stroke: 'transparent' 默认不可见，高亮时改颜色
     const strokeBase = { fill: 'none' as const, stroke: 'transparent', strokeWidth: 4, opacity, editable: false, hitFill: 'none' as const, hitStroke: 'all' as const }
 
-    switch (section.borderType) {
+    const borderType2 = (section as any).type
+
+    switch (borderType2) {
       case 'rect': {
         const w = section.width ?? 100
         const h = section.height ?? 100
@@ -162,8 +163,11 @@ export class SectionRenderer {
         ]
       }
       case 'path': {
-        if (!section.pathPoints) return null
-        const d = pathPointsToSvgPath(section.pathPoints)
+        let d = (section as any).path
+        if (!d && section.pathPoints?.length) {
+          d = pathPointsToSvgPath(section.pathPoints)
+        }
+        if (!d) return null
         return [
           new Path({ id: `section-border-fill-${section.id}`, ...fillBase, x: 0, y: 0, path: d }),
           new Path({ id: `section-border-stroke-${section.id}`, ...strokeBase, x: 0, y: 0, path: d }),
@@ -319,20 +323,24 @@ export class SectionRenderer {
     let cx = 0
     let cy = 0
 
-    if (section.borderType === 'rect') {
+    const labelType = (section as any).type
+
+    if (labelType === 'rect') {
       cx = (section.width ?? 100) / 2
       cy = (section.height ?? 100) / 2
-    } else if (section.borderType === 'ellipse') {
+    } else if (labelType === 'ellipse') {
       cx = (section.radiusX ?? 50) / 2
       cy = (section.radiusY ?? 50) / 2
-    } else if (section.borderType === 'path' && section.pathPoints) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      section.pathPoints.forEach(p => {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
-        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y)
-      })
-      cx = (minX + maxX) / 2
-      cy = (minY + maxY) / 2
+    } else if (labelType === 'path') {
+      if (section.pathPoints?.length) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        section.pathPoints.forEach(p => {
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
+          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y)
+        })
+        cx = (minX + maxX) / 2
+        cy = (minY + maxY) / 2
+      }
     }
 
     return new Text({

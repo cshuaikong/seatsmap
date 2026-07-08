@@ -38,7 +38,7 @@ import { InteractionDispatcher } from '../editor/InteractionDispatcher'
 import { VertexEditManager } from '../editor/VertexEditManager'
 import { DrawingManager } from '../editor/DrawingManager'
 import { DirtyTracker, RenderScheduler } from '../editor/DirtyTracker'
-import { getSectionAABB, isInsideSection } from '../viewer/geometry'
+import { getSectionAABB, isInsideSection, pathPointsToSvgPath } from '../viewer/geometry'
 
 import { darkenColor, getCategoryColor } from '../utils/color'
 
@@ -735,8 +735,10 @@ onMounted(() => {
     getSyncing: () => isSyncing,
     setSyncing: (v: boolean) => { isSyncing = v },
     saveHistory: () => store.saveHistory(),
-    updateSectionBorderPathPoints: (sectionId, pathPoints) =>
-      store.updateSectionBorder(sectionId, { pathPoints: pathPoints }),
+    updateSectionBorderPathPoints: (sectionId, pathPoints) => {
+      const d = pathPointsToSvgPath(pathPoints)
+      store.updateSectionBorder(sectionId, { pathPoints, path: d })
+    },
     updateShapePoints: (id, points, arcDepths) =>
       store.updateShape(id, { points, arcDepths }),
     updateAreaPoints: (id, points, arcDepths) =>

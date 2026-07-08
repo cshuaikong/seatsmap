@@ -35,12 +35,13 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     return {
       id: group.__sectionId,
       name: group.__sectionName || '',
-      borderType: 'path' as const,
+      type: 'path',
       x: +(group.x ?? 0).toFixed(2),
       y: +(group.y ?? 0).toFixed(2),
       rotation: +(group.rotation ?? 0).toFixed(2),
       fill: pathChild?.fill ?? '#d1d5db',
       stroke: pathChild?.stroke ?? '#9ca3af',
+      path: pathChild?.path ?? '',
       width: pathChild?.width ?? 100,
       height: pathChild?.height ?? 100,
       opacity: +(group.opacity ?? 1).toFixed(2),
@@ -61,19 +62,21 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       if (data.rotation !== undefined) existing.rotation = data.rotation
       if (data.opacity !== undefined) existing.opacity = data.opacity
       if (data.zIndex !== undefined) existing.zIndex = data.zIndex
-      if (data.borderType !== undefined) existing.borderType = data.borderType
+      if (data.type !== undefined) (existing as any).type = data.type
+      if (data.path !== undefined) (existing as any).path = data.path
     } else {
       // 创建新 section
       store.venue.sections.push({
         id: data.id,
         name: data.name || data.id,
         rows: [],
-        borderType: data.borderType || 'path',
+        type: 'path' as any,
         x: data.x ?? 0,
         y: data.y ?? 0,
         rotation: data.rotation ?? 0,
         fill: data.fill ?? '#d1d5db',
         stroke: data.stroke ?? '#9ca3af',
+        path: (data as any).path ?? '',
         width: data.width ?? 100,
         height: data.height ?? 100,
         opacity: data.opacity ?? 1,
@@ -376,6 +379,11 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
     const pathChild = getPathChild(group)
 
+    // 同步 path
+    const secPath = (section as any).path
+    if (secPath !== undefined && pathChild && pathChild.path !== secPath) {
+      pathChild.path = secPath
+    }
     // 同步 fill
     if (section.fill !== undefined && pathChild && pathChild.fill !== section.fill) {
       pathChild.fill = section.fill
