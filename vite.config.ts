@@ -10,6 +10,7 @@ export default defineConfig({
   },
   publicDir: 'static',
   server: {
+    host: '0.0.0.0',
     proxy: {
       '/venue': {
         target: 'http://seatmap.web.jinsc.cn',

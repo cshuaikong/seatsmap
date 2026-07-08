@@ -37,6 +37,7 @@ import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
 import { usePathEditorSync } from '../composables/usePathEditorSync'
+import { getSvgPathCenter } from '../viewer/geometry'
 import { nanoid } from 'nanoid'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
@@ -320,6 +321,8 @@ function buildVenueData(): any {
       stroke: pathChild.stroke,
       id: sectionId,
       path: pathChild.path,
+      width: pathChild.width ?? 100,
+      height: pathChild.height ?? 100,
     }
     if (group.rotation) sec.rotation = +(group.rotation ?? 0).toFixed(2)
     if (group.zIndex != null) sec.zIndex = group.zIndex
@@ -637,11 +640,14 @@ function enterSectionFocus(sectionId: string): void {
     editor?.cancel()
     if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
     if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
-    const cx = section.x ?? 0; const cy = section.y ?? 0
+    const secPath = (section as any).path as string | undefined
+    const pathCenter = secPath ? getSvgPathCenter(secPath) : null
+    const cx = pathCenter ? (section.x ?? 0) + pathCenter.cx : (section.x ?? 0)
+    const cy = pathCenter ? (section.y ?? 0) + pathCenter.cy : (section.y ?? 0)
     const raw: any = props.venueData || {}
-    const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
+    const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null) ?? seatModule.getBaseScale()
     const currentS = getS()
-    const targetScale = baseScale ?? currentS
+    const targetScale = baseScale
     if (Math.abs(targetScale - currentS) > 0.001) {
       leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
       setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
@@ -665,12 +671,20 @@ function enterSectionFocus(sectionId: string): void {
   if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
 
   const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
-  const cx = section?.x ?? group.x ?? 0
-  const cy = section?.y ?? group.y ?? 0
+  let cx = section?.x ?? group.x ?? 0
+  let cy = section?.y ?? group.y ?? 0
+  // 用 Leafer group 的真实包围盒中心作为缩放锚点
+  try {
+    const box = group.getBounds?.('world')
+    if (box && box.width > 0 && box.height > 0) {
+      cx = box.x + box.width / 2
+      cy = box.y + box.height / 2
+    }
+  } catch (_) {}
   const raw: any = props.venueData || {}
-  const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null)
+  const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null) ?? seatModule.getBaseScale()
   const currentS = getS()
-  const targetScale = baseScale ?? currentS
+  const targetScale = baseScale
   if (Math.abs(targetScale - currentS) > 0.001) {
     leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
     setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)

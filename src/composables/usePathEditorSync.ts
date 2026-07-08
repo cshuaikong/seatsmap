@@ -62,6 +62,8 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       if (data.rotation !== undefined) existing.rotation = data.rotation
       if (data.opacity !== undefined) existing.opacity = data.opacity
       if (data.zIndex !== undefined) existing.zIndex = data.zIndex
+      if (data.width !== undefined) (existing as any).width = data.width
+      if (data.height !== undefined) (existing as any).height = data.height
       if (data.type !== undefined) (existing as any).type = data.type
       if (data.path !== undefined) (existing as any).path = data.path
     } else {

@@ -724,5 +724,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     rebuildSeatRow,
     updateSeatLOD,
     modeHandlers,
+    getBaseScale: seatDraw.getBaseScale,
   }
 }

@@ -921,12 +921,12 @@ export const useVenueStore = defineStore('venue', () => {
 
     const normalizedSections: Section[] = data.sections.map(section => ({
       ...section,
-      borderType: section.borderType || (section as any).type || undefined,
+      borderType: (section as any).type || undefined,
       readonly: false,
       rows: Array.isArray(section.rows) ? section.rows : [],
-      shapes: Array.isArray(section.shapes) ? section.shapes : [],
-      texts: Array.isArray(section.texts) ? section.texts : [],
-      areas: Array.isArray(section.areas) ? section.areas : []
+      // shapes: Array.isArray(section.shapes) ? section.shapes : [],
+      // texts: Array.isArray(section.texts) ? section.texts : [],
+      // areas: Array.isArray(section.areas) ? section.areas : []
     }))
 
     // 为 row 填充默认值
@@ -948,8 +948,7 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections: normalizedSections,
-      focalPoint: data.focalPoint,
-      baseScale: (data as any).scale ?? null
+      baseScale: (data as any).baseScale ?? (data as any).scale ?? null
     }
   }
 
@@ -969,8 +968,8 @@ export const useVenueStore = defineStore('venue', () => {
       data.categories.forEach((cat: CategoryLegacy, index: number) => {
         categories.push({
           key: cat.id || index + 1,
-          label: cat.name || '未命名分类',
-          color: cat.color || '#4CAF50',
+          label: cat.name || '',
+          color: cat.color || '',
           accessible: cat.accessible || false
         })
       })
@@ -982,14 +981,14 @@ export const useVenueStore = defineStore('venue', () => {
       data.sections.forEach((sec: SectionLegacy) => {
         const section: Section = {
           id: sec.id || generateId(),
-          name: sec.name || '未命名区块',
+          name: sec.name || '',
           x: sec.x || 0,
           y: sec.y || 0,
           rotation: sec.rotation || 0,
           rows: [],
-          shapes: [],
-          texts: [],
-          areas: []
+          // shapes: [],
+          // texts: [],
+          // areas: []
         }
 
         // 转换排
@@ -1042,7 +1041,7 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections,
-      focalPoint: undefined
+      // focalPoint: undefined
     }
   }
 
@@ -1060,7 +1059,7 @@ export const useVenueStore = defineStore('venue', () => {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections: [],
-      focalPoint: undefined
+      // focalPoint: undefined
     }
   }
 
