@@ -194,12 +194,13 @@ onMounted(async () => {
     const store = useVenueStore()
     store.importVenueData(raw)
 
-    // 同步 visualConfig / baseScale（兼容 API 的 scale 字段）
+    // 同步 visualConfig / baseScale（兼容 API 的 baseScale / scale 字段）
     if ((raw as any).visualConfig) {
       store.visualConfig = (raw as any).visualConfig
     }
-    if ((raw as any).scale != null) {
-      store.venue.baseScale =  (raw as any).scale
+    const bs = (raw as any).baseScale ?? (raw as any).scale
+    if (bs != null) {
+      store.venue.baseScale = bs
     }
 
     demoVenue.value = store.venue

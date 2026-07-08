@@ -6,6 +6,7 @@
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import type { VenueData, Seat, SeatRow, Section } from '../types'
 import { useVenueStore } from '../stores/venueStore'
+import { PointerEvent as LP, ZoomEvent } from 'leafer-ui'
 import { LeaferEngine } from '../viewer/LeaferEngine'
 import { SectionRenderer } from '../viewer/SectionRenderer'
 import { SeatRenderer } from '../viewer/SeatRenderer'
@@ -66,6 +67,29 @@ const rebuildSectionLayers = () => {
     sectionLayers.push(sectionGroup)
     leafer.add(sectionGroup)
   })
+}
+
+/** 点击画布放大到基准缩放，以点击点为中心 */
+const handleCanvasTap = (e: any) => {
+  if (!engine) return
+  // 点击到座位时只执行选座，不放大
+  if (e.target?.__meta?.kind === 'seat') return
+  const l: any = engine.leafer
+  const zoomLayer = l.zoomLayer
+  if (!zoomLayer) return
+
+  const targetScale = getRenderConfig().baseScale
+  // 直接读取 zoomLayer 的实际 scale，避免 getter 在 viewport 模式下取值偏差
+  const currentS = zoomLayer.__?.scaleX ?? zoomLayer.scaleX ?? engine.scale ?? 1
+  const changeScale = targetScale / currentS
+  if (Math.abs(changeScale - 1) < 0.001) return
+
+  // TAP 事件的 x/y 为世界坐标，直接作为 scaleOfWorld 的缩放中心
+  const point = { x: e.x, y: e.y }
+  zoomLayer.scaleOfWorld(point, changeScale)
+
+  // 手动触发 ZoomEvent.END 以便 seat LOD / label 更新
+  l.emit?.(ZoomEvent.END, { scale: targetScale, totalScale: targetScale })
 }
 
 /** 创建/重建座位渲染器 */
@@ -148,6 +172,45 @@ onMounted(() => {
 
   engine.onZoomChange((scale) => {
     updateViewState(scale)
+  })
+
+  // 画布点击：以点击位置为中心放大到 baseScale
+  engine.leafer.on(LP.TAP, handleCanvasTap)
+
+  // 自定义单指平移：点击任何地方拖动都能跟随移动
+  let panState: {
+    dragging: boolean
+    startPoint: { x: number; y: number }
+    startViewX: number
+    startViewY: number
+  } | null = null
+  const PAN_THRESHOLD = 24
+
+  engine.leafer.on(LP.DOWN, (e: any) => {
+    panState = {
+      dragging: false,
+      startPoint: e.getPagePoint(),
+      startViewX: engine.leafer.x ?? 0,
+      startViewY: engine.leafer.y ?? 0,
+    }
+  })
+
+  engine.leafer.on(LP.MOVE, (e: any) => {
+    if (!panState) return
+    const point = e.getPagePoint()
+    const dx = point.x - panState.startPoint.x
+    const dy = point.y - panState.startPoint.y
+    if (!panState.dragging && Math.hypot(dx, dy) > PAN_THRESHOLD) {
+      panState.dragging = true
+    }
+    if (panState.dragging) {
+      engine.leafer.x = panState.startViewX + dx
+      engine.leafer.y = panState.startViewY + dy
+    }
+  })
+
+  engine.leafer.on(LP.UP, () => {
+    panState = null
   })
 
   renderAll()

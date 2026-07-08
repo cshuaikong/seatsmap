@@ -443,3 +443,63 @@ export function pathPointsToSvgPath(points: PathPoint[]): string {
   path += ' Z'
   return path
 }
+
+/** 解析 SVG path d 字符串，计算包围盒中心 */
+export function getSvgPathCenter(d: string): { cx: number; cy: number } | null {
+  if (!d) return null
+
+  const cmdRe = /([MLQCAmkqcalvhtHVTsSzZ])\s*([^MLQCAmkqcalvhtHVTsSzZ]*)/g
+  let match
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  let curX = 0, curY = 0
+
+  while ((match = cmdRe.exec(d)) !== null) {
+    const rawCmd = match[1]
+    const args = match[2].trim()
+    const cmd = rawCmd.toUpperCase()
+    const rel = rawCmd === rawCmd.toLowerCase()
+
+    if (!args) {
+      if (cmd === 'Z') { minX = Math.min(minX, curX); maxX = Math.max(maxX, curX); minY = Math.min(minY, curY); maxY = Math.max(maxY, curY) }
+      continue
+    }
+
+    const nums = args.split(/[,\s]+/).filter(s => s.length > 0).map(Number)
+    let i = 0
+    const take = (): number => nums[i++] ?? 0
+
+    const pt = (x: number, y: number) => {
+      if (rel) { curX += x; curY += y } else { curX = x; curY = y }
+      minX = Math.min(minX, curX); maxX = Math.max(maxX, curX)
+      minY = Math.min(minY, curY); maxY = Math.max(maxY, curY)
+    }
+
+    switch (cmd) {
+      case 'M':
+        pt(take(), take())
+        while (i + 1 < nums.length) pt(take(), take())
+        break
+      case 'L':
+        while (i + 1 < nums.length) pt(take(), take())
+        break
+      case 'H':
+        while (i < nums.length) { const x = take(); if (rel) curX += x; else curX = x; minX = Math.min(minX, curX); maxX = Math.max(maxX, curX) }
+        break
+      case 'V':
+        while (i < nums.length) { const y = take(); if (rel) curY += y; else curY = y; minY = Math.min(minY, curY); maxY = Math.max(maxY, curY) }
+        break
+      case 'C':
+        while (i + 5 < nums.length) { i += 4; pt(take(), take()) }
+        break
+      case 'Q':
+        while (i + 3 < nums.length) { i += 2; pt(take(), take()) }
+        break
+      case 'A':
+        while (i + 6 < nums.length) { i += 5; pt(take(), take()) }
+        break
+    }
+  }
+
+  if (minX === Infinity) return null
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 }
+}

@@ -4,15 +4,14 @@ import '@leafer-in/viewport'
 
 /**
  * 基于 Leafer 原生 Viewport 插件的渲染引擎。
- * Pan / 双指缩放 由 @leafer-in/viewport 内置处理，
- * Ctrl+滚轮缩放 / 双击缩放 由自定义处理器接管。
+ * Pan / 双指缩放 / Ctrl+滚轮缩放 由 @leafer-in/viewport 内置处理，
+ * 双击缩放由自定义处理器接管。
  */
 export class LeaferEngine {
   readonly leafer: Leafer
   private _destroyed = false
   private _canvas: HTMLCanvasElement | null = null
   private _doubleTapOff: (() => void) | null = null
-  private _boundWheel: ((e: WheelEvent) => void) | null = null
 
   constructor(container: HTMLElement, config?: Record<string, any>) {
     const width = container.clientWidth || 800
@@ -22,8 +21,11 @@ export class LeaferEngine {
       view: container,
       width,
       height,
-      move: { scroll: true, disabled: false, holdSpaceKey: true, holdMiddleKey: true },
-      wheel: { preventDefault: true, speed: 0.5 },
+      type: 'viewport',
+      move: { scroll: true, disabled: false, holdSpaceKey: true, holdMiddleKey: true, drag: false },
+      pointer: { dragDistance: 24, tapTime: 200 },
+      wheel: { preventDefault: true, zoomSpeed: 0.5 },
+      multiTouch: { singleGesture: { count: 1 } },
       zoom: { min: 0.05, max: 20 },
       ...config,
     })
@@ -31,27 +33,11 @@ export class LeaferEngine {
     this.leafer.waitViewReady(() => {
       this._canvas = this.leafer.canvas.view as HTMLCanvasElement
       if (this._canvas) {
-        this._setupWheelZoom()
+        // 禁止浏览器默认触摸行为，避免页面滚动/缩放干扰画布手势
+        this._canvas.style.touchAction = 'none'
         this._setupDoubleTapZoom()
       }
     })
-  }
-
-  // ==================== Ctrl+滚轮缩放 ====================
-
-  private _setupWheelZoom(): void {
-    if (!this._canvas) return
-    this._boundWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      const local = this.leafer.interaction?.getLocal({ clientX: e.clientX, clientY: e.clientY })
-      if (!local) return
-      const delta = e.deltaY > 0 ? -0.5 : 0.5
-      const changeScale = 1 + delta * 0.5
-      this.leafer.scaleOfWorld(local, changeScale)
-      this.leafer.emit(ZoomEvent.END, { scale: this.scale, totalScale: this.scale } as any)
-    }
-    this._canvas.addEventListener('wheel', this._boundWheel, { passive: false })
   }
 
   // ==================== 双击缩放（自定义业务逻辑） ====================
@@ -107,7 +93,8 @@ export class LeaferEngine {
   // ==================== 公共 API ====================
 
   get scale(): number {
-    return this.leafer.scaleX ?? (this.leafer as any).__zoomLayer?.scaleX ?? 1
+    const l: any = this.leafer
+    return l.zoomLayer?.__?.scaleX ?? l.zoomLayer?.scaleX ?? l.__?.scaleX ?? l.scaleX ?? 1
   }
 
   get canvasElement(): HTMLCanvasElement | null {
@@ -148,10 +135,6 @@ export class LeaferEngine {
     this._destroyed = true
     this._onDestroy()
 
-    if (this._boundWheel) {
-      this._canvas?.removeEventListener('wheel', this._boundWheel)
-      this._boundWheel = null
-    }
     if (this._doubleTapOff) {
       this.leafer.off_(this._doubleTapOff)
       this._doubleTapOff = null

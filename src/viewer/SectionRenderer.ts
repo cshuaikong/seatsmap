@@ -1,6 +1,6 @@
 import { Group, Rect, Ellipse, Polygon, Line, Path, Text } from 'leafer-ui'
 import type { Section, ShapeObject, TextObject, AreaObject } from '../types'
-import { pathPointsToSvgPath, flatToPathPoints, hasArcs } from './geometry'
+import { pathPointsToSvgPath, flatToPathPoints, hasArcs, getSvgPathCenter } from './geometry'
 
 /**
  * 渲染分区边框、形状、文本和区域对象。
@@ -102,7 +102,6 @@ export class SectionRenderer {
 
     const id = `section-border-${section.id}`
     const base = { id, fill, stroke, strokeWidth, opacity: section.opacity ?? 1, editable: false }
-     console.log('createBorder',base)
     const borderType = (section as any).type
     switch (borderType) {
       case 'rect':
@@ -123,7 +122,6 @@ export class SectionRenderer {
         })
       case 'path': {
         let d = (section as any).path
-        console.log('createBorder',d)
         return new Path({ ...base, x: 0, y: 0, path: d })
       }
       default:
@@ -332,15 +330,9 @@ export class SectionRenderer {
       cx = (section.radiusX ?? 50) / 2
       cy = (section.radiusY ?? 50) / 2
     } else if (labelType === 'path') {
-      if (section.pathPoints?.length) {
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-        section.pathPoints.forEach(p => {
-          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x)
-          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y)
-        })
-        cx = (minX + maxX) / 2
-        cy = (minY + maxY) / 2
-      }
+      const d = (section as any).path as string | undefined
+      const center = d ? getSvgPathCenter(d) : null
+      if (center) { cx = center.cx; cy = center.cy }
     }
 
     return new Text({
