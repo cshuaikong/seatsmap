@@ -5,188 +5,201 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 
 const props = defineProps<{
-  seatMapViewer: any  // SeatMapViewer 的 ref
-  venue: any  // VenueData，用于获取分区信息
+  seatMapViewer: any
+  venue: any
 }>()
 
 const containerRef = ref<HTMLDivElement>()
 const canvasRef = ref<HTMLCanvasElement>()
 
-// 缓存 venueBounds，只在第一次计算，避免缩放时跳动
 let cachedVenueBounds: { x: number; y: number; width: number; height: number } | null = null
+let staticCanvas: HTMLCanvasElement | null = null
+let lastState = ''
+let rafId = 0
 
-// 响应式尺寸：根据容器宽度计算，最大 200px
 const minimapSize = computed(() => {
-  const containerWidth = containerRef.value?.clientWidth || 200
-  return Math.min(containerWidth, 200)
+  const w = containerRef.value?.clientWidth || 200
+  return Math.min(w, 200)
 })
 
-// 渲染 Minimap
-const renderMinimap = () => {
-  if (!props.seatMapViewer || !canvasRef.value) return
-  
-  const canvas = canvasRef.value
+// ========== 静态层：分区轮廓（只在场馆数据变化时重绘） ==========
+
+const buildStaticLayer = () => {
   const size = minimapSize.value
-  canvas.width = size * 2  // 2倍分辨率，更清晰
-  canvas.height = size * 0.65 * 2  // 4:3 比例
-  
-  const ctx = canvas.getContext('2d')!
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  
-  // 获取舞台状态
-  const stageState = props.seatMapViewer.getStageState()
-  
-  // 【关键】使用缓存的 venueBounds，只在第一次计算，避免缩放时跳动
+  const dpr = window.devicePixelRatio || 1
+  const w = Math.round(size * dpr)
+  const h = Math.round(size * 0.65 * dpr)
+
+  if (!staticCanvas) {
+    staticCanvas = document.createElement('canvas')
+  }
+  staticCanvas.width = w
+  staticCanvas.height = h
+
+  const ctx = staticCanvas.getContext('2d')!
+  ctx.clearRect(0, 0, w, h)
+
+  if (!props.venue?.sections) return
+
   if (!cachedVenueBounds) {
-    cachedVenueBounds = props.seatMapViewer.getVenueBounds()
+    cachedVenueBounds = props.seatMapViewer?.getVenueBounds?.()
   }
-  const venueBounds = cachedVenueBounds
-  
-  const selectedSeats = props.seatMapViewer.getSelectedSeats()
-  
-  // 如果没有内容，不渲染
-  if (!venueBounds || venueBounds.width === 0 || venueBounds.height === 0) return
-  
-  // 计算 Minimap 的缩放比例，让内容完全居中显示，不留太多空白
-  const padding = 5 * 2  // 减少内边距，2倍分辨率
-  const minimapWidth = canvas.width - padding * 2
-  const minimapHeight = canvas.height - padding * 2
-  
-  // 计算基础缩放：让所有内容刚好适应 Minimap（不留太多空白）
-  const minimapScaleX = minimapWidth / venueBounds!.width
-  const minimapScaleY = minimapHeight / venueBounds!.height
-  const minimapScale = Math.min(minimapScaleX, minimapScaleY)
-  
-  // 计算内容在 Minimap 中的偏移（完全居中）
-  const contentWidth = venueBounds!.width * minimapScale
-  const contentHeight = venueBounds!.height * minimapScale
-  const offsetX = padding + (minimapWidth - contentWidth) / 2
-  const offsetY = padding + (minimapHeight - contentHeight) / 2
-  
-  // 1. 先绘制白色背景
+  const vb = cachedVenueBounds
+  if (!vb || vb.width === 0 || vb.height === 0) return
+
+  const padding = 5 * dpr
+  const mw = w - padding * 2
+  const mh = h - padding * 2
+  const minimapScale = Math.min(mw / vb.width, mh / vb.height)
+  const contentW = vb.width * minimapScale
+  const contentH = vb.height * minimapScale
+  const ox = padding + (mw - contentW) / 2
+  const oy = padding + (mh - contentH) / 2
+
   ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  
-  // 2. 绘制分区轮廓（完整显示，固定大小，带透明度）
-  if (props.venue?.sections) {
-    props.venue.sections.forEach((section: any) => {
-      if (!section.borderType || section.borderType === 'none') return
-      
-      ctx.fillStyle = section.fill || 'rgba(128, 128, 128, 0.15)'
-      ctx.strokeStyle = section.stroke || '#808080'
-      ctx.lineWidth = 1 * 2
-      
-      const baseX = offsetX + ((section.x || 0) - venueBounds!.x) * minimapScale
-      const baseY = offsetY + ((section.y || 0) - venueBounds!.y) * minimapScale
-      
-      if (section.borderType === 'rect') {
-        ctx.fillRect(
-          baseX,
-          baseY,
-          (section.width || 100) * minimapScale,
-          (section.height || 100) * minimapScale
-        )
-        ctx.strokeRect(
-          baseX,
-          baseY,
-          (section.width || 100) * minimapScale,
-          (section.height || 100) * minimapScale
-        )
-      } else if (section.borderType === 'ellipse') {
-        ctx.beginPath()
-        ctx.ellipse(
-          baseX + (section.radiusX || 50) * minimapScale,
-          baseY + (section.radiusY || 50) * minimapScale,
-          (section.radiusX || 50) * minimapScale,
-          (section.radiusY || 50) * minimapScale,
-          0,
-          0,
-          Math.PI * 2
-        )
-        ctx.fill()
-        ctx.stroke()
-      } else if (section.borderType === 'path' && section.pathPoints) {
-        ctx.beginPath()
-        section.pathPoints.forEach((point: any, index: number) => {
-          const x = baseX + point.x * minimapScale
-          const y = baseY + point.y * minimapScale
-          if (index === 0) {
-            ctx.moveTo(x, y)
-          } else {
-            ctx.lineTo(x, y)
-          }
-        })
-        ctx.closePath()
-        ctx.fill()
-        ctx.stroke()
-      }
-    })
-  }
-  
-  // 3. 绘制已选座位（红色圆点）
+  ctx.fillRect(0, 0, w, h)
+
+  props.venue.sections.forEach((section: any) => {
+    if (!section.borderType || section.borderType === 'none') return
+
+    ctx.fillStyle = section.fill || 'rgba(128, 128, 128, 0.15)'
+    ctx.strokeStyle = section.stroke || '#808080'
+    ctx.lineWidth = 1 * dpr
+
+    const bx = ox + ((section.x || 0) - vb.x) * minimapScale
+    const by = oy + ((section.y || 0) - vb.y) * minimapScale
+
+    if (section.borderType === 'rect') {
+      ctx.fillRect(bx, by, (section.width || 100) * minimapScale, (section.height || 100) * minimapScale)
+      ctx.strokeRect(bx, by, (section.width || 100) * minimapScale, (section.height || 100) * minimapScale)
+    } else if (section.borderType === 'ellipse') {
+      ctx.beginPath()
+      ctx.ellipse(
+        bx + (section.radiusX || 50) * minimapScale,
+        by + (section.radiusY || 50) * minimapScale,
+        (section.radiusX || 50) * minimapScale,
+        (section.radiusY || 50) * minimapScale,
+        0, 0, Math.PI * 2,
+      )
+      ctx.fill()
+      ctx.stroke()
+    } else if (section.borderType === 'path' && section.pathPoints) {
+      ctx.beginPath()
+      section.pathPoints.forEach((pt: any, i: number) => {
+        const x = bx + pt.x * minimapScale
+        const y = by + pt.y * minimapScale
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      })
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    }
+  })
+}
+
+// ========== 动态层：视口框 + 已选座位 ==========
+
+const drawDynamicLayer = () => {
+  const canvas = canvasRef.value
+  if (!canvas || !staticCanvas) return
+
+  const viewer = props.seatMapViewer
+  if (!viewer) return
+
+  const stageState = viewer.getStageState?.()
+  const selected = viewer.getSelectedSeats?.() || []
+  if (!stageState) return
+
+  // 变更检测：跳过无变化帧
+  const stateKey = `${stageState.scale}|${stageState.position.x}|${stageState.position.y}|${selected.length}`
+  if (stateKey === lastState) return
+  lastState = stateKey
+
+  const vb = cachedVenueBounds
+  if (!vb || vb.width === 0) return
+
+  const dpr = window.devicePixelRatio || 1
+  const size = minimapSize.value
+  const w = Math.round(size * dpr)
+  const h = Math.round(size * 0.65 * dpr)
+  canvas.width = w
+  canvas.height = h
+
+  const ctx = canvas.getContext('2d')!
+  // 先铺静态层
+  ctx.drawImage(staticCanvas, 0, 0)
+
+  const padding = 5 * dpr
+  const mw = w - padding * 2
+  const mh = h - padding * 2
+  const minimapScale = Math.min(mw / vb.width, mh / vb.height)
+  const contentW = vb.width * minimapScale
+  const contentH = vb.height * minimapScale
+  const ox = padding + (mw - contentW) / 2
+  const oy = padding + (mh - contentH) / 2
+
+  // 已选座位
   ctx.fillStyle = '#ef4444'
-  selectedSeats.forEach((seat: { x: number; y: number }) => {
+  selected.forEach((seat: { x: number; y: number }) => {
     ctx.beginPath()
     ctx.arc(
-      offsetX + (seat.x - venueBounds!.x) * minimapScale,
-      offsetY + (seat.y - venueBounds!.y) * minimapScale,
-      3 * 2,  // 2倍分辨率
-      0,
-      Math.PI * 2
+      ox + (seat.x - vb.x) * minimapScale,
+      oy + (seat.y - vb.y) * minimapScale,
+      3 * dpr, 0, Math.PI * 2,
     )
     ctx.fill()
   })
-  
-  // 4. 计算视口在世界坐标中的位置和大小
-  const viewportWorldX = -stageState.position.x / stageState.scale
-  const viewportWorldY = -stageState.position.y / stageState.scale
-  const viewportWorldW = stageState.width / stageState.scale
-  const viewportWorldH = stageState.height / stageState.scale
-  
-  // 计算视口在 Minimap 中的位置和大小
-  const viewportX = offsetX + (viewportWorldX - venueBounds!.x) * minimapScale
-  const viewportY = offsetY + (viewportWorldY - venueBounds!.y) * minimapScale
-  const viewportW = viewportWorldW * minimapScale
-  const viewportH = viewportWorldH * minimapScale
-  
-  // 5. 绘制视口外的灰色蒙层（半透明，覆盖在图形上）
+
+  // 视口在世界坐标中的位置
+  const vx = -stageState.position.x / stageState.scale
+  const vy = -stageState.position.y / stageState.scale
+  const vw = stageState.width / stageState.scale
+  const vh = stageState.height / stageState.scale
+
+  const vpX = ox + (vx - vb.x) * minimapScale
+  const vpY = oy + (vy - vb.y) * minimapScale
+  const vpW = vw * minimapScale
+  const vpH = vh * minimapScale
+
+  // 蒙层（上下左右四块）
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
-  
-  // 上方蒙层
-  ctx.fillRect(0, 0, canvas.width, viewportY)
-  // 下方蒙层
-  ctx.fillRect(0, viewportY + viewportH, canvas.width, canvas.height - viewportY - viewportH)
-  // 左侧蒙层
-  ctx.fillRect(0, viewportY, viewportX, viewportH)
-  // 右侧蒙层
-  ctx.fillRect(viewportX + viewportW, viewportY, canvas.width - viewportX - viewportW, viewportH)
-  
-  // 6. 绘制视口边框（蓝色）
+  ctx.fillRect(0, 0, w, vpY)
+  ctx.fillRect(0, vpY + vpH, w, h - vpY - vpH)
+  ctx.fillRect(0, vpY, vpX, vpH)
+  ctx.fillRect(vpX + vpW, vpY, w - vpX - vpW, vpH)
+
+  // 视口边框
   ctx.strokeStyle = '#3b82f6'
-  ctx.lineWidth = 3 * 2
-  ctx.strokeRect(viewportX, viewportY, viewportW, viewportH)
+  ctx.lineWidth = 3 * dpr
+  ctx.strokeRect(vpX, vpY, vpW, vpH)
 }
 
-// 监听舞台变化
-let interval: number | null = null
+// ========== 渲染循环 ==========
+
+const loop = () => {
+  drawDynamicLayer()
+  rafId = requestAnimationFrame(loop)
+}
 
 onMounted(() => {
-  // 延迟渲染，确保 SeatMapViewer 已初始化
   setTimeout(() => {
-    renderMinimap()
+    buildStaticLayer()
+    rafId = requestAnimationFrame(loop)
   }, 500)
-  
-  // 定时更新（100ms）
-  interval = setInterval(renderMinimap, 100)
 })
 
 onUnmounted(() => {
-  if (interval) {
-    clearInterval(interval)
-  }
+  cancelAnimationFrame(rafId)
+})
+
+// venue 切换时重置缓存
+watch(() => props.venue, () => {
+  cachedVenueBounds = null
+  staticCanvas = null
+  setTimeout(() => buildStaticLayer(), 100)
 })
 </script>
 
@@ -210,7 +223,6 @@ canvas {
   height: auto;
 }
 
-/* 移动端适配 */
 @media (max-width: 768px) {
   .minimap {
     top: 8px;
