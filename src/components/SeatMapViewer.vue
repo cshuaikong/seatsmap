@@ -154,7 +154,11 @@ onMounted(() => {
 
   const width = props.width || containerRef.value.clientWidth || 800
   const height = props.height || containerRef.value.clientHeight || 600
-  engine = new LeaferEngine(containerRef.value, { width, height })
+  engine = new LeaferEngine(containerRef.value, {
+    width,
+    height,
+    move: { scroll: true, disabled: false, holdSpaceKey: true, holdMiddleKey: true, drag: true }
+  })
 
   labelRenderer = new LabelRenderer()
 
@@ -177,41 +181,8 @@ onMounted(() => {
   // 画布点击：以点击位置为中心放大到 baseScale
   engine.leafer.on(LP.TAP, handleCanvasTap)
 
-  // 自定义单指平移：点击任何地方拖动都能跟随移动
-  let panState: {
-    dragging: boolean
-    startPoint: { x: number; y: number }
-    startViewX: number
-    startViewY: number
-  } | null = null
-  const PAN_THRESHOLD = 24
-
-  engine.leafer.on(LP.DOWN, (e: any) => {
-    panState = {
-      dragging: false,
-      startPoint: e.getPagePoint(),
-      startViewX: engine.leafer.x ?? 0,
-      startViewY: engine.leafer.y ?? 0,
-    }
-  })
-
-  engine.leafer.on(LP.MOVE, (e: any) => {
-    if (!panState) return
-    const point = e.getPagePoint()
-    const dx = point.x - panState.startPoint.x
-    const dy = point.y - panState.startPoint.y
-    if (!panState.dragging && Math.hypot(dx, dy) > PAN_THRESHOLD) {
-      panState.dragging = true
-    }
-    if (panState.dragging) {
-      engine.leafer.x = panState.startViewX + dx
-      engine.leafer.y = panState.startViewY + dy
-    }
-  })
-
-  engine.leafer.on(LP.UP, () => {
-    panState = null
-  })
+  // viewport 内置拖拽处理单指/鼠标平移（drag: true）
+  // 小距离移动会触发 TAP，执行 handleCanvasTap 放大；大距离移动触发平移
 
   renderAll()
 })
