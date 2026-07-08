@@ -25,11 +25,19 @@ const minimapSize = computed(() => {
   return Math.min(w, 200)
 })
 
-// ========== 静态层：分区轮廓（只在场馆数据变化时重绘） ==========
+// ========== 静态层：分区轮廓（只在数据就绪时构建一次） ==========
 
-const buildStaticLayer = () => {
+const buildStaticLayer = (): boolean => {
+  if (!props.venue?.sections) return false
+
+  if (!cachedVenueBounds) {
+    cachedVenueBounds = props.seatMapViewer?.getVenueBounds?.()
+  }
+  const vb = cachedVenueBounds
+  if (!vb || vb.width === 0 || vb.height === 0) return false
+
   const size = minimapSize.value
-  const dpr = window.devicePixelRatio || 1
+  const dpr = (window.devicePixelRatio || 1) * 2
   const w = Math.round(size * dpr)
   const h = Math.round(size * 0.65 * dpr)
 
@@ -41,14 +49,6 @@ const buildStaticLayer = () => {
 
   const ctx = staticCanvas.getContext('2d')!
   ctx.clearRect(0, 0, w, h)
-
-  if (!props.venue?.sections) return
-
-  if (!cachedVenueBounds) {
-    cachedVenueBounds = props.seatMapViewer?.getVenueBounds?.()
-  }
-  const vb = cachedVenueBounds
-  if (!vb || vb.width === 0 || vb.height === 0) return
 
   const padding = 5 * dpr
   const mw = w - padding * 2
@@ -98,13 +98,19 @@ const buildStaticLayer = () => {
       ctx.stroke()
     }
   })
+
+  return true
 }
 
 // ========== 动态层：视口框 + 已选座位 ==========
 
 const drawDynamicLayer = () => {
   const canvas = canvasRef.value
-  if (!canvas || !staticCanvas) return
+  if (!canvas) return
+
+  if (!staticCanvas) {
+    if (!buildStaticLayer()) return
+  }
 
   const viewer = props.seatMapViewer
   if (!viewer) return
@@ -113,15 +119,12 @@ const drawDynamicLayer = () => {
   const selected = viewer.getSelectedSeats?.() || []
   if (!stageState) return
 
-  // 变更检测：跳过无变化帧
   const stateKey = `${stageState.scale}|${stageState.position.x}|${stageState.position.y}|${selected.length}`
   if (stateKey === lastState) return
   lastState = stateKey
 
-  const vb = cachedVenueBounds
-  if (!vb || vb.width === 0) return
-
-  const dpr = window.devicePixelRatio || 1
+  const vb = cachedVenueBounds!
+  const dpr = (window.devicePixelRatio || 1) * 2
   const size = minimapSize.value
   const w = Math.round(size * dpr)
   const h = Math.round(size * 0.65 * dpr)
@@ -129,7 +132,6 @@ const drawDynamicLayer = () => {
   canvas.height = h
 
   const ctx = canvas.getContext('2d')!
-  // 先铺静态层
   ctx.drawImage(staticCanvas, 0, 0)
 
   const padding = 5 * dpr
@@ -164,7 +166,7 @@ const drawDynamicLayer = () => {
   const vpW = vw * minimapScale
   const vpH = vh * minimapScale
 
-  // 蒙层（上下左右四块）
+  // 蒙层
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'
   ctx.fillRect(0, 0, w, vpY)
   ctx.fillRect(0, vpY + vpH, w, h - vpY - vpH)
@@ -195,7 +197,6 @@ onUnmounted(() => {
   cancelAnimationFrame(rafId)
 })
 
-// venue 切换时重置缓存
 watch(() => props.venue, () => {
   cachedVenueBounds = null
   staticCanvas = null
