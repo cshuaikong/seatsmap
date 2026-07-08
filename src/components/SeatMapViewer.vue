@@ -178,34 +178,40 @@ onMounted(() => {
   engine.leafer.on(LP.TAP, handleCanvasTap)
 
   // 自定义单指平移：点击任何地方拖动都能跟随移动
+  // 注意：viewport 的平移由 zoomLayer.move() 驱动，直接改 leafer.x/y 不会生效
   let panState: {
     dragging: boolean
     startPoint: { x: number; y: number }
-    startViewX: number
-    startViewY: number
+    lastPoint: { x: number; y: number }
   } | null = null
   const PAN_THRESHOLD = 24
 
   engine.leafer.on(LP.DOWN, (e: any) => {
+    const point = e.getPagePoint()
     panState = {
       dragging: false,
-      startPoint: e.getPagePoint(),
-      startViewX: engine.leafer.x ?? 0,
-      startViewY: engine.leafer.y ?? 0,
+      startPoint: point,
+      lastPoint: point,
     }
   })
 
   engine.leafer.on(LP.MOVE, (e: any) => {
     if (!panState) return
     const point = e.getPagePoint()
-    const dx = point.x - panState.startPoint.x
-    const dy = point.y - panState.startPoint.y
-    if (!panState.dragging && Math.hypot(dx, dy) > PAN_THRESHOLD) {
+    const totalDx = point.x - panState.startPoint.x
+    const totalDy = point.y - panState.startPoint.y
+    if (!panState.dragging && Math.hypot(totalDx, totalDy) > PAN_THRESHOLD) {
       panState.dragging = true
     }
     if (panState.dragging) {
-      engine.leafer.x = panState.startViewX + dx
-      engine.leafer.y = panState.startViewY + dy
+      const moveX = point.x - panState.lastPoint.x
+      const moveY = point.y - panState.lastPoint.y
+      panState.lastPoint = point
+      const l: any = engine.leafer
+      const zoomLayer = l.zoomLayer
+      if (zoomLayer) {
+        zoomLayer.move({ x: moveX, y: moveY })
+      }
     }
   })
 
