@@ -69,30 +69,49 @@ const rebuildSectionLayers = () => {
   })
 }
 
-/** 点击画布放大到基准缩放，以点击点为中心 */
+const easeInOutCubic = (t: number): number =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+
+let zoomAnimRaf = 0
+
+/** 点击画布放大到基准缩放，以点击点为中心，带缓动动画 */
 const handleCanvasTap = (e: any) => {
   if (!engine) return
-  // 点击到座位时只执行选座，不放大
   if (e.target?.__meta?.kind === 'seat') return
   const l: any = engine.leafer
   const zoomLayer = l.zoomLayer
   if (!zoomLayer) return
 
   const targetScale = getRenderConfig().baseScale
-  // 直接读取 zoomLayer 的实际 scale，避免 getter 在 viewport 模式下取值偏差
-  const currentS = zoomLayer.__?.scaleX ?? zoomLayer.scaleX ?? engine.scale ?? 1
+  const startScale = zoomLayer.__?.scaleX ?? zoomLayer.scaleX ?? engine.scale ?? 1
 
-  // 只在尚未放大到 baseScale 时才放大；已经 >= baseScale 时点击不再缩放
-  if (currentS >= targetScale * 0.95) return
+  if (startScale >= targetScale * 0.95) return
 
-  const changeScale = targetScale / currentS
+  cancelAnimationFrame(zoomAnimRaf)
 
-  // TAP 事件的 x/y 为世界坐标，直接作为 scaleOfWorld 的缩放中心
   const point = { x: e.x, y: e.y }
-  zoomLayer.scaleOfWorld(point, changeScale)
+  const duration = 300
+  let prevScale = startScale
+  const startTime = performance.now()
 
-  // 手动触发 ZoomEvent.END 以便 seat LOD / label 更新
-  l.emit?.(ZoomEvent.END, { scale: targetScale, totalScale: targetScale })
+  const animate = (now: number) => {
+    const elapsed = now - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    const eased = easeInOutCubic(progress)
+    const desiredScale = startScale + (targetScale - startScale) * eased
+
+    zoomLayer.scaleOfWorld(point, desiredScale / prevScale)
+    prevScale = desiredScale
+
+    if (progress < 1) {
+      zoomAnimRaf = requestAnimationFrame(animate)
+    } else {
+      zoomAnimRaf = 0
+      l.emit?.(ZoomEvent.END, { scale: targetScale, totalScale: targetScale })
+    }
+  }
+
+  zoomAnimRaf = requestAnimationFrame(animate)
 }
 
 /** 创建/重建座位渲染器 */
