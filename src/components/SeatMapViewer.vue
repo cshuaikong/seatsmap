@@ -180,48 +180,6 @@ onMounted(() => {
   // 画布点击：以点击位置为中心放大到 baseScale
   engine.leafer.on(LP.TAP, handleCanvasTap)
 
-  // 自定义单指平移：直接修改 zoomLayer 的 x/y，不走 viewport 的 move 事件，避免闪烁
-  let panState: {
-    dragging: boolean
-    startPoint: { x: number; y: number }
-    startZoomX: number
-    startZoomY: number
-  } | null = null
-  const PAN_THRESHOLD = 24
-
-  engine.leafer.on(LP.DOWN, (e: any) => {
-    const l: any = engine.leafer
-    const zoomLayer = l.zoomLayer
-    panState = {
-      dragging: false,
-      startPoint: e.getPagePoint(),
-      startZoomX: zoomLayer?.x ?? 0,
-      startZoomY: zoomLayer?.y ?? 0,
-    }
-  })
-
-  engine.leafer.on(LP.MOVE, (e: any) => {
-    if (!panState) return
-    const point = e.getPagePoint()
-    const dx = point.x - panState.startPoint.x
-    const dy = point.y - panState.startPoint.y
-    if (!panState.dragging && Math.hypot(dx, dy) > PAN_THRESHOLD) {
-      panState.dragging = true
-    }
-    if (panState.dragging) {
-      const l: any = engine.leafer
-      const zoomLayer = l.zoomLayer
-      if (zoomLayer) {
-        zoomLayer.x = panState.startZoomX + dx
-        zoomLayer.y = panState.startZoomY + dy
-      }
-    }
-  })
-
-  engine.leafer.on(LP.UP, () => {
-    panState = null
-  })
-
   renderAll()
 })
 

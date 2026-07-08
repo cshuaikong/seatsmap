@@ -22,7 +22,7 @@ export class LeaferEngine {
       width,
       height,
       type: 'viewport',
-      move: { scroll: true, disabled: false, holdSpaceKey: true, holdMiddleKey: true, drag: false },
+      move: { scroll: true, disabled: false, holdMiddleKey: true, drag: 'auto' },
       pointer: { dragDistance: 24, tapTime: 200 },
       wheel: { preventDefault: true, zoomSpeed: 0.5 },
       multiTouch: { singleGesture: { count: 1 } },
