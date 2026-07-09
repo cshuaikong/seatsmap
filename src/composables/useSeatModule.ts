@@ -640,10 +640,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             if (detail) st.fontSize = r
           }
         }
-        bar.visible = false
-      } else {
-        bar.visible = false
       }
+      // 编辑器模式下缩放时始终显示座位条（排线）
+      bar.visible = true
       const labelText = (g as any).__labelText
       if (labelText) {
         const hasLabel = String(g.__rowLabel || '').length > 0
