@@ -124,7 +124,7 @@ async function confirmCreateVenue() {
         { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
       ],
       sections: [],
-      baseScale: 1
+      scale: 1
     }
 
     const res = await createVenue(venue)
