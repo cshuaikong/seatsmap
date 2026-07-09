@@ -522,8 +522,8 @@ const updateRowSelectionVisuals = () => {
         const isGlobalView = !venueStore.focusedSectionId
         const isFocusedSection = venueStore.focusedSectionId === section.id
         const shouldForceBarMode = isGlobalView || !isFocusedSection
-        const { width } = venueStore.visualConfig
-        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, width))
+        const { width: visualConfigWidth } = venueStore.visualConfig
+        rowShape.sceneFunc(createRowSceneFunc(row, getSeatColorForRow(row), isSelected, rowSeatRadius, venueStore.selectedSeatIds, 1, 1, shouldForceBarMode, visualConfigWidth))
         
         // 同步更新 listening 状态
         if (shouldForceBarMode) {
