@@ -634,8 +634,8 @@ function enterSectionFocus(sectionId: string): void {
     const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
     if (!section || !leafer) return
     focusedSectionId.value = sectionId
-    focusedSectionName.value = section.name || sectionId
-    title.value = `分区编辑 — ${focusedSectionName.value}`
+    focusedSectionName.value = section.name || ''
+    title.value = focusedSectionName.value ? `分区编辑 — ${focusedSectionName.value}` : '分区编辑'
     emit('section-focus-change', true, focusedSectionName.value)
     editor?.cancel()
     if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()

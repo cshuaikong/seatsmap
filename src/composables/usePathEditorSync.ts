@@ -70,7 +70,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       // 创建新 section
       store.venue.sections.push({
         id: data.id,
-        name: data.name || data.id,
+        name: data.name || '',
         rows: [],
         type: 'path' as any,
         x: data.x ?? 0,

@@ -1054,7 +1054,7 @@ const renderSectionBorder = (section: Section) => {
   const label = new Konva.Text({
     x: labelX,
     y: labelY,
-    text: section.name || '分区',
+    text: section.name || '',
     fontSize: Math.max(13 * visualScale, 8),  // 反向缩放保持视觉大小恒定，最小 8px
     fontFamily: 'Inter, -apple-system, sans-serif',
     fontStyle: 'bold',
