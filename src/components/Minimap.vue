@@ -86,16 +86,14 @@ const buildStaticLayer = (): boolean => {
       )
       ctx.fill()
       ctx.stroke()
-    } else if (section.borderType === 'path' && section.pathPoints) {
-      ctx.beginPath()
-      section.pathPoints.forEach((pt: any, i: number) => {
-        const x = bx + pt.x * minimapScale
-        const y = by + pt.y * minimapScale
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-      })
-      ctx.closePath()
-      ctx.fill()
-      ctx.stroke()
+    } else if (section.borderType === 'path' && section.path) {
+      ctx.save()
+      ctx.translate(bx, by)
+      ctx.scale(minimapScale, minimapScale)
+      const p = new Path2D(section.path)
+      ctx.fill(p)
+      ctx.stroke(p)
+      ctx.restore()
     }
   })
 
