@@ -6,15 +6,6 @@
         <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
         <span class="section-type-badge">{{ sectionTypeLabel }}</span>
       </div>
-      <button
-        v-if="!isMulti && section"
-        class="header-edit-btn"
-        title="进入分区编辑模式"
-        @click="emit('enter-section')"
-      >
-        <Icon icon="lucide:pen-square" class="btn-icon" />
-        编辑
-      </button>
     </div>
 
     <div class="panel-body" v-if="section">
@@ -179,11 +170,6 @@
         </div>
       </div>
 
-      <div v-if="section.type === 'path' && !isMulti" class="panel-note">
-        <Icon icon="lucide:pen-tool" class="note-icon" />
-        <span>当前走 path 数据</span>
-      </div>
-
       <div v-if="section.type === 'path' && pathSegments.length && !isMulti" class="path-editor">
         <div class="path-editor-header">
           <Icon icon="lucide:spline-pointer" class="note-icon" />
@@ -248,22 +234,6 @@
         </div>
       </div>
 
-      <!-- 顶点编辑按钮（仅 polygon/path 分区显示） -->
-      <button
-        v-if="section.type === 'path' && !isMulti"
-        class="vertex-edit-btn"
-        :class="{ active: vertexEditActive }"
-        @click="emit('toggle-vertex-edit')"
-      >
-        <Icon :icon="vertexEditActive ? 'lucide:edit-3' : 'lucide:edit'" class="btn-icon" />
-        {{ vertexEditActive ? '退出顶点编辑' : '顶点编辑' }}
-      </button>
-
-      <!-- 进入分区按钮 -->
-      <button class="enter-section-btn" @click="emit('enter-section')">
-        <Icon icon="lucide:zoom-in" class="btn-icon" />
-        进入分区编辑
-      </button>
     </div>
 
     <div v-else class="panel-empty">
