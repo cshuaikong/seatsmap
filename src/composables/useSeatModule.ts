@@ -641,8 +641,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           }
         }
       }
-      // 编辑器模式下缩放时始终显示座位条（排线）
-      bar.visible = true
+      // 座位条和座位圆互斥：没有座位圆时显示排线
+      bar.visible = !detail
       const labelText = (g as any).__labelText
       if (labelText) {
         const hasLabel = String(g.__rowLabel || '').length > 0
