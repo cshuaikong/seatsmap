@@ -646,7 +646,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const labelText = (g as any).__labelText
       if (labelText) {
         const hasLabel = String(g.__rowLabel || '').length > 0
-        labelText.visible = hasLabel && ellipses && ellipses.length > 1
+        // 只有座位圆出现时才显示排标签
+        labelText.visible = detail && hasLabel && ellipses && ellipses.length > 1
         if (detail) labelText.fontSize = r * 1.3
       }
       bar.stroke = sel ? '#3b82f6' : '#81C784'
