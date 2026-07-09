@@ -91,6 +91,7 @@ export function useKonvaTransformer(options: UseKonvaTransformerOptions): UseKon
     transformer = new Konva.Transformer({
       rotateEnabled: true,
       resizeEnabled: true,
+      enabledAnchors: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
       rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
       rotationSnapTolerance: 5,
       padding: 0,
