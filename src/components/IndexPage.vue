@@ -6,7 +6,38 @@
         <Icon icon="lucide:layout-dashboard" class="header-logo" />
         <span class="app-title">座位图管理</span>
       </div>
+      <div class="header-right">
+        <button class="hdr-btn" @click="openCreateModal">
+          <Icon icon="lucide:plus" class="btn-icon" />
+          添加
+        </button>
+      </div>
     </header>
+
+    <!-- 新建场馆弹框 -->
+    <div v-if="isCreateModalOpen" class="modal-overlay" @click.self="closeCreateModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <Icon icon="lucide:plus-circle" class="modal-icon" />
+          <span>新建场馆</span>
+        </div>
+        <div class="modal-body">
+          <label class="modal-label">场馆名称</label>
+          <input
+            v-model="newVenueName"
+            class="modal-input"
+            placeholder="请输入场馆名称"
+            @keydown.enter="confirmCreateVenue"
+          />
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn modal-btn--secondary" @click="closeCreateModal">取消</button>
+          <button class="modal-btn modal-btn--primary" :disabled="!newVenueName.trim() || creating" @click="confirmCreateVenue">
+            {{ creating ? '创建中...' : '确定' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- 主体：左侧列表 + 右侧设计器 -->
     <div class="app-body">
@@ -43,7 +74,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import SeatMapDesigner from './SeatMapDesigner.vue'
-import { fetchSeatMaps, fetchSeatMapData, editVenue, getVenueId, type SeatMapEntry } from '../api/seatMap'
+import { fetchSeatMaps, fetchSeatMapData, editVenue, createVenue, getVenueId, type SeatMapEntry } from '../api/seatMap'
+import { nanoid } from 'nanoid'
 
 const DEFAULT_COLORS = ['#e0f2fe', '#fef3c7', '#f1f5f9', '#fce7f3', '#e0e7ff', '#d1fae5']
 
@@ -61,6 +93,54 @@ const activeIndex = computed(() => {
 
 const venueData = ref<any>({})
 const loading = ref(false)
+
+const isCreateModalOpen = ref(false)
+const newVenueName = ref('')
+const creating = ref(false)
+
+function openCreateModal() {
+  newVenueName.value = ''
+  isCreateModalOpen.value = true
+}
+
+function closeCreateModal() {
+  isCreateModalOpen.value = false
+}
+
+async function confirmCreateVenue() {
+  const name = newVenueName.value.trim()
+  if (!name || creating.value) return
+
+  creating.value = true
+  try {
+    const id = nanoid()
+    const venue = {
+      id,
+      name,
+      type: 'WITH_SECTION',
+      categories: [
+        { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
+        { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
+        { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
+      ],
+      sections: [],
+      baseScale: 1
+    }
+
+    const res = await createVenue(venue)
+    const realId = res?.id || res?.venue_id || id
+
+    // 刷新列表并切换到新场馆
+    seatMaps.value = await fetchSeatMaps()
+    router.push({ query: { venue: realId } })
+    closeCreateModal()
+  } catch (e) {
+    console.error('[IndexPage] 创建场馆失败:', e)
+    alert('创建失败：' + (e instanceof Error ? e.message : '未知错误'))
+  } finally {
+    creating.value = false
+  }
+}
 
 function onCardClick(index: number) {
   const vid = getVenueId(seatMaps.value[index])
@@ -274,5 +354,95 @@ async function onSaveVenue(data: any) {
   flex: 1;
   overflow: hidden;
   min-width: 0;
+}
+
+/* ==================== Modal ==================== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 42, 38, 0.45);
+  z-index: 100;
+}
+
+.modal-card {
+  width: 360px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(45, 42, 38, 0.18);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.modal-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--color-accent);
+}
+
+.modal-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.modal-input:focus {
+  border-color: var(--color-accent);
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s;
+}
+
+.modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal-btn--primary {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.modal-btn--secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
 }
 </style>

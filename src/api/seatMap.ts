@@ -28,3 +28,11 @@ export function editVenue(data: any): Promise<any> {
     body: JSON.stringify(data),
   })
 }
+
+/** 创建新场馆（后端接口地址请根据实际接口调整） */
+export function createVenue(venue: any): Promise<any> {
+  return request('/venue/create', {
+    method: 'POST',
+    body: JSON.stringify({ venue }),
+  })
+}
