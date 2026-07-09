@@ -2,6 +2,7 @@ import { watch } from 'vue'
 import type { Section, SeatRow, Seat } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { nanoid } from 'nanoid'
+import { darkenColor } from '../utils/color'
 
 export interface PathEditorSyncCtx {
   getLeafer: () => any
@@ -10,6 +11,7 @@ export interface PathEditorSyncCtx {
   getSeatRowGroups: () => any[]
   getFocusedSectionId: () => string | null
   rebuildSeatRow: (group: any, newData: any, endCenter?: { x: number; y: number }, anchorFromEnd?: boolean) => void
+  refreshSeatLOD?: () => void
 }
 
 /**
@@ -208,6 +210,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     const store = useVenueStore()
     const focusedId = ctx.getFocusedSectionId()
 
+    if (isApplyingToCanvas) return
     isSyncingToStore = true
 
     if (list.length === 0) {
@@ -219,13 +222,29 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     // 分类选中元素（使用数组保持顺序）
     const sectionGroups: any[] = []
     const seatRowGroups: any[] = []
+    const seatEllipses: any[] = []
 
     for (const el of list) {
       if (el.__sectionGroup === true) {
         sectionGroups.push(el)
       } else if (el.__seatRow) {
         seatRowGroups.push(el)
+      } else if (el.__seatId) {
+        seatEllipses.push(el)
       }
+    }
+
+    // 座位圆选中（优先级最高）
+    if (seatEllipses.length > 0) {
+      store.clearSelection()
+      for (let i = 0; i < seatEllipses.length; i++) {
+        const sid = seatEllipses[i].__seatId
+        if (sid) {
+          store.selectSeat(sid, i > 0)
+        }
+      }
+      isSyncingToStore = false
+      return
     }
 
     // 分区编辑模式下：seat row Groups 选中
@@ -296,6 +315,49 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     }
 
     isSyncingToStore = false
+  }
+
+  // ==================== Store → 画布选中同步 ====================
+
+  function applyStoreSelectionToCanvas(): void {
+    const editor = ctx.getEditor()
+    if (!editor) return
+    const store = useVenueStore()
+    const focusedId = ctx.getFocusedSectionId()
+
+    const targets: any[] = []
+
+    if (focusedId) {
+      if (store.selectedSeatIds.length > 0) {
+        const seatSet = new Set(store.selectedSeatIds)
+        for (const g of ctx.getSeatRowGroups()) {
+          const ellipses = (g.__seatEllipses || []) as any[]
+          for (const e of ellipses) {
+            if (e.__seatId && seatSet.has(e.__seatId)) targets.push(e)
+          }
+        }
+      } else if (store.selectedRowIds.length > 0) {
+        const rowSet = new Set(store.selectedRowIds)
+        for (const g of ctx.getSeatRowGroups()) {
+          if (g.__rowId && rowSet.has(g.__rowId)) targets.push(g)
+        }
+      }
+    } else {
+      if (store.selectedSectionIds.length > 0) {
+        const secSet = new Set(store.selectedSectionIds)
+        const sectionMap = ctx.getSectionGroupMap()
+        for (const sid of store.selectedSectionIds) {
+          const g = sectionMap.get(sid)
+          if (g && secSet.has(g.__sectionId)) targets.push(g)
+        }
+      }
+    }
+
+    isApplyingToCanvas = true
+    try {
+      editor.target = targets as any
+    } catch (_) {}
+    isApplyingToCanvas = false
   }
 
   // ==================== 变换同步（画布 → Store） ====================
@@ -481,7 +543,11 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       if (storeCatKey !== ellCatKey) {
         const cat = categories.find((c: any) => String(c.key) === storeCatKey)
         ell.__categoryKey = storeCatKey
-        if (cat?.color) ell.fill = cat.color
+        if (cat?.color) {
+          ell.fill = cat.color
+          ell.stroke = darkenColor(cat.color, 30)
+          ell.__originalStroke = ell.stroke
+        }
       }
       // label → 标签文本
       const st = (ell as any).__labelText
@@ -493,6 +559,9 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
         }
       }
     }
+
+    // 标签/分类变化后刷新座位 LOD，确保标签显隐和选中高亮正确
+    ctx.refreshSeatLOD?.()
 
     // 同步 rotation（排旋转）
     // 同步 rowSpacing / 位置（行间距变更时 RightPanel 会重算 x/y）
@@ -541,9 +610,12 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
         const cat = categories.find(c => String(c.key) === catKey)
         if (cat?.color && ell.fill !== cat.color) {
           ell.fill = cat.color
+          ell.stroke = darkenColor(cat.color, 30)
+          ell.__originalStroke = ell.stroke
         }
       }
     }
+    ctx.refreshSeatLOD?.()
   }
 
   /**
@@ -590,7 +662,33 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       { deep: true },
     )
 
-    return () => { stopSections(); stopCategories() }
+    // Store 选中变化 → 画布回显
+    const stopSelectedRows = watch(
+      () => store.selectedRowIds,
+      () => {
+        if (isSyncingToStore || isApplyingToCanvas) return
+        applyStoreSelectionToCanvas()
+      },
+      { deep: true },
+    )
+    const stopSelectedSections = watch(
+      () => store.selectedSectionIds,
+      () => {
+        if (isSyncingToStore || isApplyingToCanvas) return
+        applyStoreSelectionToCanvas()
+      },
+      { deep: true },
+    )
+    const stopSelectedSeats = watch(
+      () => store.selectedSeatIds,
+      () => {
+        if (isSyncingToStore || isApplyingToCanvas) return
+        applyStoreSelectionToCanvas()
+      },
+      { deep: true },
+    )
+
+    return () => { stopSections(); stopCategories(); stopSelectedRows(); stopSelectedSections(); stopSelectedSeats() }
   }
 
   /** 从画布 Group 坐标计算 row 参考点的世界位置 */

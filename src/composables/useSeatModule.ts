@@ -1,11 +1,11 @@
 import { ref } from 'vue'
 import { Group, Line, Ellipse, Text, PointerEvent, DragEvent } from 'leafer-ui'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
+import { useVenueStore } from '../stores/venueStore'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
 import { calculateCurvedPositions } from '../viewer/geometry'
 import { getCategoryColor, darkenColor } from '../utils/color'
-import { useVenueStore } from '../stores/venueStore'
 
 export interface SeatModuleCtx {
   getLeafer: () => any
@@ -16,12 +16,14 @@ export interface SeatModuleCtx {
   getAllNonSeatPaths: () => any[]
   getSectionGroupMap: () => Map<string, any>
   getFocusedSectionId?: () => string | null
+  getCurrentTool?: () => string
   onToolChange: (tool: string) => void
 }
 
 export function useSeatModule(ctx: SeatModuleCtx) {
   const seatRowGroups: any[] = []
   const drawnSeatCount = ref(0)
+  const store = useVenueStore()
 
   // 座位排拖拽/旋转状态（Alt+拖拽=旋转，普通拖拽=移动）
   let seatDragState: {
@@ -33,6 +35,15 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     hasMoved: boolean
   } | null = null
   const DRAG_THRESHOLD = 3
+
+  /** 判断事件路径中是否包含可见的单个座位圆 */
+  function isEventOnVisibleSeat(e: any): boolean {
+    const path = e.path?.list ?? e.path ?? []
+    for (const leaf of path) {
+      if (leaf?.__seatId && leaf.visible) return true
+    }
+    return false
+  }
 
   // 全局 MOVE/UP 监听（拖拽时更新位置 + editBox）
   const leafer = ctx.getLeafer()
@@ -90,26 +101,27 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       // 单击选中 / Alt+拖拽旋转 / 普通拖拽移动
       group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
         const ed = ctx.getEditor()
-        if (ed && ctx.getFocusedSectionId?.()) {
-          if (ed.hasItem(group)) {
-            // 已选中 → 启动拖拽/旋转
-            seatDragState = {
-              group,
-              startX: e.x, startY: e.y,
-              startGroupX: group.x || 0, startGroupY: group.y || 0,
-              startRotation: group.rotation || 0,
-              isRotate: !!e.altKey,
-              hasMoved: false,
-            }
-            return
+        if (!ed || !ctx.getFocusedSectionId?.()) return
+        // 如果点击的是可见的单个座位圆，交给 selector 处理单座选择，不归一到排
+        if (isEventOnVisibleSeat(e)) return
+        if (ed.hasItem(group)) {
+          // 已选中 → 启动拖拽/旋转
+          seatDragState = {
+            group,
+            startX: e.x, startY: e.y,
+            startGroupX: group.x || 0, startGroupY: group.y || 0,
+            startRotation: group.rotation || 0,
+            isRotate: !!e.altKey,
+            hasMoved: false,
           }
-          if (e.shiftKey) {
-            ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
-          } else {
-            ed.target = group
-          }
-          e.stop()
+          return
         }
+        if (e.shiftKey) {
+          ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
+        } else {
+          ed.target = group
+        }
+        e.stop()
       })
 
       const lastIdx = row.count - 1
@@ -142,6 +154,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           hittable: true,
           draggable: false,
         })
+        ;(ell as any).__originalStroke = '#81C784'
+        ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
         // 座位标签文本（正中间）
         const st = new Text({
           text: '',
@@ -232,12 +246,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     }
     const bs = seatDraw.getBaseScale()
     // 同步 baseScale 到 store，确保预览端的座位比例与编辑器一致
-    try {
-      const store = useVenueStore()
-      if (store.venue.baseScale !== bs) {
-        store.setSectionBaseScale(bs)
-      }
-    } catch (_) {}
+    if (store.venue.baseScale !== bs) {
+      store.setSectionBaseScale(bs)
+    }
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
     const lineWidth = size
@@ -283,9 +294,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
         // ---- 渲染 ----
         const group = new Group({
-          editable: false,
-          hittable: false,
-          draggable: false,
+          editable: true,
+          hittable: true,
+          draggable: true,
           hitChildren: false,
         })
         ;(group as any).__seatRow = true
@@ -293,25 +304,26 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         ;(group as any).__sectionId = section.id
         group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
           const ed = ctx.getEditor()
-          if (ed && ctx.getFocusedSectionId?.()) {
-            if (ed.hasItem(group)) {
-              seatDragState = {
-                group,
-                startX: e.x, startY: e.y,
-                startGroupX: group.x || 0, startGroupY: group.y || 0,
-                startRotation: group.rotation || 0,
-                isRotate: !!e.altKey,
-                hasMoved: false,
-              }
-              return
+          if (!ed || !ctx.getFocusedSectionId?.()) return
+          // 如果点击的是可见的单个座位圆，交给 selector 处理单座选择，不归一到排
+          if (isEventOnVisibleSeat(e)) return
+          if (ed.hasItem(group)) {
+            seatDragState = {
+              group,
+              startX: e.x, startY: e.y,
+              startGroupX: group.x || 0, startGroupY: group.y || 0,
+              startRotation: group.rotation || 0,
+              isRotate: !!e.altKey,
+              hasMoved: false,
             }
-            if (e.shiftKey) {
-              ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
-            } else {
-              ed.target = group
-            }
-            e.stop()
+            return
           }
+          if (e.shiftKey) {
+            ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
+          } else {
+            ed.target = group
+          }
+          e.stop()
         })
         ;(group as any).__rowId = row.id
         ;(group as any).__rowLabel = row.label || ''
@@ -344,6 +356,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             draggable: false,
             visible: false,
           })
+          ;(ell as any).__originalStroke = darkenColor(color, 30)
+          ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
           ;(ell as any).__seatId = seat.id
           ;(ell as any).__categoryKey = ck
           ;(ell as any).__sourceSeat = seat
@@ -359,7 +373,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           strokeWidth: lineWidth,
           strokeCap: 'round',
           opacity: 0.25,
-          hittable: false,
+          hittable: true,
           draggable: false,
         })
         group.add(bar)
@@ -530,6 +544,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             strokeWidth: sw, around: 'center',
             hittable: true, draggable: false,
           })
+          ;(ell as any).__originalStroke = '#81C784'
+          ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
           group.add(ell)
           ellipses.push(ell)
         }
@@ -583,6 +599,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             strokeWidth: sw, around: 'center',
             hittable: true, draggable: false,
           })
+          ;(ell as any).__originalStroke = '#81C784'
+          ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
           group.add(ell)
           ellipses.push(ell)
         }
@@ -623,6 +641,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const s = ctx.getS()
     const threshold = SEAT_CONFIG.radius // 座位圆在 currentScale >= baseScale 时显示
     const selectedSet = new Set((ctx.getEditor() as any)?.list ?? [])
+    const selectedSeatSet = new Set(store.selectedSeatIds)
     for (const g of seatRowGroups) {
       const r = (g as any).__seatRadius as number | undefined
       const bar = (g as any).__bar as any
@@ -633,6 +652,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       if (ellipses && ellipses.length > 0) {
         for (const e of ellipses) {
           e.visible = detail
+          const seatSelected = selectedSeatSet.has(e.__seatId)
+          e.stroke = seatSelected ? '#3b82f6' : (e.__originalStroke ?? '#81C784')
+          e.strokeWidth = seatSelected ? (1 / Math.max(seatDraw.getBaseScale(), 0.02)) * 2 : (1 / Math.max(seatDraw.getBaseScale(), 0.02))
           const st = (e as any).__labelText
           if (st) {
             const hasSeatLabel = String((e as any).__sourceSeat?.label || '').length > 0

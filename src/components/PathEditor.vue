@@ -37,6 +37,7 @@ import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
 import { usePathEditorSync } from '../composables/usePathEditorSync'
+import { useVenueStore } from '../stores/venueStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import { nanoid } from 'nanoid'
 const props = withDefaults(defineProps<{
@@ -534,6 +535,7 @@ const seatModule = useSeatModule({
   },
   getSectionGroupMap: () => sectionGroupMap,
   getFocusedSectionId: () => focusedSectionId.value,
+  getCurrentTool: () => props.currentTool,
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
@@ -547,7 +549,14 @@ const pathEditorSync = usePathEditorSync({
   getFocusedSectionId: () => focusedSectionId.value,
   rebuildSeatRow: (group, newData, endCenter, anchorFromEnd) =>
     seatModule.rebuildSeatRow(group, newData, endCenter, anchorFromEnd),
+  refreshSeatLOD: () => seatModule.updateSeatLOD(),
 })
+
+// Store 中的单座选中变化 → 刷新 LOD 高亮
+const venueStoreForWatch = useVenueStore()
+watch(() => venueStoreForWatch.selectedSeatIds, () => {
+  seatModule.updateSeatLOD()
+}, { deep: true })
 
 // ==================== 顶点编辑 ====================
 
@@ -851,9 +860,10 @@ onMounted(() => {
   leafer.on(LP.UP, () => {
     const sel2 = (editor as any)?.selector
     const list: any[] = (editor as any)?.list ?? []
+    const hasSeats = list.some((el: any) => el.__seatId)
     if (sel2?.__boxHidden) {
       const allSeat = list.length > 0 && list.every((el: any) => el.__seatRow)
-      if (!allSeat) {
+      if (!allSeat && !hasSeats) {
         ;(editor as any).editBox.visible = true
         ;(editor as any).editBox.update()
       }
@@ -865,7 +875,7 @@ onMounted(() => {
     }
     // 框选后 editBox 仍被隐藏的兜底恢复（仅恢复 visible，不调 update 防止已选中排重绘抖动）
     const eb = (editor as any)?.editBox
-    if (eb && !eb.visible && list.length > 0) {
+    if (eb && !eb.visible && list.length > 0 && !hasSeats) {
       eb.visible = true
     }
   })
@@ -937,8 +947,8 @@ onMounted(() => {
     // 选中变化时刷新座位条高亮
     seatModule.updateSeatLOD()
 
-    // 座位排 → 隐藏包围盒（分区保留，需要旋转手柄）
-    if (list.length > 0 && list.every((el: any) => el.__seatRow)) {
+    // 座位排 / 座位圆 → 隐藏包围盒（分区保留，需要旋转手柄）
+    if (list.length > 0 && (list.every((el: any) => el.__seatRow) || list.some((el: any) => el.__seatId))) {
       ;(editor as any).editBox.visible = false
     }
 

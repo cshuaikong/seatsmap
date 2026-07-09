@@ -35,7 +35,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     }
   }
 
-  // ① editBox.update — 座位排选中时穿透整个 editor 层
+  // ① editBox.update — 座位排选中时穿透整个 editor 层；座位选中时隐藏 editBox 避免遮挡
   const editBox = (editor as any).editBox
   if (editBox) {
     const _origUpdate = editBox.update.bind(editBox)
@@ -43,6 +43,7 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const list: any[] = (editor as any)?.list ?? []
       try { _origUpdate() } catch (_) {}
       const allSeats = list.length > 0 && list.every((el: any) => el.__seatRow)
+      const hasSeats = list.some((el: any) => el.__seatId)
       if (allSeats) {
         ;(editor as any).hittable = false
         ;(editor as any).hitSelf = false
@@ -53,6 +54,10 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         if ((editBox as any).rect) {
           ;(editBox as any).rect.hittable = false
         }
+      } else if (hasSeats) {
+        // 座位选择不需要 editBox，隐藏即可
+        ;(editBox as any).visible = false
+        ;(editBox as any).hittable = false
       } else {
         ;(editBox as any).hittable = true
         ;(editBox as any).hitSelf = true
@@ -79,10 +84,14 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     if (ctx.getFocusedSectionId?.() && target?.__sectionGroup === true) return false
     if (!target) return _origAllow(target)
     let node = target
+    let inSeatRow = false
     while (node) {
       if (node === editor) return false
+      if (node?.__seatRow) inSeatRow = true
       node = node.parent
     }
+    // 非分区编辑模式下禁止选中座位排/座位
+    if (inSeatRow && !ctx.getFocusedSectionId?.()) return false
     if (!target?.draggable && !target?.editable) return true
     return _origAllow(target)
   }
@@ -96,7 +105,13 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     // 边框 → SectionGroup
     const borderGroup = ctx.getBorderGroup(result)
     if (borderGroup) return borderGroup
-    // 路径中有 seatRow 父元素
+    // focus 模式下，命中可见的单个座位圆 → 直接选中座位
+    if (focusedId) {
+      for (const leaf of path) {
+        if (leaf?.__seatId && leaf.visible) return leaf
+      }
+    }
+    // 路径中有 seatRow 父元素（非座位圆命中时归一到排）
     for (const leaf of path) {
       const p = leaf.parent
       if (p?.__seatRow) return p
@@ -116,8 +131,8 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const _origCheck = sel.checkAndSelect.bind(sel)
   sel.checkAndSelect = function (e: any) {
     const find = sel.findUI(e)
-    if (find && sel.editor.hasItem(find) && sel.editor.multiple && !sel.isMultipleSelect(e)) return
 
+    // 先执行 focus/row 拦截，再处理已选中对象的早期返回
     if (find?.__sectionGroup === true && ctx.getFocusedSectionId?.()) return
 
     if (find?.__seatRow && ctx.getFocusedSectionId?.() && !sel.editor.editing) {
@@ -130,6 +145,8 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       if (!directlyHit) return
     }
 
+    if (find && sel.editor.hasItem(find) && sel.editor.multiple && !sel.isMultipleSelect(e)) return
+
     _origCheck(e)
   }
 
@@ -137,6 +154,10 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   let _proxyRestore: (() => void) | null = null
   const _origAllowDrag = (sel as any).allowDrag.bind(sel)
   ;(sel as any).allowDrag = function (e: any) {
+    // 兜底：如果存在未恢复的 proxy，先恢复
+    if (_proxyRestore && !this.dragging) {
+      _proxyRestore()
+    }
     if (ctx.getFocusedSectionId?.() && !this.dragging) {
       if (e.target?.__seatHandleIdx != null) return _origAllowDrag(e)
       let node = e.target
@@ -147,9 +168,10 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
           const saved = appSelector.proxy
           appSelector.proxy = null
           const restore = () => {
+            if (!_proxyRestore) return
             appSelector.proxy = saved
             _proxyRestore = null
-            editor.off_([restoreId])
+            try { editor.off_([restoreId]) } catch (_) {}
           }
           _proxyRestore = restore
           const restoreId = editor.on_(DragEvent.END, restore)
