@@ -88,7 +88,7 @@ export function getSectionAABB(section: Section): AABB | null {
   const bx = section.x ?? 0
   const by = section.y ?? 0
 
-  switch (section.borderType) {
+  switch (section.type) {
     case 'rect':
       return { x: bx, y: by, width: section.width ?? 100, height: section.height ?? 100 }
     case 'ellipse': {
@@ -111,7 +111,7 @@ export function isInsideSection(section: Section, worldPos: { x: number; y: numb
   const px = worldPos.x
   const py = worldPos.y
 
-  switch (section.borderType) {
+  switch (section.type) {
     case 'rect':
       return px >= bx && px <= bx + (section.width ?? 100)
           && py >= by && py <= by + (section.height ?? 100)
@@ -140,7 +140,7 @@ export function isNearSectionBorder(section: Section, worldPos: { x: number; y: 
   const py = worldPos.y
   const threshold = BORDER_HIT_RADIUS
 
-  switch (section.borderType) {
+  switch (section.type) {
     case 'rect':
       return _isNearRectBorder(section, bx, by, px, py, threshold)
     case 'ellipse':

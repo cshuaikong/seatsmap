@@ -599,7 +599,7 @@ export class DrawingManager {
     if (this._polygonPoints.length < 3) return
     const center = calculatePolygonCenter(this._polygonPoints)
     const relativePoints = toRelativePoints(this._polygonPoints, center)
-    // 转为 PathPoint[] 格式（path borderType 需要）
+    // 转为 PathPoint[] 格式（path type 需要）
     const pathPts: PathPoint[] = []
     for (let i = 0; i < relativePoints.length; i += 2) {
       pathPts.push({ x: relativePoints[i], y: relativePoints[i + 1], type: 'line', arcDepth: 0 })
@@ -608,7 +608,7 @@ export class DrawingManager {
     const sectionId = store.addSection({
       name: `分区${store.venue.sections.length + 1}`,
       rows: [],
-      borderType: 'path',
+      type: 'path',
       x: center.x,
       y: center.y,
       pathPoints: pathPts,

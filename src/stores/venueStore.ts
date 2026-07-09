@@ -696,7 +696,7 @@ export const useVenueStore = defineStore('venue', () => {
   function updateSectionBorder(sectionId: string, border: Partial<Pick<Section,
     'name'
     | 'rotation'
-    | 'borderType'
+    | 'type'
     | 'x'
     | 'y'
     | 'width'
@@ -921,7 +921,7 @@ export const useVenueStore = defineStore('venue', () => {
 
     const normalizedSections: Section[] = data.sections.map(section => ({
       ...section,
-      borderType: (section as any).type || undefined,
+      type: (section as any).type || (section as any).borderType || undefined,
       readonly: false,
       rows: Array.isArray(section.rows) ? section.rows : [],
       // shapes: Array.isArray(section.shapes) ? section.shapes : [],

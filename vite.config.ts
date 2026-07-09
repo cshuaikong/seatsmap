@@ -13,8 +13,9 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/venue': {
-        target: 'http://seatmap.web.jinsc.cn',
+        target: 'https://seatmap.web.jinsc.cn',
         changeOrigin: true,
+        secure: true,
       }
     }
   }

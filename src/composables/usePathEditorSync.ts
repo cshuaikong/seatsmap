@@ -413,8 +413,8 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     if (section.zIndex !== undefined && group.zIndex !== section.zIndex) {
       group.zIndex = section.zIndex
     }
-    // 同步 borderType → readonly（只读分区不可编辑）
-    if (section.borderType === 'none' && section.readonly === true) {
+    // 同步 type → readonly（只读分区不可编辑）
+    if (section.type === 'none' && section.readonly === true) {
       // 只读分区不处理
     }
   }

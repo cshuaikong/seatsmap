@@ -4,6 +4,7 @@
       <div class="header-left">
         <Icon icon="lucide:layout-grid" class="panel-header-icon" />
         <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
+        <span class="section-type-badge">{{ sectionTypeLabel }}</span>
       </div>
       <button
         v-if="!isMulti && section"
@@ -140,7 +141,7 @@
       <div class="panel-stats">
         <div class="stat-item">
           <Icon icon="lucide:vector-square" class="stat-icon" />
-          <span>{{ isMulti ? `${selectedCount} 个分区` : borderTypeLabel }}</span>
+          <span>{{ isMulti ? `${selectedCount} 个分区` : sectionTypeLabel }}</span>
         </div>
         <div class="stat-item" v-if="!isMulti">
           <Icon icon="lucide:rows-3" class="stat-icon" />
@@ -178,12 +179,12 @@
         </div>
       </div>
 
-      <div v-if="section.borderType === 'path' && !isMulti" class="panel-note">
+      <div v-if="section.type === 'path' && !isMulti" class="panel-note">
         <Icon icon="lucide:pen-tool" class="note-icon" />
         <span>当前走 path 数据</span>
       </div>
 
-      <div v-if="section.borderType === 'path' && pathSegments.length && !isMulti" class="path-editor">
+      <div v-if="section.type === 'path' && pathSegments.length && !isMulti" class="path-editor">
         <div class="path-editor-header">
           <Icon icon="lucide:spline-pointer" class="note-icon" />
           <span>边段编辑</span>
@@ -249,7 +250,7 @@
 
       <!-- 顶点编辑按钮（仅 polygon/path 分区显示） -->
       <button
-        v-if="section.borderType === 'path' && !isMulti"
+        v-if="section.type === 'path' && !isMulti"
         class="vertex-edit-btn"
         :class="{ active: vertexEditActive }"
         @click="emit('toggle-vertex-edit')"
@@ -450,8 +451,8 @@ function onCategoryColorChange(key: string, color: string): void {
   venueStore.updateCategory(key, { color })
 }
 
-const borderTypeLabel = computed(() => {
-  const type = props.section?.borderType
+const sectionTypeLabel = computed(() => {
+  const type = props.section?.type
   if (type === 'path') return '路径分区'
   if (type === 'ellipse') return '椭圆分区'
   if (type === 'rect') return '矩形分区'
@@ -529,6 +530,17 @@ const pathSegments = computed(() => {
   width: 15px;
   height: 15px;
   color: var(--color-accent);
+}
+
+.section-type-badge {
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #64748b);
+  background: var(--color-bg-tertiary, #f1f5f9);
+  border-radius: 4px;
+  white-space: nowrap;
 }
 
 .panel-body {

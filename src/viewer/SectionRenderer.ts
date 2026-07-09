@@ -43,7 +43,7 @@ export class SectionRenderer {
     }
 
     // 1. 边框（相对 group 在 0,0）
-    const effectiveType = (section as any).type
+    const effectiveType = section.type
     if (effectiveType && effectiveType !== 'none') {
       if (dualLayer) {
         const dual = SectionRenderer.createDualBorder(section)
@@ -102,8 +102,8 @@ export class SectionRenderer {
 
     const id = `section-border-${section.id}`
     const base = { id, fill, stroke, strokeWidth, opacity: section.opacity ?? 1, editable: false }
-    const borderType = (section as any).type
-    switch (borderType) {
+    const sectionType = section.type
+    switch (sectionType) {
       case 'rect':
         return new Rect({
           ...base,
@@ -141,9 +141,9 @@ export class SectionRenderer {
     // strokeWidth: 4 提供点击命中区；stroke: 'transparent' 默认不可见，高亮时改颜色
     const strokeBase = { fill: 'none' as const, stroke: 'transparent', strokeWidth: 4, opacity, editable: false, hitFill: 'none' as const, hitStroke: 'all' as const }
 
-    const borderType2 = (section as any).type
+    const sectionType2 = section.type
 
-    switch (borderType2) {
+    switch (sectionType2) {
       case 'rect': {
         const w = section.width ?? 100
         const h = section.height ?? 100
@@ -321,7 +321,7 @@ export class SectionRenderer {
     let cx = 0
     let cy = 0
 
-    const labelType = (section as any).type
+    const labelType = section.type
 
     if (labelType === 'rect') {
       cx = (section.width ?? 100) / 2

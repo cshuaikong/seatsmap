@@ -63,7 +63,7 @@ const buildStaticLayer = (): boolean => {
   ctx.fillRect(0, 0, w, h)
 
   props.venue.sections.forEach((section: any) => {
-    if (!section.borderType || section.borderType === 'none') return
+    if (!section.type || section.type === 'none') return
 
     ctx.fillStyle = section.fill || 'rgba(128, 128, 128, 0.15)'
     ctx.strokeStyle = section.stroke || '#808080'
@@ -72,10 +72,10 @@ const buildStaticLayer = (): boolean => {
     const bx = ox + ((section.x || 0) - vb.x) * minimapScale
     const by = oy + ((section.y || 0) - vb.y) * minimapScale
 
-    if (section.borderType === 'rect') {
+    if (section.type === 'rect') {
       ctx.fillRect(bx, by, (section.width || 100) * minimapScale, (section.height || 100) * minimapScale)
       ctx.strokeRect(bx, by, (section.width || 100) * minimapScale, (section.height || 100) * minimapScale)
-    } else if (section.borderType === 'ellipse') {
+    } else if (section.type === 'ellipse') {
       ctx.beginPath()
       ctx.ellipse(
         bx + (section.radiusX || 50) * minimapScale,
@@ -86,7 +86,7 @@ const buildStaticLayer = (): boolean => {
       )
       ctx.fill()
       ctx.stroke()
-    } else if (section.borderType === 'path' && section.path) {
+    } else if (section.type === 'path' && section.path) {
       ctx.save()
       ctx.translate(bx, by)
       ctx.scale(minimapScale, minimapScale)

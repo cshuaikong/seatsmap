@@ -85,7 +85,7 @@ let pendingAutoSelect: { kind: string; id: string } | null = null
 /** 节点编辑工具模式：等待点击分区进入顶点编辑 */
 let nodeToolActive = false
 let ctxMenuCleanup: (() => void) | null = null
-/** 分区 ID → 其边框元素（用于悬停高亮，覆盖所有 borderType） */
+/** 分区 ID → 其边框元素（用于悬停高亮，覆盖所有 type） */
 const sectionBorderElMap = new Map<string, any>()
 /** 分区 ID → 双图层 fill 元素（仅选中分区存在） */
 const sectionFillElMap = new Map<string, any>()
@@ -168,8 +168,8 @@ const rebuildSectionLayers = (dirtySectionIds?: Set<string> | null) => {
 
     leafer.add(sectionGroup)
 
-    // 缓存边框元素（供悬停高亮用，覆盖所有 borderType）
-    if (section.borderType && section.borderType !== 'none') {
+    // 缓存边框元素（供悬停高亮用，覆盖所有 type）
+    if (section.type && section.type !== 'none') {
       if (isSelected) {
         // 双图层: children[0]=fill, children[1]=stroke
         const fillEl = sectionGroup.children[0]
@@ -233,7 +233,7 @@ const bindStrokeDoubleClick = (sectionId: string, el: any) => {
     if (dispatcher?.mode === 'VERTEX_EDIT') return
     const section = props.venue.sections.find(s => s.id === sectionId)
     if (!section || !dispatcher) return
-    if (section.borderType === 'path' && section.pathPoints?.length) {
+    if (section.type === 'path' && section.pathPoints?.length) {
       dispatcher.enterVertexEdit(section, 'path')
     }
   })
@@ -831,7 +831,7 @@ onMounted(() => {
       const sections = props.venue.sections
       for (let i = sections.length - 1; i >= 0; i--) {
         const s = sections[i]
-        if (!s.borderType || s.borderType === 'none') continue
+        if (!s.type || s.type === 'none') continue
         if (s.readonly) continue
         const aabb = getSectionAABB(s)
         if (!aabb) continue
@@ -840,7 +840,7 @@ onMounted(() => {
           worldPos.y < aabb.y - 1 || worldPos.y > aabb.y + aabb.height + 1
         ) continue
         if (isInsideSection(s, worldPos)) {
-          if (s.borderType === 'path' && s.pathPoints?.length) {
+          if (s.type === 'path' && s.pathPoints?.length) {
             dispatcher.enterVertexEdit(s, 'path')
             return
           }
@@ -1040,7 +1040,7 @@ const setDrawingTool = (tool: string) => {
     // 节点编辑工具：有选中分区 → 立即进入顶点编辑；否则等待点击
     const sid = store.selectedSectionIds[0]
     const section = sid ? props.venue.sections.find(s => s.id === sid) : null
-    if (section?.borderType === 'path' && section.pathPoints?.length) {
+    if (section?.type === 'path' && section.pathPoints?.length) {
       if (vertexEditManager?.activeKind !== 'path') {
         engine?.editor.cancel()
         vertexEditManager?.enterForPathSection(section, sectionBorderElMap.get(section.id))
@@ -1130,7 +1130,7 @@ const enterSectionFocus = (sectionId: string, worldPos?: { x: number; y: number 
   } else {
     cx = section.x ?? 0
     cy = section.y ?? 0
-    if (section.borderType === 'rect') {
+    if (section.type === 'rect') {
       cx += (section.width ?? 100) / 2
       cy += (section.height ?? 100) / 2
     }
@@ -1190,7 +1190,7 @@ const toggleVertexEdit = () => {
   if (!sectionId) return
   const section = props.venue.sections.find(s => s.id === sectionId)
   if (!section) return
-  if (section.borderType === 'path' && section.pathPoints?.length) {
+  if (section.type === 'path' && section.pathPoints?.length) {
     dispatcher.enterVertexEdit(section, 'path')
   }
 }

@@ -6,9 +6,9 @@
     </template>
 
     <!-- Section 分区选中面板 -->
-    <template v-else-if="selectedSectionWithBorder">
+    <template v-else-if="selectedSection">
       <SectionPanel
-        :section="selectedSectionWithBorder"
+        :section="selectedSection"
         :active-point-index="activePathPointIndex"
         :is-multi="isMultiSectionSelected"
         :selected-count="selectedSections.length"
@@ -281,20 +281,18 @@ const emit = defineEmits<{
 // 使用 venueStore 作为唯一数据源
 const venueStore = useVenueStore()
 
-// Section 分区选中（有边框的 section）- 单选时返回第一个，多选时也返回第一个用于显示
-const selectedSectionWithBorder = computed<Section | null>(() => {
+// Section 分区选中 - 单选时返回第一个，多选时也返回第一个用于显示
+const selectedSection = computed<Section | null>(() => {
   const sectionId = venueStore.selectedSectionIds[0]
   if (!sectionId) return null
-  const section = venueStore.venue.sections.find(s => s.id === sectionId)
-  if (!section || !section.borderType || section.borderType === 'none') return null
-  return section
+  return venueStore.venue.sections.find(s => s.id === sectionId) || null
 })
 
 // 获取所有选中的分区（用于批量编辑）
 const selectedSections = computed<Section[]>(() => {
   return venueStore.selectedSectionIds
     .map(id => venueStore.venue.sections.find(s => s.id === id))
-    .filter((s): s is Section => !!s && !!s.borderType && s.borderType !== 'none')
+    .filter((s): s is Section => !!s)
 })
 
 // 是否多选分区

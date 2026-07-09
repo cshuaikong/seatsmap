@@ -129,7 +129,7 @@ export interface Section {
   texts?: TextObject[]
   areas?: AreaObject[]
   // 分区形状类型
-  borderType?: 'rect' | 'ellipse' | 'path' | 'none'
+  type?: 'rect' | 'ellipse' | 'path' | 'none'
   width?: number          // rect 专用
   height?: number         // rect 专用
   radiusX?: number        // ellipse 专用

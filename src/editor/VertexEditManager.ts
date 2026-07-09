@@ -13,7 +13,7 @@ export interface VertexEditManagerOptions {
   setSyncing: (v: boolean) => void
   saveHistory: () => void
 
-  // path 分区（borderType='path'）
+  // path 分区（type='path'）
   updateSectionBorderPathPoints?: (sectionId: string, pathPoints: PathPoint[]) => void
   // 形状（ShapeObject: polygon/polyline）
   updateShapePoints?: (id: string, points: number[], arcDepths?: number[]) => void

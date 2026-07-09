@@ -674,7 +674,7 @@ export function submitRect(startPos: Position, endPos: Position) {
     rows: [],
     x: 0,
     y: 0,
-    borderType: 'rect',
+    type: 'rect',
     x: x,
     y: y,
     width: width,
@@ -734,7 +734,7 @@ export function submitEllipse(startPos: Position, endPos: Position) {
     rows: [],
     x: startPos.x,
     y: startPos.y,
-    borderType: 'ellipse',
+    type: 'ellipse',
     radiusX: radius,
     radiusY: radius,
     fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明

@@ -288,7 +288,7 @@ function renderAll(data: VenueData): void {
     // SIMPLE 模式：自动进入默认分区聚焦，座位工具直接可用
     const venueType: string = (data as any)?.type ?? 'SIMPLE'
     if (venueType === 'SIMPLE') {
-      const defaultSection = sections.find((s: any) => s.borderType === 'none' || !s.path) || sections[0]
+      const defaultSection = sections.find((s: any) => s.type === 'none' || !s.type || !s.path) || sections[0]
       if (defaultSection) {
         nextTick(() => enterSectionFocus(defaultSection.id))
       }
@@ -459,7 +459,7 @@ function buildVenueData(): any {
     sections.push({
       name: orig.name,
       rows: sectionRowsMap.get(orig.id)!,
-      type: orig.borderType || 'path',
+      type: orig.type || (orig as any).borderType || 'path',
       x: +(orig.x ?? 0).toFixed(2),
       y: +(orig.y ?? 0).toFixed(2),
       fill: orig.fill || '#dbdbdb',
@@ -630,7 +630,7 @@ let _origOpenGroupFn: ((group: any) => void) | null = null
 function enterSectionFocus(sectionId: string): void {
   const group = sectionGroupMap.get(sectionId)
   if (!group) {
-    // 无 SectionGroup 的分区（如 borderType=none）：手动执行 setup
+    // 无 SectionGroup 的分区（如 type=none）：手动执行 setup
     const section = props.venueData?.sections?.find((s: any) => s.id === sectionId)
     if (!section || !leafer) return
     focusedSectionId.value = sectionId

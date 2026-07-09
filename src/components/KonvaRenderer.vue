@@ -217,7 +217,7 @@ const getOrCreateDefaultSection = (): string => {
       rows: [],
       x: 0,
       y: 0,
-      borderType: 'rect',
+      type: 'rect',
       x: 100,      // 左上角 x
       y: 100,      // 左上角 y
       width: 400,  // 宽度
@@ -228,7 +228,7 @@ const getOrCreateDefaultSection = (): string => {
     return sectionId || 'default'
   }
   // 返回第一个没有边框的 Section（普通 section）或第一个 section
-  const defaultSection = venueStore.venue.sections.find(s => !s.borderType || s.borderType === 'none')
+  const defaultSection = venueStore.venue.sections.find(s => !s.type || s.type === 'none')
   if (defaultSection) return defaultSection.id
   return venueStore.venue.sections[0].id
 }
@@ -568,13 +568,13 @@ const renderAll = () => {
     const isFocusedSection = venueStore.focusedSectionId === section.id
     if (isFocusedSection) {
       // 分区编辑模式：先 border 后 content，座位在最上层可点击
-      if (section.borderType && section.borderType !== 'none') {
+      if (section.type && section.type !== 'none') {
         renderSectionBorder(section)
       }
       renderSection(section, false) // 焦点分区显示具体座位
     } else {
       // 全局视图或分区编辑模式下的非焦点分区：先 border 后 content，显示横条
-      if (section.borderType && section.borderType !== 'none') {
+      if (section.type && section.type !== 'none') {
         renderSectionBorder(section)
       }
       const forceBarMode = !!venueStore.focusedSectionId // 分区编辑模式下非焦点分区强制横条
@@ -914,7 +914,7 @@ const pathPointsToSvgPath = (points: PathPoint[]): string => {
 }
 
 const renderSectionBorder = (section: Section) => {
-  if (!mainLayer || !section.borderType || section.borderType === 'none') return
+  if (!mainLayer || !section.type || section.type === 'none') return
 
   const isFocused = venueStore.focusedSectionId === section.id
   const isOtherFocused = venueStore.focusedSectionId !== null && !isFocused
@@ -969,7 +969,7 @@ const renderSectionBorder = (section: Section) => {
     listening: canListen,
   }
 
-  if (section.borderType === 'ellipse') {
+  if (section.type === 'ellipse') {
     // ellipse: x,y 为中心点，radiusX,radiusY 为半径（与 ShapeObject 一致）
     const rx = section.radiusX || 50
     const ry = section.radiusY || 30
@@ -987,7 +987,7 @@ const renderSectionBorder = (section: Section) => {
       width: rx * 2,
       height: ry * 2
     })
-  } else if (section.borderType === 'path') {
+  } else if (section.type === 'path') {
     // path: 带弧线的路径，使用 pathPoints
     const pathData = section.pathPoints 
       ? pathPointsToSvgPath(section.pathPoints)
@@ -1038,11 +1038,11 @@ const renderSectionBorder = (section: Section) => {
 
   // 分区名称标签位置
   let labelX: number, labelY: number
-  if (section.borderType === 'ellipse') {
+  if (section.type === 'ellipse') {
     // 椭圆中心点
     labelX = section.x || 0
     labelY = section.y || 0
-  } else if (section.borderType === 'path') {
+  } else if (section.type === 'path') {
     // 路径中心点
     labelX = section.x || 0
     labelY = section.y || 0
@@ -1069,7 +1069,7 @@ const renderSectionBorder = (section: Section) => {
 
   const borderNode = borderShape as Konva.Shape
   borderNode.setAttr('sectionId', section.id)
-  borderNode.setAttr('borderType', section.borderType)
+  borderNode.setAttr('borderType', section.type)
   nodeMap.set('sectionBorder_' + section.id, borderNode)
   
   // 标签也加入 nodeMap 以便跟随移动
@@ -1169,7 +1169,7 @@ const renderSectionBorder = (section: Section) => {
       y: borderNode.y(),
       rotation: borderNode.rotation()
     }
-    const bt = section.borderType
+    const bt = section.type
     const scaleX = borderNode.scaleX()
     const scaleY = borderNode.scaleY()
     if (bt === 'rect') {
@@ -1193,7 +1193,7 @@ const renderSectionBorder = (section: Section) => {
 
   mainLayer.add(borderShape)
 
-  if (section.borderType === 'path') {
+  if (section.type === 'path') {
     renderPathSegmentHandles(section, strokeColor, isOtherFocused)
     // 渲染可拖拽的顶点手柄
     if (isSelected) {
@@ -2862,7 +2862,7 @@ const submitRect = (startPos: Position, endPos: Position) => {
     rows: [],
     x: 0,
     y: 0,
-    borderType: 'rect',
+    type: 'rect',
     x: x,
     y: y,
     width: width,
@@ -2930,7 +2930,7 @@ const submitEllipse = (startPos: Position, endPos: Position) => {
     rows: [],
     x: centerX,
     y: centerY,
-    borderType: 'ellipse',
+    type: 'ellipse',
     radiusX: radiusX,
     radiusY: radiusY,
     fill: 'rgba(128,128,128,0.15)',  // 默认灰色半透明
@@ -2970,7 +2970,7 @@ const submitPolygon = (points: import('../types').PathPoint[]) => {
   venueStore.addSection({
     name: '路径分区',
     rows: [],
-    borderType: 'path',
+    type: 'path',
     x: center.x,
     y: center.y,
     pathPoints: relativePathPoints,
