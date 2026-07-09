@@ -629,7 +629,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const ellipses = (g as any).__seatEllipses as any[] | undefined
       if (r == null || !bar) continue
       const sel = selectedSet.has(g)
-      const detail = r * s > threshold
+      const detail = r * s >= threshold
       if (ellipses && ellipses.length > 0) {
         for (const e of ellipses) {
           e.visible = detail
