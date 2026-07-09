@@ -536,6 +536,7 @@ const seatModule = useSeatModule({
   getSectionGroupMap: () => sectionGroupMap,
   getFocusedSectionId: () => focusedSectionId.value,
   getCurrentTool: () => props.currentTool,
+  onSeatRowTransform: () => pathEditorSync.syncTransformToStore(),
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 

@@ -17,6 +17,7 @@ export interface SeatModuleCtx {
   getSectionGroupMap: () => Map<string, any>
   getFocusedSectionId?: () => string | null
   getCurrentTool?: () => string
+  onSeatRowTransform?: () => void
   onToolChange: (tool: string) => void
 }
 
@@ -71,11 +72,17 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
       const editBox = (ctx.getEditor() as any)?.editBox
       if (editBox) editBox.update()
+      if (seatDragState?.hasMoved) {
+        ctx.onSeatRowTransform?.()
+      }
     })
 
     leafer.on(PointerEvent.UP, () => {
       if (!seatDragState) return
-      // TODO: 移动/旋转结束后保存到 store
+      // 拖拽/旋转结束后同步到 store
+      if (seatDragState.hasMoved) {
+        ctx.onSeatRowTransform?.()
+      }
       seatDragState = null
     })
   }
@@ -118,10 +125,19 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         }
         if (e.shiftKey) {
           ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
-        } else {
-          ed.target = group
+          e.stop()
+          return
         }
-        e.stop()
+        // 未选中：先选中，同时按下即可拖拽/旋转（超过阈值后生效）
+        ed.target = group
+        seatDragState = {
+          group,
+          startX: e.x, startY: e.y,
+          startGroupX: group.x || 0, startGroupY: group.y || 0,
+          startRotation: group.rotation || 0,
+          isRotate: !!e.altKey,
+          hasMoved: false,
+        }
       })
 
       const lastIdx = row.count - 1
@@ -320,10 +336,19 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           }
           if (e.shiftKey) {
             ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
-          } else {
-            ed.target = group
+            e.stop()
+            return
           }
-          e.stop()
+          // 未选中：先选中，同时按下即可拖拽/旋转（超过阈值后生效）
+          ed.target = group
+          seatDragState = {
+            group,
+            startX: e.x, startY: e.y,
+            startGroupX: group.x || 0, startGroupY: group.y || 0,
+            startRotation: group.rotation || 0,
+            isRotate: !!e.altKey,
+            hasMoved: false,
+          }
         })
         ;(group as any).__rowId = row.id
         ;(group as any).__rowLabel = row.label || ''
