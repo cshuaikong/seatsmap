@@ -4,7 +4,7 @@
       <div class="header-left">
         <Icon icon="lucide:layout-grid" class="panel-header-icon" />
         <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
-        <span class="section-type-badge">{{ sectionTypeLabel }}</span>
+        <span v-if="sectionTypeLabel" class="section-type-badge">{{ sectionTypeLabel }}</span>
       </div>
       <button
         v-if="!isMulti && section"
@@ -432,7 +432,7 @@ function onCategoryColorChange(key: string, color: string): void {
 
 const sectionTypeLabel = computed(() => {
   const type = props.section?.type
-  if (type === 'path') return '路径分区'
+  if (type === 'path') return ''
   if (type === 'ellipse') return '椭圆分区'
   if (type === 'rect') return '矩形分区'
   return '普通分区'
