@@ -762,7 +762,20 @@ onMounted(() => {
     zoom: { min: 0.05, max: 20 },
   })
 
-  editor = new Editor({ selector: true, moveable: true, rotateable: true, resizeable: false, keyEvent: true, hover: false, pointSize: 6, strokeWidth: 1, stroke: '#3b82f6', multiSelect: true, area: { fill: 'rgba(59,130,246,0.1)', strokeWidthFixed: true } })
+  editor = new Editor({
+    selector: true,
+    moveable: true,
+    rotateable: true,
+    resizeable: false,
+    skewable: false, // 是否允许倾斜（skew）
+    keyEvent: true,
+    hover: false,
+    pointSize: 6,
+    strokeWidth: 1,
+    stroke: '#3b82f6',
+    multiSelect: true,
+    area: { fill: 'rgba(59,130,246,0.1)', strokeWidthFixed: true }
+  })
 
   useSelectorPatch({
     getEditor: () => editor,
