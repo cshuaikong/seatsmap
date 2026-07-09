@@ -6,6 +6,15 @@
         <span>{{ isMulti ? `批量编辑 (${selectedCount}个分区)` : '分区属性' }}</span>
         <span class="section-type-badge">{{ sectionTypeLabel }}</span>
       </div>
+      <button
+        v-if="!isMulti && section"
+        class="header-edit-btn"
+        title="进入分区编辑模式"
+        @click="emit('enter-section')"
+      >
+        <Icon icon="lucide:pen-square" class="btn-icon" />
+        编辑
+      </button>
     </div>
 
     <div class="panel-body" v-if="section">
