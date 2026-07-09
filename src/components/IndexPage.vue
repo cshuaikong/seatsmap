@@ -6,12 +6,6 @@
         <Icon icon="lucide:layout-dashboard" class="header-logo" />
         <span class="app-title">座位图管理</span>
       </div>
-      <div class="header-right">
-        <button class="hdr-btn" @click="openCreateModal">
-          <Icon icon="lucide:plus" class="btn-icon" />
-          添加
-        </button>
-      </div>
     </header>
 
     <!-- 新建场馆弹框 -->
@@ -19,7 +13,7 @@
       <div class="modal-card">
         <div class="modal-header">
           <Icon icon="lucide:plus-circle" class="modal-icon" />
-          <span>新建场馆</span>
+          <span>新增场馆</span>
         </div>
         <div class="modal-body">
           <label class="modal-label">场馆名称</label>
@@ -42,6 +36,10 @@
     <!-- 主体：左侧列表 + 右侧设计器 -->
     <div class="app-body">
       <aside class="sidebar">
+        <button class="sidebar-add-btn" @click="openCreateModal">
+          <Icon icon="lucide:plus" class="add-btn-icon" />
+          <span>新增场馆</span>
+        </button>
         <div
           v-for="(item, i) in seatMaps"
           :key="getVenueId(item)"
@@ -288,6 +286,34 @@ async function onSaveVenue(data: any) {
   background: var(--color-bg-secondary, #f1f5f9);
   border-right: 1px solid var(--color-border, #e2e8f0);
   overflow-y: auto;
+}
+
+.sidebar-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sidebar-add-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.add-btn-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .venue-card {
