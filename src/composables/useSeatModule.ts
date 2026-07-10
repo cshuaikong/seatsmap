@@ -136,7 +136,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
   }
 
   function clearSeatElements(): void {
-    seatDragState = null
     seatRowGroups.forEach(g => { try { g.remove() } catch (_) {} })
     seatRowGroups.length = 0
     drawnSeatCount.value = 0
