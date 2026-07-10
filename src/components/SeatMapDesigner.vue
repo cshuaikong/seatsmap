@@ -33,10 +33,6 @@
           <Icon :icon="importStatus === 'success' ? 'lucide:check' : importStatus === 'error' ? 'lucide:circle-x' : 'lucide:upload'" class="btn-icon" />
           {{ importStatus === 'success' ? '已导入' : importStatus === 'error' ? '失败' : '导入' }}
         </button>
-        <button class="action-btn secondary" @click="onPreview">
-          <Icon icon="lucide:eye" class="btn-icon" />
-          预览
-        </button>
         <button class="action-btn primary" @click="onSave">
           <Icon icon="lucide:check" class="btn-icon" />
           保存
@@ -107,11 +103,6 @@
         @delete="onDeleteCategory"
       />
 
-      <PreviewModal
-        :visible="showPreview"
-        :venue="venueStore.venue"
-        @close="showPreview = false"
-      />
     </div>
   </div>
 </template>
@@ -126,7 +117,6 @@ import type { VenueData } from '../types'
 import { useVenueStore } from '../stores/venueStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
-import PreviewModal from './PreviewModal.vue'
 
 const emit = defineEmits<{
   (e: 'save', data: any): void
@@ -211,7 +201,6 @@ const displayCategories = computed(() => {
 })
 
 const showCategoryManager = ref(false)
-const showPreview = ref(false)
 
 // ==================== 导出/导入 ====================
 
@@ -257,10 +246,6 @@ const onImportData = async () => {
     importStatus.value = 'idle'
     importTip.value = ''
   }, 3000)
-}
-
-const onPreview = () => {
-  showPreview.value = true
 }
 
 const onSave = () => {

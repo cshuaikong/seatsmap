@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { Group, Line, Ellipse, Text, PointerEvent, DragEvent } from 'leafer-ui'
+import { Group, Line, Ellipse, Text, PointerEvent } from 'leafer-ui'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatDrawRowData } from './useSeatDraw'

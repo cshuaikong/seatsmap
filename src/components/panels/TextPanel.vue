@@ -112,29 +112,14 @@ const readFromNode = () => {
   if (!props.node) return
   const node = props.node
 
-  // 判断是 Konva 节点还是纯数据对象（TextObject）
-  const isKonvaNode = typeof node.getAttr === 'function'
-
-  if (isKonvaNode) {
-    // Konva 节点模式
-    localCaption.value = node.text?.() || ''
-    localFontSize.value = node.fontSize?.() || 14
-    localTextColor.value = node.fill?.() || '#000000'
-    const fontStyle = node.fontStyle?.() || ''
-    localBold.value = fontStyle.includes('bold')
-    localItalic.value = fontStyle.includes('italic')
-    const scaleX = node.scaleX?.() || 1
-    localScale.value = Math.round(scaleX * 100)
-  } else {
-    // 纯数据对象模式（TextObject）
-    localCaption.value = node.text || ''
-    localFontSize.value = node.fontSize || 14
-    localTextColor.value = node.fill || node.textColor || '#000000'
-    const fontStyle = node.fontStyle || (node.bold ? 'bold' : node.italic ? 'italic' : 'normal')
-    localBold.value = fontStyle.includes('bold')
-    localItalic.value = fontStyle.includes('italic')
-    localScale.value = 100
-  }
+  // 纯数据对象模式（TextObject）
+  localCaption.value = node.text || ''
+  localFontSize.value = node.fontSize || 14
+  localTextColor.value = node.fill || node.textColor || '#000000'
+  const fontStyle = node.fontStyle || (node.bold ? 'bold' : node.italic ? 'italic' : 'normal')
+  localBold.value = fontStyle.includes('bold')
+  localItalic.value = fontStyle.includes('italic')
+  localScale.value = 100
 }
 
 // 挂载时和 node 变化时读取
@@ -151,7 +136,6 @@ const updateProperty = (key: string, value: any) => {
     case 'italic': localItalic.value = value; break
     case 'scale': localScale.value = value; break
   }
-  // emit 到父组件更新 Konva 节点
   emit('update-property', key, value)
 }
 

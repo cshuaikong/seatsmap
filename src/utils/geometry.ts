@@ -1,21 +1,21 @@
-import type { Point, Rect } from '../types'
+import type { Position, Rect } from '../types'
 
 /**
  * 几何计算工具函数
  */
 
 /** 计算两点之间的距离 */
-export function distance(p1: Point, p2: Point): number {
+export function distance(p1: Position, p2: Position): number {
   return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2))
 }
 
 /** 计算两点之间的角度（弧度） */
-export function angle(p1: Point, p2: Point): number {
+export function angle(p1: Position, p2: Position): number {
   return Math.atan2(p2.y - p1.y, p2.x - p1.x)
 }
 
 /** 点绕中心旋转 */
-export function rotatePoint(point: Point, center: Point, rotation: number): Point {
+export function rotatePoint(point: Position, center: Position, rotation: number): Position {
   const cos = Math.cos(rotation)
   const sin = Math.sin(rotation)
   const dx = point.x - center.x
@@ -28,7 +28,7 @@ export function rotatePoint(point: Point, center: Point, rotation: number): Poin
 }
 
 /** 对齐到网格 */
-export function snapToGrid(point: Point, gridSize: number): Point {
+export function snapToGrid(point: Position, gridSize: number): Position {
   return {
     x: Math.round(point.x / gridSize) * gridSize,
     y: Math.round(point.y / gridSize) * gridSize
@@ -36,7 +36,7 @@ export function snapToGrid(point: Point, gridSize: number): Point {
 }
 
 /** 检查点是否在矩形内 */
-export function pointInRect(point: Point, rect: Rect): boolean {
+export function pointInRect(point: Position, rect: Rect): boolean {
   return point.x >= rect.x && 
          point.x <= rect.x + rect.width &&
          point.y >= rect.y && 
@@ -52,7 +52,7 @@ export function rectIntersect(r1: Rect, r2: Rect): boolean {
 }
 
 /** 计算矩形的中心点 */
-export function rectCenter(rect: Rect): Point {
+export function rectCenter(rect: Rect): Position {
   return {
     x: rect.x + rect.width / 2,
     y: rect.y + rect.height / 2
@@ -61,9 +61,9 @@ export function rectCenter(rect: Rect): Point {
 
 /** 将屏幕坐标转换为 SVG 坐标 */
 export function screenToSvg(
-  screenPoint: Point, 
+  screenPoint: Position, 
   svgElement: SVGSVGElement
-): Point {
+): Position {
   const point = svgElement.createSVGPoint()
   point.x = screenPoint.x
   point.y = screenPoint.y
@@ -73,13 +73,13 @@ export function screenToSvg(
 
 /** 生成弧形排座位位置 */
 export function generateArcSeats(
-  center: Point,
+  center: Position,
   radius: number,
   startAngle: number,
   endAngle: number,
   count: number
-): Point[] {
-  const points: Point[] = []
+): Position[] {
+  const points: Position[] = []
   const angleStep = (endAngle - startAngle) / (count - 1)
   
   for (let i = 0; i < count; i++) {
@@ -94,7 +94,7 @@ export function generateArcSeats(
 }
 
 /** 计算排的对齐角度 */
-export function calculateRowAngle(seats: Point[]): number {
+export function calculateRowAngle(seats: Position[]): number {
   if (seats.length < 2) return 0
   const first = seats[0]
   const last = seats[seats.length - 1]

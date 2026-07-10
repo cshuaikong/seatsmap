@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { generateId } from '../utils/id'
 import type { 
@@ -12,11 +12,6 @@ import type {
   AreaObject,
   CanvasImage,
   SelectedObjectType,
-  // 旧格式类型
-  SeatLegacy,
-  RowLegacy,
-  SectionLegacy,
-  CategoryLegacy
 } from '../types'
 
 export const useVenueStore = defineStore('venue', () => {
@@ -31,8 +26,7 @@ export const useVenueStore = defineStore('venue', () => {
       { key: 2, label: 'VIP区', color: '#FF8A80', accessible: false },   // 中红
       { key: 3, label: '轮椅区', color: '#90CAF9', accessible: true }   // 中蓝
     ],
-    sections: [],
-    focalPoint: undefined
+    sections: []
   })
 
   // 选中状态
@@ -954,7 +948,7 @@ export const useVenueStore = defineStore('venue', () => {
 
   /**
    * 将旧格式数据转换为新的 VenueData 格式
-   * 兼容 SeatLegacy/RowLegacy/SectionLegacy/CategoryLegacy
+   * 兼容 any/any/any/any
    */
   function importLegacyData(data: any): VenueData {
     if (!data) {
@@ -965,7 +959,7 @@ export const useVenueStore = defineStore('venue', () => {
     // 转换分类
     const categories: Category[] = []
     if (Array.isArray(data.categories)) {
-      data.categories.forEach((cat: CategoryLegacy, index: number) => {
+      data.categories.forEach((cat: any, index: number) => {
         categories.push({
           key: cat.id || index + 1,
           label: cat.name || '',
@@ -978,7 +972,7 @@ export const useVenueStore = defineStore('venue', () => {
     // 转换区块
     const sections: Section[] = []
     if (Array.isArray(data.sections)) {
-      data.sections.forEach((sec: SectionLegacy) => {
+      data.sections.forEach((sec: any) => {
         const section: Section = {
           id: sec.id || generateId(),
           name: sec.name || '',
@@ -993,7 +987,7 @@ export const useVenueStore = defineStore('venue', () => {
 
         // 转换排
         if (Array.isArray(sec.rows)) {
-          sec.rows.forEach((row: RowLegacy) => {
+          sec.rows.forEach((row: any) => {
             const seatRow: SeatRow = {
               id: row.id || generateId(),
               label: row.label || '',
@@ -1005,7 +999,7 @@ export const useVenueStore = defineStore('venue', () => {
 
             // 转换座位
             if (Array.isArray(row.seats)) {
-              row.seats.forEach((seat: SeatLegacy) => {
+              row.seats.forEach((seat: any) => {
                 seatRow.seats.push({
                   id: seat.id || generateId(),
                   label: seat.label || '',

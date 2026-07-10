@@ -69,7 +69,7 @@
                       :style="{ backgroundColor: category.color }"
                     ></div>
                     <input
-                      :ref="el => setColorInputRef(el, category.id)"
+                      :ref="el => setColorInputRef(el as Element, category.id)"
                       type="color"
                       :value="category.color"
                       @input="onColorChange(category.id, $event)"
@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 
 interface Category {
@@ -208,7 +208,7 @@ function onDragStart(event: DragEvent, index: number) {
   }
 }
 
-function onDragOver(event: DragEvent, index: number) {
+function onDragOver(event: DragEvent, _index: number) {
   event.preventDefault()
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = 'move'

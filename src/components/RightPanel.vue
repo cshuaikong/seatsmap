@@ -338,7 +338,7 @@ const handleActivatePathSegment = (pointIndex: number) => {
   venueStore.setActivePathSegment(sectionId, pointIndex)
 }
 
-// onEnterSection：通知外部（KonvaDesigner）执行 enterSectionFocus
+// onEnterSection：通知外部执行 enterSectionFocus
 const onEnterSection = () => {
   const sectionId = venueStore.selectedSectionIds[0]
   if (!sectionId) return

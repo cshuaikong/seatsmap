@@ -73,7 +73,7 @@ interface Category {
   accessible?: boolean
 }
 
-const props = defineProps<{
+defineProps<{
   chartName: string
   categories: Category[]
   totalSeats: number

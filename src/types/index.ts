@@ -15,6 +15,13 @@ export interface Position {
   y: number
 }
 
+export interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
 // 座位状态常量定义（项目级常量）
 export const SEAT_STATUS = {
   /** 可选 */
@@ -137,6 +144,7 @@ export interface Section {
   points?: number[]       // polygon 专用（相对坐标）
   arcDepths?: number[]    // polygon 弧深数组
   pathPoints?: PathPoint[] // path 专用
+  path?: string           // SVG path 字符串（PathEditor 使用）
   cornerRadius?: number   // rect 圆角
   fill?: string
   stroke?: string

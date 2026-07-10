@@ -658,7 +658,7 @@ function enterSectionFocus(sectionId: string): void {
     const currentS = getS()
     const targetScale = baseScale
     if (Math.abs(targetScale - currentS) > 0.001) {
-      leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
+      leafer?.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
       setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
     }
     sectionGroupMap.forEach((g, id) => {
@@ -695,7 +695,7 @@ function enterSectionFocus(sectionId: string): void {
   const currentS = getS()
   const targetScale = baseScale
   if (Math.abs(targetScale - currentS) > 0.001) {
-    leafer.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
+    leafer?.scaleOfWorld({ x: cx, y: cy }, targetScale / currentS)
     setTimeout(() => { scale.value = getS(); leafer?.emit(ZoomEvent.END, { scale: getS(), totalScale: getS() } as any) }, 350)
   }
 
@@ -783,7 +783,7 @@ onMounted(() => {
     strokeWidth: 1,
     stroke: '#3b82f6',
     multiSelect: true,
-    area: { fill: 'rgba(59,130,246,0.1)', strokeWidthFixed: true }
+    area: { fill: 'rgba(59,130,246,0.1)' }
   })
 
   useSelectorPatch({
@@ -820,7 +820,7 @@ onMounted(() => {
   editor.closeGroup = function () {
     // 分区聚焦期间阻止自动 close（exitSectionFocus 会先清 focusedSectionId 再调用）
     if (focusedSectionId.value) return
-    try { _origCloseGroup() } catch (_) {}
+    try { _origCloseGroup(undefined as any) } catch (_) {}
     sectionGroupMap.forEach((group) => {
       group.opacity = 1; group.hittable = true; group.editable = true; group.draggable = true
     })

@@ -71,7 +71,6 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = ref(false)
-const selectorRef = ref<HTMLElement>()
 
 const selectedCategory = computed(() => {
   if (!props.modelValue) return null

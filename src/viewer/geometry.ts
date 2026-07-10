@@ -63,7 +63,7 @@ function getArcGeometry(
 }
 
 /** 采样弧边上的点 */
-function sampleArcPoints(arc: ReturnType<typeof getArcGeometry>, count: number, depth: number): Array<{ x: number; y: number }> {
+function sampleArcPoints(arc: ReturnType<typeof getArcGeometry>, count: number, _depth: number): Array<{ x: number; y: number }> {
   if (!arc) return []
   const { cx, cy, r, startAngle, endAngle } = arc
 
@@ -155,19 +155,6 @@ export function isNearSectionBorder(section: Section, worldPos: { x: number; y: 
 
 // ==================== 内部辅助函数 ====================
 
-function _pointsAABB(points: number[], ox: number, oy: number): AABB {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (let i = 0; i < points.length; i += 2) {
-    const wx = ox + points[i]
-    const wy = oy + points[i + 1]
-    if (wx < minX) minX = wx
-    if (wy < minY) minY = wy
-    if (wx > maxX) maxX = wx
-    if (wy > maxY) maxY = wy
-  }
-  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
-}
-
 function _pathPointsAABB(pts: PathPoint[], ox: number, oy: number): AABB {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const p of pts) {
@@ -179,22 +166,6 @@ function _pathPointsAABB(pts: PathPoint[], ox: number, oy: number): AABB {
     if (wy > maxY) maxY = wy
   }
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
-}
-
-/** 射线法检测点在多边形内 (flat points, world-space) */
-function _polygonContains(points: number[], ox: number, oy: number, px: number, py: number): boolean {
-  let inside = false
-  const n = points.length
-  for (let i = 0, j = n - 2; i < n; j = i, i += 2) {
-    const xi = ox + points[i]
-    const yi = oy + points[i + 1]
-    const xj = ox + points[j]
-    const yj = oy + points[j + 1]
-    if ((yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) {
-      inside = !inside
-    }
-  }
-  return inside
 }
 
 /** 射线法检测点在多边形内 (PathPoint[], world-space) */
@@ -253,37 +224,6 @@ function _isNearEllipseBorder(
   const ex = cx + rx * Math.cos(angle)
   const ey = cy + ry * Math.sin(angle)
   return Math.hypot(px - ex, py - ey) < threshold
-}
-
-/** 点到 polygon 各边的最近距离（含弧边采样） */
-function _isNearPolygonBorder(
-  points: number[], arcDepths: number[] | undefined, ox: number, oy: number,
-  px: number, py: number, threshold: number,
-): boolean {
-  const n = points.length / 2
-  for (let i = 0; i < n; i++) {
-    const ax = ox + points[i * 2]
-    const ay = oy + points[i * 2 + 1]
-    const bi = (i + 1) % n
-    const bx = ox + points[bi * 2]
-    const by = oy + points[bi * 2 + 1]
-    const ad = arcDepths?.[i] ?? 0
-
-    if (Math.abs(ad) < 0.005) {
-      if (distToSegment(px, py, ax, ay, bx, by) < threshold) return true
-    } else {
-      const arc = getArcGeometry(ax, ay, bx, by, ad)
-      const samples = sampleArcPoints(arc, ARC_SAMPLE_COUNT, ad)
-      for (const s of samples) {
-        if (Math.hypot(px - s.x, py - s.y) < threshold) return true
-      }
-      // 同时检测到弦的距离（补齐采样间距盲区）
-      for (let j = 1; j < samples.length; j++) {
-        if (distToSegment(px, py, samples[j - 1].x, samples[j - 1].y, samples[j].x, samples[j].y) < threshold) return true
-      }
-    }
-  }
-  return false
 }
 
 /** 点到 path 各边的最近距离（含弧边采样） */
