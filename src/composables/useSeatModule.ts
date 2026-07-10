@@ -17,7 +17,6 @@ export interface SeatModuleCtx {
   getSectionGroupMap: () => Map<string, any>
   getFocusedSectionId?: () => string | null
   getCurrentTool?: () => string
-  onSeatRowTransform?: () => void
   onToolChange: (tool: string) => void
 }
 
@@ -26,17 +25,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
   const drawnSeatCount = ref(0)
   const store = useVenueStore()
 
-  // 座位排拖拽/旋转状态（Alt+拖拽=旋转，普通拖拽=移动）
-  let seatDragState: {
-    group: any
-    startX: number; startY: number
-    startGroupX: number; startGroupY: number
-    startRotation: number
-    isRotate: boolean
-    hasMoved: boolean
-  } | null = null
-  const DRAG_THRESHOLD = 3
-
   /** 判断事件路径中是否包含可见的单个座位圆 */
   function isEventOnVisibleSeat(e: any): boolean {
     const path = e.path?.list ?? e.path ?? []
@@ -44,47 +32,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       if (leaf?.__seatId && leaf.visible) return true
     }
     return false
-  }
-
-  // 全局 MOVE/UP 监听（拖拽时更新位置 + editBox）
-  const leafer = ctx.getLeafer()
-  if (leafer) {
-    leafer.on(PointerEvent.MOVE, (e: any) => {
-      if (!seatDragState) return
-      const s = seatDragState
-      const dx = e.x - s.startX
-      const dy = e.y - s.startY
-
-      if (!s.hasMoved && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return
-      s.hasMoved = true
-
-      if (s.isRotate) {
-        const lb = s.group.getBounds?.('local') || { x: 0, y: 0, width: 100, height: 20 }
-        const cx = s.startGroupX + (lb.x || 0) + (lb.width || 0) / 2
-        const cy = s.startGroupY + (lb.y || 0) + (lb.height || 0) / 2
-        const sa = Math.atan2(s.startY - cy, s.startX - cx)
-        const ca = Math.atan2(e.y - cy, e.x - cx)
-        s.group.rotation = s.startRotation + (ca - sa) * 180 / Math.PI
-      } else {
-        s.group.x = s.startGroupX + dx
-        s.group.y = s.startGroupY + dy
-      }
-
-      const editBox = (ctx.getEditor() as any)?.editBox
-      if (editBox) editBox.update()
-      if (seatDragState?.hasMoved) {
-        ctx.onSeatRowTransform?.()
-      }
-    })
-
-    leafer.on(PointerEvent.UP, () => {
-      if (!seatDragState) return
-      // 拖拽/旋转结束后同步到 store
-      if (seatDragState.hasMoved) {
-        ctx.onSeatRowTransform?.()
-      }
-      seatDragState = null
-    })
   }
 
   // ---- 创建座位元素 ----
@@ -105,39 +52,19 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       })
       ;(group as any).__seatRow = true
       if (sectionId) (group as any).__sectionId = sectionId
-      // 单击选中 / Alt+拖拽旋转 / 普通拖拽移动
+      // 单击选中（移动/旋转交给 Leafer Editor 的 editBox）
       group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
         const ed = ctx.getEditor()
         if (!ed || !ctx.getFocusedSectionId?.()) return
         // 如果点击的是可见的单个座位圆，交给 selector 处理单座选择，不归一到排
         if (isEventOnVisibleSeat(e)) return
-        if (ed.hasItem(group)) {
-          // 已选中 → 启动拖拽/旋转
-          seatDragState = {
-            group,
-            startX: e.x, startY: e.y,
-            startGroupX: group.x || 0, startGroupY: group.y || 0,
-            startRotation: group.rotation || 0,
-            isRotate: !!e.altKey,
-            hasMoved: false,
-          }
-          return
-        }
+        if (ed.hasItem(group)) return
         if (e.shiftKey) {
           ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
-          e.stop()
-          return
+        } else {
+          ed.target = group
         }
-        // 未选中：先选中，同时按下即可拖拽/旋转（超过阈值后生效）
-        ed.target = group
-        seatDragState = {
-          group,
-          startX: e.x, startY: e.y,
-          startGroupX: group.x || 0, startGroupY: group.y || 0,
-          startRotation: group.rotation || 0,
-          isRotate: !!e.altKey,
-          hasMoved: false,
-        }
+        e.stop()
       })
 
       const lastIdx = row.count - 1
@@ -323,32 +250,13 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           if (!ed || !ctx.getFocusedSectionId?.()) return
           // 如果点击的是可见的单个座位圆，交给 selector 处理单座选择，不归一到排
           if (isEventOnVisibleSeat(e)) return
-          if (ed.hasItem(group)) {
-            seatDragState = {
-              group,
-              startX: e.x, startY: e.y,
-              startGroupX: group.x || 0, startGroupY: group.y || 0,
-              startRotation: group.rotation || 0,
-              isRotate: !!e.altKey,
-              hasMoved: false,
-            }
-            return
-          }
+          if (ed.hasItem(group)) return
           if (e.shiftKey) {
             ed.hasItem(group) ? ed.removeItem(group) : ed.addItem(group)
-            e.stop()
-            return
+          } else {
+            ed.target = group
           }
-          // 未选中：先选中，同时按下即可拖拽/旋转（超过阈值后生效）
-          ed.target = group
-          seatDragState = {
-            group,
-            startX: e.x, startY: e.y,
-            startGroupX: group.x || 0, startGroupY: group.y || 0,
-            startRotation: group.rotation || 0,
-            isRotate: !!e.altKey,
-            hasMoved: false,
-          }
+          e.stop()
         })
         ;(group as any).__rowId = row.id
         ;(group as any).__rowLabel = row.label || ''

@@ -107,21 +107,35 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
     const rowGX = group.x ?? 0
     const rowGY = group.y ?? 0
+    const rowRot = ((group.rotation ?? 0) * Math.PI) / 180
+    const cosR = Math.cos(rowRot)
+    const sinR = Math.sin(rowRot)
+
+    // 将 Group 局部坐标（含 row 自身旋转）转为世界坐标
+    function localToWorld(lx: number, ly: number): { x: number; y: number } {
+      const rx = lx * cosR - ly * sinR
+      const ry = lx * sinR + ly * cosR
+      return {
+        x: sX + rx * cosS - ry * sinS,
+        y: sY + rx * sinS + ry * cosS,
+      }
+    }
+
     const _barPt0 = barPts[0] ?? rowData?.x ?? 0
     const _barPt1 = barPts[1] ?? rowData?.y ?? 0
     const rowLocalX = rowGX + _barPt0
     const rowLocalY = rowGY + _barPt1
-    const rowWorldX = sX + rowLocalX * cosS - rowLocalY * sinS
-    const rowWorldY = sY + rowLocalX * sinS + rowLocalY * cosS
+    const rowWorldPos = localToWorld(rowLocalX, rowLocalY)
+    const rowWorldX = rowWorldPos.x
+    const rowWorldY = rowWorldPos.y
 
     // 世界行方向
     const _fbX = rowData ? _barPt0 + rowData.ux * rowData.spacing * (rowData.count - 1) : _barPt0
     const _fbY = rowData ? _barPt1 + rowData.uy * rowData.spacing * (rowData.count - 1) : _barPt1
     const beLX = rowGX + (barPts[2] ?? _fbX)
     const beLY = rowGY + (barPts[3] ?? _fbY)
-    const beWX = sX + beLX * cosS - beLY * sinS
-    const beWY = sY + beLX * sinS + beLY * cosS
-    const worldRowRot = Math.atan2(beWY - rowWorldY, beWX - rowWorldX)
+    const beWorldPos = localToWorld(beLX, beLY)
+    const worldRowRot = Math.atan2(beWorldPos.y - rowWorldY, beWorldPos.x - rowWorldX)
 
     // 提取座位数据（世界坐标 → 行局部坐标）
     const cosWRR = Math.cos(-worldRowRot)
@@ -140,10 +154,9 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     const seats: Partial<Seat>[] = ellipses.map((ell: any) => {
       const ellLocalX = rowGX + (ell.x ?? 0)
       const ellLocalY = rowGY + (ell.y ?? 0)
-      const eWX = sX + ellLocalX * cosS - ellLocalY * sinS
-      const eWY = sY + ellLocalX * sinS + ellLocalY * cosS
-      const wx = eWX - rowWorldX
-      const wy = eWY - rowWorldY
+      const eW = localToWorld(ellLocalX, ellLocalY)
+      const wx = eW.x - rowWorldX
+      const wy = eW.y - rowWorldY
       const rawCatKey = ell.__categoryKey
       const categoryKey = (rawCatKey != null && rawCatKey !== 1) ? rawCatKey : (inheritedCatKey ?? rawCatKey ?? 1)
       return {

@@ -536,7 +536,6 @@ const seatModule = useSeatModule({
   getSectionGroupMap: () => sectionGroupMap,
   getFocusedSectionId: () => focusedSectionId.value,
   getCurrentTool: () => props.currentTool,
-  onSeatRowTransform: () => pathEditorSync.syncTransformToStore(),
   onToolChange: (tool) => emit('update:currentTool', tool),
 })
 
@@ -863,8 +862,7 @@ onMounted(() => {
     const list: any[] = (editor as any)?.list ?? []
     const hasSeats = list.some((el: any) => el.__seatId)
     if (sel2?.__boxHidden) {
-      const allSeat = list.length > 0 && list.every((el: any) => el.__seatRow)
-      if (!allSeat && !hasSeats) {
+      if (!hasSeats) {
         ;(editor as any).editBox.visible = true
         ;(editor as any).editBox.update()
       }
@@ -948,8 +946,8 @@ onMounted(() => {
     // 选中变化时刷新座位条高亮
     seatModule.updateSeatLOD()
 
-    // 座位排 / 座位圆 → 隐藏包围盒（分区保留，需要旋转手柄）
-    if (list.length > 0 && (list.every((el: any) => el.__seatRow) || list.some((el: any) => el.__seatId))) {
+    // 座位圆选中时隐藏 editBox，避免遮挡相邻座位
+    if (list.length > 0 && list.some((el: any) => el.__seatId)) {
       ;(editor as any).editBox.visible = false
     }
 

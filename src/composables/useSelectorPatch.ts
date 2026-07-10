@@ -1,6 +1,5 @@
 import { LeafList } from '@leafer-ui/core'
 import { EditSelectHelper } from '@leafer-in/editor'
-import { DragEvent } from 'leafer-ui'
 import { sampleArc } from '../utils/pathUtils'
 
 export interface SelectorPatchCtx {
@@ -45,9 +44,10 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const allSeats = list.length > 0 && list.every((el: any) => el.__seatRow)
       const hasSeats = list.some((el: any) => el.__seatId)
       if (allSeats) {
-        ;(editor as any).hittable = false
+        // 座位排选中时保留 editBox 用于拖拽/旋转，但让事件能穿透到子座位圆
+        ;(editor as any).hittable = true
         ;(editor as any).hitSelf = false
-        ;(editor as any).hitChildren = false
+        ;(editor as any).hitChildren = true
         ;(editBox as any).hittable = true
         ;(editBox as any).hitSelf = false
         ;(editBox as any).hitChildren = true
@@ -150,35 +150,12 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     _origCheck(e)
   }
 
-  // ⑤ allowDrag + proxy 临时解除
-  let _proxyRestore: (() => void) | null = null
+  // ⑤ allowDrag — focus 模式下让 Editor 自己处理拖拽
   const _origAllowDrag = (sel as any).allowDrag.bind(sel)
   ;(sel as any).allowDrag = function (e: any) {
-    // 兜底：如果存在未恢复的 proxy，先恢复
-    if (_proxyRestore && !this.dragging) {
-      _proxyRestore()
-    }
     if (ctx.getFocusedSectionId?.() && !this.dragging) {
+      // 座位端点编辑手柄仍走原生
       if (e.target?.__seatHandleIdx != null) return _origAllowDrag(e)
-      let node = e.target
-      while (node) { if (node === editor) return _origAllowDrag(e); node = node.parent }
-      if (e.target?.draggable) {
-        const appSelector = editor.app?.selector
-        if (appSelector?.proxy && !_proxyRestore) {
-          const saved = appSelector.proxy
-          appSelector.proxy = null
-          const restore = () => {
-            if (!_proxyRestore) return
-            appSelector.proxy = saved
-            _proxyRestore = null
-            try { editor.off_([restoreId]) } catch (_) {}
-          }
-          _proxyRestore = restore
-          const restoreId = editor.on_(DragEvent.END, restore)
-        }
-        return false
-      }
-      return true
     }
     return _origAllowDrag(e)
   }
