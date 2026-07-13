@@ -875,7 +875,6 @@ onMounted(() => {
         if (key === 'v') {
           e.preventDefault()
           editorStore.paste()
-          renderAll(venueDataStore.venue)
           return
         }
         if (key === 'z') {
