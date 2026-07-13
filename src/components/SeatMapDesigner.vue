@@ -156,6 +156,11 @@ watch(() => props.venueData?.name, (name) => {
   if (name) chartName.value = name
 })
 
+// undo/redo 后重新渲染画布（historyIndex 变化即代表恢复了旧状态）
+watch(() => historyStore.historyIndex, () => {
+  rendererRef.value?.renderAll?.(venueDataStore.venue)
+})
+
 onMounted(() => {
 })
 

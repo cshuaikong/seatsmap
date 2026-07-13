@@ -39,6 +39,8 @@ import { useSeatModule } from '../composables/useSeatModule'
 import { usePathEditorSync } from '../composables/usePathEditorSync'
 import { useSelectionOverlay } from '../composables/canvas/useSelectionOverlay'
 import { useEditorStore } from '../stores/editorStore'
+import { useHistoryStore } from '../stores/historyStore'
+import { useVenueDataStore } from '../stores/venueDataStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
 import type { ToolId } from '../domain/toolRegistry'
@@ -404,6 +406,8 @@ const selectionOverlay = useSelectionOverlay({
 
 // Store 中的单座选中变化 → 刷新 LOD 高亮
 const editorStore = useEditorStore()
+const historyStore = useHistoryStore()
+const venueDataStore = useVenueDataStore()
 watch(() => editorStore.selectedSeatIds, () => {
   seatModule.updateSeatLOD()
 }, { deep: true })
@@ -795,6 +799,10 @@ onMounted(() => {
     canvas.addEventListener('wheel', boundWheel, { passive: false })
 
     const onKey = (e: KeyboardEvent) => {
+      const isMod = e.ctrlKey || e.metaKey
+      const tag = (e.target as HTMLElement)?.tagName
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable
+
       if (e.key === 'Escape') {
         if (focusedSectionId.value) {
           exitSectionFocus()
@@ -806,12 +814,37 @@ onMounted(() => {
         }
         mode.cancelCurrent()
       }
+
       if (e.key === 'Backspace' || e.key === 'Delete') {
-        // 表单输入框中不触发画布删除
-        const tag = (e.target as HTMLElement)?.tagName
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+        if (isTyping) return
         if (seatVertexEdit.isEditing.value) return
         deleteSelected()
+      }
+
+      if (isMod && !isTyping) {
+        const key = e.key.toLowerCase()
+        if (key === 'c') {
+          e.preventDefault()
+          editorStore.copySelected()
+          return
+        }
+        if (key === 'v') {
+          e.preventDefault()
+          editorStore.paste()
+          renderAll(venueDataStore.venue)
+          return
+        }
+        if (key === 'z') {
+          e.preventDefault()
+          if (e.shiftKey) historyStore.redo()
+          else historyStore.undo()
+          return
+        }
+        if (key === 'y') {
+          e.preventDefault()
+          historyStore.redo()
+          return
+        }
       }
     }
     document.addEventListener('keydown', onKey)
