@@ -53,7 +53,15 @@
         <!-- EN: Number of seats -->
         <label class="property-label">座位数</label>
         <div class="property-control">
-          <span class="count-text readonly">{{ seatCountDisplay }}</span>
+          <div class="seat-count-display">
+            <button class="step-btn" @click="onDecreaseSeatCount" :disabled="!canDecreaseSeatCount">
+              <Icon icon="lucide:minus" class="step-icon" />
+            </button>
+            <span class="count-text">{{ seatCountDisplay }}</span>
+            <button class="step-btn" @click="onIncreaseSeatCount" :disabled="!canIncreaseSeatCount">
+              <Icon icon="lucide:plus" class="step-icon" />
+            </button>
+          </div>
         </div>
       </div>
       <div class="property-row">
@@ -407,6 +415,16 @@ const canIncreaseCurve = computed(() => {
   return localCurves.value.some(curve => curve < 200)
 })
 
+// 是否可以减少座位数
+const canDecreaseSeatCount = computed(() => {
+  return localSeatCounts.value.some(count => count > 1)
+})
+
+// 是否可以增加座位数
+const canIncreaseSeatCount = computed(() => {
+  return localSeatCounts.value.length > 0
+})
+
 // 计算座位间距显示文本（多选用逗号分隔）
 const seatSpacingDisplay = computed(() => {
   if (localSeatSpacings.value.length === 0) return '18'
@@ -568,6 +586,20 @@ function onIncreaseRowSpacing() {
   const newSpacings = localRowSpacings.value.map(spacing => +((spacing != null ? spacing : fallback) + 0.2).toFixed(2))
   localRowSpacings.value = newSpacings
   emit('update-property', 'rowSpacing', newSpacings)
+}
+
+function onDecreaseSeatCount() {
+  if (!canDecreaseSeatCount.value) return
+  const newCounts = localSeatCounts.value.map(count => Math.max(1, count - 1))
+  localSeatCounts.value = newCounts
+  emit('update-property', 'seatCount', newCounts)
+}
+
+function onIncreaseSeatCount() {
+  if (!canIncreaseSeatCount.value) return
+  const newCounts = localSeatCounts.value.map(count => count + 1)
+  localSeatCounts.value = newCounts
+  emit('update-property', 'seatCount', newCounts)
 }
 
 function onUpdateProperty(key: string, value: any) {
