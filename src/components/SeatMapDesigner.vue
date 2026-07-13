@@ -115,6 +115,7 @@ import LeftToolbar from './LeftToolbar.vue'
 import PathEditor from './PathEditor.vue'
 import type { VenueData } from '../types'
 import { useVenueDataStore } from '../stores/venueDataStore'
+import { useEditorStore } from '../stores/editorStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
 
@@ -141,6 +142,7 @@ const effectiveVenueData = computed(() => {
 
 const rendererRef = ref<InstanceType<typeof PathEditor>>()
 const venueDataStore = useVenueDataStore()
+const editorStore = useEditorStore()
 const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
 // ==================== 数据加载 ====================
@@ -268,7 +270,7 @@ const onRedo = () => { console.log('重做') }
 const onCopy = () => { console.log('复制') }
 const onPaste = () => { console.log('粘贴') }
 const onDelete = () => {
-  ;(rendererRef.value as any)?.deleteSelected?.()
+  editorStore.deleteSelected()
 }
 
 const onManageCategories = () => {

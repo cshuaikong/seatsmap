@@ -224,6 +224,7 @@ function deleteSelected() {
   const list: any[] = (editor as any)?.list ?? []
   if (list.length === 0) return
 
+  // 1) 先清理画布元素
   list.forEach((el: any) => {
     // 分区 Group（SectionGroup）
     if (el.__sectionGroup) {
@@ -259,6 +260,10 @@ function deleteSelected() {
   })
 
   edgeCache = new WeakMap<object, number[][]>()
+
+  // 2) 再从 store 删除对应数据并清空选择
+  editorStore.deleteSelected()
+
   editor?.cancel()
   seatModule.updateSeatLOD()
 }

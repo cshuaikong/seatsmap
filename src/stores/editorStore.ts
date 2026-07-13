@@ -231,6 +231,19 @@ export const useEditorStore = defineStore('editor', () => {
     selectedImageId.value = null
   }
 
+  /** 删除当前所有选中的对象并清空选择 */
+  function deleteSelected() {
+    venueDataStore.deleteSelectedObjects({
+      seatIds: selectedSeatIds.value,
+      rowIds: selectedRowIds.value,
+      sectionIds: selectedSectionIds.value,
+      shapeIds: selectedShapeIds.value,
+      textIds: selectedTextIds.value,
+      areaIds: selectedAreaIds.value,
+    })
+    clearSelection()
+  }
+
   // ==================== Return ====================
 
   return {
@@ -271,5 +284,8 @@ export const useEditorStore = defineStore('editor', () => {
     removeCanvasImage,
     selectCanvasImage,
     clearCanvasImageSelection,
+
+    // Deletion
+    deleteSelected,
   }
 })

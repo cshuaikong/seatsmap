@@ -301,6 +301,25 @@ export const useVenueDataStore = defineStore('venueData', () => {
     return false
   }
 
+  /** 根据编辑器当前选中的 ID 批量删除对象 */
+  function deleteSelectedObjects(selection: {
+    seatIds?: string[]
+    rowIds?: string[]
+    sectionIds?: string[]
+    shapeIds?: string[]
+    textIds?: string[]
+    areaIds?: string[]
+  }) {
+    const { seatIds = [], rowIds = [], sectionIds = [], shapeIds = [], textIds = [], areaIds = [] } = selection
+
+    if (seatIds.length > 0) removeSelectedSeats(seatIds)
+    if (rowIds.length > 0) rowIds.forEach(deleteRow)
+    if (sectionIds.length > 0) sectionIds.forEach(deleteSection)
+    if (shapeIds.length > 0) shapeIds.forEach(deleteShape)
+    if (textIds.length > 0) textIds.forEach(deleteText)
+    if (areaIds.length > 0) areaIds.forEach(deleteArea)
+  }
+
   // ==================== Shape / Text / Area CRUD ====================
 
   function addShape(sectionId: string, shape: Omit<ShapeObject, 'id'>) {
@@ -625,6 +644,9 @@ export const useVenueDataStore = defineStore('venueData', () => {
     removeSeatAtRowStart,
     removeSeatAtRowEnd,
     removeSelectedSeats,
+
+    // Batch deletion
+    deleteSelectedObjects,
 
     // Shape / Text / Area
     addShape,

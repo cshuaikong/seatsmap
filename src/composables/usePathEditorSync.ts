@@ -631,6 +631,37 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     ctx.refreshSeatLOD?.()
   }
 
+  /** 当 store 中的 section / row 被删除时，同步移除画布元素 */
+  function removeMissingSectionsAndRows(newSections: Section[]): void {
+    const sectionIds = new Set(newSections.map(s => s.id))
+    const rowIds = new Set<string>()
+    newSections.forEach(s => s.rows?.forEach(r => rowIds.add(r.id)))
+
+    const sectionGroupMap = ctx.getSectionGroupMap()
+    const seatRowGroups = ctx.getSeatRowGroups()
+
+    // 移除已不存在的 section group
+    sectionGroupMap.forEach((group, sid) => {
+      if (sectionIds.has(sid)) return
+      group.children?.slice().forEach((child: any) => {
+        if (child.__seatRow) {
+          const idx = seatRowGroups.indexOf(child)
+          if (idx !== -1) seatRowGroups.splice(idx, 1)
+        }
+      })
+      try { group.remove() } catch (_) {}
+      sectionGroupMap.delete(sid)
+    })
+
+    // 移除已不存在的 row group
+    seatRowGroups.slice().forEach((group: any) => {
+      if (!group.__rowId || rowIds.has(group.__rowId)) return
+      const idx = seatRowGroups.indexOf(group)
+      if (idx !== -1) seatRowGroups.splice(idx, 1)
+      try { group.parent?.remove(group) } catch (_) {}
+    })
+  }
+
   /**
    * 监听 store 变更并应用到画布。
    * 在 PathEditor onMounted 中调用一次即可。
@@ -646,8 +677,11 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
         isApplyingToCanvas = true
 
+        // 先同步删除：store 中消失的对象从画布移除
+        removeMissingSectionsAndRows(newSections ?? [])
+
         // 遍历所有 section 检查属性变更
-        for (const section of newSections) {
+        for (const section of newSections ?? []) {
           applySectionProperty(section.id, store)
 
           // 遍历 rows
