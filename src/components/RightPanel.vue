@@ -1,7 +1,7 @@
 <template>
   <div class="right-panel">
-    <!-- 图片工具激活时：始终显示图片面板（优先级最高） -->
-    <template v-if="props.currentTool === 'image'">
+    <!-- 图片工具暂未实现，隐藏图片面板 -->
+    <template v-if="false">
       <ImagePanel />
     </template>
 
@@ -245,7 +245,7 @@ import SeatPanel from './panels/SeatPanel.vue'
 import RowPanel from './panels/RowPanel.vue'
 import AreaPanel from './panels/AreaPanel.vue'
 import MixedPanel from './panels/MixedPanel.vue'
-import ImagePanel from './panels/ImagePanel.vue'
+// import ImagePanel from './panels/ImagePanel.vue'
 import SectionPanel from './panels/SectionPanel.vue'
 
 // 面板内部使用的 Category 类型（兼容旧版 id/name 和新版 key/label）

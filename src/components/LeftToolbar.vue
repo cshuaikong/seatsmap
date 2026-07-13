@@ -59,23 +59,7 @@
     <!-- SIMPLE: 隐藏 | WITH_SECTIONS: 始终显示 -->
     <template v-if="showSectionTools">
       <div class="toolbar-section">
-        <button
-          class="tool-item"
-          :class="{ active: modelValue === 'drawline' }"
-          title="绘制线条"
-          @click="onToolChange('drawline')"
-        >
-          <i class="iconfont icon-xianduan tool-iconfont"></i>
-        </button>
-        <button
-          class="tool-item"
-          :class="{ active: modelValue === 'drawRect' }"
-          title="绘制矩形"
-          @click="onToolChange('drawRect')"
-        >
-          <i class="iconfont icon-rect tool-iconfont"></i>
-        </button>
-        <button
+          <button
           class="tool-item"
           :class="{ active: modelValue === 'drawPolygon' }"
           title="绘制分区"
@@ -87,8 +71,8 @@
       <div class="toolbar-divider"></div>
     </template>
 
-    <!-- 4. 标注工具 -->
-    <div class="toolbar-section">
+    <!-- 4. 标注工具（text / image 暂未实现，先隐藏） -->
+    <div v-if="false" class="toolbar-section">
       <button
         class="tool-item"
         :class="{ active: modelValue === 'text' }"
@@ -107,7 +91,7 @@
       </button>
     </div>
 
-    <div class="toolbar-divider"></div>
+    <div v-if="false" class="toolbar-divider"></div>
 
     <!-- 编辑操作 -->
     <div class="toolbar-section">

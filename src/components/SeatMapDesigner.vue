@@ -61,7 +61,7 @@
         <div class="canvas-container">
           <PathEditor
             ref="rendererRef"
-            :venue-data="props.venueData"
+            :venue-data="effectiveVenueData"
             :seat-list="[]"
             :current-tool="currentTool"
             hide-toolbar
@@ -108,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import RightPanel from './RightPanel.vue'
 import LeftToolbar from './LeftToolbar.vue'
@@ -133,6 +133,10 @@ const props = withDefaults(defineProps<{
 const currentTool = ref<string>('select')
 const vertexEditActive = ref(false)
 const chartName = ref(props.venueData?.name || '未命名座位图')
+const effectiveVenueData = computed(() => {
+  const hasRealData = props.venueData?.sections && props.venueData.sections.length > 0
+  return hasRealData ? props.venueData : venueStore.venue
+})
 
 
 const rendererRef = ref<InstanceType<typeof PathEditor>>()
@@ -140,6 +144,10 @@ const venueStore = useVenueStore()
 const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
 // ==================== 数据加载 ====================
+
+watch(() => props.venueData?.name, (name) => {
+  if (name) chartName.value = name
+})
 
 onMounted(() => {
 })

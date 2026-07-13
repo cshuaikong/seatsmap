@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Vue3 SVG 座位图编辑器",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -390,7 +390,7 @@ function buildVenueData(): any {
       }
       if (g.__seatSpacing != null) row.seatSpacing = +g.__seatSpacing.toFixed(2)
       if (g.__rowSpacing != null) row.rowSpacing = +g.__rowSpacing.toFixed(2)
-      if (g.__categoryId != null) row.categoryId = g.__categoryId
+      if (g.__categoryId != null) row.categoryKey = g.__categoryId
       rowLookup.set(rowId, row)
       sectionRowsMap.get(sectionId)!.push(row)
     }
@@ -430,7 +430,7 @@ function buildVenueData(): any {
         label: src?.label || '',
         x: +localX.toFixed(2),
         y: +localY.toFixed(2),
-        cat_id: ell.__categoryKey ?? src?.categoryKey ?? 1,
+        categoryKey: ell.__categoryKey ?? src?.categoryKey ?? 1,
         status: src ? toStatus(src.status || 'available') : 0,
         type: src ? toType(src.objectType || 'seat') : 1,
       })

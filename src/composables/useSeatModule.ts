@@ -1,6 +1,12 @@
 import { ref } from 'vue'
 import { Group, Line, Ellipse, Text, PointerEvent } from 'leafer-ui'
+import type { LeaferElementMeta } from '../types/leafer-meta'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
+
+// 带业务元数据的 Leafer 元素类型
+export type MetaGroup = Group & LeaferElementMeta
+export type MetaEllipse = Ellipse & LeaferElementMeta
+export type MetaText = Text & LeaferElementMeta
 import { useVenueStore } from '../stores/venueStore'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
@@ -49,9 +55,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         hittable: true,
         draggable: true,
         hitChildren: false,
-      })
-      ;(group as any).__seatRow = true
-      if (sectionId) (group as any).__sectionId = sectionId
+      }) as MetaGroup
+      ;group.__seatRow = true
+      if (sectionId) group.__sectionId = sectionId
       // 单击选中（移动/旋转交给 Leafer Editor 的 editBox）
       group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
         const ed = ctx.getEditor()
@@ -96,9 +102,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           around: 'center',
           hittable: true,
           draggable: false,
-        })
-        ;(ell as any).__originalStroke = '#81C784'
-        ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
+        }) as MetaEllipse
+        ;ell.__originalStroke = '#81C784'
+        ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
         // 座位标签文本（正中间）
         const st = new Text({
           text: '',
@@ -110,19 +116,19 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           around: 'center',
           editable: false,
           hittable: false,
-        })
-        ;(st as any).__seatLabelText = true
+        }) as MetaText
+        ;st.__seatLabelText = true
         group.add(ell)
         group.add(st)
-        ;(ell as any).__labelText = st
+        ;ell.__labelText = st
         ellipses.push(ell)
       }
 
-      ;(group as any).__seatRadius = radius
-      ;(group as any).__seatEllipses = ellipses
-      ;(group as any).__bar = bar
-      ;(group as any).__seatRowData = { ...row }
-      ;(group as any).__seatSpacing = row.spacing
+      ;group.__seatRadius = radius
+      ;group.__seatEllipses = ellipses
+      ;group.__bar = bar
+      ;group.__seatRowData = { ...row }
+      ;group.__seatSpacing = row.spacing
 
       addRowLabelText(group)
 
@@ -171,10 +177,10 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       around: 'center',
       editable: false,
       hittable: false,
-    })
-    ;(labelText as any).__rowLabelText = true
+    }) as MetaText
+    ;labelText.__rowLabelText = true
     group.add(labelText)
-    ;(group as any).__labelText = labelText
+    ;group.__labelText = labelText
   }
 
   /** 从 venue data 的 sections[].rows[].seats[] 渲染座位排
@@ -240,10 +246,10 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           hittable: true,
           draggable: true,
           hitChildren: false,
-        })
-        ;(group as any).__seatRow = true
-        ;(group as any).__isVenueDataSeat = true
-        ;(group as any).__sectionId = section.id
+        }) as MetaGroup
+        ;group.__seatRow = true
+        ;group.__isVenueDataSeat = true
+        ;group.__sectionId = section.id
         group.on(PointerEvent.BEFORE_DOWN, (e: any) => {
           const ed = ctx.getEditor()
           if (!ed || !ctx.getFocusedSectionId?.()) return
@@ -257,14 +263,14 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           }
           e.stop()
         })
-        ;(group as any).__rowId = row.id
-        ;(group as any).__rowLabel = row.label || ''
+        ;group.__rowId = row.id
+        ;group.__rowLabel = row.label || ''
         // 保留弧度和旋转参数，供编辑/导出使用
-        ;(group as any).__curve = curve
-        ;(group as any).__rotation = row.rotation ?? 0
-        ;(group as any).__rowOriginX = rowX
-        ;(group as any).__rowOriginY = rowY
-        ;(group as any).__rawSeats = sortedSeats
+        ;group.__curve = curve
+        ;group.__rotation = row.rotation ?? 0
+        ;group.__rowOriginX = rowX
+        ;group.__rowOriginY = rowY
+        ;group.__rawSeats = sortedSeats
 
         const ellipses: any[] = []
         for (let i = 0; i < sortedSeats.length; i++) {
@@ -287,12 +293,12 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             hittable: true,
             draggable: false,
             visible: false,
-          })
-          ;(ell as any).__originalStroke = darkenColor(color, 30)
-          ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
-          ;(ell as any).__seatId = seat.id
-          ;(ell as any).__categoryKey = ck
-          ;(ell as any).__sourceSeat = seat
+          }) as MetaEllipse
+          ;ell.__originalStroke = darkenColor(color, 30)
+          ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
+          ;ell.__seatId = seat.id
+          ;ell.__categoryKey = ck
+          ;ell.__sourceSeat = seat
           group.add(ell)
           ellipses.push(ell)
         }
@@ -310,9 +316,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         })
         group.add(bar)
 
-        ;(group as any).__seatRadius = radius
-        ;(group as any).__seatEllipses = ellipses
-        ;(group as any).__bar = bar
+        ;group.__seatRadius = radius
+        ;group.__seatEllipses = ellipses
+        ;group.__bar = bar
 
         // 确定归属 SectionGroup 并转局部坐标
         const parentGroup = ctx.getSectionGroupMap().get(section.id)
@@ -372,10 +378,10 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             around: 'center',
             editable: false,
             hittable: false,
-          })
-          ;(st as any).__seatLabelText = true
+          }) as MetaText
+          ;st.__seatLabelText = true
           group.add(st)
-          ;(ell as any).__labelText = st
+          ;ell.__labelText = st
         }
 
         const ldx = localLastX - localFirstX
@@ -384,7 +390,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
 
         console.log(`[import] row=${row.id} final: localFirst=(${localFirstX},${localFirstY}) localLast=(${localLastX},${localLastY}) ldist=${ldist.toFixed(1)} ux=${(ldist>0.001?ldx/ldist:1).toFixed(4)} uy=${(ldist>0.001?ldy/ldist:0).toFixed(4)} count=${sortedSeats.length}`)
 
-        ;(group as any).__seatRowData = {
+        ;group.__seatRowData = {
           x: localFirstX,
           y: localFirstY,
           ux: ldist > 0.001 ? ldx / ldist : 1,
@@ -396,7 +402,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         } as SeatDrawRowData
 
         // __seatSpacing 取 rowData.spacing 保证与 rebuildSeatRow 的 compare 一致
-        ;(group as any).__seatSpacing = (group as any).__seatRowData.spacing
+        ;group.__seatSpacing = group.__seatRowData.spacing
 
         // __rowOriginX/Y 保留世界坐标（导出时直接使用），不转局部
 
@@ -413,8 +419,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
   }
 
   function rebuildSeatRow(group: any, newData: SeatDrawRowData, endCenter?: { x: number; y: number }, anchorFromEnd?: boolean): void {
-    const bar = (group as any).__bar
-    const ellipses = (group as any).__seatEllipses as any[] | undefined
+    const bar = group.__bar
+    const ellipses = group.__seatEllipses as any[] | undefined
 
     const bs = seatDraw.getBaseScale()
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
@@ -423,7 +429,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const { x, y, ux, uy, count, spacing } = newData
 
     if (ellipses) {
-      const groupCurve = (group as any).__curve ?? 0
+      const groupCurve = group.__curve ?? 0
       const isCurved = Math.abs(groupCurve) > 0.001
 
       if (isCurved) {
@@ -475,9 +481,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             fill: '#A5D6A7', stroke: '#81C784',
             strokeWidth: sw, around: 'center',
             hittable: true, draggable: false,
-          })
-          ;(ell as any).__originalStroke = '#81C784'
-          ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
+          }) as MetaEllipse
+          ;ell.__originalStroke = '#81C784'
+          ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
           group.add(ell)
           ellipses.push(ell)
         }
@@ -502,11 +508,11 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           bar.strokeWidth = size
         }
 
-        const prevFromEnd = (group as any).__anchorFromEnd
+        const prevFromEnd = group.__anchorFromEnd
         if (anchorFromEnd !== prevFromEnd && prevFromEnd !== undefined) {
           ellipses.reverse()
         }
-        ;(group as any).__anchorFromEnd = anchorFromEnd
+        ;group.__anchorFromEnd = anchorFromEnd
 
         for (let i = 0; i < count; i++) {
           if (ellipses[i]) {
@@ -530,20 +536,20 @@ export function useSeatModule(ctx: SeatModuleCtx) {
             fill: '#A5D6A7', stroke: '#81C784',
             strokeWidth: sw, around: 'center',
             hittable: true, draggable: false,
-          })
-          ;(ell as any).__originalStroke = '#81C784'
-          ;(ell as any).editConfig = { moveable: false, rotateable: false, resizeable: false }
+          }) as MetaEllipse
+          ;ell.__originalStroke = '#81C784'
+          ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
           group.add(ell)
           ellipses.push(ell)
         }
       }
     }
 
-    ;(group as any).__seatRowData = { ...newData }
-    ;(group as any).__seatRadius = radius
+    ;group.__seatRowData = { ...newData }
+    ;group.__seatRadius = radius
 
     // 更新排标签文本位置/旋转
-    const labelText = (group as any).__labelText
+    const labelText = group.__labelText
     if (ellipses && ellipses.length > 1) {
       if (labelText) {
         const barPts = bar?.points ?? []
@@ -552,7 +558,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           const dx2 = lx2 - fx2, dy2 = ly2 - fy2
           const len2 = Math.hypot(dx2, dy2) || 1
           const ux2 = dx2 / len2, uy2 = dy2 / len2
-          const sp = (group as any).__seatSpacing ?? ((group as any).__seatRowData?.spacing ?? 18)
+          const sp = group.__seatSpacing ?? (group.__seatRowData?.spacing ?? 18)
           labelText.x = fx2 - ux2 * sp * 0.8
           labelText.y = fy2 - uy2 * sp * 0.8
           labelText.rotation = Math.atan2(dy2, dx2) * 180 / Math.PI
@@ -575,9 +581,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const selectedSet = new Set((ctx.getEditor() as any)?.list ?? [])
     const selectedSeatSet = new Set(store.selectedSeatIds)
     for (const g of seatRowGroups) {
-      const r = (g as any).__seatRadius as number | undefined
-      const bar = (g as any).__bar as any
-      const ellipses = (g as any).__seatEllipses as any[] | undefined
+      const r = g.__seatRadius as number | undefined
+      const bar = g.__bar as any
+      const ellipses = g.__seatEllipses as any[] | undefined
       if (r == null || !bar) continue
       const sel = selectedSet.has(g)
       const detail = r * s >= threshold
@@ -587,9 +593,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           const seatSelected = selectedSeatSet.has(e.__seatId)
           e.stroke = seatSelected ? '#3b82f6' : (e.__originalStroke ?? '#81C784')
           e.strokeWidth = seatSelected ? (1 / Math.max(seatDraw.getBaseScale(), 0.02)) * 2 : (1 / Math.max(seatDraw.getBaseScale(), 0.02))
-          const st = (e as any).__labelText
+          const st = e.__labelText
           if (st) {
-            const hasSeatLabel = String((e as any).__sourceSeat?.label || '').length > 0
+            const hasSeatLabel = String(e.__sourceSeat?.label || '').length > 0
             st.visible = detail && hasSeatLabel
             if (detail) st.fontSize = r
           }
@@ -597,7 +603,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       }
       // 座位条和座位圆互斥：没有座位圆时显示排线
       bar.visible = !detail
-      const labelText = (g as any).__labelText
+      const labelText = g.__labelText
       if (labelText) {
         const hasLabel = String(g.__rowLabel || '').length > 0
         // 只有座位圆出现时才显示排标签

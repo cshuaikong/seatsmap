@@ -923,11 +923,14 @@ export const useVenueStore = defineStore('venue', () => {
       // areas: Array.isArray(section.areas) ? section.areas : []
     }))
 
-    // 为 row 填充默认值
+    // 为 row 填充默认值，并把后端字段 cat_id 统一为内部字段 categoryKey
     normalizedSections.forEach(section => {
       section.rows = section.rows.map(row => ({
         ...row,
-        seats: Array.isArray(row.seats) ? row.seats : []
+        seats: Array.isArray(row.seats) ? row.seats.map(seat => ({
+          ...seat,
+          categoryKey: seat.categoryKey ?? (seat as any).cat_id ?? (seat as any).category ?? 1
+        })) : []
       }))
     })
 
