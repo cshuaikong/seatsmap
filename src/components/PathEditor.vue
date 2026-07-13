@@ -37,9 +37,10 @@ import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
 import { usePathEditorSync } from '../composables/usePathEditorSync'
+import { useSelectionOverlay } from '../composables/canvas/useSelectionOverlay'
 import { useVenueStore } from '../stores/venueStore'
 import { getSvgPathCenter } from '../viewer/geometry'
-import { nanoid } from 'nanoid'
+import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
   seatList?: any[]
@@ -74,7 +75,7 @@ let boundWheel: ((e: WheelEvent) => void) | null = null
 let allPaths: any[] = []
 let sectionGroupMap = new Map<string, any>()
 let edgeCache = new WeakMap<object, number[][]>()
-let sectionBorders: Array<{ border: any; group: any }> = []
+// let sectionBorders: Array<{ border: any; group: any }> = []
 
 // ==================== 工具函数 ====================
 
@@ -304,186 +305,23 @@ function renderAll(data: VenueData): void {
   }
 }
 
-function buildVenueData(): any {
-  const raw: any = props.venueData || {}
-
-  // 从 sectionGroupMap 构建 section 数据（x/y/rotation 从 Group 读，path 从子 Path 读）
-  const pathSectionMap = new Map<string, any>()
-  sectionGroupMap.forEach((group, sectionId) => {
-    const pathChild = group.children?.find((c: any) => c.tag === 'Path')
-    if (!pathChild) return
-    const sec: any = {
-      name: (group as any).__sectionName || '',
-      rows: [] as any[],
-      type: 'path',
-      x: +(group.x ?? 0).toFixed(2),
-      y: +(group.y ?? 0).toFixed(2),
-      fill: pathChild.fill,
-      stroke: pathChild.stroke,
-      id: sectionId,
-      path: pathChild.path,
-      width: pathChild.width ?? 100,
-      height: pathChild.height ?? 100,
-    }
-    if (group.rotation) sec.rotation = +(group.rotation ?? 0).toFixed(2)
-    if (group.zIndex != null) sec.zIndex = group.zIndex
-    pathSectionMap.set(sectionId, sec)
+/**
+ * 从当前画布构建 VenueData
+ *
+ * 当前仍依赖 Leafer 运行时元素，这是"画布为中心"架构的遗留。
+ * 后续数据驱动渲染完善后，应改用 venueDataStore.exportVenueData()。
+ */
+function buildVenueData(): VenueData {
+  return buildVenueDataFromCanvas({
+    rawVenue: props.venueData,
+    sectionGroupMap,
+    seatRowGroups: seatModule.seatRowGroups,
   })
-
-  // 从 seatRowGroups 构建 row→section 关系
-  // barPts/ell 在 SectionGroup 局部空间，需用 SectionGroup 的世界变换转回世界坐标
-  const sectionRowsMap = new Map<string, any[]>()
-  const sectionRowLookup = new Map<string, Map<string, any>>()
-
-  seatModule.seatRowGroups.forEach((g: any) => {
-    const sectionId = g.__sectionId
-    if (!sectionId) return
-
-    if (!sectionRowsMap.has(sectionId)) sectionRowsMap.set(sectionId, [])
-    if (!sectionRowLookup.has(sectionId)) sectionRowLookup.set(sectionId, new Map())
-
-    const rowLookup = sectionRowLookup.get(sectionId)!
-    const rowId = g.__rowId || nanoid(8)
-    const ellipses = (g.__seatEllipses || []) as any[]
-    const rowData = g.__seatRowData
-    const rowLabel = g.__rowLabel || ''
-    const barPts = (g.__bar as any)?.points ?? []
-
-    // 获取 SectionGroup 世界变换（用于局部→世界）
-    const sectionGroup = sectionGroupMap.get(sectionId)
-    const sX = sectionGroup?.x ?? 0
-    const sY = sectionGroup?.y ?? 0
-    const sRot = ((sectionGroup?.rotation ?? 0) * Math.PI) / 180
-    const cosS = Math.cos(sRot)
-    const sinS = Math.sin(sRot)
-
-    // Row 原点：局部 → 世界（barPts/ell 在 seat row Group 局部空间，需加 Group 偏移）
-    const rowGX = g.x ?? 0
-    const rowGY = g.y ?? 0
-    const _barPt0 = barPts[0] ?? rowData?.x ?? 0
-    const _barPt1 = barPts[1] ?? rowData?.y ?? 0
-    const rowLocalX = rowGX + _barPt0
-    const rowLocalY = rowGY + _barPt1
-    const rowWorldX = sX + rowLocalX * cosS - rowLocalY * sinS
-    const rowWorldY = sY + rowLocalX * sinS + rowLocalY * cosS
-
-    // 世界行方向（从 bar 端点局部→世界计算）
-    const _fbX = rowData ? _barPt0 + rowData.ux * rowData.spacing * (rowData.count - 1) : _barPt0
-    const _fbY = rowData ? _barPt1 + rowData.uy * rowData.spacing * (rowData.count - 1) : _barPt1
-    const beLX = rowGX + (barPts[2] ?? _fbX)
-    const beLY = rowGY + (barPts[3] ?? _fbY)
-    const beWX = sX + beLX * cosS - beLY * sinS
-    const beWY = sY + beLX * sinS + beLY * cosS
-    const wDX = beWX - rowWorldX
-    const wDY = beWY - rowWorldY
-    const worldRowRot = Math.atan2(wDY, wDX)
-
-    if (!rowLookup.has(rowId)) {
-      const row: any = {
-        id: rowId,
-        label: rowLabel,
-        x: +rowWorldX.toFixed(2),
-        y: +rowWorldY.toFixed(2),
-        rotation: +(worldRowRot * 180 / Math.PI).toFixed(2),
-        curve: +(g.__curve ?? 0).toFixed(2),
-        seats: [],
-      }
-      if (g.__seatSpacing != null) row.seatSpacing = +g.__seatSpacing.toFixed(2)
-      if (g.__rowSpacing != null) row.rowSpacing = +g.__rowSpacing.toFixed(2)
-      if (g.__categoryId != null) row.categoryKey = g.__categoryId
-      rowLookup.set(rowId, row)
-      sectionRowsMap.get(sectionId)!.push(row)
-    }
-
-    const row = rowLookup.get(rowId)!
-    const statusMap: Record<string, number> = { available: 0, sold: 1, reserved: 2 }
-    const toStatus = (s: string) => statusMap[s] ?? 0
-    const typeMap: Record<string, number> = { seat: 1 }
-    const toType = (s: string) => typeMap[s] ?? 1
-
-    const pushSeat = (seat: any) => {
-      seat.ven_id = raw.id || ''
-      row.seats.push(seat)
-    }
-
-    // 世界行方向 → 行局部坐标逆旋转
-    const cosWRR = Math.cos(-worldRowRot)
-    const sinWRR = Math.sin(-worldRowRot)
-
-    console.log(`[buildVenueData] section=${sectionId} row=${rowId} s=(${sX},${sY}) rot=${((sectionGroup?.rotation ?? 0)).toFixed(1)}deg rowG=(${rowGX},${rowGY}) barPts=[${barPts.join(',')}] rowWorld=(${rowWorldX.toFixed(1)},${rowWorldY.toFixed(1)}) worldRowRot=${(worldRowRot*180/Math.PI).toFixed(1)}deg`)
-
-    ellipses.forEach((ell: any) => {
-      const src = ell.__sourceSeat
-      const ellLocalX = rowGX + (ell.x ?? 0)
-      const ellLocalY = rowGY + (ell.y ?? 0)
-      const eWX = sX + ellLocalX * cosS - ellLocalY * sinS
-      const eWY = sY + ellLocalX * sinS + ellLocalY * cosS
-      const wx = eWX - rowWorldX
-      const wy = eWY - rowWorldY
-      const localX = wx * cosWRR - wy * sinWRR
-      const localY = wx * sinWRR + wy * cosWRR
-      if (row.seats.length === 0) {
-        console.log(`[buildVenueData] firstSeat: ell=(${(ell.x??0).toFixed(1)},${(ell.y??0).toFixed(1)}) ellLocal=(${ellLocalX.toFixed(1)},${ellLocalY.toFixed(1)}) eWorld=(${eWX.toFixed(1)},${eWY.toFixed(1)}) rowLocal=(${localX.toFixed(1)},${localY.toFixed(1)}) hasSrc=${!!src}`)
-      }
-      pushSeat({
-        id: ell.__seatId || src?.id || nanoid(8),
-        label: src?.label || '',
-        x: +localX.toFixed(2),
-        y: +localY.toFixed(2),
-        categoryKey: ell.__categoryKey ?? src?.categoryKey ?? 1,
-        status: src ? toStatus(src.status || 'available') : 0,
-        type: src ? toType(src.objectType || 'seat') : 1,
-      })
-    })
-    console.log(`[buildVenueData] row=${rowId} exported ${row.seats.length} seats`)
-  })
-
-  // 合并：有 Group 的 section 直接输出，仅有 seats 的 section 从原始数据补齐
-  const sections: any[] = []
-  const seenSectionIds = new Set<string>()
-
-  sectionGroupMap.forEach((_group, sectionId) => {
-    const sec = pathSectionMap.get(sectionId)
-    if (!sec) return
-    if (sectionRowsMap.has(sectionId)) {
-      sec.rows = sectionRowsMap.get(sectionId)!
-    }
-    sections.push(sec)
-    seenSectionIds.add(sectionId)
-  })
-
-  // 补充只有座位没有边框的 section（从原始 venueData）
-  const origSections = props.venueData?.sections ?? []
-  for (const orig of origSections) {
-    if (seenSectionIds.has(orig.id)) continue
-    if (!sectionRowsMap.has(orig.id)) continue
-    sections.push({
-      name: orig.name,
-      rows: sectionRowsMap.get(orig.id)!,
-      type: orig.type || (orig as any).borderType || 'path',
-      x: +(orig.x ?? 0).toFixed(2),
-      y: +(orig.y ?? 0).toFixed(2),
-      fill: orig.fill || '#dbdbdb',
-      stroke: orig.stroke || '#81C784',
-      id: orig.id,
-    })
-    seenSectionIds.add(orig.id)
-  }
-  return {
-    venue:{
-      id: raw.id,
-      name: raw.name,
-      type: raw.type,
-      categories: raw.categories ?? [],
-      scale: +(raw.scale ?? 1),
-      sections
-    }
-  }
 }
 
 function onExportJSON() {
-  const data = buildVenueData()
-  downloadFile('venue-data.json', JSON.stringify(data, null, 2))
+  const venue = buildVenueData()
+  downloadFile('venue-data.json', JSON.stringify({ venue }, null, 2))
 }
 
 function downloadFile(filename: string, content: string): void {
@@ -552,6 +390,14 @@ const pathEditorSync = usePathEditorSync({
   refreshSeatLOD: () => seatModule.updateSeatLOD(),
 })
 
+// 选中 Section 时的蓝色边框覆盖层
+const selectionOverlay = useSelectionOverlay({
+  getEditor: () => editor,
+  getLeafer: () => leafer,
+  getScale: getS,
+  getVertexEditing: () => vertexEdit.isEditing.value,
+})
+
 // Store 中的单座选中变化 → 刷新 LOD 高亮
 const venueStoreForWatch = useVenueStore()
 watch(() => venueStoreForWatch.selectedSeatIds, () => {
@@ -576,11 +422,11 @@ const vertexEdit = useVertexEdit({
     if (target) {
       const pg = (target as any).__sectionGroup
       if (pg) {
-        const entry = sectionBorders.find(b => b.group === pg)
+        const entry = selectionOverlay.sectionBorders.value.find(b => b.group === pg)
         if (entry) return entry.border
       }
     }
-    return sectionBorders[0]?.border ?? null
+    return selectionOverlay.sectionBorders.value[0]?.border ?? null
   },
   getParentGroup: () => {
     const tgt = vertexEdit.getTarget()
@@ -791,7 +637,7 @@ onMounted(() => {
     getEdgeCache: () => edgeCache,
     getVertexTarget: () => vertexEdit.getTarget(),
     getBorderGroup: (el: any) => {
-      const entry = sectionBorders.find(b => b.border === el)
+      const entry = selectionOverlay.sectionBorders.value.find(b => b.border === el)
       return entry?.group ?? null
     },
     onSeatRowsSelected: (_groups: any[]) => {
@@ -836,13 +682,7 @@ onMounted(() => {
   }
 
   // 拖拽/旋转时选择框跟手 + 边框同步（Group 嵌套自动处理子元素跟随）
-  const syncBorder = () => {
-    sectionBorders.forEach(({ border, group }) => {
-      border.x = group.x
-      border.y = group.y
-      border.rotation = group.rotation
-    })
-  }
+  const syncBorder = () => selectionOverlay.updatePositions()
   editor.on(EditorMoveEvent.MOVE, () => {
     ;(editor as any).editBox?.update()
     syncBorder()
@@ -906,42 +746,8 @@ onMounted(() => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
 
-    // 清理旧边框
-    if (!vertexEdit.isEditing.value) {
-      sectionBorders.forEach(b => b.border.remove())
-      sectionBorders = []
-    }
-
-    // 为所有选中分区绘制贴合形状的蓝色边框
-    if (list.length > 0 && leafer) {
-      const s = getS()
-      for (const el of list) {
-        // 兼容两种选中情况：SectionGroup（__sectionGroup===true）或内部 Path（__sectionGroup指向父Group）
-        if (!el?.__sectionGroup) continue
-        const isGroup = el.__sectionGroup === true
-        const group = isGroup ? el : el.__sectionGroup
-        const pathChild = isGroup
-          ? group.children?.find((c: any) => c.tag === 'Path')
-          : el
-        if (!pathChild || !group) continue
-        const border = new Path({
-          id: `section-border-${group.__sectionId}`,
-          path: pathChild.path,
-          x: group.x ?? 0,
-          y: group.y ?? 0,
-          rotation: group.rotation ?? 0,
-          fill: 'transparent',
-          stroke: '#3b82f6',
-          strokeWidth: 2 / s,
-          editable: false,
-          draggable: false,
-          hittable: false,
-          zIndex: 998,
-        })
-        leafer.add(border)
-        sectionBorders.push({ border, group })
-      }
-    }
+    // 清理旧边框并绘制新边框
+    selectionOverlay.sync()
 
     // 选中变化时刷新座位条高亮
     seatModule.updateSeatLOD()
@@ -1014,7 +820,7 @@ onMounted(() => {
     const handles = vertexEdit.getTarget() ? [...vertexEdit.getHandles(), ...vertexEdit.getEdgeHandles()] : undefined
     compensateZoom(editor, s, handles)
     if (seatVertexEdit.isEditing.value) seatVertexEdit.updateHandleSize()
-    sectionBorders.forEach(b => b.border.strokeWidth = 2 / s)
+    selectionOverlay.updateStrokeWidth(s)
     seatModule.updateSeatLOD()
     updateNameTextsLOD()
   })
