@@ -13,6 +13,24 @@ import type {
   SelectedObjectType,
 } from '../types'
 
+export interface PasteInput {
+  sections?: Section[]
+  rows?: SeatRow[]
+  seats?: Seat[]
+  shapes?: ShapeObject[]
+  texts?: TextObject[]
+  areas?: AreaObject[]
+}
+
+export interface PasteResult {
+  sectionIds: string[]
+  rowIds: string[]
+  seatIds: string[]
+  shapeIds: string[]
+  textIds: string[]
+  areaIds: string[]
+}
+
 /**
  * 纯场馆数据 Store
  *
@@ -318,6 +336,145 @@ export const useVenueDataStore = defineStore('venueData', () => {
     if (shapeIds.length > 0) shapeIds.forEach(deleteShape)
     if (textIds.length > 0) textIds.forEach(deleteText)
     if (areaIds.length > 0) areaIds.forEach(deleteArea)
+  }
+
+  // ==================== Copy / Paste ====================
+
+  function cloneSection(section: Section, dx: number, dy: number): Section {
+    return {
+      ...section,
+      id: generateId(),
+      name: `${section.name || '分区'} 副本`,
+      x: (section.x ?? 0) + dx,
+      y: (section.y ?? 0) + dy,
+      rows: section.rows.map(row => cloneRow(row, dx, dy)),
+      shapes: section.shapes?.map(shape => cloneShape(shape, dx, dy)),
+      texts: section.texts?.map(text => cloneText(text, dx, dy)),
+      areas: section.areas?.map(area => cloneArea(area)),
+    }
+  }
+
+  function cloneRow(row: SeatRow, dx: number, dy: number): SeatRow {
+    return {
+      ...row,
+      id: generateId(),
+      label: '',
+      x: (row.x ?? 0) + dx,
+      y: (row.y ?? 0) + dy,
+      seats: row.seats.map(seat => cloneSeat(seat, dx, dy)),
+    }
+  }
+
+  function cloneSeat(seat: Seat, dx: number, dy: number): Seat {
+    return {
+      ...seat,
+      id: generateId(),
+      label: '',
+      x: seat.x + dx,
+      y: seat.y + dy,
+    }
+  }
+
+  function cloneShape(shape: ShapeObject, dx: number, dy: number): ShapeObject {
+    return { ...shape, id: generateId(), x: shape.x + dx, y: shape.y + dy }
+  }
+
+  function cloneText(text: TextObject, dx: number, dy: number): TextObject {
+    return { ...text, id: generateId(), x: text.x + dx, y: text.y + dy }
+  }
+
+  function cloneArea(area: AreaObject): AreaObject {
+    return { ...area, id: generateId() }
+  }
+
+  function findSectionByRowId(rowId: string): Section | undefined {
+    return venue.value.sections.find(s => s.rows.some(r => r.id === rowId))
+  }
+
+  function findRowBySeatId(seatId: string): SeatRow | undefined {
+    for (const section of venue.value.sections) {
+      const row = section.rows.find(r => r.seats.some(s => s.id === seatId))
+      if (row) return row
+    }
+    return undefined
+  }
+
+  function pasteObjects(data: PasteInput, offset: { x: number; y: number } = { x: 20, y: 20 }): PasteResult {
+    const result: PasteResult = {
+      sectionIds: [],
+      rowIds: [],
+      seatIds: [],
+      shapeIds: [],
+      textIds: [],
+      areaIds: [],
+    }
+
+    // 1) 复制整个 Section
+    data.sections?.forEach(section => {
+      const cloned = cloneSection(section, offset.x, offset.y)
+      venue.value.sections.push(cloned)
+      result.sectionIds.push(cloned.id)
+      cloned.rows.forEach(r => result.rowIds.push(r.id))
+      cloned.rows.forEach(r => r.seats.forEach(s => result.seatIds.push(s.id)))
+      cloned.shapes?.forEach(s => result.shapeIds.push(s.id))
+      cloned.texts?.forEach(t => result.textIds.push(t.id))
+      cloned.areas?.forEach(a => result.areaIds.push(a.id))
+    })
+
+    // 2) 复制 Row（粘贴到原属 Section）
+    data.rows?.forEach(row => {
+      const section = findSectionByRowId(row.id)
+      if (!section) return
+      const cloned = cloneRow(row, offset.x, offset.y)
+      section.rows.push(cloned)
+      result.rowIds.push(cloned.id)
+      cloned.seats.forEach(s => result.seatIds.push(s.id))
+    })
+
+    // 3) 复制 Seat -> 新建一个 Row 容纳它们
+    if (data.seats && data.seats.length > 0) {
+      const row = findRowBySeatId(data.seats[0].id)
+      const section = row ? findSectionByRowId(row.id) : venue.value.sections[0]
+      if (section) {
+        const avgX = data.seats.reduce((sum, s) => sum + s.x, 0) / data.seats.length
+        const avgY = data.seats.reduce((sum, s) => sum + s.y, 0) / data.seats.length
+        const newRow: SeatRow = {
+          id: generateId(),
+          label: '',
+          x: avgX + offset.x,
+          y: avgY + offset.y,
+          seats: data.seats.map(seat => cloneSeat(seat, offset.x, offset.y)),
+        }
+        section.rows.push(newRow)
+        result.rowIds.push(newRow.id)
+        newRow.seats.forEach(s => result.seatIds.push(s.id))
+      }
+    }
+
+    // 4) 复制独立 Shape / Text / Area（粘贴到第一个 Section，若无可容纳则忽略）
+    const firstSection = venue.value.sections[0]
+    if (firstSection) {
+      data.shapes?.forEach(shape => {
+        const cloned = cloneShape(shape, offset.x, offset.y)
+        if (!firstSection.shapes) firstSection.shapes = []
+        firstSection.shapes.push(cloned)
+        result.shapeIds.push(cloned.id)
+      })
+      data.texts?.forEach(text => {
+        const cloned = cloneText(text, offset.x, offset.y)
+        if (!firstSection.texts) firstSection.texts = []
+        firstSection.texts.push(cloned)
+        result.textIds.push(cloned.id)
+      })
+      data.areas?.forEach(area => {
+        const cloned = cloneArea(area)
+        if (!firstSection.areas) firstSection.areas = []
+        firstSection.areas.push(cloned)
+        result.areaIds.push(cloned.id)
+      })
+    }
+
+    return result
   }
 
   // ==================== Shape / Text / Area CRUD ====================
@@ -645,8 +802,9 @@ export const useVenueDataStore = defineStore('venueData', () => {
     removeSeatAtRowEnd,
     removeSelectedSeats,
 
-    // Batch deletion
+    // Batch deletion / copy-paste
     deleteSelectedObjects,
+    pasteObjects,
 
     // Shape / Text / Area
     addShape,

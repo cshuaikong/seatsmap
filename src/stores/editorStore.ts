@@ -8,6 +8,7 @@ import type {
   TextObject,
   AreaObject,
   CanvasImage,
+  Section,
 } from '../types'
 
 /**
@@ -37,6 +38,16 @@ export const useEditorStore = defineStore('editor', () => {
   // 画布上的图片（支持多张）
   const canvasImages = ref<CanvasImage[]>([])
   const selectedImageId = ref<string | null>(null)
+
+  // 剪贴板（复制/粘贴）
+  const clipboard = ref<{
+    sections: Section[]
+    rows: SeatRow[]
+    seats: Seat[]
+    shapes: ShapeObject[]
+    texts: TextObject[]
+    areas: AreaObject[]
+  } | null>(null)
 
   // ==================== Getters ====================
 
@@ -244,6 +255,91 @@ export const useEditorStore = defineStore('editor', () => {
     clearSelection()
   }
 
+  /** 深拷贝当前选中的对象到剪贴板 */
+  function copySelected() {
+    const sectionIdSet = new Set(selectedSectionIds.value)
+    const rowIdSet = new Set(selectedRowIds.value)
+
+    const sections: Section[] = []
+    const rows: SeatRow[] = []
+    const seats: Seat[] = []
+    const shapes: ShapeObject[] = []
+    const texts: TextObject[] = []
+    const areas: AreaObject[] = []
+
+    selectedSectionIds.value.forEach(id => {
+      const section = venueDataStore.venue.sections.find(s => s.id === id)
+      if (section) sections.push(JSON.parse(JSON.stringify(section)))
+    })
+
+    selectedRowIds.value.forEach(id => {
+      for (const section of venueDataStore.venue.sections) {
+        const row = section.rows.find(r => r.id === id)
+        if (row && !sectionIdSet.has(section.id)) {
+          rows.push(JSON.parse(JSON.stringify(row)))
+          break
+        }
+      }
+    })
+
+    selectedSeatIds.value.forEach(id => {
+      for (const section of venueDataStore.venue.sections) {
+        for (const row of section.rows) {
+          const seat = row.seats.find(s => s.id === id)
+          if (seat && !sectionIdSet.has(section.id) && !rowIdSet.has(row.id)) {
+            seats.push(JSON.parse(JSON.stringify(seat)))
+            break
+          }
+        }
+      }
+    })
+
+    selectedShapeIds.value.forEach(id => {
+      for (const section of venueDataStore.venue.sections) {
+        const shape = section.shapes?.find(s => s.id === id)
+        if (shape && !sectionIdSet.has(section.id)) {
+          shapes.push(JSON.parse(JSON.stringify(shape)))
+          break
+        }
+      }
+    })
+
+    selectedTextIds.value.forEach(id => {
+      for (const section of venueDataStore.venue.sections) {
+        const text = section.texts?.find(t => t.id === id)
+        if (text && !sectionIdSet.has(section.id)) {
+          texts.push(JSON.parse(JSON.stringify(text)))
+          break
+        }
+      }
+    })
+
+    selectedAreaIds.value.forEach(id => {
+      for (const section of venueDataStore.venue.sections) {
+        const area = section.areas?.find(a => a.id === id)
+        if (area && !sectionIdSet.has(section.id)) {
+          areas.push(JSON.parse(JSON.stringify(area)))
+          break
+        }
+      }
+    })
+
+    clipboard.value = { sections, rows, seats, shapes, texts, areas }
+  }
+
+  /** 粘贴剪贴板内容并选中新对象 */
+  function paste() {
+    if (!clipboard.value) return
+    const result = venueDataStore.pasteObjects(clipboard.value)
+    clearSelection()
+    result.sectionIds.forEach(id => selectSection(id, true))
+    result.rowIds.forEach(id => selectRow(id, true))
+    result.seatIds.forEach(id => selectSeat(id, true))
+    result.shapeIds.forEach(id => selectShape(id, true))
+    result.textIds.forEach(id => selectText(id, true))
+    result.areaIds.forEach(id => selectArea(id, true))
+  }
+
   // ==================== Return ====================
 
   return {
@@ -287,5 +383,10 @@ export const useEditorStore = defineStore('editor', () => {
 
     // Deletion
     deleteSelected,
+
+    // Clipboard
+    clipboard,
+    copySelected,
+    paste,
   }
 })

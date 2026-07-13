@@ -896,6 +896,7 @@ defineExpose({
   exitSectionFocus,
   deleteSelected,
   buildVenueData,
+  renderAll,
   drawnSeatCount: seatModule.drawnSeatCount,
 })
 </script>

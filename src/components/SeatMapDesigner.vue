@@ -262,8 +262,11 @@ const onSave = () => {
 
 const onUndo = () => { historyStore.undo() }
 const onRedo = () => { historyStore.redo() }
-const onCopy = () => { console.log('复制') }
-const onPaste = () => { console.log('粘贴') }
+const onCopy = () => { editorStore.copySelected() }
+const onPaste = () => {
+  editorStore.paste()
+  rendererRef.value?.renderAll?.(venueDataStore.venue)
+}
 const onDelete = () => {
   editorStore.deleteSelected()
 }
