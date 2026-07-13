@@ -49,6 +49,8 @@ export const useHistoryStore = defineStore('history', () => {
 
   function scheduleSave() {
     if (isRestoring || isPaused) return
+    // 一旦开始使用 CommandStack，就不再为自动 mutation 生成快照，避免双轨历史混乱
+    if (commandStack.canUndo) return
     if (pendingSaveTimer) clearTimeout(pendingSaveTimer)
     pendingSaveTimer = setTimeout(() => {
       pendingSaveTimer = null

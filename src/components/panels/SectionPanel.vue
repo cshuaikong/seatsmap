@@ -256,6 +256,8 @@ import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { PathPoint, Section } from '../../types'
 import { useVenueDataStore } from '../../stores/venueDataStore'
+import { useHistoryStore } from '../../stores/historyStore'
+import { createUpdateCategoryCommand } from '../../domain/venueCommands'
 
 const props = defineProps<{
   section: Section | null
@@ -368,6 +370,7 @@ const solidFill = computed(() => {
 })
 
 const venueDataStore = useVenueDataStore()
+const historyStore = useHistoryStore()
 
 const seatCount = computed(() => {
   if (!props.section) return 0
@@ -427,7 +430,7 @@ const sectionCategories = computed(() => {
 })
 
 function onCategoryColorChange(key: string, color: string): void {
-  venueDataStore.updateCategory(key, { color })
+  historyStore.execute(createUpdateCategoryCommand(venueDataStore, key, { color }))
 }
 
 const sectionTypeLabel = computed(() => {

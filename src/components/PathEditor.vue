@@ -43,6 +43,7 @@ import { useHistoryStore } from '../stores/historyStore'
 import { useVenueDataStore } from '../stores/venueDataStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
+import { createUpdateSectionBorderCommand } from '../domain/venueCommands'
 import type { ToolId } from '../domain/toolRegistry'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
@@ -470,7 +471,7 @@ const vertexEdit = useVertexEdit({
   },
   onToolChange: (tool) => { currentTool.value = tool as ToolId },
   onPathChange: (sectionId, path) => {
-    venueDataStore.updateSectionBorder(sectionId, { path })
+    historyStore.execute(createUpdateSectionBorderCommand(venueDataStore, sectionId, { path }))
   },
 })
 

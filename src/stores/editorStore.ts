@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useVenueDataStore } from './venueDataStore'
 import { useHistoryStore } from './historyStore'
-import { createDeleteSelectedObjectsCommand } from '../domain/venueCommands'
+import { createDeleteSelectedObjectsCommand, createPasteObjectsCommand } from '../domain/venueCommands'
 import type {
   Seat,
   SeatRow,
@@ -335,14 +335,32 @@ export const useEditorStore = defineStore('editor', () => {
   /** 粘贴剪贴板内容并选中新对象 */
   function paste() {
     if (!clipboard.value) return
-    const result = venueDataStore.pasteObjects(clipboard.value)
+    const command = createPasteObjectsCommand(venueDataStore, clipboard.value, { x: 20, y: 20 })
+    historyStore.execute(command)
     clearSelection()
-    result.sectionIds.forEach(id => selectSection(id, true))
-    result.rowIds.forEach(id => selectRow(id, true))
-    result.seatIds.forEach(id => selectSeat(id, true))
-    result.shapeIds.forEach(id => selectShape(id, true))
-    result.textIds.forEach(id => selectText(id, true))
-    result.areaIds.forEach(id => selectArea(id, true))
+    // paste command 执行后 result 已写入 command 内部，但这里拿不到。
+    // 为保持选中行为，直接从 store 中查找最近新增的对象（id 不在原剪贴板中）。
+    const originalIds = new Set<string>([
+      ...(clipboard.value.sections?.map(s => s.id) ?? []),
+      ...(clipboard.value.rows?.map(r => r.id) ?? []),
+      ...(clipboard.value.seats?.map(s => s.id) ?? []),
+      ...(clipboard.value.shapes?.map(s => s.id) ?? []),
+      ...(clipboard.value.texts?.map(t => t.id) ?? []),
+      ...(clipboard.value.areas?.map(a => a.id) ?? []),
+    ])
+    venueDataStore.venue.sections.forEach(section => {
+      if (originalIds.has(section.id)) return
+      selectSection(section.id, true)
+      section.rows.forEach(row => {
+        if (!originalIds.has(row.id)) selectRow(row.id, true)
+        row.seats.forEach(seat => {
+          if (!originalIds.has(seat.id)) selectSeat(seat.id, true)
+        })
+      })
+      section.shapes?.forEach(shape => { if (!originalIds.has(shape.id)) selectShape(shape.id, true) })
+      section.texts?.forEach(text => { if (!originalIds.has(text.id)) selectText(text.id, true) })
+      section.areas?.forEach(area => { if (!originalIds.has(area.id)) selectArea(area.id, true) })
+    })
   }
 
   // ==================== Return ====================

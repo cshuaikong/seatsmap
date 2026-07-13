@@ -122,6 +122,11 @@ import { useEditorStore } from '../stores/editorStore'
 import { useHistoryStore } from '../stores/historyStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
+import {
+  createAddCategoryCommand,
+  createUpdateCategoryCommand,
+  createDeleteCategoryCommand,
+} from '../domain/venueCommands'
 
 const emit = defineEmits<{
   (e: 'save', data: any): void
@@ -298,22 +303,22 @@ const onCloseCategoryManager = () => {
 }
 
 const onAddCategory = (category: { name: string; color: string }) => {
-  venueDataStore.addCategory({
+  historyStore.execute(createAddCategoryCommand(venueDataStore, {
     label: category.name,
     color: category.color,
     accessible: false,
-  })
+  }))
 }
 
 const onUpdateCategory = (categoryId: string, updates: { name?: string; color?: string }) => {
   const venueUpdates: any = {}
   if (updates.name !== undefined) venueUpdates.label = updates.name
   if (updates.color !== undefined) venueUpdates.color = updates.color
-  venueDataStore.updateCategory(categoryId, venueUpdates)
+  historyStore.execute(createUpdateCategoryCommand(venueDataStore, categoryId, venueUpdates))
 }
 
 const onDeleteCategory = (categoryId: string) => {
-  venueDataStore.deleteCategory(categoryId)
+  historyStore.execute(createDeleteCategoryCommand(venueDataStore, categoryId))
 }
 
 defineExpose({
