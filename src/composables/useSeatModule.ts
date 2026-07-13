@@ -9,10 +9,13 @@ export type MetaEllipse = Ellipse & LeaferElementMeta
 export type MetaText = Text & LeaferElementMeta
 import { useVenueDataStore } from '../stores/venueDataStore'
 import { useEditorStore } from '../stores/editorStore'
+import { useHistoryStore } from '../stores/historyStore'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
 import { calculateCurvedPositions } from '../viewer/geometry'
 import { getCategoryColor, darkenColor } from '../utils/color'
+import { createAddRowsCommand } from '../domain/venueCommands'
+import { buildSeatRowsFromDrawData } from '../domain/rowGeometry'
 
 export interface SeatModuleCtx {
   getLeafer: () => any
@@ -32,6 +35,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
   const drawnSeatCount = ref(0)
   const venueDataStore = useVenueDataStore()
   const editorStore = useEditorStore()
+  const historyStore = useHistoryStore()
 
   /** 判断事件路径中是否包含可见的单个座位圆 */
   function isEventOnVisibleSeat(e: any): boolean {
@@ -626,22 +630,23 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     onFinish: (data) => {
       const focusedId = ctx.getFocusedSectionId?.()
       const targetGroup = focusedId ? ctx.getSectionGroupMap().get(focusedId) : undefined
-      if (targetGroup) {
-        // 绘图工具产生世界坐标，需转 Group 局部坐标（含旋转）
-        const sx = targetGroup.x ?? 0
-        const sy = targetGroup.y ?? 0
-        const pgRot = (targetGroup.rotation ?? 0) * Math.PI / 180
-        const cosR = Math.cos(-pgRot)
-        const sinR = Math.sin(-pgRot)
-        const adjusted = data.rows.map(row => ({
-          ...row,
-          x: +((row.x - sx) * cosR - (row.y - sy) * sinR).toFixed(2),
-          y: +((row.x - sx) * sinR + (row.y - sy) * cosR).toFixed(2),
-          ux: +(row.ux * cosR - row.uy * sinR).toFixed(4),
-          uy: +(row.ux * sinR + row.uy * cosR).toFixed(4),
-        }))
-        createSeatElements(adjusted, targetGroup, focusedId)
+      if (targetGroup && focusedId) {
+        // Phase C：聚焦分区模式下，座位排直接写入 store，canvas 由 watcher 渲染
+        const section = venueDataStore.venue.sections.find(s => s.id === focusedId)
+        if (!section) {
+          // fallback：section 不存在时仍走 canvas-first
+          createSeatElements(data.rows, targetGroup, focusedId)
+          return
+        }
+        const seatRows = buildSeatRowsFromDrawData(data.rows, {
+          section,
+          categories: venueDataStore.venue.categories,
+        })
+        if (seatRows.length) {
+          historyStore.execute(createAddRowsCommand(venueDataStore, focusedId, seatRows))
+        }
       } else {
+        // 无聚焦分区：暂时保持 canvas-first，后续改造
         createSeatElements(data.rows, undefined, undefined)
       }
     },

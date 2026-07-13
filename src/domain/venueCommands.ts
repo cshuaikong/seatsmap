@@ -66,6 +66,25 @@ export function createBatchCommand(commands: Command[]): Command {
 
 // ==================== Row Commands ====================
 
+/** 向指定 Section 添加若干 Row */
+export function createAddRowsCommand(
+  store: VenueDataStore,
+  sectionId: string,
+  rows: Omit<SeatRow, 'id'>[],
+): Command {
+  const captured = clone(rows) as Omit<SeatRow, 'id'>[]
+  let addedIds: string[] = []
+  return {
+    name: 'addRows',
+    execute: () => {
+      addedIds = store.addRows(sectionId, clone(captured)) ?? []
+    },
+    undo: () => {
+      addedIds.forEach(id => store.deleteRow(id))
+    },
+  }
+}
+
 /** 更新 Row 属性的命令（全量替换） */
 export function createUpdateRowCommand(
   store: VenueDataStore,

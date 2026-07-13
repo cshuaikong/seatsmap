@@ -110,6 +110,18 @@ export const useVenueDataStore = defineStore('venueData', () => {
     return newRow.id
   }
 
+  function addRows(sectionId: string, rows: Omit<SeatRow, 'id'>[]) {
+    const section = venue.value.sections.find(s => s.id === sectionId)
+    if (!section) return []
+    const addedIds: string[] = []
+    for (const row of rows) {
+      const newRow: SeatRow = { ...row, id: generateId() }
+      section.rows.push(newRow)
+      addedIds.push(newRow.id)
+    }
+    return addedIds
+  }
+
   function updateRow(rowId: string, updates: Partial<SeatRow>) {
     venue.value.sections.forEach(section => {
       const row = section.rows.find(r => r.id === rowId)
@@ -784,6 +796,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
 
     // Row
     addRow,
+    addRows,
     updateRow,
     updateMultipleRows,
     deleteRow,
