@@ -3,8 +3,10 @@ export { default as SeatMapDesigner } from './components/SeatMapDesigner.vue'
 export { default as LeftToolbar } from './components/LeftToolbar.vue'
 export { default as RightPanel } from './components/RightPanel.vue'
 
-// Store
-export { useVenueStore } from './stores/venueStore'
+// Stores
+export { useVenueDataStore } from './stores/venueDataStore'
+export { useEditorStore } from './stores/editorStore'
+export { useHistoryStore } from './stores/historyStore'
 
 // 类型
 export * from './types'
