@@ -2,56 +2,44 @@ import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useVenueDataStore } from './venueDataStore'
 import { useEditorStore } from './editorStore'
-import type { VenueData } from '../types'
+import { createCommandStack } from '../domain/command'
+import type { Command } from '../domain/command'
 
 /**
  * 撤销/重做历史 Store
  *
- * 职责：基于 venueDataStore 的完整数据快照实现 undo/redo。
- * 当前使用深拷贝快照，后续可演进为 Command 模式。
+ * 当前仍基于 venue 完整快照实现 undo/redo，同时内置 CommandStack
+ * 作为迁移目标。外部可通过 execute(command) 记录精确命令，未命令化的
+ * 操作仍由 auto-save 快照兜底。
  */
 export const useHistoryStore = defineStore('history', () => {
-  // ==================== State ====================
-
-  const history = ref<VenueData[]>([])
-  const historyIndex = ref(-1)
-  const MAX_HISTORY = 50
-
   const venueDataStore = useVenueDataStore()
   const editorStore = useEditorStore()
 
-  // ==================== Getters ====================
+  const MAX_HISTORY = 50
 
-  const canUndo = computed(() => historyIndex.value > 0)
-  const canRedo = computed(() => historyIndex.value < history.value.length - 1)
+  // ==================== Snapshot history (legacy) ====================
+
+  const history = ref<any[]>([])
+  const historyIndex = ref(-1)
+
+  const canUndoSnapshot = computed(() => historyIndex.value > 0)
+  const canRedoSnapshot = computed(() => historyIndex.value < history.value.length - 1)
 
   let isRestoring = false
   let isPaused = false
   let pendingSaveTimer: ReturnType<typeof setTimeout> | null = null
 
-  // ==================== Actions ====================
-
-  function initHistory() {
-    if (historyIndex.value !== -1) return
-    history.value.push(venueDataStore.exportVenueData())
-    historyIndex.value = 0
-  }
-
-  function saveHistory() {
+  function saveSnapshot() {
     if (historyIndex.value === -1) {
-      initHistory()
+      history.value.push(venueDataStore.exportVenueData())
+      historyIndex.value = 0
       return
     }
-
-    // 删除当前索引之后的历史（如果有）
     if (historyIndex.value < history.value.length - 1) {
       history.value = history.value.slice(0, historyIndex.value + 1)
     }
-
-    // 添加新状态
     history.value.push(venueDataStore.exportVenueData())
-
-    // 限制历史记录数量
     if (history.value.length > MAX_HISTORY) {
       history.value.shift()
     } else {
@@ -59,8 +47,17 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
-  function undo() {
-    if (!canUndo.value) return
+  function scheduleSave() {
+    if (isRestoring || isPaused) return
+    if (pendingSaveTimer) clearTimeout(pendingSaveTimer)
+    pendingSaveTimer = setTimeout(() => {
+      pendingSaveTimer = null
+      saveSnapshot()
+    }, 300)
+  }
+
+  function undoSnapshot() {
+    if (!canUndoSnapshot.value) return
     isRestoring = true
     historyIndex.value--
     venueDataStore.importVenueData(history.value[historyIndex.value])
@@ -68,8 +65,8 @@ export const useHistoryStore = defineStore('history', () => {
     isRestoring = false
   }
 
-  function redo() {
-    if (!canRedo.value) return
+  function redoSnapshot() {
+    if (!canRedoSnapshot.value) return
     isRestoring = true
     historyIndex.value++
     venueDataStore.importVenueData(history.value[historyIndex.value])
@@ -77,7 +74,7 @@ export const useHistoryStore = defineStore('history', () => {
     isRestoring = false
   }
 
-  function reset() {
+  function resetSnapshots() {
     history.value = []
     historyIndex.value = -1
     if (pendingSaveTimer) {
@@ -86,7 +83,56 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
-  /** 暂停历史记录（例如拖拽过程中） */
+  watch(() => venueDataStore.venue, () => {
+    scheduleSave()
+  }, { deep: true })
+
+  // ==================== Command history (migration target) ====================
+
+  const commandStack = createCommandStack(MAX_HISTORY)
+
+  const canUndoCommand = computed(() => commandStack.canUndo)
+  const canRedoCommand = computed(() => commandStack.canRedo)
+
+  function execute(command: Command) {
+    commandStack.execute(command)
+  }
+
+  function undoCommand() {
+    editorStore.clearSelection()
+    commandStack.undo()
+  }
+
+  function redoCommand() {
+    editorStore.clearSelection()
+    commandStack.redo()
+  }
+
+  function resetCommands() {
+    commandStack.reset()
+  }
+
+  // ==================== Unified API ====================
+
+  const canUndo = computed(() => canUndoSnapshot.value || canUndoCommand.value)
+  const canRedo = computed(() => canRedoSnapshot.value || canRedoCommand.value)
+
+  function undo() {
+    if (canUndoCommand.value) undoCommand()
+    else undoSnapshot()
+  }
+
+  function redo() {
+    if (canRedoCommand.value) redoCommand()
+    else redoSnapshot()
+  }
+
+  function reset() {
+    resetSnapshots()
+    resetCommands()
+  }
+
+  /** 拖拽等已知 before 状态的场景用 */
   function pauseRecording() {
     isPaused = true
     if (pendingSaveTimer) {
@@ -95,42 +141,20 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
-  /** 恢复历史记录并立即保存当前状态 */
   function resumeRecording() {
     if (!isPaused) return
     isPaused = false
-    saveHistory()
+    saveSnapshot()
   }
-
-  /** 延迟自动保存：把连续快速变更合并为一次历史记录 */
-  function scheduleSave() {
-    if (isRestoring || isPaused) return
-    if (pendingSaveTimer) clearTimeout(pendingSaveTimer)
-    pendingSaveTimer = setTimeout(() => {
-      pendingSaveTimer = null
-      saveHistory()
-    }, 300)
-  }
-
-  // 监听 venue 数据变化，自动记录历史（undo/redo 恢复期间跳过）
-  watch(() => venueDataStore.venue, () => {
-    scheduleSave()
-  }, { deep: true })
-
-  // ==================== Return ====================
 
   return {
-    history,
-    historyIndex,
     canUndo,
     canRedo,
-    initHistory,
-    saveHistory,
-    scheduleSave,
-    pauseRecording,
-    resumeRecording,
     undo,
     redo,
     reset,
+    execute,
+    pauseRecording,
+    resumeRecording,
   }
 })

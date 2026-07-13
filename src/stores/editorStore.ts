@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useVenueDataStore } from './venueDataStore'
+import { useHistoryStore } from './historyStore'
+import { createDeleteSelectedObjectsCommand } from '../domain/venueCommands'
 import type {
   Seat,
   SeatRow,
@@ -52,6 +54,7 @@ export const useEditorStore = defineStore('editor', () => {
   // ==================== Getters ====================
 
   const venueDataStore = useVenueDataStore()
+  const historyStore = useHistoryStore()
 
   const selectedSeats = computed(() => {
     const seats: Seat[] = []
@@ -244,14 +247,16 @@ export const useEditorStore = defineStore('editor', () => {
 
   /** 删除当前所有选中的对象并清空选择 */
   function deleteSelected() {
-    venueDataStore.deleteSelectedObjects({
+    const selection = {
       seatIds: selectedSeatIds.value,
       rowIds: selectedRowIds.value,
       sectionIds: selectedSectionIds.value,
       shapeIds: selectedShapeIds.value,
       textIds: selectedTextIds.value,
       areaIds: selectedAreaIds.value,
-    })
+    }
+    const command = createDeleteSelectedObjectsCommand(venueDataStore, selection)
+    historyStore.execute(command)
     clearSelection()
   }
 

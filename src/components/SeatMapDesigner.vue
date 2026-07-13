@@ -238,7 +238,6 @@ const onImportData = async () => {
   if (venue) {
     venueDataStore.importVenueData(venue)
     historyStore.reset()
-    historyStore.initHistory()
     const seatCount = venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
     importStatus.value = 'success'
     importTip.value = `成功导入 ${seatCount} 个座位`

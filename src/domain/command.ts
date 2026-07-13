@@ -28,6 +28,8 @@ export interface CommandStack {
   readonly canUndo: boolean
   /** 是否可重做 */
   readonly canRedo: boolean
+  /** 清空历史 */
+  reset(): void
 }
 
 /** 简单的命令执行器（Invoker） */
@@ -64,6 +66,10 @@ export function createCommandStack(maxHistory = 50): CommandStack {
     },
     get canRedo() {
       return index < commands.length - 1
+    },
+    reset() {
+      commands.length = 0
+      index = -1
     },
   }
 }
