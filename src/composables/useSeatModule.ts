@@ -7,7 +7,8 @@ import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
 export type MetaGroup = Group & LeaferElementMeta
 export type MetaEllipse = Ellipse & LeaferElementMeta
 export type MetaText = Text & LeaferElementMeta
-import { useVenueStore } from '../stores/venueStore'
+import { useVenueDataStore } from '../stores/venueDataStore'
+import { useEditorStore } from '../stores/editorStore'
 import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
 import { calculateCurvedPositions } from '../viewer/geometry'
@@ -29,7 +30,8 @@ export interface SeatModuleCtx {
 export function useSeatModule(ctx: SeatModuleCtx) {
   const seatRowGroups: any[] = []
   const drawnSeatCount = ref(0)
-  const store = useVenueStore()
+  const venueDataStore = useVenueDataStore()
+  const editorStore = useEditorStore()
 
   /** 判断事件路径中是否包含可见的单个座位圆 */
   function isEventOnVisibleSeat(e: any): boolean {
@@ -194,8 +196,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     }
     const bs = seatDraw.getBaseScale()
     // 同步 baseScale 到 store，确保预览端的座位比例与编辑器一致
-    if (store.venue.baseScale !== bs) {
-      store.setSectionBaseScale(bs)
+    if (venueDataStore.venue.baseScale !== bs) {
+      venueDataStore.setSectionBaseScale(bs)
     }
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
@@ -579,7 +581,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const s = ctx.getS()
     const threshold = SEAT_CONFIG.radius // 座位圆在 currentScale >= baseScale 时显示
     const selectedSet = new Set((ctx.getEditor() as any)?.list ?? [])
-    const selectedSeatSet = new Set(store.selectedSeatIds)
+    const selectedSeatSet = new Set(editorStore.selectedSeatIds)
     for (const g of seatRowGroups) {
       const r = g.__seatRadius as number | undefined
       const bar = g.__bar as any

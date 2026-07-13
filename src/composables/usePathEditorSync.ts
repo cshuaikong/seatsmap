@@ -1,6 +1,7 @@
 import { watch } from 'vue'
 import type { Section, SeatRow, Seat } from '../types'
-import { useVenueStore } from '../stores/venueStore'
+import { useVenueDataStore } from '../stores/venueDataStore'
+import { useEditorStore } from '../stores/editorStore'
 import { nanoid } from 'nanoid'
 import { darkenColor } from '../utils/color'
 
@@ -15,12 +16,15 @@ export interface PathEditorSyncCtx {
 }
 
 /**
- * PathEditor <-> venueStore 双向同步桥
+ * PathEditor <-> split stores 双向同步桥
  *
- * 方向1 (画布→Store)：选中画布对象时，将当前状态推送到 venueStore，使 RightPanel 显示正确的属性面板。
- * 方向2 (Store→画布)：RightPanel 修改属性 → venueStore 变更 → 反向应用到画布元素。
+ * 方向1 (画布→Store)：选中画布对象时，将当前状态推送到 stores，使 RightPanel 显示正确的属性面板。
+ * 方向2 (Store→画布)：RightPanel 修改属性 → store 变更 → 反向应用到画布元素。
  */
 export function usePathEditorSync(ctx: PathEditorSyncCtx) {
+  const venueDataStore = useVenueDataStore()
+  const editorStore = useEditorStore()
+
   let isSyncingToStore = false
   let isApplyingToCanvas = false
 
@@ -52,8 +56,8 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   }
 
   /** 确保 Section 存在于 venueStore（不存在则创建，存在则更新关键属性） */
-  function upsertSectionInStore(store: ReturnType<typeof useVenueStore>, data: Partial<Section> & { id: string }): void {
-    const existing = store.venue.sections.find(s => s.id === data.id)
+  function upsertSectionInStore(data: Partial<Section> & { id: string }): void {
+    const existing = venueDataStore.venue.sections.find(s => s.id === data.id)
     if (existing) {
       // 更新可变属性（保留 rows/其他已有数据）
       if (data.name !== undefined) existing.name = data.name
@@ -70,7 +74,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       if (data.path !== undefined) (existing as any).path = data.path
     } else {
       // 创建新 section
-      store.venue.sections.push({
+      venueDataStore.venue.sections.push({
         id: data.id,
         name: data.name || '',
         rows: [],
@@ -146,8 +150,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     const sectionFill = sectionPath?.fill ?? ''
     let inheritedCatKey: string | number | null = null
     if (sectionFill) {
-      const store = useVenueStore()
-      const cat = (store.venue.categories ?? []).find((c: any) => c.color === sectionFill)
+      const cat = (venueDataStore.venue.categories ?? []).find((c: any) => c.color === sectionFill)
       if (cat) inheritedCatKey = cat.key
     }
 
@@ -187,12 +190,11 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
   /** 确保 Row 存在于 venueStore 的指定 section 中 */
   function upsertRowInStore(
-    store: ReturnType<typeof useVenueStore>,
     sectionId: string,
     rowData: Partial<SeatRow> & { id: string },
     seats: Partial<Seat>[],
   ): void {
-    const section = store.venue.sections.find(s => s.id === sectionId)
+    const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
     if (!section) return
 
     const existingRow = section.rows.find(r => r.id === rowData.id)
@@ -220,14 +222,13 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   function syncSelectionToStore(): void {
     const editor = ctx.getEditor()
     const list: any[] = editor?.list ?? []
-    const store = useVenueStore()
     const focusedId = ctx.getFocusedSectionId()
 
     if (isApplyingToCanvas) return
     isSyncingToStore = true
 
     if (list.length === 0) {
-      store.clearSelection()
+      editorStore.clearSelection()
       isSyncingToStore = false
       return
     }
@@ -249,11 +250,11 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
     // 座位圆选中（优先级最高）
     if (seatEllipses.length > 0) {
-      store.clearSelection()
+      editorStore.clearSelection()
       for (let i = 0; i < seatEllipses.length; i++) {
         const sid = seatEllipses[i].__seatId
         if (sid) {
-          store.selectSeat(sid, i > 0)
+          editorStore.selectSeat(sid, i > 0)
         }
       }
       isSyncingToStore = false
@@ -287,19 +288,19 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
           const sectionGroup = ctx.getSectionGroupMap().get(sid)
           if (sectionGroup) {
             const secData = extractSectionData(sectionGroup)
-            upsertSectionInStore(store, secData)
+            upsertSectionInStore(secData)
           }
           const { row, seats } = extractRowData(g)
-          upsertRowInStore(store, sid, row, seats)
+          upsertRowInStore(sid, row, seats)
         }
       }
 
       // 选中所有排（多选）
-      store.clearSelection()
+      editorStore.clearSelection()
       for (let i = 0; i < seatRowGroups.length; i++) {
         const rid = seatRowGroups[i].__rowId
         if (rid) {
-          store.selectRow(rid, i > 0)
+          editorStore.selectRow(rid, i > 0)
         }
       }
     }
@@ -307,20 +308,20 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     else if (sectionGroups.length > 0) {
       for (const g of sectionGroups) {
         const secData = extractSectionData(g)
-        upsertSectionInStore(store, secData)
+        upsertSectionInStore(secData)
       }
 
       // 清除其他选中类型
-      store.clearSelection()
+      editorStore.clearSelection()
       for (let i = 0; i < sectionGroups.length; i++) {
         const sid = sectionGroups[i].__sectionId
         if (sid) {
           if (i === 0) {
-            store.selectSection(sid, false)
+            editorStore.selectSection(sid, false)
           } else {
             // 多选：直接 push 到 selectedSectionIds（避免 selectSection 清除前面的）
-            if (!store.selectedSectionIds.includes(sid)) {
-              store.selectedSectionIds.push(sid)
+            if (!editorStore.selectedSectionIds.includes(sid)) {
+              editorStore.selectedSectionIds.push(sid)
             }
           }
         }
@@ -335,31 +336,30 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   function applyStoreSelectionToCanvas(): void {
     const editor = ctx.getEditor()
     if (!editor) return
-    const store = useVenueStore()
     const focusedId = ctx.getFocusedSectionId()
 
     const targets: any[] = []
 
     if (focusedId) {
-      if (store.selectedSeatIds.length > 0) {
-        const seatSet = new Set(store.selectedSeatIds)
+      if (editorStore.selectedSeatIds.length > 0) {
+        const seatSet = new Set(editorStore.selectedSeatIds)
         for (const g of ctx.getSeatRowGroups()) {
           const ellipses = (g.__seatEllipses || []) as any[]
           for (const e of ellipses) {
             if (e.__seatId && seatSet.has(e.__seatId)) targets.push(e)
           }
         }
-      } else if (store.selectedRowIds.length > 0) {
-        const rowSet = new Set(store.selectedRowIds)
+      } else if (editorStore.selectedRowIds.length > 0) {
+        const rowSet = new Set(editorStore.selectedRowIds)
         for (const g of ctx.getSeatRowGroups()) {
           if (g.__rowId && rowSet.has(g.__rowId)) targets.push(g)
         }
       }
     } else {
-      if (store.selectedSectionIds.length > 0) {
-        const secSet = new Set(store.selectedSectionIds)
+      if (editorStore.selectedSectionIds.length > 0) {
+        const secSet = new Set(editorStore.selectedSectionIds)
         const sectionMap = ctx.getSectionGroupMap()
-        for (const sid of store.selectedSectionIds) {
+        for (const sid of editorStore.selectedSectionIds) {
           const g = sectionMap.get(sid)
           if (g && secSet.has(g.__sectionId)) targets.push(g)
         }
@@ -378,7 +378,6 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   function syncTransformToStore(): void {
     const editor = ctx.getEditor()
     const list: any[] = editor?.list ?? []
-    const store = useVenueStore()
     const focusedId = ctx.getFocusedSectionId()
 
     if (list.length === 0) return
@@ -390,7 +389,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       if (el.__sectionGroup === true) {
         const sectionId = el.__sectionId
         if (sectionId) {
-          const section = store.venue.sections.find(s => s.id === sectionId)
+          const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
           if (section) {
             const oldSX = section.x as number
             const oldSY = section.y as number
@@ -427,7 +426,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
         if (sectionId) {
           // 重新计算世界坐标
           const { row } = extractRowData(el)
-          const section = store.venue.sections.find(s => s.id === sectionId)
+          const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
           if (section) {
             const existingRow = section.rows.find(r => r.id === row.id)
             if (existingRow) {
@@ -446,8 +445,8 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   // ==================== 属性应用（Store → 画布） ====================
 
   /** 将 venueStore 中 section 的属性变更应用到画布元素 */
-  function applySectionProperty(sectionId: string, store: ReturnType<typeof useVenueStore>): void {
-    const section = store.venue.sections.find(s => s.id === sectionId)
+  function applySectionProperty(sectionId: string): void {
+    const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
     if (!section) return
 
     const sectionGroupMap = ctx.getSectionGroupMap()
@@ -495,10 +494,10 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   }
 
   /** 将 venueStore 中 row 的属性变更应用到画布座位排 */
-  function applyRowProperty(rowId: string, store: ReturnType<typeof useVenueStore>): void {
+  function applyRowProperty(rowId: string): void {
     // 查找 row 所在的 section
     let rowStore: SeatRow | null = null
-    for (const s of store.venue.sections) {
+    for (const s of venueDataStore.venue.sections) {
       const r = s.rows.find(r => r.id === rowId)
       if (r) { rowStore = r; break }
     }
@@ -546,7 +545,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     // 同步 seat categoryKey + label → 更新座位 fill 和标签文本
     const ellipses = (group.__seatEllipses || []) as any[]
     const storeSeats = rowStore.seats || []
-    const categories = store.venue.categories ?? []
+    const categories = venueDataStore.venue.categories ?? []
     for (let i = 0; i < Math.min(ellipses.length, storeSeats.length); i++) {
       const ell = ellipses[i]
       const storeSeat = storeSeats[i] as any
@@ -612,8 +611,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
   /** 当分类 color/label 变更时，更新所有同分类座位的 fill */
   function applyCategoryToSeatElements(): void {
-    const store = useVenueStore()
-    const categories = store.venue.categories ?? []
+    const categories = venueDataStore.venue.categories ?? []
     const seatRowGroups = ctx.getSeatRowGroups()
 
     for (const group of seatRowGroups) {
@@ -668,10 +666,9 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
    * 返回 cleanup 函数 (unwatch)。
    */
   function watchStoreAndApply(): () => void {
-    const store = useVenueStore()
 
     const stopSections = watch(
-      () => store.venue.sections,
+      () => venueDataStore.venue.sections,
       (newSections) => {
         if (isSyncingToStore || isApplyingToCanvas) return
 
@@ -682,12 +679,12 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
         // 遍历所有 section 检查属性变更
         for (const section of newSections ?? []) {
-          applySectionProperty(section.id, store)
+          applySectionProperty(section.id)
 
           // 遍历 rows
           if (section.rows) {
             for (const row of section.rows) {
-              applyRowProperty(row.id, store)
+              applyRowProperty(row.id)
             }
           }
         }
@@ -699,7 +696,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
     // 分类颜色变更 → 画布座位 fill 同步
     const stopCategories = watch(
-      () => store.venue.categories,
+      () => venueDataStore.venue.categories,
       () => {
         if (isSyncingToStore) return
         isApplyingToCanvas = true
@@ -711,7 +708,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
     // Store 选中变化 → 画布回显
     const stopSelectedRows = watch(
-      () => store.selectedRowIds,
+      () => editorStore.selectedRowIds,
       () => {
         if (isSyncingToStore || isApplyingToCanvas) return
         applyStoreSelectionToCanvas()
@@ -719,7 +716,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       { deep: true },
     )
     const stopSelectedSections = watch(
-      () => store.selectedSectionIds,
+      () => editorStore.selectedSectionIds,
       () => {
         if (isSyncingToStore || isApplyingToCanvas) return
         applyStoreSelectionToCanvas()
@@ -727,7 +724,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       { deep: true },
     )
     const stopSelectedSeats = watch(
-      () => store.selectedSeatIds,
+      () => editorStore.selectedSeatIds,
       () => {
         if (isSyncingToStore || isApplyingToCanvas) return
         applyStoreSelectionToCanvas()
@@ -767,7 +764,6 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
    * 将所有画布上的 SectionGroup 同步到 venueStore（初始加载/重新渲染时调用）。
    */
   function syncAllSectionsToStore(): void {
-    const store = useVenueStore()
     const sectionGroupMap = ctx.getSectionGroupMap()
     const seatRowGroups = ctx.getSeatRowGroups()
 
@@ -775,12 +771,12 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
     sectionGroupMap.forEach((group, sectionId) => {
       const secData = extractSectionData(group)
-      upsertSectionInStore(store, secData)
+      upsertSectionInStore(secData)
 
       const sectionRows = seatRowGroups.filter((g: any) => g.__sectionId === sectionId)
       for (const rowGroup of sectionRows) {
         const { row, seats } = extractRowData(rowGroup)
-        upsertRowInStore(store, sectionId, row, seats)
+        upsertRowInStore(sectionId, row, seats)
       }
     })
 

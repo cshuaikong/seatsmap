@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { VenueData, Section, SeatRow, Seat } from '../types'
-import { useVenueStore } from '../stores/venueStore'
+import { useVenueDataStore } from '../stores/venueDataStore'
 
 // 验证导入数据 — 兼容旧格式 { version, venue } 和新格式 (venue 直接)
 function validateImportData(data: any): data is VenueData {
@@ -16,17 +16,17 @@ function validateImportData(data: any): data is VenueData {
 export function useSeatMapIO() {
   const isImporting = ref(false)
   const lastError = ref<string | null>(null)
+  const venueDataStore = useVenueDataStore()
 
   // 导出座位图数据为 JSON 文件
   const exportSeatMap = async (venue: VenueData, fileName?: string): Promise<{ success: boolean; method: 'picker' | 'download' | null }> => {
     try {
       // 深拷贝，baseScale 优先使用 venue 自带的，否则从 store 取
-      const store = useVenueStore()
       const venueCopy: any = JSON.parse(JSON.stringify(venue))
       if (venueCopy.baseScale == null) {
-        venueCopy.baseScale = store.getBaseScale()
+        venueCopy.baseScale = venueDataStore.getBaseScale()
       }
-      venueCopy.visualConfig = store.visualConfig
+      venueCopy.visualConfig = venueDataStore.visualConfig
 
       const jsonStr = JSON.stringify(venueCopy, null, 2)
       const blob = new Blob([jsonStr], { type: 'application/json' })
