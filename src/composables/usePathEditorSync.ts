@@ -1,8 +1,7 @@
 import { watch } from 'vue'
-import type { Section, SeatRow, Seat } from '../types'
+import type { Section, SeatRow } from '../types'
 import { useVenueDataStore } from '../stores/venueDataStore'
 import { useEditorStore } from '../stores/editorStore'
-import { nanoid } from 'nanoid'
 import { darkenColor } from '../utils/color'
 
 export interface PathEditorSyncCtx {
@@ -22,11 +21,9 @@ export interface PathEditorSyncCtx {
 /**
  * PathEditor <-> split stores 同步桥
  *
- * 主方向 (Store → 画布)：store 是单一真相源，RightPanel/Command 修改 store 后，
+ * 单向同步：store 是单一真相源，RightPanel/Command 修改 store 后，
  * 这里把变更应用到 Leafer 画布元素。
- *
- * 残留方向 (画布 → Store)：座位排绘制等旧流程仍依赖 canvas 计算几何，
- * syncAllSectionsToStore 用于把这些结果回写到 store。后续应逐步移除。
+ * 选中变化时也会把 canvas 选中状态同步到 editorStore（但不反向写 venueDataStore）。
  */
 export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   const venueDataStore = useVenueDataStore()
@@ -45,194 +42,12 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     return group?.children?.find((c: any) => c.tag === 'Path') ?? null
   }
 
-  /** 从 SectionGroup 提取 Section 数据（世界坐标） */
-  function extractSectionData(group: any): Partial<Section> & { id: string } {
-    const pathChild = getPathChild(group)
-    return {
-      id: group.__sectionId,
-      name: group.__sectionName || '',
-      type: 'path',
-      x: +(group.x ?? 0).toFixed(2),
-      y: +(group.y ?? 0).toFixed(2),
-      rotation: +(group.rotation ?? 0).toFixed(2),
-      fill: pathChild?.fill ?? '#d1d5db',
-      stroke: pathChild?.stroke ?? '#9ca3af',
-      path: pathChild?.path ?? '',
-      width: pathChild?.width ?? 100,
-      height: pathChild?.height ?? 100,
-      opacity: +(group.opacity ?? 1).toFixed(2),
-      zIndex: group.zIndex ?? 0,
-    }
-  }
-
-  /** 确保 Section 存在于 venueStore（不存在则创建，存在则更新关键属性） */
-  function upsertSectionInStore(data: Partial<Section> & { id: string }): void {
-    const existing = venueDataStore.venue.sections.find(s => s.id === data.id)
-    if (existing) {
-      // 更新可变属性（保留 rows/其他已有数据）
-      if (data.name !== undefined) existing.name = data.name
-      if (data.fill !== undefined) existing.fill = data.fill
-      if (data.stroke !== undefined) existing.stroke = data.stroke
-      if (data.x !== undefined) existing.x = data.x
-      if (data.y !== undefined) existing.y = data.y
-      if (data.rotation !== undefined) existing.rotation = data.rotation
-      if (data.opacity !== undefined) existing.opacity = data.opacity
-      if (data.zIndex !== undefined) existing.zIndex = data.zIndex
-      if (data.width !== undefined) (existing as any).width = data.width
-      if (data.height !== undefined) (existing as any).height = data.height
-      if (data.type !== undefined) (existing as any).type = data.type
-      if (data.path !== undefined) (existing as any).path = data.path
-    } else {
-      // 创建新 section
-      venueDataStore.venue.sections.push({
-        id: data.id,
-        name: data.name || '',
-        rows: [],
-        type: 'path' as any,
-        x: data.x ?? 0,
-        y: data.y ?? 0,
-        rotation: data.rotation ?? 0,
-        fill: data.fill ?? '#d1d5db',
-        stroke: data.stroke ?? '#9ca3af',
-        path: (data as any).path ?? '',
-        width: data.width ?? 100,
-        height: data.height ?? 100,
-        opacity: data.opacity ?? 1,
-        zIndex: data.zIndex ?? 0,
-      })
-    }
-  }
-
-  /** 从座位排 Group 提取 SeatRow 数据（世界坐标） */
-  function extractRowData(group: any): { row: Partial<SeatRow> & { id: string }; sectionId: string; seats: Partial<Seat>[] } {
-    const rowData = group.__seatRowData
-    const ellipses = (group.__seatEllipses || []) as any[]
-    const barPts = (group.__bar as any)?.points ?? []
-    const sectionId = group.__sectionId
-
-    // 计算世界坐标（复用 buildVenueData 中的逻辑）
-    const sectionGroupMap = ctx.getSectionGroupMap()
-    const sectionGroup = sectionId ? sectionGroupMap.get(sectionId) : null
-    const sX = sectionGroup?.x ?? 0
-    const sY = sectionGroup?.y ?? 0
-    const sRot = ((sectionGroup?.rotation ?? 0) * Math.PI) / 180
-    const cosS = Math.cos(sRot)
-    const sinS = Math.sin(sRot)
-
-    const rowGX = group.x ?? 0
-    const rowGY = group.y ?? 0
-    const rowRot = ((group.rotation ?? 0) * Math.PI) / 180
-    const cosR = Math.cos(rowRot)
-    const sinR = Math.sin(rowRot)
-
-    // 将 Group 局部坐标（含 row 自身旋转）转为世界坐标
-    function localToWorld(lx: number, ly: number): { x: number; y: number } {
-      const rx = lx * cosR - ly * sinR
-      const ry = lx * sinR + ly * cosR
-      return {
-        x: sX + rx * cosS - ry * sinS,
-        y: sY + rx * sinS + ry * cosS,
-      }
-    }
-
-    const _barPt0 = barPts[0] ?? rowData?.x ?? 0
-    const _barPt1 = barPts[1] ?? rowData?.y ?? 0
-    const rowLocalX = rowGX + _barPt0
-    const rowLocalY = rowGY + _barPt1
-    const rowWorldPos = localToWorld(rowLocalX, rowLocalY)
-    const rowWorldX = rowWorldPos.x
-    const rowWorldY = rowWorldPos.y
-
-    // 世界行方向
-    const _fbX = rowData ? _barPt0 + rowData.ux * rowData.spacing * (rowData.count - 1) : _barPt0
-    const _fbY = rowData ? _barPt1 + rowData.uy * rowData.spacing * (rowData.count - 1) : _barPt1
-    const beLX = rowGX + (barPts[2] ?? _fbX)
-    const beLY = rowGY + (barPts[3] ?? _fbY)
-    const beWorldPos = localToWorld(beLX, beLY)
-    const worldRowRot = Math.atan2(beWorldPos.y - rowWorldY, beWorldPos.x - rowWorldX)
-
-    // 提取座位数据（世界坐标 → 行局部坐标）
-    const cosWRR = Math.cos(-worldRowRot)
-    const sinWRR = Math.sin(-worldRowRot)
-
-    // 座位分类继承：默认分类(1)自动从分区填充色匹配
-    const sectionPath = sectionGroup?.children?.find((c: any) => c.tag === 'Path')
-    const sectionFill = sectionPath?.fill ?? ''
-    let inheritedCatKey: string | number | null = null
-    if (sectionFill) {
-      const cat = (venueDataStore.venue.categories ?? []).find((c: any) => c.color === sectionFill)
-      if (cat) inheritedCatKey = cat.key
-    }
-
-    const seats: Partial<Seat>[] = ellipses.map((ell: any) => {
-      const ellLocalX = rowGX + (ell.x ?? 0)
-      const ellLocalY = rowGY + (ell.y ?? 0)
-      const eW = localToWorld(ellLocalX, ellLocalY)
-      const wx = eW.x - rowWorldX
-      const wy = eW.y - rowWorldY
-      const rawCatKey = ell.__categoryKey
-      const categoryKey = (rawCatKey != null && rawCatKey !== 1) ? rawCatKey : (inheritedCatKey ?? rawCatKey ?? 1)
-      return {
-        id: ell.__seatId || nanoid(8),
-        label: ell.__sourceSeat?.label || '',
-        x: +(wx * cosWRR - wy * sinWRR).toFixed(2),
-        y: +(wx * sinWRR + wy * cosWRR).toFixed(2),
-        categoryKey,
-        status: 'available' as const,
-        objectType: 'seat' as const,
-      }
-    })
-
-    const row: Partial<SeatRow> & { id: string } = {
-      id: group.__rowId || nanoid(8),
-      label: group.__rowLabel || '',
-      x: +rowWorldX.toFixed(2),
-      y: +rowWorldY.toFixed(2),
-      rotation: +(worldRowRot * 180 / Math.PI).toFixed(2),
-      curve: +(group.__curve ?? 0).toFixed(2),
-      seatSpacing: group.__seatSpacing ?? rowData?.spacing ?? 28,
-      rowSpacing: group.__rowSpacing,
-      seats: seats as Seat[],
-    }
-
-    return { row, sectionId, seats }
-  }
-
-  /** 确保 Row 存在于 venueStore 的指定 section 中 */
-  function upsertRowInStore(
-    sectionId: string,
-    rowData: Partial<SeatRow> & { id: string },
-    seats: Partial<Seat>[],
-  ): void {
-    const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
-    if (!section) return
-
-    const existingRow = section.rows.find(r => r.id === rowData.id)
-    if (existingRow) {
-      // 更新已有 row 属性
-      if (rowData.label !== undefined) existingRow.label = rowData.label
-      if (rowData.x !== undefined) existingRow.x = rowData.x
-      if (rowData.y !== undefined) existingRow.y = rowData.y
-      if (rowData.rotation !== undefined) existingRow.rotation = rowData.rotation
-      if (rowData.curve !== undefined) existingRow.curve = rowData.curve
-      if (rowData.seatSpacing !== undefined) existingRow.seatSpacing = rowData.seatSpacing
-      existingRow.rowSpacing = rowData.rowSpacing
-      if (seats.length > 0) existingRow.seats = seats as Seat[]
-    } else {
-      // 添加新 row
-      section.rows.push({
-        ...rowData,
-        seats: seats as Seat[],
-      } as SeatRow)
-    }
-  }
-
   // ==================== 选中同步（画布 → Store） ====================
 
+  /** canvas 选中变化 → 同步到 editorStore（不再反向写 venueDataStore） */
   function syncSelectionToStore(): void {
     const editor = ctx.getEditor()
     const list: any[] = editor?.list ?? []
-    const focusedId = ctx.getFocusedSectionId()
 
     if (isApplyingToCanvas) return
     isSyncingToStore = true
@@ -243,7 +58,6 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       return
     }
 
-    // 分类选中元素（使用数组保持顺序）
     const sectionGroups: any[] = []
     const seatRowGroups: any[] = []
     const seatEllipses: any[] = []
@@ -263,77 +77,33 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       editorStore.clearSelection()
       for (let i = 0; i < seatEllipses.length; i++) {
         const sid = seatEllipses[i].__seatId
-        if (sid) {
-          editorStore.selectSeat(sid, i > 0)
-        }
+        if (sid) editorStore.selectSeat(sid, i > 0)
       }
       isSyncingToStore = false
       return
     }
 
-    // 分区编辑模式下：seat row Groups 选中
-    if (focusedId && seatRowGroups.length > 0 && sectionGroups.length === 0) {
-      // 从选中排的实际画布位置计算行间距
-      if (seatRowGroups.length >= 2) {
-        const sectionGroup = ctx.getSectionGroupMap().get(focusedId) ?? null
-        const worldPositions = seatRowGroups.map(g => computeRowWorldPos(g, sectionGroup))
-        // 取相邻排的世界距离作为行间距
-        for (let i = 0; i < seatRowGroups.length; i++) {
-          const next = i < worldPositions.length - 1 ? worldPositions[i + 1] : null
-          const prev = i > 0 ? worldPositions[i - 1] : null
-          let spacing: number | undefined
-          if (next) {
-            spacing = +Math.hypot(next.wx - worldPositions[i].wx, next.wy - worldPositions[i].wy).toFixed(2)
-          } else if (prev) {
-            spacing = +Math.hypot(worldPositions[i].wx - prev.wx, worldPositions[i].wy - prev.wy).toFixed(2)
-          }
-          if (spacing != null && spacing > 0) {
-            seatRowGroups[i].__rowSpacing = spacing
-          }
-        }
-      }
-      for (const g of seatRowGroups) {
-        const sid = g.__sectionId
-        if (sid) {
-          const sectionGroup = ctx.getSectionGroupMap().get(sid)
-          if (sectionGroup) {
-            const secData = extractSectionData(sectionGroup)
-            upsertSectionInStore(secData)
-          }
-          const { row, seats } = extractRowData(g)
-          upsertRowInStore(sid, row, seats)
-        }
-      }
-
-      // 选中所有排（多选）
+    // 排选中
+    if (seatRowGroups.length > 0 && sectionGroups.length === 0) {
       editorStore.clearSelection()
       for (let i = 0; i < seatRowGroups.length; i++) {
         const rid = seatRowGroups[i].__rowId
-        if (rid) {
-          editorStore.selectRow(rid, i > 0)
-        }
+        if (rid) editorStore.selectRow(rid, i > 0)
       }
+      isSyncingToStore = false
+      return
     }
-    // SectionGroup 选中
-    else if (sectionGroups.length > 0) {
-      for (const g of sectionGroups) {
-        const secData = extractSectionData(g)
-        upsertSectionInStore(secData)
-      }
 
-      // 清除其他选中类型
+    // 分区选中
+    if (sectionGroups.length > 0) {
       editorStore.clearSelection()
       for (let i = 0; i < sectionGroups.length; i++) {
         const sid = sectionGroups[i].__sectionId
-        if (sid) {
-          if (i === 0) {
-            editorStore.selectSection(sid, false)
-          } else {
-            // 多选：直接 push 到 selectedSectionIds（避免 selectSection 清除前面的）
-            if (!editorStore.selectedSectionIds.includes(sid)) {
-              editorStore.selectedSectionIds.push(sid)
-            }
-          }
+        if (!sid) continue
+        if (i === 0) {
+          editorStore.selectSection(sid, false)
+        } else if (!editorStore.selectedSectionIds.includes(sid)) {
+          editorStore.selectedSectionIds.push(sid)
         }
       }
     }
@@ -341,49 +111,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     isSyncingToStore = false
   }
 
-  // ==================== Store → 画布选中同步 ====================
-
-  function applyStoreSelectionToCanvas(): void {
-    const editor = ctx.getEditor()
-    if (!editor) return
-    const focusedId = ctx.getFocusedSectionId()
-
-    const targets: any[] = []
-
-    if (focusedId) {
-      if (editorStore.selectedSeatIds.length > 0) {
-        const seatSet = new Set(editorStore.selectedSeatIds)
-        for (const g of ctx.getSeatRowGroups()) {
-          const ellipses = (g.__seatEllipses || []) as any[]
-          for (const e of ellipses) {
-            if (e.__seatId && seatSet.has(e.__seatId)) targets.push(e)
-          }
-        }
-      } else if (editorStore.selectedRowIds.length > 0) {
-        const rowSet = new Set(editorStore.selectedRowIds)
-        for (const g of ctx.getSeatRowGroups()) {
-          if (g.__rowId && rowSet.has(g.__rowId)) targets.push(g)
-        }
-      }
-    } else {
-      if (editorStore.selectedSectionIds.length > 0) {
-        const secSet = new Set(editorStore.selectedSectionIds)
-        const sectionMap = ctx.getSectionGroupMap()
-        for (const sid of editorStore.selectedSectionIds) {
-          const g = sectionMap.get(sid)
-          if (g && secSet.has(g.__sectionId)) targets.push(g)
-        }
-      }
-    }
-
-    isApplyingToCanvas = true
-    try {
-      editor.target = targets as any
-    } catch (_) {}
-    isApplyingToCanvas = false
-  }
-
-  // ==================== 变换同步（画布 → Store） ====================
+  // ==================== 变换收集（画布 → Command） ====================
 
   interface TransformUpdate {
     sectionId: string
@@ -391,7 +119,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     rowUpdates: { rowId: string; updates: Partial<SeatRow> }[]
   }
 
-  /** 从当前 editor.list 收集变换更新，不修改 store */
+  /** pointerup 时收集 editor.list 中元素的变换，不修改 store，交给 Command 提交 */
   function collectTransformUpdates(): TransformUpdate[] {
     const editor = ctx.getEditor()
     const list: any[] = editor?.list ?? []
@@ -444,26 +172,37 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
           rowUpdates,
         })
       }
-      // 座位排 Group 拖拽/旋转
+      // 座位排 Group 拖拽/旋转（仅在分区聚焦模式下）
       else if (el.__seatRow && focusedId) {
         const sectionId = el.__sectionId
         if (!sectionId) continue
-        const { row } = extractRowData(el)
-        if (!row.id) continue
+        const sectionGroup = ctx.getSectionGroupMap().get(sectionId)
+        if (!sectionGroup) continue
         const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
         if (!section) continue
-        const existingRow = section.rows.find(r => r.id === row.id)
+        const rowId = el.__rowId
+        if (!rowId) continue
+        const existingRow = section.rows.find(r => r.id === rowId)
         if (!existingRow) continue
+
+        const rowData = el.__seatRowData as { x: number; y: number; ux: number; uy: number } | undefined
+        if (!rowData) continue
+
+        const sRot = ((sectionGroup.rotation ?? 0) as number) * Math.PI / 180
+        const localRowX = rowData.x + (el.x ?? 0)
+        const localRowY = rowData.y + (el.y ?? 0)
+        const cosS = Math.cos(sRot), sinS = Math.sin(sRot)
+        const worldX = +(sectionGroup.x + localRowX * cosS - localRowY * sinS).toFixed(2)
+        const worldY = +(sectionGroup.y + localRowX * sinS + localRowY * cosS).toFixed(2)
+        const baseRot = Math.atan2(rowData.uy, rowData.ux) * 180 / Math.PI
+        const worldRot = +(baseRot + (sectionGroup.rotation ?? 0) + (el.rotation ?? 0)).toFixed(2)
+
         updates.push({
           sectionId,
           sectionUpdates: {},
           rowUpdates: [{
-            rowId: row.id,
-            updates: {
-              x: row.x ?? existingRow.x,
-              y: row.y ?? existingRow.y,
-              rotation: row.rotation ?? existingRow.rotation,
-            },
+            rowId,
+            updates: { x: worldX, y: worldY, rotation: worldRot },
           }],
         })
       }
@@ -472,24 +211,48 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     return updates
   }
 
-  /**
-   * 旧实时同步入口（已弃用）。
-   * Phase C 后改为 pointerup 时执行 command，拖拽中不再写 store。
-   */
-  function syncTransformToStore(): void {
-    const updates = collectTransformUpdates()
-    isSyncingToStore = true
-    for (const u of updates) {
-      const section = venueDataStore.venue.sections.find(s => s.id === u.sectionId)
-      if (!section) continue
-      Object.assign(section, u.sectionUpdates)
-      for (const { rowId, updates } of u.rowUpdates) {
-        const row = section.rows.find(r => r.id === rowId)
-        if (row) Object.assign(row, updates)
+  // ==================== Store → 画布选中同步 ====================
+
+  function applyStoreSelectionToCanvas(): void {
+    const editor = ctx.getEditor()
+    if (!editor) return
+    const focusedId = ctx.getFocusedSectionId()
+
+    const targets: any[] = []
+
+    if (focusedId) {
+      if (editorStore.selectedSeatIds.length > 0) {
+        const seatSet = new Set(editorStore.selectedSeatIds)
+        for (const g of ctx.getSeatRowGroups()) {
+          const ellipses = (g.__seatEllipses || []) as any[]
+          for (const e of ellipses) {
+            if (e.__seatId && seatSet.has(e.__seatId)) targets.push(e)
+          }
+        }
+      } else if (editorStore.selectedRowIds.length > 0) {
+        const rowSet = new Set(editorStore.selectedRowIds)
+        for (const g of ctx.getSeatRowGroups()) {
+          if (g.__rowId && rowSet.has(g.__rowId)) targets.push(g)
+        }
+      }
+    } else {
+      if (editorStore.selectedSectionIds.length > 0) {
+        const secSet = new Set(editorStore.selectedSectionIds)
+        const sectionMap = ctx.getSectionGroupMap()
+        for (const sid of editorStore.selectedSectionIds) {
+          const g = sectionMap.get(sid)
+          if (g && secSet.has(g.__sectionId)) targets.push(g)
+        }
       }
     }
-    isSyncingToStore = false
+
+    isApplyingToCanvas = true
+    try {
+      editor.target = targets as any
+    } catch (_) {}
+    isApplyingToCanvas = false
   }
+
 
   // ==================== 属性应用（Store → 画布） ====================
 
@@ -806,54 +569,6 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     return () => { stopSections(); stopCategories(); stopSelectedRows(); stopSelectedSections(); stopSelectedSeats() }
   }
 
-  /** 从画布 Group 坐标计算 row 参考点的世界位置 */
-  function computeRowWorldPos(rowGroup: any, sGroup: any | null): { wx: number; wy: number } {
-    const barPts: number[] = (rowGroup.__bar as any)?.points ?? []
-    const barOx = barPts[0] ?? 0
-    const barOy = barPts[1] ?? 0
-    const rowGX = rowGroup.x ?? 0
-    const rowGY = rowGroup.y ?? 0
-
-    const inSection = sGroup && rowGroup.parent === sGroup
-    if (inSection) {
-      const sX = sGroup.x ?? 0
-      const sY = sGroup.y ?? 0
-      const sRot = ((sGroup.rotation ?? 0) * Math.PI) / 180
-      const cosS = Math.cos(sRot)
-      const sinS = Math.sin(sRot)
-      const localX = rowGX + barOx
-      const localY = rowGY + barOy
-      return {
-        wx: sX + localX * cosS - localY * sinS,
-        wy: sY + localX * sinS + localY * cosS,
-      }
-    }
-    return { wx: rowGX + barOx, wy: rowGY + barOy }
-  }
-
-  /**
-   * 将所有画布上的 SectionGroup 同步到 venueStore（初始加载/重新渲染时调用）。
-   */
-  function syncAllSectionsToStore(): void {
-    const sectionGroupMap = ctx.getSectionGroupMap()
-    const seatRowGroups = ctx.getSeatRowGroups()
-
-    isSyncingToStore = true
-
-    sectionGroupMap.forEach((group, sectionId) => {
-      const secData = extractSectionData(group)
-      upsertSectionInStore(secData)
-
-      const sectionRows = seatRowGroups.filter((g: any) => g.__sectionId === sectionId)
-      for (const rowGroup of sectionRows) {
-        const { row, seats } = extractRowData(rowGroup)
-        upsertRowInStore(sectionId, row, seats)
-      }
-    })
-
-    isSyncingToStore = false
-  }
-
   function resetKnownIds() {
     knownSectionIds = new Set(venueDataStore.venue.sections.map(s => s.id))
     knownRowIds = new Set<string>()
@@ -866,9 +581,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
   return {
     syncSelectionToStore,
-    syncTransformToStore,
     collectTransformUpdates,
-    syncAllSectionsToStore,
     watchStoreAndApply,
     resetKnownIds,
     // 暴露用于手动控制同步标志

@@ -42,7 +42,6 @@ import { useEditorStore } from '../stores/editorStore'
 import { useHistoryStore } from '../stores/historyStore'
 import { useVenueDataStore } from '../stores/venueDataStore'
 import { getSvgPathCenter } from '../viewer/geometry'
-import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
 import {
   createBatchCommand,
   createUpdateSectionBorderCommand,
@@ -332,20 +331,6 @@ function renderAll(data: VenueData): void {
   } catch (e) {
     console.error('[renderAll] error:', e)
   }
-}
-
-/**
- * 从当前画布构建 VenueData
- *
- * 当前仍依赖 Leafer 运行时元素，这是"画布为中心"架构的遗留。
- * 后续数据驱动渲染完善后，应改用 venueDataStore.exportVenueData()。
- */
-function buildVenueData(): VenueData {
-  return buildVenueDataFromCanvas({
-    rawVenue: props.venueData,
-    sectionGroupMap,
-    seatRowGroups: seatModule.seatRowGroups,
-  })
 }
 
 function onExportJSON() {
@@ -995,7 +980,6 @@ defineExpose({
   enterSectionFocus,
   exitSectionFocus,
   deleteSelected,
-  buildVenueData,
   renderAll,
   drawnSeatCount: seatModule.drawnSeatCount,
 })

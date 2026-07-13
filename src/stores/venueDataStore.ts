@@ -729,19 +729,6 @@ export const useVenueDataStore = defineStore('venueData', () => {
     venue.value = createDefaultVenue()
   }
 
-  function createSnapshot(): string {
-    return JSON.stringify({ venue: exportVenueData() })
-  }
-
-  function restoreSnapshot(snapshot: string) {
-    try {
-      const data = JSON.parse(snapshot) as { venue: VenueData }
-      if (data.venue) importVenueData(data.venue)
-    } catch (error) {
-      console.error('恢复快照失败:', error)
-    }
-  }
-
   // ==================== BaseScale ====================
 
   function initBaseScale(currentScale: number) {
@@ -841,8 +828,6 @@ export const useVenueDataStore = defineStore('venueData', () => {
     importVenueData,
     importLegacyData,
     resetVenue,
-    createSnapshot,
-    restoreSnapshot,
 
     // BaseScale
     initBaseScale,
