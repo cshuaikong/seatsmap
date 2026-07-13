@@ -735,7 +735,6 @@ export const useVenueDataStore = defineStore('venueData', () => {
   function initBaseScale(currentScale: number) {
     if (venue.value.baseScale === undefined || venue.value.baseScale === null) {
       venue.value.baseScale = Math.round(currentScale * 100) / 100
-      console.log('[baseScale] 基准缩放已锁定:', venue.value.baseScale)
     }
   }
 
@@ -745,7 +744,6 @@ export const useVenueDataStore = defineStore('venueData', () => {
 
   function setSectionBaseScale(scale: number) {
     venue.value.baseScale = Math.round(scale * 100) / 100
-    console.log('[baseScale] 更新为:', venue.value.baseScale)
   }
 
   // ==================== Helpers ====================

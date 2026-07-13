@@ -157,11 +157,9 @@ async function refreshCurrentData() {
     venueData.value = {}
     return
   }
-  console.log('[IndexPage] fetchSeatMapData, venue_id:', vid)
   loading.value = true
   try {
     venueData.value = await fetchSeatMapData(vid)
-    console.log('[IndexPage] venueData 加载成功, sections:', (venueData.value as any)?.sections?.length)
   } catch (e) {
     console.error('[IndexPage] 加载座位图数据失败:', e)
     venueData.value = {}
@@ -186,7 +184,6 @@ watch(() => route.query.venue, () => {
 async function onSaveVenue(data: any) {
   try {
     await editVenue(data)
-    console.log('[IndexPage] 保存成功')
     alert('保存成功')
   } catch (e) {
     console.error('[IndexPage] 保存失败:', e)

@@ -270,7 +270,6 @@ function deleteSelected() {
 }
 
 function renderAll(data: VenueData): void {
-  console.log('[renderAll] called, sections count:', (data as any)?.sections?.length ?? 0, 'keys:', Object.keys(data || {}))
   try {
     clearAllPaths()
 
@@ -282,13 +281,11 @@ function renderAll(data: VenueData): void {
         polygonCount++
       }
     })
-    console.log('[renderAll] polygons created:', polygonCount)
 
     // 从 venue data 渲染座位（sections[].rows[].seats[]），兼容 API 的 scale 字段
     const raw: any = data
     const bs = raw?.baseScale ?? raw?.scale
     seatModule.createSeatsFromVenueData(sections, bs != null ? parseFloat(bs) : bs, data?.categories)
-    console.log('[renderAll] seats rendered, count:', seatModule.drawnSeatCount.value)
 
     // 分区名称文本初始定位（rAF 确保 LeaferJS 布局就绪）
     requestAnimationFrame(() => updateNameTextsLOD())
@@ -761,7 +758,6 @@ onMounted(() => {
     }
   })
 
-  console.log('[PathEditor] mount renderAll, venueData keys:', Object.keys(props.venueData || {}))
   renderAll(props.venueData)
   // 初始同步：将画布 SectionGroup push 到 venueStore
   nextTick(() => { pathEditorSync.syncAllSectionsToStore() })
@@ -898,7 +894,6 @@ onUnmounted(() => {
 // ==================== Watch ====================
 
 watch(() => props.venueData, (newVal) => {
-  console.log('[PathEditor] watch fired, venueData keys:', Object.keys(newVal || {}), 'sections:', (newVal as any)?.sections?.length)
   renderAll(newVal)
   nextTick(() => pathEditorSync.syncAllSectionsToStore())
 })

@@ -337,8 +337,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         let localFirstX = firstSX, localFirstY = firstSY
         let localLastX = lastSX, localLastY = lastSY
 
-        console.log(`[import] sec=${section.id} row=${row.id} data: rowXY=(${rowX},${rowY}) rot=${row.rotation??0}deg curve=${curve} seats=${row.seats.length}`)
-        console.log(`[import] secGroup=(${sx},${sy}) rot=${parentGroup?.rotation??0}deg firstWorld=(${firstSX},${firstSY}) dataIsLocal=${dataIsLocal} needConvert=${needConvert}`)
 
         if (needConvert) {
           // 世界→局部：考虑父 Group 的平移+旋转（之前只做了减法，旋转时手柄偏移）
@@ -390,7 +388,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         const ldy = localLastY - localFirstY
         const ldist = Math.hypot(ldx, ldy)
 
-        console.log(`[import] row=${row.id} final: localFirst=(${localFirstX},${localFirstY}) localLast=(${localLastX},${localLastY}) ldist=${ldist.toFixed(1)} ux=${(ldist>0.001?ldx/ldist:1).toFixed(4)} uy=${(ldist>0.001?ldy/ldist:0).toFixed(4)} count=${sortedSeats.length}`)
 
         ;group.__seatRowData = {
           x: localFirstX,

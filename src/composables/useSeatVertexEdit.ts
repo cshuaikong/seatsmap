@@ -66,12 +66,6 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
     seatRadius = getRadius()
     isEditing.value = true
 
-    const pg = ctx.getParentGroup?.()
-    console.log('[seatVertex enter] rowData=', JSON.stringify(rowData), 'radius=', seatRadius)
-    console.log('[seatVertex enter] parent=', pg ? { x: pg.x, y: pg.y, rot: pg.rotation, id: pg.id } : null)
-    const wp = toWorldSpace(rowData!.x, rowData!.y)
-    console.log('[seatVertex enter] toWorldSpace=', wp)
-
     ctx.getEditor()?.cancel()
     ctx.getAllPaths().forEach((p: any) => { p.locked = true })
     ctx.setPanEnabled(false)
