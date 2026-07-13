@@ -37,7 +37,6 @@ import { useEditorMode } from '../composables/useEditorMode'
 import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
 import { usePathEditorSync } from '../composables/usePathEditorSync'
-import { useSelectionOverlay } from '../composables/canvas/useSelectionOverlay'
 import { useEditorStore } from '../stores/editorStore'
 import { useHistoryStore } from '../stores/historyStore'
 import { useVenueDataStore } from '../stores/venueDataStore'
@@ -181,8 +180,8 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
     ;(sectionGroup as any).__sectionName = p.name
   }
 
-  // 边框 Path 作为子元素，坐标相对 Group
-  const existingBody = sectionGroup.children?.find((c: any) => c.tag === 'Path')
+  // 分区填充形状（body）作为子元素，坐标相对 Group
+  const existingBody = sectionGroup.children?.find((c: any) => c.tag === 'Path' && !c.__sectionBorder)
   if (existingBody) {
     existingBody.path = p.path
     existingBody.fill = p.fill
@@ -206,6 +205,31 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
     ;(body as any).__rawPath = p.path
     sectionGroup.add(body)
     allPaths.push(body)
+  }
+
+  // 选中高亮边框（作为 Group 子元素，随 Group 自动移动/旋转）
+  const existingBorder = sectionGroup.children?.find((c: any) => c.tag === 'Path' && c.__sectionBorder)
+  if (existingBorder) {
+    existingBorder.path = p.path
+    ;(existingBorder as any).__rawPath = p.path
+  } else {
+    const border = new Path({
+      path: p.path,
+      x: 0, y: 0,
+      fill: 'transparent',
+      stroke: '#3b82f6',
+      strokeWidth: 2 / getS(),
+      strokeAlign: 'center',
+      zIndex: 1,
+      editable: false,
+      draggable: false,
+      hittable: false,
+      visible: false,
+    })
+    ;(border as any).__sectionBorder = true
+    ;(border as any).__rawPath = p.path
+    sectionGroup.add(border)
+    ;(sectionGroup as any).__selectionBorder = border
   }
 
   // 分区名称文本（不可选中，显示于分区中心，响应缩放，初始隐藏防闪烁）
@@ -405,14 +429,6 @@ const pathEditorSync = usePathEditorSync({
   },
 })
 
-// 选中 Section 时的蓝色边框覆盖层
-const selectionOverlay = useSelectionOverlay({
-  getEditor: () => editor,
-  getLeafer: () => leafer,
-  getScale: getS,
-  getVertexEditing: () => vertexEdit.isEditing.value,
-})
-
 // Store 中的单座选中变化 → 刷新 LOD 高亮
 const editorStore = useEditorStore()
 const historyStore = useHistoryStore()
@@ -438,12 +454,13 @@ const vertexEdit = useVertexEdit({
     const target = vertexEdit.getTarget()
     if (target) {
       const pg = (target as any).__sectionGroup
-      if (pg) {
-        const entry = selectionOverlay.sectionBorders.value.find(b => b.group === pg)
-        if (entry) return entry.border
+      if (pg && pg !== true) {
+        const border = pg.__selectionBorder
+        if (border) return border
       }
     }
-    return selectionOverlay.sectionBorders.value[0]?.border ?? null
+    const firstGroup = sectionGroupMap.values().next().value
+    return firstGroup?.__selectionBorder ?? null
   },
   getParentGroup: () => {
     const tgt = vertexEdit.getTarget()
@@ -657,8 +674,10 @@ onMounted(() => {
     getEdgeCache: () => edgeCache,
     getVertexTarget: () => vertexEdit.getTarget(),
     getBorderGroup: (el: any) => {
-      const entry = selectionOverlay.sectionBorders.value.find(b => b.border === el)
-      return entry?.group ?? null
+      if (el?.__sectionGroup === true) return el
+      if (el?.__sectionGroup && el.__sectionGroup !== true) return el.__sectionGroup
+      if (el?.__sectionBorder && el.parent?.__sectionGroup === true) return el.parent
+      return null
     },
     onSeatRowsSelected: (_groups: any[]) => {
       seatModule.updateSeatLOD()
@@ -701,19 +720,16 @@ onMounted(() => {
     ;(leafer as any)?.__updateViewPort?.()
   }
 
-  // 拖拽/旋转时选择框跟手 + 边框同步（Group 嵌套自动处理子元素跟随）
+  // 拖拽/旋转时选择框跟手（Group 嵌套自动处理子元素跟随）
   let isDraggingForHistory = false
-  const syncBorder = () => selectionOverlay.updatePositions()
   editor.on(EditorMoveEvent.MOVE, () => {
     isDraggingForHistory = true
     ;(editor as any).editBox?.update()
-    syncBorder()
     // 拖拽中不写 store，pointerup 时通过 command 提交
   })
   editor.on(EditorRotateEvent.ROTATE, () => {
     isDraggingForHistory = true
     ;(editor as any).editBox?.update()
-    syncBorder()
     // 旋转中不写 store，pointerup 时通过 command 提交
   })
   const commitTransformCommand = () => {
@@ -789,8 +805,19 @@ onMounted(() => {
     const list: any[] = (editor as any)?.list ?? []
     selectedCount.value = list.length
 
-    // 清理旧边框并绘制新边框
-    selectionOverlay.sync()
+    // 同步分区高亮边框（边框作为 SectionGroup 子元素，自动跟随移动/旋转）
+    const selectedGroups = new Set<any>()
+    for (const el of list) {
+      if (el.__sectionGroup === true) {
+        selectedGroups.add(el)
+      } else if (el.__sectionGroup && el.__sectionGroup !== true) {
+        selectedGroups.add(el.__sectionGroup)
+      }
+    }
+    sectionGroupMap.forEach((group) => {
+      const border = (group as any).__selectionBorder
+      if (border) border.visible = selectedGroups.has(group)
+    })
 
     // 选中变化时刷新座位条高亮
     seatModule.updateSeatLOD()
@@ -891,7 +918,10 @@ onMounted(() => {
     const handles = vertexEdit.getTarget() ? [...vertexEdit.getHandles(), ...vertexEdit.getEdgeHandles()] : undefined
     compensateZoom(editor, s, handles)
     if (seatVertexEdit.isEditing.value) seatVertexEdit.updateHandleSize()
-    selectionOverlay.updateStrokeWidth(s)
+    sectionGroupMap.forEach((group) => {
+      const border = (group as any).__selectionBorder
+      if (border) border.strokeWidth = 2 / s
+    })
     seatModule.updateSeatLOD()
     updateNameTextsLOD()
   })
