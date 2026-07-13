@@ -1,97 +1,23 @@
 <template>
   <div class="left-toolbar">
-    <!-- 1. 选择工具 -->
-    <div class="toolbar-section">
-      <button
-        class="tool-item"
-        :class="{ active: modelValue === 'select' }"
-        title="选择工具 (V)"
-        @click="onToolChange('select')"
-      >
-        <i class="iconfont icon-shubiaojiantoumoshi tool-iconfont"></i>
-      </button>
-
-      <button
-        class="tool-item"
-        :class="{ active: modelValue === 'node' }"
-        title="节点编辑 (E)"
-        @click="onToolChange('node')"
-      >
-        <i class="iconfont icon-a-4404035571 tool-iconfont"></i>
-      </button>
-      <button
-        class="tool-item"
-        :class="{ active: modelValue === 'selectseat' }"
-        title="选择座位"
-        @click="onToolChange('selectseat')"
-      >
-        <i class="iconfont icon-selectseat tool-iconfont"></i>
-      </button>
-    </div>
+    <template v-for="(group, index) in groupedTools" :key="group.category">
+      <div v-if="index > 0" class="toolbar-divider"></div>
+      <div class="toolbar-section">
+        <button
+          v-for="tool in group.tools"
+          :key="tool.id"
+          class="tool-item"
+          :class="{ active: modelValue === tool.id }"
+          :title="tool.title"
+          @click="onToolChange(tool.id)"
+        >
+          <i v-if="tool.iconSet === 'iconfont'" :class="['iconfont', tool.iconValue, 'tool-iconfont']"></i>
+          <Icon v-else :icon="tool.iconValue" class="tool-icon" />
+        </button>
+      </div>
+    </template>
 
     <div class="toolbar-divider"></div>
-
-    <!-- 2. 座位绘制工具区 -->
-    <!-- SIMPLE: 始终显示 | WITH_SECTIONS: 仅分区聚焦后显示 -->
-    <template v-if="showSeatTools">
-      <div class="toolbar-section">
-        <button
-          class="tool-item"
-          :class="{ active: modelValue === 'seat-row' }"
-          title="单行座位"
-          @click="onToolChange('seat-row')"
-        >
-          <i class="iconfont icon-dorwrow tool-iconfont"></i>
-        </button>
-        <button
-          class="tool-item"
-          :class="{ active: modelValue === 'seat-diagonal' }"
-          title="多行座位"
-          @click="onToolChange('seat-diagonal')"
-        >
-          <i class="iconfont icon-drowmultrows tool-iconfont"></i>
-        </button>
-      </div>
-      <div class="toolbar-divider"></div>
-    </template>
-
-    <!-- 3. 分区绘制工具区 -->
-    <!-- SIMPLE: 隐藏 | WITH_SECTIONS: 始终显示 -->
-    <template v-if="showSectionTools">
-      <div class="toolbar-section">
-          <button
-          class="tool-item"
-          :class="{ active: modelValue === 'drawPolygon' }"
-          title="绘制分区"
-          @click="onToolChange('drawPolygon')"
-        >
-          <i class="iconfont icon-duobianxing tool-iconfont"></i>
-        </button>
-      </div>
-      <div class="toolbar-divider"></div>
-    </template>
-
-    <!-- 4. 标注工具（text / image 暂未实现，先隐藏） -->
-    <div v-if="false" class="toolbar-section">
-      <button
-        class="tool-item"
-        :class="{ active: modelValue === 'text' }"
-        title="文字"
-        @click="onToolChange('text')"
-      >
-        <i class="iconfont icon-wenzi tool-iconfont"></i>
-      </button>
-      <button
-        class="tool-item"
-        :class="{ active: modelValue === 'image' }"
-        title="图片"
-        @click="onImageClick"
-      >
-        <i class="iconfont icon-tupian tool-iconfont"></i>
-      </button>
-    </div>
-
-    <div v-if="false" class="toolbar-divider"></div>
 
     <!-- 编辑操作 -->
     <div class="toolbar-section">
@@ -121,21 +47,17 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-
-type ToolMode = 'select' | 'node' | 'selectseat'
-  | 'seat-row' | 'seat-section' | 'seat-diagonal'
-  | 'drawline' | 'drawRect' | 'drawPolygon'
-  | 'text' | 'image'
+import { Icon } from '@iconify/vue'
+import { getVisibleTools, groupToolsByCategory, type ToolId, type ToolCategory } from '../domain/toolRegistry'
 
 const props = defineProps<{
-  modelValue: ToolMode
+  modelValue: ToolId
   venueType?: string
   sectionFocused?: boolean
 }>()
 
-// Emits
 const emit = defineEmits<{
-  'update:modelValue': [tool: ToolMode]
+  'update:modelValue': [tool: ToolId]
   'undo': []
   'redo': []
   'copy': []
@@ -143,22 +65,24 @@ const emit = defineEmits<{
   'delete': []
 }>()
 
-const isSimple = computed(() => props.venueType === 'SIMPLE')
+const visibleTools = computed(() =>
+  getVisibleTools({
+    venueType: props.venueType || 'SIMPLE',
+    sectionFocused: !!props.sectionFocused,
+  })
+)
 
-/** 座位绘制工具：SIMPLE 始终显示，WITH_SECTIONS 仅分区聚焦后显示 */
-const showSeatTools = computed(() => isSimple.value || !!props.sectionFocused)
+const groupedTools = computed(() => {
+  const groups = groupToolsByCategory(visibleTools.value)
+  const result: { category: ToolCategory; tools: typeof visibleTools.value }[] = []
+  groups.forEach((tools, category) => {
+    result.push({ category, tools })
+  })
+  return result
+})
 
-/** 分区绘制工具：仅 WITH_SECTIONS 显示 */
-const showSectionTools = computed(() => !isSimple.value)
-
-// 工具切换
-const onToolChange = (tool: ToolMode) => {
+const onToolChange = (tool: ToolId) => {
   emit('update:modelValue', tool)
-}
-
-// 图片按钮点击
-const onImageClick = () => {
-  emit('update:modelValue', 'image')
 }
 </script>
 

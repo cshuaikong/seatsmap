@@ -47,7 +47,7 @@
     <!-- 主内容区 - 三栏布局 -->
     <div class="designer-main">
       <LeftToolbar
-        v-model="currentTool as any"
+        v-model="currentTool"
         :venue-type="props.venueData?.type"
         :section-focused="sectionFocused"
         @undo="onUndo"
@@ -66,7 +66,7 @@
             :current-tool="currentTool"
             hide-toolbar
             @body-double-tap="onPathDoubleTap"
-            @update:current-tool="(tool: string) => currentTool = tool"
+            @update:current-tool="(tool: ToolId) => currentTool = tool"
             @vertex-edit-change="(active: boolean) => vertexEditActive = active"
             @section-focus-change="onSectionFocusChange"
           />
@@ -87,7 +87,7 @@
         :chart-name="chartName"
         :categories="displayCategories"
         :total-seats="0"
-        :current-tool="currentTool as any"
+        :current-tool="currentTool"
         :vertex-edit-active="vertexEditActive"
         @manage-categories="onManageCategories"
         @enter-section="(sectionId: string) => (rendererRef as any)?.enterSectionFocus?.(sectionId)"
@@ -115,6 +115,9 @@ import LeftToolbar from './LeftToolbar.vue'
 import PathEditor from './PathEditor.vue'
 import type { VenueData } from '../types'
 import { useVenueDataStore } from '../stores/venueDataStore'
+
+import type { ToolId } from '../domain/toolRegistry'
+import { ALL_TOOLS } from '../domain/toolRegistry'
 import { useEditorStore } from '../stores/editorStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
@@ -131,7 +134,7 @@ const props = withDefaults(defineProps<{
   embedded: false,
 })
 
-const currentTool = ref<string>('select')
+const currentTool = ref<ToolId>('select')
 const vertexEditActive = ref(false)
 const chartName = ref(props.venueData?.name || '未命名座位图')
 const effectiveVenueData = computed(() => {
@@ -169,20 +172,8 @@ const seatCount = computed(() => {
 })
 
 const currentToolLabel = computed(() => {
-  const labels: Record<string, string> = {
-    'select': '选择',
-    'selectseat': '选择座位',
-    'node': '节点编辑',
-    'row-straight': '单行座位',
-    'section': '分段座位',
-    'section-diagonal': '多行座位',
-    'drawRect': '方形区域',
-    'drawPolygon': '多边形',
-    'drawPolyline': '折线',
-    'text': '文字标注',
-    'image': '图片',
-  }
-  return labels[currentTool.value] || currentTool.value
+  const tool = ALL_TOOLS.find(t => t.id === currentTool.value)
+  return tool?.label || currentTool.value
 })
 
 // ==================== 分区聚焦 ====================

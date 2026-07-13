@@ -41,24 +41,23 @@ import { useSelectionOverlay } from '../composables/canvas/useSelectionOverlay'
 import { useEditorStore } from '../stores/editorStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
+import type { ToolId } from '../domain/toolRegistry'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
   seatList?: any[]
   hideToolbar?: boolean
-  currentTool?: string
 }>(), {
   hideToolbar: false,
   venueData: () => ({}) as VenueData,
   seatList: () => [],
-  currentTool: 'select',
 })
+const currentTool = defineModel<ToolId>('currentTool', { default: 'select' })
 const title = ref('座位图设计器')
 const focusedSectionId = ref<string | null>(null)
 const focusedSectionName = ref('')
 const emit = defineEmits<{
   (e: 'body-double-tap', body: any): void
   (e: 'ready', leafer: any, editor: any): void
-  (e: 'update:currentTool', tool: string): void
   (e: 'vertex-edit-change', active: boolean): void
   (e: 'section-focus-change', focused: boolean, sectionName?: string): void
 }>()
@@ -360,7 +359,7 @@ const polygonDraw = usePolygonDraw({
       name: `分区 ${allPaths.length + 1}`,
     })
   },
-  onToolChange: (tool) => emit('update:currentTool', tool),
+  onToolChange: (tool) => { currentTool.value = tool as ToolId },
 })
 
 // ==================== 座位模块 ====================
@@ -378,8 +377,8 @@ const seatModule = useSeatModule({
   },
   getSectionGroupMap: () => sectionGroupMap,
   getFocusedSectionId: () => focusedSectionId.value,
-  getCurrentTool: () => props.currentTool,
-  onToolChange: (tool) => emit('update:currentTool', tool),
+  getCurrentTool: () => currentTool.value,
+  onToolChange: (tool) => { currentTool.value = tool as ToolId },
 })
 
 // ==================== 画布↔表单同步桥 ====================
@@ -437,7 +436,7 @@ const vertexEdit = useVertexEdit({
     const tgt = vertexEdit.getTarget()
     return tgt ? (tgt as any).__sectionGroup ?? null : null
   },
-  onToolChange: (tool) => emit('update:currentTool', tool),
+  onToolChange: (tool) => { currentTool.value = tool as ToolId },
 })
 
 // ==================== 座位排顶点编辑 ====================
@@ -460,14 +459,14 @@ const seatVertexEdit = useSeatVertexEdit({
     return sectionId ? sectionGroupMap.get(sectionId) ?? null : null
   },
   onRebuild: (group, newData, endCenter, anchorFromEnd) => seatModule.rebuildSeatRow(group, newData, endCenter, anchorFromEnd),
-  onToolChange: (tool) => emit('update:currentTool', tool),
+  onToolChange: (tool) => { currentTool.value = tool as ToolId },
 })
 
 watch(() => vertexEdit.isEditing.value || seatVertexEdit.isEditing.value, (v) => emit('vertex-edit-change', v))
 
 // ==================== 工具调度中心 ====================
 
-const mode = useEditorMode((tool) => emit('update:currentTool', tool))
+const mode = useEditorMode((tool) => { currentTool.value = tool as ToolId })
 
 mode.register('drawPolygon', {
   enter: () => polygonDraw.enter(),
@@ -762,7 +761,7 @@ onMounted(() => {
       ;(editor as any).editBox.visible = false
     }
 
-    if (props.currentTool === 'node' && list.length === 1 && !vertexEdit.isEditing.value) {
+    if (currentTool.value === 'node' && list.length === 1 && !vertexEdit.isEditing.value) {
       if (list[0]?.__seatRow && seatVertexEdit.getTarget() !== list[0]) {
         seatVertexEdit.enter(list[0])
         return
@@ -852,7 +851,7 @@ watch(() => props.venueData, (newVal) => {
   nextTick(() => pathEditorSync.syncAllSectionsToStore())
 })
 
-watch(() => props.currentTool, (tool) => {
+watch(currentTool, (tool) => {
   // node 模式特殊处理：如果已有选中元素，直接进入对应顶点编辑
   if (tool === 'node') {
     const list: any[] = (editor as any)?.list ?? []
