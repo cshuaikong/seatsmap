@@ -38,7 +38,7 @@ import { useSelectorPatch } from '../composables/useSelectorPatch'
 import { useSeatModule } from '../composables/useSeatModule'
 import { usePathEditorSync } from '../composables/usePathEditorSync'
 import { useSelectionOverlay } from '../composables/canvas/useSelectionOverlay'
-import { useVenueStore } from '../stores/venueStore'
+import { useEditorStore } from '../stores/editorStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
 const props = withDefaults(defineProps<{
@@ -399,8 +399,8 @@ const selectionOverlay = useSelectionOverlay({
 })
 
 // Store 中的单座选中变化 → 刷新 LOD 高亮
-const venueStoreForWatch = useVenueStore()
-watch(() => venueStoreForWatch.selectedSeatIds, () => {
+const editorStore = useEditorStore()
+watch(() => editorStore.selectedSeatIds, () => {
   seatModule.updateSeatLOD()
 }, { deep: true })
 
