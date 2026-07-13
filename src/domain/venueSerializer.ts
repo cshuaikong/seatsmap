@@ -5,12 +5,10 @@ import type { LeaferUI } from '../types/leafer-meta'
 /**
  * 场馆序列化器
  *
- * 职责：把 VenueData 序列化为可存储/传输的格式，
- * 或从 Leafer 画布状态反序列化回 VenueData。
+ * 职责：把 VenueData 序列化为可存储/传输的格式，或从 JSON 反序列化。
  *
- * 注意：buildVenueDataFromCanvas 仍依赖 Leafer 运行时元素，
- * 这是当前"画布为中心"架构的遗留。后续应逐步让 store 数据成为唯一真相，
- * 最终只保留 serializeVenue / deserializeVenue。
+ * 注意：buildVenueDataFromCanvas 是旧"画布为中心"架构的遗留，
+ * 仅供内部调试/兜底使用。保存、导出等正式流程应直接基于 venueDataStore.venue。
  */
 
 /** 把 VenueData 序列化为 JSON 字符串 */

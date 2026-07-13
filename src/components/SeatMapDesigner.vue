@@ -137,12 +137,6 @@ const props = withDefaults(defineProps<{
 
 const currentTool = ref<ToolId>('select')
 const vertexEditActive = ref(false)
-const chartName = ref(props.venueData?.name || '未命名座位图')
-const effectiveVenueData = computed(() => {
-  const hasRealData = props.venueData?.sections && props.venueData.sections.length > 0
-  return hasRealData ? props.venueData : venueDataStore.venue
-})
-
 
 const rendererRef = ref<InstanceType<typeof PathEditor>>()
 const venueDataStore = useVenueDataStore()
@@ -150,9 +144,25 @@ const editorStore = useEditorStore()
 const historyStore = useHistoryStore()
 const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
+const chartName = ref(props.venueData?.name || venueDataStore.venue.name || '未命名座位图')
+// PathEditor 始终渲染 store 中的数据；props.venueData 仅作为外部初始数据源导入 store
+const effectiveVenueData = computed(() => venueDataStore.venue)
+
 // ==================== 数据加载 ====================
 
 watch(() => props.venueData?.name, (name) => {
+  if (name) chartName.value = name
+})
+
+// 外部传入的 venueData 同步到 store，使 store 成为唯一真相源
+watch(() => props.venueData, (data) => {
+  if (data && data.sections && data.sections.length > 0) {
+    venueDataStore.importVenueData(data)
+    historyStore.reset()
+  }
+}, { immediate: true, deep: true })
+
+watch(() => venueDataStore.venue.name, (name) => {
   if (name) chartName.value = name
 })
 
@@ -163,13 +173,11 @@ onMounted(() => {
 
 const seatCount = computed(() => {
   let count = 0
-  for (const s of props.venueData.sections ?? []) {
+  for (const s of venueDataStore.venue.sections ?? []) {
     for (const r of s.rows ?? []) {
       count += r.seats?.length ?? 0
     }
   }
-  // 加上 PathEditor 中绘制的座位
-  count += rendererRef.value?.drawnSeatCount ?? 0
   return count
 })
 
@@ -216,7 +224,7 @@ const importTip = ref('')
 let importTipTimer: ReturnType<typeof setTimeout> | null = null
 
 const onExportData = async () => {
-  const venue = rendererRef.value?.buildVenueData?.() || venueDataStore.venue
+  const venue = venueDataStore.exportVenueData()
   const result = await exportSeatMap(venue, `${venue.name || 'seatmap'}.json`)
   if (result.success) {
     exportStatus.value = 'success'
@@ -253,7 +261,7 @@ const onImportData = async () => {
 }
 
 const onSave = () => {
-  const venue = rendererRef.value?.buildVenueData?.() 
+  const venue = venueDataStore.exportVenueData()
   emit('save', venue)
 }
 

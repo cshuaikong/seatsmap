@@ -91,7 +91,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
     sectionId: string,
     border: Partial<Pick<Section,
       | 'name' | 'rotation' | 'type' | 'x' | 'y' | 'width' | 'height'
-      | 'radiusX' | 'radiusY' | 'pathPoints' | 'fill' | 'stroke'
+      | 'radiusX' | 'radiusY' | 'pathPoints' | 'path' | 'fill' | 'stroke'
       | 'opacity' | 'zIndex' | 'readonly'
     >>
   ) {

@@ -344,7 +344,7 @@ function buildVenueData(): VenueData {
 }
 
 function onExportJSON() {
-  const venue = buildVenueData()
+  const venue = venueDataStore.exportVenueData()
   downloadFile('venue-data.json', JSON.stringify({ venue }, null, 2))
 }
 
@@ -469,6 +469,9 @@ const vertexEdit = useVertexEdit({
     return tgt ? (tgt as any).__sectionGroup ?? null : null
   },
   onToolChange: (tool) => { currentTool.value = tool as ToolId },
+  onPathChange: (sectionId, path) => {
+    venueDataStore.updateSectionBorder(sectionId, { path })
+  },
 })
 
 // ==================== 座位排顶点编辑 ====================

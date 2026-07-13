@@ -14,6 +14,8 @@ export interface VertexEditCtx {
   getCurrentBorder: () => any
   getParentGroup?: () => any | null
   onToolChange: (tool: string) => void
+  /** 顶点/弧线变化时回调，用于同步回 store */
+  onPathChange?: (sectionId: string, path: string) => void
 }
 
 export function useVertexEdit(ctx: VertexEditCtx) {
@@ -159,6 +161,9 @@ export function useVertexEdit(ctx: VertexEditCtx) {
         repositionEdgeHandles(i)
         repositionEdgeHandles((i - 1 + n) % n)
       })
+      h.on_(DragEvent.END, () => {
+        notifyPathChange()
+      })
 
       leafer.add(h)
       handles.push(h)
@@ -190,6 +195,9 @@ export function useVertexEdit(ctx: VertexEditCtx) {
         arcDepths[i] = Math.max(-1, Math.min(1, proj / (cLen * 0.5)))
         repositionEdgeHandles(i)
         rebuildPath()
+      })
+      h.on_(DragEvent.END, () => {
+        notifyPathChange()
       })
 
       leafer.add(h)
@@ -245,6 +253,16 @@ export function useVertexEdit(ctx: VertexEditCtx) {
     const border = ctx.getCurrentBorder()
     if (border) border.path = d
     ctx.getEdgeCache().delete(el)
+  }
+
+  function notifyPathChange(): void {
+    const el = target
+    if (!el || !ctx.onPathChange) return
+    const sectionId = (el as any).__sectionId as string | undefined
+    if (!sectionId) return
+    const path = (el as any).path as string | undefined
+    if (!path) return
+    ctx.onPathChange(sectionId, path)
   }
 
   return {
