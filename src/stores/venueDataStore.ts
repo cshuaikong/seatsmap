@@ -77,8 +77,8 @@ export const useVenueDataStore = defineStore('venueData', () => {
 
   // ==================== Section CRUD ====================
 
-  function addSection(section: Omit<Section, 'id'>) {
-    const newSection: Section = { ...section, id: generateId() }
+  function addSection(section: Omit<Section, 'id'> & { id?: string }) {
+    const newSection: Section = { ...section, id: section.id || generateId() }
     venue.value.sections.push(newSection)
     return newSection.id
   }

@@ -43,7 +43,11 @@ import { useHistoryStore } from '../stores/historyStore'
 import { useVenueDataStore } from '../stores/venueDataStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import { buildVenueDataFromCanvas } from '../domain/venueSerializer'
-import { createUpdateSectionBorderCommand } from '../domain/venueCommands'
+import {
+  createBatchCommand,
+  createUpdateSectionBorderCommand,
+  createUpdateRowCommand,
+} from '../domain/venueCommands'
 import type { ToolId } from '../domain/toolRegistry'
 const props = withDefaults(defineProps<{
   venueData?: VenueData
@@ -372,13 +376,22 @@ const polygonDraw = usePolygonDraw({
   getS,
   setPanEnabled,
   onFinish: (data) => {
-    createPolygonItem({
+    venueDataStore.addSection({
       id: data.id,
-      path: data.path,
-      x: 0, y: 0,
-      fill: '#d1d5db',
       name: `分区 ${allPaths.length + 1}`,
-    })
+      type: 'path',
+      path: data.path,
+      pathPoints: data.points.map(p => ({ x: p.x, y: p.y })),
+      x: 0,
+      y: 0,
+      fill: '#d1d5db',
+      stroke: '#9ca3af',
+      rows: [],
+      shapes: [],
+      texts: [],
+      areas: [],
+    } as any)
+    // canvas 由 watcher 从 store 增量渲染
   },
   onToolChange: (tool) => { currentTool.value = tool as ToolId },
 })
@@ -725,27 +738,35 @@ onMounted(() => {
   let isDraggingForHistory = false
   const syncBorder = () => selectionOverlay.updatePositions()
   editor.on(EditorMoveEvent.MOVE, () => {
-    if (!isDraggingForHistory) {
-      isDraggingForHistory = true
-      historyStore.pauseRecording()
-    }
+    isDraggingForHistory = true
     ;(editor as any).editBox?.update()
     syncBorder()
-    pathEditorSync.syncTransformToStore()
+    // 拖拽中不写 store，pointerup 时通过 command 提交
   })
   editor.on(EditorRotateEvent.ROTATE, () => {
-    if (!isDraggingForHistory) {
-      isDraggingForHistory = true
-      historyStore.pauseRecording()
-    }
+    isDraggingForHistory = true
     ;(editor as any).editBox?.update()
     syncBorder()
-    pathEditorSync.syncTransformToStore()
+    // 旋转中不写 store，pointerup 时通过 command 提交
   })
+  const commitTransformCommand = () => {
+    const updates = pathEditorSync.collectTransformUpdates()
+    if (updates.length === 0) return
+    const commands: ReturnType<typeof createUpdateSectionBorderCommand | typeof createUpdateRowCommand>[] = []
+    for (const u of updates) {
+      if (Object.keys(u.sectionUpdates).length > 0) {
+        commands.push(createUpdateSectionBorderCommand(venueDataStore, u.sectionId, u.sectionUpdates))
+      }
+      for (const rw of u.rowUpdates) {
+        commands.push(createUpdateRowCommand(venueDataStore, rw.rowId, rw.updates))
+      }
+    }
+    if (commands.length) historyStore.execute(createBatchCommand(commands))
+  }
   const onPointerUp = () => {
     if (isDraggingForHistory) {
       isDraggingForHistory = false
-      historyStore.resumeRecording()
+      commitTransformCommand()
     }
   }
   document.addEventListener('pointerup', onPointerUp)

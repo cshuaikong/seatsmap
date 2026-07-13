@@ -20,10 +20,13 @@ export interface PathEditorSyncCtx {
 }
 
 /**
- * PathEditor <-> split stores 双向同步桥
+ * PathEditor <-> split stores 同步桥
  *
- * 方向1 (画布→Store)：选中画布对象时，将当前状态推送到 stores，使 RightPanel 显示正确的属性面板。
- * 方向2 (Store→画布)：RightPanel 修改属性 → store 变更 → 反向应用到画布元素。
+ * 主方向 (Store → 画布)：store 是单一真相源，RightPanel/Command 修改 store 后，
+ * 这里把变更应用到 Leafer 画布元素。
+ *
+ * 残留方向 (画布 → Store)：座位排绘制等旧流程仍依赖 canvas 计算几何，
+ * syncAllSectionsToStore 用于把这些结果回写到 store。后续应逐步移除。
  */
 export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   const venueDataStore = useVenueDataStore()
@@ -382,70 +385,109 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
   // ==================== 变换同步（画布 → Store） ====================
 
-  function syncTransformToStore(): void {
+  interface TransformUpdate {
+    sectionId: string
+    sectionUpdates: Partial<Section>
+    rowUpdates: { rowId: string; updates: Partial<SeatRow> }[]
+  }
+
+  /** 从当前 editor.list 收集变换更新，不修改 store */
+  function collectTransformUpdates(): TransformUpdate[] {
     const editor = ctx.getEditor()
     const list: any[] = editor?.list ?? []
     const focusedId = ctx.getFocusedSectionId()
 
-    if (list.length === 0) return
+    if (list.length === 0) return []
 
-    isSyncingToStore = true
+    const updates: TransformUpdate[] = []
 
     for (const el of list) {
       // SectionGroup 拖拽/旋转
       if (el.__sectionGroup === true) {
         const sectionId = el.__sectionId
-        if (sectionId) {
-          const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
-          if (section) {
-            const oldSX = section.x as number
-            const oldSY = section.y as number
-            const oldSRot = ((section.rotation ?? 0) as number) * Math.PI / 180
+        if (!sectionId) continue
+        const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
+        if (!section) continue
 
-            section.x = +(el.x ?? 0).toFixed(2)
-            section.y = +(el.y ?? 0).toFixed(2)
-            section.rotation = +(el.rotation ?? 0).toFixed(2)
+        const oldSX = (section.x ?? 0) as number
+        const oldSY = (section.y ?? 0) as number
+        const oldSRot = ((section.rotation ?? 0) as number) * Math.PI / 180
 
-            const newSX = section.x as number
-            const newSY = section.y as number
-            const newSRot = ((section.rotation ?? 0) as number) * Math.PI / 180
+        const newSX = +(el.x ?? 0).toFixed(2)
+        const newSY = +(el.y ?? 0).toFixed(2)
+        const newSRotDeg = +(el.rotation ?? 0).toFixed(2)
+        const newSRot = (newSRotDeg * Math.PI) / 180
 
-            // 同步更新子 row 世界坐标，防止 applyRowProperty 用旧坐标反算错位
-            if (section.rows) {
-              const cosOld = Math.cos(oldSRot), sinOld = Math.sin(oldSRot)
-              const cosNew = Math.cos(newSRot), sinNew = Math.sin(newSRot)
-              for (const row of section.rows) {
-                if (row.x == null || row.y == null) continue
-                const dx = (row.x as number) - oldSX
-                const dy = (row.y as number) - oldSY
-                const localX = dx * cosOld + dy * sinOld
-                const localY = -dx * sinOld + dy * cosOld
-                row.x = +(newSX + localX * cosNew - localY * sinNew).toFixed(2)
-                row.y = +(newSY + localX * sinNew + localY * cosNew).toFixed(2)
-              }
-            }
+        const rowUpdates: { rowId: string; updates: Partial<SeatRow> }[] = []
+        if (section.rows) {
+          const cosOld = Math.cos(oldSRot), sinOld = Math.sin(oldSRot)
+          const cosNew = Math.cos(newSRot), sinNew = Math.sin(newSRot)
+          for (const row of section.rows) {
+            if (row.x == null || row.y == null) continue
+            const dx = (row.x as number) - oldSX
+            const dy = (row.y as number) - oldSY
+            const localX = dx * cosOld + dy * sinOld
+            const localY = -dx * sinOld + dy * cosOld
+            rowUpdates.push({
+              rowId: row.id,
+              updates: {
+                x: +(newSX + localX * cosNew - localY * sinNew).toFixed(2),
+                y: +(newSY + localX * sinNew + localY * cosNew).toFixed(2),
+              },
+            })
           }
         }
+
+        updates.push({
+          sectionId,
+          sectionUpdates: { x: newSX, y: newSY, rotation: newSRotDeg },
+          rowUpdates,
+        })
       }
       // 座位排 Group 拖拽/旋转
       else if (el.__seatRow && focusedId) {
         const sectionId = el.__sectionId
-        if (sectionId) {
-          // 重新计算世界坐标
-          const { row } = extractRowData(el)
-          const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
-          if (section) {
-            const existingRow = section.rows.find(r => r.id === row.id)
-            if (existingRow) {
-              existingRow.x = row.x ?? existingRow.x
-              existingRow.y = row.y ?? existingRow.y
-              existingRow.rotation = row.rotation ?? existingRow.rotation
-            }
-          }
-        }
+        if (!sectionId) continue
+        const { row } = extractRowData(el)
+        if (!row.id) continue
+        const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
+        if (!section) continue
+        const existingRow = section.rows.find(r => r.id === row.id)
+        if (!existingRow) continue
+        updates.push({
+          sectionId,
+          sectionUpdates: {},
+          rowUpdates: [{
+            rowId: row.id,
+            updates: {
+              x: row.x ?? existingRow.x,
+              y: row.y ?? existingRow.y,
+              rotation: row.rotation ?? existingRow.rotation,
+            },
+          }],
+        })
       }
     }
 
+    return updates
+  }
+
+  /**
+   * 旧实时同步入口（已弃用）。
+   * Phase C 后改为 pointerup 时执行 command，拖拽中不再写 store。
+   */
+  function syncTransformToStore(): void {
+    const updates = collectTransformUpdates()
+    isSyncingToStore = true
+    for (const u of updates) {
+      const section = venueDataStore.venue.sections.find(s => s.id === u.sectionId)
+      if (!section) continue
+      Object.assign(section, u.sectionUpdates)
+      for (const { rowId, updates } of u.rowUpdates) {
+        const row = section.rows.find(r => r.id === rowId)
+        if (row) Object.assign(row, updates)
+      }
+    }
     isSyncingToStore = false
   }
 
@@ -825,6 +867,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   return {
     syncSelectionToStore,
     syncTransformToStore,
+    collectTransformUpdates,
     syncAllSectionsToStore,
     watchStoreAndApply,
     resetKnownIds,
