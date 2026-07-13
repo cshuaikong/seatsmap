@@ -815,8 +815,7 @@ onMounted(() => {
   })
 
   renderAll(props.venueData)
-  // 初始同步：将画布 SectionGroup push 到 venueStore
-  nextTick(() => { pathEditorSync.syncAllSectionsToStore() })
+  // 所有 section/row 数据均来自 store，无需再将 canvas 反向同步
 
   // 选中变化 → 边框层管理
   editor.on(EditorEvent.SELECT, () => {
@@ -950,7 +949,6 @@ onUnmounted(() => {
 
 watch(() => props.venueData, (newVal) => {
   renderAll(newVal)
-  nextTick(() => pathEditorSync.syncAllSectionsToStore())
 })
 
 watch(currentTool, (tool) => {

@@ -37,10 +37,10 @@ export function localVectorToWorld(
 
 /** 根据 section fill 匹配默认 category key */
 export function resolveCategoryKey(
-  section: Section,
+  section: Section | undefined,
   categories: Category[],
 ): string | number {
-  const fill = section.fill
+  const fill = section?.fill
   if (fill) {
     const cat = categories.find(c => c.color === fill)
     if (cat) return cat.key
@@ -61,7 +61,7 @@ export interface SeatDrawRowData {
 export function buildSeatRowFromDrawData(
   rowData: SeatDrawRowData,
   options: {
-    section: Section
+    section?: Section
     categories: Category[]
     generateSeatId?: () => string
   },
@@ -97,12 +97,61 @@ export function buildSeatRowFromDrawData(
 export function buildSeatRowsFromDrawData(
   rows: SeatDrawRowData[],
   options: {
-    section: Section
+    section?: Section
     categories: Category[]
     generateSeatId?: () => string
   },
 ): SeatRow[] {
   return rows.map(r => buildSeatRowFromDrawData(r, options))
+}
+
+/** 计算若干 row 的世界坐标包围盒 */
+export function computeRowsBoundingBox(rows: SeatDrawRowData[]): {
+  x: number
+  y: number
+  width: number
+  height: number
+} {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const row of rows) {
+    const lastIdx = row.count - 1
+    const lastX = row.x + row.ux * row.spacing * lastIdx
+    const lastY = row.y + row.uy * row.spacing * lastIdx
+    minX = Math.min(minX, row.x, lastX)
+    minY = Math.min(minY, row.y, lastY)
+    maxX = Math.max(maxX, row.x, lastX)
+    maxY = Math.max(maxY, row.y, lastY)
+  }
+  const padding = 40
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: maxX - minX + padding * 2,
+    height: maxY - minY + padding * 2,
+  }
+}
+
+/** 根据 row 列表生成一个包围它们的矩形 section */
+export function buildSectionFromRows(
+  rows: SeatDrawRowData[],
+  options: { name?: string; fill?: string; stroke?: string },
+): Omit<Section, 'id' | 'rows'> {
+  const { x, y, width, height } = computeRowsBoundingBox(rows)
+  const path = `M${x},${y} L${x + width},${y} L${x + width},${y + height} L${x},${y + height} Z`
+  return {
+    name: options.name || '分区',
+    type: 'path',
+    path,
+    x,
+    y,
+    width,
+    height,
+    fill: options.fill || '#d1d5db',
+    stroke: options.stroke || '#9ca3af',
+    shapes: [],
+    texts: [],
+    areas: [],
+  }
 }
 
 /** 将 section 局部的 SeatDrawRowData 转成世界坐标的 SeatRow */

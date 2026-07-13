@@ -14,8 +14,8 @@ import type { SeatDrawRowData } from './useSeatDraw'
 import type { ToolHandler } from './useEditorMode'
 import { calculateCurvedPositions } from '../viewer/geometry'
 import { getCategoryColor, darkenColor } from '../utils/color'
-import { createAddRowsCommand } from '../domain/venueCommands'
-import { buildSeatRowsFromDrawData } from '../domain/rowGeometry'
+import { createAddRowsCommand, createAddSectionWithRowsCommand } from '../domain/venueCommands'
+import { buildSeatRowsFromDrawData, buildSectionFromRows } from '../domain/rowGeometry'
 
 export interface SeatModuleCtx {
   getLeafer: () => any
@@ -646,8 +646,18 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           historyStore.execute(createAddRowsCommand(venueDataStore, focusedId, seatRows))
         }
       } else {
-        // 无聚焦分区：暂时保持 canvas-first，后续改造
-        createSeatElements(data.rows, undefined, undefined)
+        // 无聚焦分区：自动创建一个包围这些排的 section，然后写入 store
+        const seatRows = buildSeatRowsFromDrawData(data.rows, {
+          section: venueDataStore.venue.sections[0],
+          categories: venueDataStore.venue.categories,
+        })
+        if (seatRows.length) {
+          const section = buildSectionFromRows(data.rows, {
+            name: `分区 ${venueDataStore.venue.sections.length + 1}`,
+            fill: '#d1d5db',
+          })
+          historyStore.execute(createAddSectionWithRowsCommand(venueDataStore, section, seatRows))
+        }
       }
     },
     onToolChange: ctx.onToolChange,
