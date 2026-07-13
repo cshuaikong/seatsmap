@@ -43,6 +43,7 @@ import { useHistoryStore } from '../stores/historyStore'
 import { useVenueDataStore } from '../stores/venueDataStore'
 import { getSvgPathCenter } from '../viewer/geometry'
 import {
+  createAddSectionCommand,
   createBatchCommand,
   createUpdateSectionBorderCommand,
   createUpdateRowCommand,
@@ -248,44 +249,23 @@ function deleteSelected() {
   const list: any[] = (editor as any)?.list ?? []
   if (list.length === 0) return
 
-  // 1) 先清理画布元素
+  // 只维护 allPaths 引用（多边形绘制碰撞检测需要），画布元素由 store 变更后的 watcher 统一移除
   list.forEach((el: any) => {
-    // 分区 Group（SectionGroup）
-    if (el.__sectionGroup) {
-      const sid = el.__sectionId
-      // 清理子元素引用
-      el.children?.slice().forEach((child: any) => {
-        try { el.remove(child) } catch (_) {}
-        if (child.__seatRow) {
-          const idx = seatModule.seatRowGroups.indexOf(child)
-          if (idx !== -1) seatModule.seatRowGroups.splice(idx, 1)
-        }
-        if (child.tag === 'Path') {
-          const idx = allPaths.indexOf(child)
-          if (idx !== -1) allPaths.splice(idx, 1)
-        }
-      })
-      sectionGroupMap.delete(sid)
-      try { leafer!.remove(el) } catch (_) {}
-    } else if (el.__seatRow) {
-      const idx = seatModule.seatRowGroups.indexOf(el)
-      if (idx !== -1) seatModule.seatRowGroups.splice(idx, 1)
-      try { el.parent?.remove(el) } catch (_) {}
-    } else if (el.tag === 'Path') {
+    if (el.tag === 'Path') {
       const idx = allPaths.indexOf(el)
       if (idx !== -1) allPaths.splice(idx, 1)
-      const parentGroup = (el as any).__sectionGroup
-      if (parentGroup) {
-        try { parentGroup.remove(el) } catch (_) {}
-      } else {
-        try { leafer!.remove(el) } catch (_) {}
+    } else if (el.__sectionGroup) {
+      const path = el.children?.find((c: any) => c.tag === 'Path')
+      if (path) {
+        const idx = allPaths.indexOf(path)
+        if (idx !== -1) allPaths.splice(idx, 1)
       }
     }
   })
 
   edgeCache = new WeakMap<object, number[][]>()
 
-  // 2) 再从 store 删除对应数据并清空选择
+  // store 删除 → watcher 同步画布
   editorStore.deleteSelected()
 
   editor?.cancel()
@@ -361,21 +341,23 @@ const polygonDraw = usePolygonDraw({
   getS,
   setPanEnabled,
   onFinish: (data) => {
-    venueDataStore.addSection({
-      id: data.id,
-      name: `分区 ${allPaths.length + 1}`,
-      type: 'path',
-      path: data.path,
-      pathPoints: data.points.map(p => ({ x: p.x, y: p.y })),
-      x: 0,
-      y: 0,
-      fill: '#d1d5db',
-      stroke: '#9ca3af',
-      rows: [],
-      shapes: [],
-      texts: [],
-      areas: [],
-    } as any)
+    historyStore.execute(
+      createAddSectionCommand(venueDataStore, {
+        id: data.id,
+        name: `分区 ${allPaths.length + 1}`,
+        type: 'path',
+        path: data.path,
+        pathPoints: data.points.map(p => ({ x: p.x, y: p.y })),
+        x: 0,
+        y: 0,
+        fill: '#d1d5db',
+        stroke: '#9ca3af',
+        rows: [],
+        shapes: [],
+        texts: [],
+        areas: [],
+      } as any),
+    )
     // canvas 由 watcher 从 store 增量渲染
   },
   onToolChange: (tool) => { currentTool.value = tool as ToolId },

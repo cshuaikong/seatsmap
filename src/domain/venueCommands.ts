@@ -276,6 +276,24 @@ export function createUpdateSeatsCategoryCommand(
 
 // ==================== Section Commands ====================
 
+/** 添加一个 Section（多边形/矩形等） */
+export function createAddSectionCommand(
+  store: VenueDataStore,
+  section: Omit<Section, 'id'> & { id?: string },
+): Command {
+  const captured = clone(section)
+  let sectionId: string = ''
+  return {
+    name: 'addSection',
+    execute: () => {
+      sectionId = store.addSection(captured) || ''
+    },
+    undo: () => {
+      if (sectionId) store.deleteSection(sectionId)
+    },
+  }
+}
+
 /** 添加一个 Section 并放入若干 Row（原子操作） */
 export function createAddSectionWithRowsCommand(
   store: VenueDataStore,
