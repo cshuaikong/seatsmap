@@ -109,87 +109,6 @@
       </div>
     </template>
 
-    <!-- 兼容旧版：选中排的属性 -->
-    <template v-else-if="selectedRow">
-      <div class="selection-header">
-        <div class="selection-title">
-          <span class="title-text">排设置</span>
-          <span class="title-type">ROW</span>
-        </div>
-      </div>
-
-      <div class="selection-content">
-        <div class="property-group">
-          <div class="property-field">
-            <label>排号</label>
-            <input type="text" v-model="selectedRow.label" @change="updateRow" />
-          </div>
-
-          <div class="property-field">
-            <label>座位数量</label>
-            <div class="number-input">
-              <button class="step-btn" @click="decreaseSeats">
-                <Icon icon="lucide:minus" class="step-icon" />
-              </button>
-              <span class="number-value">{{ selectedRow.seats.length }}</span>
-              <button class="step-btn" @click="increaseSeats">
-                <Icon icon="lucide:plus" class="step-icon" />
-              </button>
-            </div>
-          </div>
-
-          <div class="property-field">
-            <label>旋转角度</label>
-            <div class="number-input">
-              <button class="step-btn" @click="decreaseRotation">
-                <Icon icon="lucide:minus" class="step-icon" />
-              </button>
-              <span class="number-value">{{ Math.round(selectedRow.rotation || 0) }}°</span>
-              <button class="step-btn" @click="increaseRotation">
-                <Icon icon="lucide:plus" class="step-icon" />
-              </button>
-            </div>
-          </div>
-
-          <div class="property-field">
-            <label>位置</label>
-            <div class="position-display">
-              <span>X: {{ Math.round(selectedRow.x || 0) }}</span>
-              <span>Y: {{ Math.round(selectedRow.y || 0) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="property-group">
-          <h4>类别</h4>
-          <div class="category-select">
-            <div class="category-badge" :style="{ backgroundColor: selectedCategory?.color || '#9ca3af' }"></div>
-            <span class="category-name">{{ (selectedCategory as any)?.name || (selectedCategory as any)?.label || '选择类别' }}</span>
-            <button class="dropdown-btn">
-              <Icon icon="lucide:chevron-down" class="dropdown-icon" />
-            </button>
-          </div>
-        </div>
-
-        <div class="property-group">
-          <h4>座位间距</h4>
-          <div class="property-field">
-            <label>座位间距</label>
-            <div class="number-input">
-              <button class="step-btn" @click="seatSpacing = Math.max(20, seatSpacing - 2)">
-                <Icon icon="lucide:minus" class="step-icon" />
-              </button>
-              <span class="number-value">{{ seatSpacing }}</span>
-              <button class="step-btn" @click="seatSpacing = Math.min(60, seatSpacing + 2)">
-                <Icon icon="lucide:plus" class="step-icon" />
-              </button>
-            </div>
-            <span class="unit">pt</span>
-          </div>
-        </div>
-      </div>
-    </template>
-
     <!-- 图表概览（无选中时） -->
     <template v-else>
       <ChartOverviewPanel
@@ -238,7 +157,7 @@ const generateSeatLabels = (scheme: string, count: number, start?: string, direc
   return labels
 }
 
-import type { SeatRow as Row, PanelSelection, SelectedObjectType, Section } from '../types'
+import type { PanelSelection, SelectedObjectType, Section } from '../types'
 import ChartOverviewPanel from './panels/ChartOverviewPanel.vue'
 import ShapePanel from './panels/ShapePanel.vue'
 import TextPanel from './panels/TextPanel.vue'
@@ -266,12 +185,10 @@ const props = defineProps<{
   currentTool?: string
   // 兼容旧版：selection 现在可选，优先从 venueStore 读取
   selection?: PanelSelection | null
-  selectedRow?: Row | null
   vertexEditActive?: boolean
 }>()
 
 const emit = defineEmits<{
-  'update-row': [row: Row]
   // 兼容旧版：update-property 现在可选，面板直接写入 store
   'update-property': [updates: Record<string, any>]
   'manage-categories': []
@@ -347,8 +264,6 @@ const onEnterSection = () => {
   if (!sectionId) return
   emit('enter-section', sectionId)
 }
-
-const seatSpacing = ref(28)
 
 // 刷新 key，用于强制重新挂载子面板
 const refreshKey = ref(0)
@@ -962,42 +877,6 @@ const handleCategoryChange = (categoryId: string) => {
   }
 }
 
-// 兼容旧版：选中类别
-const selectedCategory = computed(() => {
-  if (!props.selectedRow || props.selectedRow.seats.length === 0) return null
-  // Seat 使用 categoryKey 而非 categoryId
-  const seat = props.selectedRow.seats[0] as any
-  const categoryKey = seat.categoryKey || seat.categoryId
-  return props.categories.find(c => (c as any).id === categoryKey || c.key === categoryKey)
-})
-
-function updateRow() {
-  if (props.selectedRow) {
-    emit('update-row', props.selectedRow)
-  }
-}
-
-function increaseSeats() {
-  // TODO: 增加座位
-}
-
-function decreaseSeats() {
-  // TODO: 减少座位
-}
-
-function increaseRotation() {
-  if (props.selectedRow) {
-    props.selectedRow.rotation = ((props.selectedRow.rotation || 0) + 5) % 360
-    updateRow()
-  }
-}
-
-function decreaseRotation() {
-  if (props.selectedRow) {
-    props.selectedRow.rotation = ((props.selectedRow.rotation || 0) - 5) % 360
-    updateRow()
-  }
-}
 </script>
 
 <style scoped>
