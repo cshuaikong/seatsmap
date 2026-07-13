@@ -165,47 +165,66 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
     })
     ;(sectionGroup as any).__sectionGroup = true
     ;(sectionGroup as any).__sectionId = p.id
-    ;(sectionGroup as any).__sectionName = p.name 
+    ;(sectionGroup as any).__sectionName = p.name
     sectionGroupMap.set(p.id, sectionGroup)
     leafer!.add(sectionGroup)
+  } else {
+    // 增量更新：同步位置和名称
+    sectionGroup.x = p.x ?? 0
+    sectionGroup.y = p.y ?? 0
+    sectionGroup.rotation = p.rotation ?? 0
+    ;(sectionGroup as any).__sectionName = p.name
   }
 
   // 边框 Path 作为子元素，坐标相对 Group
-  const body = new Path({
-    id: p.id,
-    path: p.path,
-    x: 0, y: 0,
-    fill: p.fill,
-    stroke: p.stroke || darkenColor(p.fill, 20),
-    strokeWidth: p.strokeWidth ?? 1,
-    strokeAlign: 'inside',
-    zIndex: 0,
-    editable: false,
-    draggable: false,
-    hittable: true,
-  })
-  ;(body as any).__sectionGroup = sectionGroup
-  ;(body as any).__rawPath = p.path
-  sectionGroup.add(body)
-  allPaths.push(body)
+  const existingBody = sectionGroup.children?.find((c: any) => c.tag === 'Path')
+  if (existingBody) {
+    existingBody.path = p.path
+    existingBody.fill = p.fill
+    existingBody.stroke = p.stroke || darkenColor(p.fill, 20)
+    ;(existingBody as any).__rawPath = p.path
+  } else {
+    const body = new Path({
+      id: p.id,
+      path: p.path,
+      x: 0, y: 0,
+      fill: p.fill,
+      stroke: p.stroke || darkenColor(p.fill, 20),
+      strokeWidth: p.strokeWidth ?? 1,
+      strokeAlign: 'inside',
+      zIndex: 0,
+      editable: false,
+      draggable: false,
+      hittable: true,
+    })
+    ;(body as any).__sectionGroup = sectionGroup
+    ;(body as any).__rawPath = p.path
+    sectionGroup.add(body)
+    allPaths.push(body)
+  }
 
   // 分区名称文本（不可选中，显示于分区中心，响应缩放，初始隐藏防闪烁）
-  const nameText = new Text({
-    text: p.name || '',
-    x: 0, y: 0,
-    fontSize: 14,
-    fill: '#374151',
-    fontWeight: '500',
-    textAlign: 'center',
-    verticalAlign: 'middle',
-    editable: false,
-    hittable: false,
-    around: 'center',
-    opacity: 0,
-  })
-  ;(nameText as any).__sectionNameText = true
-  sectionGroup.add(nameText)
-  ;(sectionGroup as any).__nameText = nameText
+  const existingNameText = (sectionGroup as any).__nameText
+  if (existingNameText) {
+    existingNameText.text = p.name || ''
+  } else {
+    const nameText = new Text({
+      text: p.name || '',
+      x: 0, y: 0,
+      fontSize: 14,
+      fill: '#374151',
+      fontWeight: '500',
+      textAlign: 'center',
+      verticalAlign: 'middle',
+      editable: false,
+      hittable: false,
+      around: 'center',
+      opacity: 0,
+    })
+    ;(nameText as any).__sectionNameText = true
+    sectionGroup.add(nameText)
+    ;(sectionGroup as any).__nameText = nameText
+  }
 }
 
 function clearAllPaths() {
@@ -303,6 +322,8 @@ function renderAll(data: VenueData): void {
       editor.cancel()
       ;(editor as any).zIndex = 999
     }
+
+    pathEditorSync.resetKnownIds()
   } catch (e) {
     console.error('[renderAll] error:', e)
   }
@@ -391,6 +412,16 @@ const pathEditorSync = usePathEditorSync({
   rebuildSeatRow: (group, newData, endCenter, anchorFromEnd) =>
     seatModule.rebuildSeatRow(group, newData, endCenter, anchorFromEnd),
   refreshSeatLOD: () => seatModule.updateSeatLOD(),
+  createSection: (section) => {
+    if (section.type === 'path' && section.path) {
+      createPolygonItem(section as { id: string; path: string; x: number; y: number; fill: string; stroke?: string; strokeWidth?: number; name?: string; rotation?: number })
+    }
+    seatModule.createSeatsFromVenueData([section])
+  },
+  createRows: (sectionId, rows) => {
+    const section = venueDataStore.venue.sections.find(s => s.id === sectionId)
+    if (section) seatModule.createSeatsFromVenueData([{ ...section, rows }])
+  },
 })
 
 // 选中 Section 时的蓝色边框覆盖层

@@ -13,6 +13,10 @@ export interface PathEditorSyncCtx {
   getFocusedSectionId: () => string | null
   rebuildSeatRow: (group: any, newData: any, endCenter?: { x: number; y: number }, anchorFromEnd?: boolean) => void
   refreshSeatLOD?: () => void
+  /** 画布增量创建新 Section */
+  createSection?: (section: Section) => void
+  /** 画布增量创建若干 Row */
+  createRows?: (sectionId: string, rows: SeatRow[]) => void
 }
 
 /**
@@ -24,6 +28,9 @@ export interface PathEditorSyncCtx {
 export function usePathEditorSync(ctx: PathEditorSyncCtx) {
   const venueDataStore = useVenueDataStore()
   const editorStore = useEditorStore()
+
+  let knownSectionIds = new Set<string>()
+  let knownRowIds = new Set<string>()
 
   let isSyncingToStore = false
   let isApplyingToCanvas = false
@@ -666,6 +673,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
    * 返回 cleanup 函数 (unwatch)。
    */
   function watchStoreAndApply(): () => void {
+    initKnownIds()
 
     const stopSections = watch(
       () => venueDataStore.venue.sections,
@@ -674,10 +682,29 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
 
         isApplyingToCanvas = true
 
-        // 先同步删除：store 中消失的对象从画布移除
+        const currentSectionIds = new Set((newSections ?? []).map(s => s.id))
+        const currentRowIds = new Set<string>()
+        ;(newSections ?? []).forEach(s => s.rows?.forEach(r => currentRowIds.add(r.id)))
+
+        // 1) 增量创建新 Section
+        for (const section of newSections ?? []) {
+          if (!knownSectionIds.has(section.id)) {
+            ctx.createSection?.(section)
+          }
+        }
+
+        // 2) 增量创建新 Row
+        for (const section of newSections ?? []) {
+          const newRows = section.rows?.filter(r => !knownRowIds.has(r.id)) ?? []
+          if (newRows.length > 0) {
+            ctx.createRows?.(section.id, newRows)
+          }
+        }
+
+        // 3) 同步删除：store 中消失的对象从画布移除
         removeMissingSectionsAndRows(newSections ?? [])
 
-        // 遍历所有 section 检查属性变更
+        // 4) 遍历所有 section 检查属性变更
         for (const section of newSections ?? []) {
           applySectionProperty(section.id)
 
@@ -689,6 +716,8 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
           }
         }
 
+        knownSectionIds = currentSectionIds
+        knownRowIds = currentRowIds
         isApplyingToCanvas = false
       },
       { deep: true },
@@ -783,11 +812,22 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     isSyncingToStore = false
   }
 
+  function resetKnownIds() {
+    knownSectionIds = new Set(venueDataStore.venue.sections.map(s => s.id))
+    knownRowIds = new Set<string>()
+    venueDataStore.venue.sections.forEach(s => s.rows?.forEach(r => knownRowIds.add(r.id)))
+  }
+
+  function initKnownIds() {
+    resetKnownIds()
+  }
+
   return {
     syncSelectionToStore,
     syncTransformToStore,
     syncAllSectionsToStore,
     watchStoreAndApply,
+    resetKnownIds,
     // 暴露用于手动控制同步标志
     get isSyncingToStore() { return isSyncingToStore },
     setSyncingToStore(v: boolean) { isSyncingToStore = v },
