@@ -690,17 +690,34 @@ onMounted(() => {
   }
 
   // 拖拽/旋转时选择框跟手 + 边框同步（Group 嵌套自动处理子元素跟随）
+  let isDraggingForHistory = false
   const syncBorder = () => selectionOverlay.updatePositions()
   editor.on(EditorMoveEvent.MOVE, () => {
+    if (!isDraggingForHistory) {
+      isDraggingForHistory = true
+      historyStore.pauseRecording()
+    }
     ;(editor as any).editBox?.update()
     syncBorder()
     pathEditorSync.syncTransformToStore()
   })
   editor.on(EditorRotateEvent.ROTATE, () => {
+    if (!isDraggingForHistory) {
+      isDraggingForHistory = true
+      historyStore.pauseRecording()
+    }
     ;(editor as any).editBox?.update()
     syncBorder()
     pathEditorSync.syncTransformToStore()
   })
+  const onPointerUp = () => {
+    if (isDraggingForHistory) {
+      isDraggingForHistory = false
+      historyStore.resumeRecording()
+    }
+  }
+  document.addEventListener('pointerup', onPointerUp)
+  ;(leafer as any).__onPointerUp = onPointerUp
   leafer.on(LP.MOVE, (e: any) => {
     const w = canvasToWorld(e.x, e.y)
     mode.handleMove(w.x, w.y)
@@ -872,6 +889,8 @@ onUnmounted(() => {
   if (canvas && boundWheel) { canvas.removeEventListener('wheel', boundWheel); boundWheel = null }
   const onKey2 = (leafer as any)?.__onKey
   if (onKey2) document.removeEventListener('keydown', onKey2)
+  const onPointerUp2 = (leafer as any)?.__onPointerUp
+  if (onPointerUp2) document.removeEventListener('pointerup', onPointerUp2)
   leafer?.destroy()
   leafer = null
 })

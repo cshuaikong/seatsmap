@@ -26,6 +26,7 @@ export const useHistoryStore = defineStore('history', () => {
   const canRedo = computed(() => historyIndex.value < history.value.length - 1)
 
   let isRestoring = false
+  let isPaused = false
   let pendingSaveTimer: ReturnType<typeof setTimeout> | null = null
 
   // ==================== Actions ====================
@@ -85,9 +86,25 @@ export const useHistoryStore = defineStore('history', () => {
     }
   }
 
+  /** 暂停历史记录（例如拖拽过程中） */
+  function pauseRecording() {
+    isPaused = true
+    if (pendingSaveTimer) {
+      clearTimeout(pendingSaveTimer)
+      pendingSaveTimer = null
+    }
+  }
+
+  /** 恢复历史记录并立即保存当前状态 */
+  function resumeRecording() {
+    if (!isPaused) return
+    isPaused = false
+    saveHistory()
+  }
+
   /** 延迟自动保存：把连续快速变更合并为一次历史记录 */
   function scheduleSave() {
-    if (isRestoring) return
+    if (isRestoring || isPaused) return
     if (pendingSaveTimer) clearTimeout(pendingSaveTimer)
     pendingSaveTimer = setTimeout(() => {
       pendingSaveTimer = null
@@ -110,6 +127,8 @@ export const useHistoryStore = defineStore('history', () => {
     initHistory,
     saveHistory,
     scheduleSave,
+    pauseRecording,
+    resumeRecording,
     undo,
     redo,
     reset,
