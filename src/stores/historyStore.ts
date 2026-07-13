@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useVenueDataStore } from './venueDataStore'
 import { useEditorStore } from './editorStore'
@@ -24,6 +24,9 @@ export const useHistoryStore = defineStore('history', () => {
 
   const canUndo = computed(() => historyIndex.value > 0)
   const canRedo = computed(() => historyIndex.value < history.value.length - 1)
+
+  let isRestoring = false
+  let pendingSaveTimer: ReturnType<typeof setTimeout> | null = null
 
   // ==================== Actions ====================
 
@@ -57,22 +60,45 @@ export const useHistoryStore = defineStore('history', () => {
 
   function undo() {
     if (!canUndo.value) return
+    isRestoring = true
     historyIndex.value--
     venueDataStore.importVenueData(history.value[historyIndex.value])
     editorStore.clearSelection()
+    isRestoring = false
   }
 
   function redo() {
     if (!canRedo.value) return
+    isRestoring = true
     historyIndex.value++
     venueDataStore.importVenueData(history.value[historyIndex.value])
     editorStore.clearSelection()
+    isRestoring = false
   }
 
   function reset() {
     history.value = []
     historyIndex.value = -1
+    if (pendingSaveTimer) {
+      clearTimeout(pendingSaveTimer)
+      pendingSaveTimer = null
+    }
   }
+
+  /** 延迟自动保存：把连续快速变更合并为一次历史记录 */
+  function scheduleSave() {
+    if (isRestoring) return
+    if (pendingSaveTimer) clearTimeout(pendingSaveTimer)
+    pendingSaveTimer = setTimeout(() => {
+      pendingSaveTimer = null
+      saveHistory()
+    }, 300)
+  }
+
+  // 监听 venue 数据变化，自动记录历史（undo/redo 恢复期间跳过）
+  watch(() => venueDataStore.venue, () => {
+    scheduleSave()
+  }, { deep: true })
 
   // ==================== Return ====================
 
@@ -83,6 +109,7 @@ export const useHistoryStore = defineStore('history', () => {
     canRedo,
     initHistory,
     saveHistory,
+    scheduleSave,
     undo,
     redo,
     reset,

@@ -119,6 +119,7 @@ import { useVenueDataStore } from '../stores/venueDataStore'
 import type { ToolId } from '../domain/toolRegistry'
 import { ALL_TOOLS } from '../domain/toolRegistry'
 import { useEditorStore } from '../stores/editorStore'
+import { useHistoryStore } from '../stores/historyStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
 
@@ -146,6 +147,7 @@ const effectiveVenueData = computed(() => {
 const rendererRef = ref<InstanceType<typeof PathEditor>>()
 const venueDataStore = useVenueDataStore()
 const editorStore = useEditorStore()
+const historyStore = useHistoryStore()
 const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
 // ==================== 数据加载 ====================
@@ -235,6 +237,8 @@ const onImportData = async () => {
   const venue = await importSeatMap(file)
   if (venue) {
     venueDataStore.importVenueData(venue)
+    historyStore.reset()
+    historyStore.initHistory()
     const seatCount = venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
     importStatus.value = 'success'
     importTip.value = `成功导入 ${seatCount} 个座位`
@@ -256,8 +260,8 @@ const onSave = () => {
 
 // ==================== 操作 ====================
 
-const onUndo = () => { console.log('撤销') }
-const onRedo = () => { console.log('重做') }
+const onUndo = () => { historyStore.undo() }
+const onRedo = () => { historyStore.redo() }
 const onCopy = () => { console.log('复制') }
 const onPaste = () => { console.log('粘贴') }
 const onDelete = () => {
