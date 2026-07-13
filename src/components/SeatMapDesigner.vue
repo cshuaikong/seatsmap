@@ -114,7 +114,7 @@ import RightPanel from './RightPanel.vue'
 import LeftToolbar from './LeftToolbar.vue'
 import PathEditor from './PathEditor.vue'
 import type { VenueData } from '../types'
-import { useVenueStore } from '../stores/venueStore'
+import { useVenueDataStore } from '../stores/venueDataStore'
 import { useSeatMapIO } from '../composables/useSeatMapIO'
 import CategoryManager from './panels/CategoryManager.vue'
 
@@ -135,12 +135,12 @@ const vertexEditActive = ref(false)
 const chartName = ref(props.venueData?.name || '未命名座位图')
 const effectiveVenueData = computed(() => {
   const hasRealData = props.venueData?.sections && props.venueData.sections.length > 0
-  return hasRealData ? props.venueData : venueStore.venue
+  return hasRealData ? props.venueData : venueDataStore.venue
 })
 
 
 const rendererRef = ref<InstanceType<typeof PathEditor>>()
-const venueStore = useVenueStore()
+const venueDataStore = useVenueDataStore()
 const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
 // ==================== 数据加载 ====================
@@ -200,7 +200,7 @@ const onExitSectionFocus = () => {
 // ==================== Categories ====================
 
 const displayCategories = computed(() => {
-  return venueStore.venue.categories.map(c => ({
+  return venueDataStore.venue.categories.map(c => ({
     id: String(c.key),
     name: c.label,
     color: c.color,
@@ -221,7 +221,7 @@ const importTip = ref('')
 let importTipTimer: ReturnType<typeof setTimeout> | null = null
 
 const onExportData = async () => {
-  const venue = rendererRef.value?.buildVenueData?.() || venueStore.venue
+  const venue = rendererRef.value?.buildVenueData?.() || venueDataStore.venue
   const result = await exportSeatMap(venue, `${venue.name || 'seatmap'}.json`)
   if (result.success) {
     exportStatus.value = 'success'
@@ -241,7 +241,7 @@ const onImportData = async () => {
   if (!file) return
   const venue = await importSeatMap(file)
   if (venue) {
-    venueStore.importVenueData(venue)
+    venueDataStore.importVenueData(venue)
     const seatCount = venue.sections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
     importStatus.value = 'success'
     importTip.value = `成功导入 ${seatCount} 个座位`
@@ -292,7 +292,7 @@ const onCloseCategoryManager = () => {
 }
 
 const onAddCategory = (category: { name: string; color: string }) => {
-  venueStore.addCategory({
+  venueDataStore.addCategory({
     label: category.name,
     color: category.color,
     accessible: false,
@@ -303,11 +303,11 @@ const onUpdateCategory = (categoryId: string, updates: { name?: string; color?: 
   const venueUpdates: any = {}
   if (updates.name !== undefined) venueUpdates.label = updates.name
   if (updates.color !== undefined) venueUpdates.color = updates.color
-  venueStore.updateCategory(categoryId, venueUpdates)
+  venueDataStore.updateCategory(categoryId, venueUpdates)
 }
 
 const onDeleteCategory = (categoryId: string) => {
-  venueStore.deleteCategory(categoryId)
+  venueDataStore.deleteCategory(categoryId)
 }
 
 defineExpose({

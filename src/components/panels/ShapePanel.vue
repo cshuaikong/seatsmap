@@ -238,7 +238,7 @@ import NumberInput from './controls/NumberInput.vue'
 import ColorPicker from './controls/ColorPicker.vue'
 import SliderInput from './controls/SliderInput.vue'
 import OrderControl from './controls/OrderControl.vue'
-import { useVenueStore } from '../../stores/venueStore'
+import { useVenueDataStore } from '../../stores/venueDataStore'
 
 const props = defineProps<{
   node: any
@@ -249,10 +249,10 @@ const emit = defineEmits<{
   'update-property': [key: string, value: any]
 }>()
 
-const venueStore = useVenueStore()
+const venueDataStore = useVenueDataStore()
 
 // 从 store 获取分类列表
-const categories = computed(() => venueStore.venue.categories)
+const categories = computed(() => venueDataStore.venue.categories)
 
 // 本地 ref 管理属性值
 const localWidth = ref(0)

@@ -205,7 +205,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useVenueStore } from '../stores/venueStore'
+import { useVenueDataStore } from '../stores/venueDataStore'
+import { useEditorStore } from '../stores/editorStore'
 
 // 生成座位标签序列
 const generateSeatLabels = (scheme: string, count: number, start?: string, direction?: string): string[] => {
@@ -278,20 +279,22 @@ const emit = defineEmits<{
   'toggle-vertex-edit': []
 }>()
 
-// 使用 venueStore 作为唯一数据源
-const venueStore = useVenueStore()
+// 数据 Store：纯场馆数据
+const venueDataStore = useVenueDataStore()
+// 编辑器 Store：选中状态、焦点路径
+const editorStore = useEditorStore()
 
 // Section 分区选中 - 单选时返回第一个，多选时也返回第一个用于显示
 const selectedSection = computed<Section | null>(() => {
-  const sectionId = venueStore.selectedSectionIds[0]
+  const sectionId = editorStore.selectedSectionIds[0]
   if (!sectionId) return null
-  return venueStore.venue.sections.find(s => s.id === sectionId) || null
+  return venueDataStore.venue.sections.find(s => s.id === sectionId) || null
 })
 
 // 获取所有选中的分区（用于批量编辑）
 const selectedSections = computed<Section[]>(() => {
-  return venueStore.selectedSectionIds
-    .map(id => venueStore.venue.sections.find(s => s.id === id))
+  return editorStore.selectedSectionIds
+    .map(id => venueDataStore.venue.sections.find(s => s.id === id))
     .filter((s): s is Section => !!s)
 })
 
@@ -300,9 +303,9 @@ const isMultiSectionSelected = computed(() => selectedSections.value.length > 1)
 
 // 选中排所属分区的 fill 色（用于分类继承判断）
 const parentSectionFill = computed(() => {
-  const rowIds = venueStore.selectedRowIds
+  const rowIds = editorStore.selectedRowIds
   if (rowIds.length === 0) return ''
-  for (const section of venueStore.venue.sections) {
+  for (const section of venueDataStore.venue.sections) {
     for (const row of section.rows) {
       if (rowIds.includes(row.id)) return section.fill || ''
     }
@@ -311,36 +314,36 @@ const parentSectionFill = computed(() => {
 })
 
 const activePathPointIndex = computed<number | null>(() => {
-  const sectionId = venueStore.selectedSectionIds[0]
-  if (!sectionId || venueStore.activePathSectionId !== sectionId) return null
-  return venueStore.activePathPointIndex
+  const sectionId = editorStore.selectedSectionIds[0]
+  if (!sectionId || editorStore.activePathSectionId !== sectionId) return null
+  return editorStore.activePathPointIndex
 })
 
 const handleSectionPropertyUpdate = (key: string, val: any) => {
   // 批量更新所有选中的分区
-  venueStore.selectedSectionIds.forEach(sectionId => {
-    venueStore.updateSectionBorder(sectionId, { [key]: val } as any)
+  editorStore.selectedSectionIds.forEach(sectionId => {
+    venueDataStore.updateSectionBorder(sectionId, { [key]: val } as any)
   })
 }
 
 // 批量更新分区名称
 const handleBatchUpdateNames = (names: string[]) => {
-  venueStore.selectedSectionIds.forEach((sectionId, index) => {
+  editorStore.selectedSectionIds.forEach((sectionId, index) => {
     if (names[index]) {
-      venueStore.updateSectionBorder(sectionId, { name: names[index] } as any)
+      venueDataStore.updateSectionBorder(sectionId, { name: names[index] } as any)
     }
   })
 }
 
 const handleActivatePathSegment = (pointIndex: number) => {
-  const sectionId = venueStore.selectedSectionIds[0]
+  const sectionId = editorStore.selectedSectionIds[0]
   if (!sectionId) return
-  venueStore.setActivePathSegment(sectionId, pointIndex)
+  editorStore.setActivePathSegment(sectionId, pointIndex)
 }
 
 // onEnterSection：通知外部执行 enterSectionFocus
 const onEnterSection = () => {
-  const sectionId = venueStore.selectedSectionIds[0]
+  const sectionId = editorStore.selectedSectionIds[0]
   if (!sectionId) return
   emit('enter-section', sectionId)
 }
@@ -352,11 +355,11 @@ const refreshKey = ref(0)
 
 // 计算当前选中类型（从 venueStore 读取）
 const currentSelectionType = computed<SelectedObjectType | null>(() => {
-  if (venueStore.selectedSeatIds.length > 0) return 'seat'
-  if (venueStore.selectedRowIds.length > 0) return 'row'
-  if (venueStore.selectedShapeIds.length > 0) {
+  if (editorStore.selectedSeatIds.length > 0) return 'seat'
+  if (editorStore.selectedRowIds.length > 0) return 'row'
+  if (editorStore.selectedShapeIds.length > 0) {
     // 返回第一个选中形状的类型
-    const shape = venueStore.selectedShapes[0]
+    const shape = editorStore.selectedShapes[0]
     if (shape) {
       const shapeType = shape.type
       if (['rect', 'ellipse', 'polygon', 'sector', 'polyline'].includes(shapeType)) {
@@ -365,20 +368,20 @@ const currentSelectionType = computed<SelectedObjectType | null>(() => {
     }
     return 'rect'
   }
-  if (venueStore.selectedTextIds.length > 0) return 'text'
-  if (venueStore.selectedAreaIds.length > 0) return 'area'
-  if (venueStore.selectedSectionIds.length > 0) return 'none'
+  if (editorStore.selectedTextIds.length > 0) return 'text'
+  if (editorStore.selectedAreaIds.length > 0) return 'area'
+  if (editorStore.selectedSectionIds.length > 0) return 'none'
   return null
 })
 
 // 混合选择检测
 const isMixedSelection = computed(() => {
   const types = [
-    venueStore.selectedSeatIds.length > 0,
-    venueStore.selectedRowIds.length > 0,
-    venueStore.selectedShapeIds.length > 0,
-    venueStore.selectedTextIds.length > 0,
-    venueStore.selectedAreaIds.length > 0,
+    editorStore.selectedSeatIds.length > 0,
+    editorStore.selectedRowIds.length > 0,
+    editorStore.selectedShapeIds.length > 0,
+    editorStore.selectedTextIds.length > 0,
+    editorStore.selectedAreaIds.length > 0,
   ].filter(Boolean).length
   return types > 1
 })
@@ -386,22 +389,22 @@ const isMixedSelection = computed(() => {
 // 获取选中对象数据
 const selectedObjects = computed(() => {
   return {
-    seats: venueStore.selectedSeats,
-    rows: venueStore.selectedRows,
-    shapes: venueStore.selectedShapes,
-    texts: venueStore.selectedTexts,
-    areas: venueStore.selectedAreas,
+    seats: editorStore.selectedSeats,
+    rows: editorStore.selectedRows,
+    shapes: editorStore.selectedShapes,
+    texts: editorStore.selectedTexts,
+    areas: editorStore.selectedAreas,
   }
 })
 
 // 获取选中 ID 列表
 const selectedIds = computed(() => {
   return {
-    seats: venueStore.selectedSeatIds,
-    rows: venueStore.selectedRowIds,
-    shapes: venueStore.selectedShapeIds,
-    texts: venueStore.selectedTextIds,
-    areas: venueStore.selectedAreaIds,
+    seats: editorStore.selectedSeatIds,
+    rows: editorStore.selectedRowIds,
+    shapes: editorStore.selectedShapeIds,
+    texts: editorStore.selectedTextIds,
+    areas: editorStore.selectedAreaIds,
   }
 })
 
@@ -440,12 +443,12 @@ const mixedSelectionTypes = computed(() => {
 
 // 监听 venueStore 选择变化，递增 refreshKey
 watch(() => [
-  venueStore.selectedSeatIds,
-  venueStore.selectedRowIds,
-  venueStore.selectedShapeIds,
-  venueStore.selectedTextIds,
-  venueStore.selectedAreaIds,
-  venueStore.selectedSectionIds
+  editorStore.selectedSeatIds,
+  editorStore.selectedRowIds,
+  editorStore.selectedShapeIds,
+  editorStore.selectedTextIds,
+  editorStore.selectedAreaIds,
+  editorStore.selectedSectionIds
 ], () => {
   refreshKey.value++
 }, { deep: true })
@@ -458,7 +461,7 @@ watch(() => props.selection, () => {
 // 判断是否显示选中对象面板
 const shouldShowSelectionPanel = computed(() => {
   // 优先使用 venueStore
-  if (venueStore.hasSelection) return true
+  if (editorStore.hasSelection) return true
   // 兼容旧版
   if (!props.selection) return false
   return props.selection.type !== 'none'
@@ -611,11 +614,11 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理座位数更新
   if (type === 'row' && 'seatCount' in updates) {
     const newCounts = updates.seatCount as number[]
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     // 为每个选中的排更新座位数
     rowIds.forEach((rowId, index) => {
       const newCount = newCounts[index] || newCounts[0] || 1
-      venueStore.updateRowSeatCount(rowId, newCount)
+      venueDataStore.updateRowSeatCount(rowId, newCount)
     })
     return
   }
@@ -623,11 +626,11 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理弧度更新
   if (type === 'row' && 'curve' in updates) {
     const newCurves = updates.curve as number[]
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     // 为每个选中的排更新弧度
     rowIds.forEach((rowId, index) => {
       const newCurve = newCurves[index] || newCurves[0] || 0
-      venueStore.updateRowCurve(rowId, newCurve)
+      venueDataStore.updateRowCurve(rowId, newCurve)
     })
     return
   }
@@ -635,11 +638,11 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理座位间距更新
   if (type === 'row' && 'seatSpacing' in updates) {
     const spacingData = updates.seatSpacing as { spacings: number[], resetCurve: boolean }
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     // 为每个选中的排更新座位间距
     rowIds.forEach((rowId, index) => {
       const newSpacing = spacingData.spacings[index] || spacingData.spacings[0] || 18
-      venueStore.updateRowSeatSpacing(rowId, newSpacing, spacingData.resetCurve)
+      venueDataStore.updateRowSeatSpacing(rowId, newSpacing, spacingData.resetCurve)
     })
     // 使用 nextTick 确保 Vue 响应式更新完成后再触发事件
     nextTick(() => {
@@ -650,36 +653,36 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
 
   // 特殊处理：在开头添加座位
   if (type === 'row' && 'addSeatAtStart' in updates) {
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     rowIds.forEach(rowId => {
-      venueStore.addSeatAtRowStart(rowId)
+      venueDataStore.addSeatAtRowStart(rowId)
     })
     return
   }
 
   // 特殊处理：在末尾添加座位
   if (type === 'row' && 'addSeatAtEnd' in updates) {
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     rowIds.forEach(rowId => {
-      venueStore.addSeatAtRowEnd(rowId)
+      venueDataStore.addSeatAtRowEnd(rowId)
     })
     return
   }
 
   // 特殊处理：移除开头座位
   if (type === 'row' && 'removeSeatAtStart' in updates) {
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     rowIds.forEach(rowId => {
-      venueStore.removeSeatAtRowStart(rowId)
+      venueDataStore.removeSeatAtRowStart(rowId)
     })
     return
   }
 
   // 特殊处理：移除末尾座位
   if (type === 'row' && 'removeSeatAtEnd' in updates) {
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     rowIds.forEach(rowId => {
-      venueStore.removeSeatAtRowEnd(rowId)
+      venueDataStore.removeSeatAtRowEnd(rowId)
     })
     return
   }
@@ -687,18 +690,18 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理行间距更新 - 重新排列多排位置（第一排固定，保持各自旋转角度）
   if (type === 'row' && 'rowSpacing' in updates) {
     const newSpacings = updates.rowSpacing as number[]
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     
     // 只处理多选情况
     if (rowIds.length < 2) {
       // 单选只更新属性（默认24）
       const newSpacing = newSpacings[0] || 24
-      venueStore.updateRow(rowIds[0], { rowSpacing: newSpacing })
+      venueDataStore.updateRow(rowIds[0], { rowSpacing: newSpacing })
       return
     }
     
     // 获取所有选中的排（按当前顺序）
-    const selectedRows = venueStore.selectedRows
+    const selectedRows = editorStore.selectedRows
     if (selectedRows.length < 2) return
     
     // 使用第一个新的行间距（多选时所有排使用相同的行间距，默认24）
@@ -737,7 +740,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     selectedRows.forEach((row, index) => {
       if (index === 0) {
         // 第一排固定位置，只更新行间距属性
-        venueStore.updateRow(row.id, { rowSpacing: newRowSpacing })
+        venueDataStore.updateRow(row.id, { rowSpacing: newRowSpacing })
       } else {
         // 其他排根据与第一排的距离计算新位置
         const offset = index * newRowSpacing
@@ -745,7 +748,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
         const newY = baseY + offset * rowDirY
         
         // 更新位置和行间距（保持原有旋转角度）
-        venueStore.updateRow(row.id, { 
+        venueDataStore.updateRow(row.id, { 
           x: newX,
           y: newY,
           rowSpacing: newRowSpacing 
@@ -762,11 +765,11 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
 
   // 特殊处理排标签更新
   if (type === 'row' && 'rowLabeling.label' in updates) {
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
     const newLabel = updates['rowLabeling.label']
     // 更新 row.label（排标签直接存在 row 上，不是嵌套对象）
     rowIds.forEach(rowId => {
-      venueStore.updateRow(rowId, { label: newLabel })
+      venueDataStore.updateRow(rowId, { label: newLabel })
     })
     return
   }
@@ -775,7 +778,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   if (type === 'row' && 'batchLabels' in updates) {
     const labels = updates.batchLabels as (string | null)[]
     // 获取所有选中的排并按位置排序（从上到下，从左到右）
-    const rows = [...venueStore.selectedRows]
+    const rows = [...editorStore.selectedRows]
     rows.sort((a, b) => {
       // 先按 Y 坐标排序，Y 相近时按 X 排序
       const yDiff = (a.y || 0) - (b.y || 0)
@@ -785,7 +788,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     // 按排序后的顺序设置标签（null 表示清除标签）
     rows.forEach((row, index) => {
       if (labels[index] !== undefined) {
-        venueStore.updateRow(row.id, { label: labels[index] ?? undefined })
+        venueDataStore.updateRow(row.id, { label: labels[index] ?? undefined })
       }
     })
     return
@@ -794,10 +797,10 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理座位批量标签更新
   if (type === 'seat' && 'batchLabels' in updates) {
     const labels = updates.batchLabels as (string | null)[]
-    const seatIds = venueStore.selectedSeatIds
+    const seatIds = editorStore.selectedSeatIds
     // 获取所有选中的座位信息（需要包含位置信息用于排序）
     const seatsWithPos: { id: string, x: number, y: number }[] = []
-    venueStore.venue.sections.forEach(section => {
+    venueDataStore.venue.sections.forEach(section => {
       section.rows.forEach(row => {
         row.seats.forEach(seat => {
           if (seatIds.includes(seat.id)) {
@@ -820,7 +823,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     // 按排序后的顺序设置标签（null 表示清除标签）
     seatsWithPos.forEach((seat, index) => {
       if (labels[index] !== undefined) {
-        venueStore.updateSeat(seat.id, { label: labels[index] ?? undefined })
+        venueDataStore.updateSeat(seat.id, { label: labels[index] ?? undefined })
       }
     })
     return
@@ -829,10 +832,10 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理排座位标签方案更新（新版：含起始值+方向）
   if (type === 'row' && 'seatLabeling' in updates) {
     const opts = updates.seatLabeling as { scheme: string; start: string; direction: string }
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
 
     rowIds.forEach(rowId => {
-      const row = venueStore.selectedRows.find(r => r.id === rowId)
+      const row = editorStore.selectedRows.find(r => r.id === rowId)
       if (!row) return
 
       const seats = row.seats
@@ -840,7 +843,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
 
       seats.forEach((seat, index) => {
         if (labels[index] !== undefined) {
-          venueStore.updateSeat(seat.id, { label: labels[index] || undefined })
+          venueDataStore.updateSeat(seat.id, { label: labels[index] || undefined })
         }
       })
     })
@@ -850,10 +853,10 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   // 特殊处理排座位标签方案更新（旧版兼容）
   if (type === 'row' && 'seatLabeling.labels' in updates) {
     const labelScheme = updates['seatLabeling.labels'] as string
-    const rowIds = venueStore.selectedRowIds
+    const rowIds = editorStore.selectedRowIds
 
     rowIds.forEach(rowId => {
-      const row = venueStore.selectedRows.find(r => r.id === rowId)
+      const row = editorStore.selectedRows.find(r => r.id === rowId)
       if (!row) return
 
       const seats = row.seats
@@ -861,7 +864,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
 
       seats.forEach((seat, index) => {
         if (labels[index] !== undefined) {
-          venueStore.updateSeat(seat.id, { label: labels[index] || undefined })
+          venueDataStore.updateSeat(seat.id, { label: labels[index] || undefined })
         }
       })
     })
@@ -872,23 +875,23 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   let ids: string[] = []
   switch (type) {
     case 'seat':
-      ids = venueStore.selectedSeatIds
+      ids = editorStore.selectedSeatIds
       break
     case 'row':
-      ids = venueStore.selectedRowIds
+      ids = editorStore.selectedRowIds
       break
     case 'rect':
     case 'ellipse':
     case 'polygon':
     case 'sector':
     case 'polyline':
-      ids = venueStore.selectedShapeIds
+      ids = editorStore.selectedShapeIds
       break
     case 'text':
-      ids = venueStore.selectedTextIds
+      ids = editorStore.selectedTextIds
       break
     case 'area':
-      ids = venueStore.selectedAreaIds
+      ids = editorStore.selectedAreaIds
       break
   }
 
@@ -896,7 +899,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   if (type === 'row' && 'categoryId' in updates) {
     const allSeatIds: string[] = []
     for (const rowId of ids) {
-      const row = venueStore.selectedRows.find(r => r.id === rowId)
+      const row = editorStore.selectedRows.find(r => r.id === rowId)
       if (row) {
         for (const seat of row.seats) {
           allSeatIds.push(seat.id)
@@ -904,7 +907,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
       }
     }
     if (allSeatIds.length > 0) {
-      venueStore.updateSeatsCategory(allSeatIds, updates['categoryId'])
+      venueDataStore.updateSeatsCategory(allSeatIds, updates['categoryId'])
     }
     return
   }
@@ -922,7 +925,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
         mappedUpdates[key] = val
       }
     }
-    venueStore.updateObjectProperty(type, id, mappedUpdates)
+    venueDataStore.updateObjectProperty(type, id, mappedUpdates)
   }
 }
 
@@ -938,15 +941,15 @@ const handleCategoryChange = (categoryId: string) => {
   let ids: string[] = []
   switch (type) {
     case 'seat':
-      ids = venueStore.selectedSeatIds
+      ids = editorStore.selectedSeatIds
       // 批量更新座位分类
-      venueStore.updateSeatsCategory(ids, categoryId)
+      venueDataStore.updateSeatsCategory(ids, categoryId)
       return
     case 'row':
-      ids = venueStore.selectedRowIds
+      ids = editorStore.selectedRowIds
       break
     case 'area':
-      ids = venueStore.selectedAreaIds
+      ids = editorStore.selectedAreaIds
       break
     default:
       // 其他类型不处理分类
@@ -955,7 +958,7 @@ const handleCategoryChange = (categoryId: string) => {
 
   // 批量更新分类
   for (const id of ids) {
-    venueStore.updateObjectProperty(type, id, { categoryId })
+    venueDataStore.updateObjectProperty(type, id, { categoryId })
   }
 }
 

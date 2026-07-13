@@ -255,7 +255,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { PathPoint, Section } from '../../types'
-import { useVenueStore } from '../../stores/venueStore'
+import { useVenueDataStore } from '../../stores/venueDataStore'
 
 const props = defineProps<{
   section: Section | null
@@ -367,7 +367,7 @@ const solidFill = computed(() => {
   return f
 })
 
-const venueStore = useVenueStore()
+const venueDataStore = useVenueDataStore()
 
 const seatCount = computed(() => {
   if (!props.section) return 0
@@ -412,7 +412,7 @@ const sectionCategories = computed(() => {
   }
 
   // 从 venueStore 补全 label / color
-  const storeCategories = venueStore.venue.categories ?? []
+  const storeCategories = venueDataStore.venue.categories ?? []
   for (const cat of categoryMap.values()) {
     const storeCat = storeCategories.find(c => String(c.key) === cat.key)
     if (storeCat) {
@@ -427,7 +427,7 @@ const sectionCategories = computed(() => {
 })
 
 function onCategoryColorChange(key: string, color: string): void {
-  venueStore.updateCategory(key, { color })
+  venueDataStore.updateCategory(key, { color })
 }
 
 const sectionTypeLabel = computed(() => {

@@ -150,19 +150,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import { useVenueStore } from '../../stores/venueStore'
+import { useEditorStore } from '../../stores/editorStore'
 import { generateId } from '../../utils/id'
 import type { CanvasImage } from '../../types'
 import PanelSection from './controls/PanelSection.vue'
 import NumberInput from './controls/NumberInput.vue'
 import SliderInput from './controls/SliderInput.vue'
 
-const venueStore = useVenueStore()
+const editorStore = useEditorStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const isDragOver = ref(false)
 
-const canvasImages = computed(() => venueStore.canvasImages)
-const selectedImageId = computed(() => venueStore.selectedImageId)
+const canvasImages = computed(() => editorStore.canvasImages)
+const selectedImageId = computed(() => editorStore.selectedImageId)
 const selectedImage = computed(() =>
   canvasImages.value.find(img => img.id === selectedImageId.value)
 )
@@ -229,7 +229,7 @@ const processFile = (file: File) => {
         fileName: file.name
       }
 
-      venueStore.addCanvasImage(image)
+      editorStore.addCanvasImage(image)
     }
     img.src = src
   }
@@ -237,21 +237,21 @@ const processFile = (file: File) => {
 }
 
 const selectImage = (id: string) => {
-  venueStore.selectCanvasImage(id)
+  editorStore.selectCanvasImage(id)
 }
 
 const removeImage = (id: string) => {
   if (confirm('确定要删除这张图片吗？')) {
-    venueStore.removeCanvasImage(id)
+    editorStore.removeCanvasImage(id)
   }
 }
 
 const updateImage = (key: keyof CanvasImage, value: any) => {
   if (!selectedImage.value) return
-  venueStore.updateCanvasImage(selectedImage.value.id, { [key]: value })
+  editorStore.updateCanvasImage(selectedImage.value.id, { [key]: value })
   // 锁定后自动取消选中
   if (key === 'locked' && value === true) {
-    venueStore.clearCanvasImageSelection()
+    editorStore.clearCanvasImageSelection()
   }
 }
 </script>
