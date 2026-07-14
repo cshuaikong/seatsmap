@@ -310,6 +310,7 @@ function deleteSelected() {
 }
 
 function renderAll(data: VenueData): void {
+  if (!leafer) return
   try {
     clearAllPaths()
 
@@ -951,7 +952,8 @@ onUnmounted(() => {
 
 // ==================== Watch ====================
 
-watch(() => props.venueData, (newVal) => {
+watch(() => props.venueData, (newVal, oldVal) => {
+  if (!newVal || newVal === oldVal) return
   renderAll(newVal)
 })
 

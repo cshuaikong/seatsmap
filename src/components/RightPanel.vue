@@ -1,12 +1,7 @@
 <template>
   <div class="right-panel">
-    <!-- 图片工具暂未实现，隐藏图片面板 -->
-    <template v-if="false">
-      <ImagePanel />
-    </template>
-
     <!-- Section 分区选中面板 -->
-    <template v-else-if="selectedSection">
+    <template v-if="selectedSection">
       <SectionPanel
         :section="selectedSection"
         :active-point-index="activePathPointIndex"

@@ -51,7 +51,6 @@
             <Icon icon="lucide:map-pin" class="venue-icon" />
           </div>
           <div class="venue-name">{{ item.name }}</div>
-
         </div>
       </aside>
 
@@ -68,19 +67,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+// ==================== Imports ====================
+import { ref, shallowRef, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import SeatMapDesigner from './SeatMapDesigner.vue'
-import { fetchSeatMaps, fetchSeatMapData, editVenue, createVenue, getVenueId, type SeatMapEntry } from '../api/seatMap'
 import { nanoid } from 'nanoid'
+import SeatMapDesigner from './SeatMapDesigner.vue'
+import {
+  fetchSeatMaps,
+  fetchSeatMapData,
+  editVenue,
+  createVenue,
+  getVenueId,
+  type SeatMapEntry,
+} from '../api/seatMap'
 
+// ==================== Constants ====================
 const DEFAULT_COLORS = ['#e0f2fe', '#fef3c7', '#f1f5f9', '#fce7f3', '#e0e7ff', '#d1fae5']
 
-const seatMaps = ref<SeatMapEntry[]>([])
+const DEFAULT_VENUE_CATEGORIES = [
+  { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
+  { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
+  { key: 3, label: '轮椅区', color: '#2196F3', accessible: true },
+]
 
+// ==================== Router ====================
 const route = useRoute()
 const router = useRouter()
+
+// ==================== State: venue list ====================
+const seatMaps = ref<SeatMapEntry[]>([])
+
+// ==================== State: current venue ====================
+const venueData = shallowRef<any>({})
 
 const activeIndex = computed(() => {
   const id = route.query.venue
@@ -89,13 +108,56 @@ const activeIndex = computed(() => {
   return idx >= 0 ? idx : 0
 })
 
-const venueData = ref<any>({})
-const loading = ref(false)
-
+// ==================== State: create modal ====================
 const isCreateModalOpen = ref(false)
 const newVenueName = ref('')
 const creating = ref(false)
 
+// ==================== Helpers ====================
+function showError(context: string, e: unknown) {
+  const msg = e instanceof Error ? e.message : '未知错误'
+  console.error(`[IndexPage] ${context}:`, e)
+  alert(`${context}：${msg}`)
+}
+
+// ==================== Data fetching ====================
+async function refreshCurrentData() {
+  const entry = seatMaps.value[activeIndex.value]
+  if (!entry) {
+    venueData.value = {}
+    return
+  }
+  const vid = getVenueId(entry)
+  if (!vid) {
+    console.warn('[IndexPage] 列表项缺少 ID 字段:', entry)
+    venueData.value = {}
+    return
+  }
+  try {
+    venueData.value = await fetchSeatMapData(vid)
+  } catch (e) {
+    console.error('[IndexPage] 加载座位图数据失败:', e)
+    venueData.value = {}
+  }
+}
+
+// ==================== Actions: venue list ====================
+function onCardClick(index: number) {
+  const vid = getVenueId(seatMaps.value[index])
+  router.push({ query: { venue: vid } })
+}
+
+// ==================== Actions: save ====================
+async function onSaveVenue(data: any) {
+  try {
+    await editVenue(data)
+    alert('保存成功')
+  } catch (e) {
+    showError('保存失败', e)
+  }
+}
+
+// ==================== Modal ====================
 function openCreateModal() {
   newVenueName.value = ''
   isCreateModalOpen.value = true
@@ -116,58 +178,25 @@ async function confirmCreateVenue() {
       id,
       name,
       type: 'WITH_SECTION',
-      categories: [
-        { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
-        { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
-        { key: 3, label: '轮椅区', color: '#2196F3', accessible: true }
-      ],
+      categories: DEFAULT_VENUE_CATEGORIES,
       sections: [],
-      scale: 1
+      scale: 1,
     }
 
     const res = await createVenue(venue)
-    const realId = res?.id || res?.venue_id || id
+    const realId = res?.id || id
 
-    // 刷新列表并切换到新场馆
     seatMaps.value = await fetchSeatMaps()
     router.push({ query: { venue: realId } })
     closeCreateModal()
   } catch (e) {
-    console.error('[IndexPage] 创建场馆失败:', e)
-    alert('创建失败：' + (e instanceof Error ? e.message : '未知错误'))
+    showError('创建场馆失败', e)
   } finally {
     creating.value = false
   }
 }
 
-function onCardClick(index: number) {
-  const vid = getVenueId(seatMaps.value[index])
-  router.push({ query: { venue: vid } })
-}
-
-async function refreshCurrentData() {
-  const entry = seatMaps.value[activeIndex.value]
-  if (!entry) {
-    venueData.value = {}
-    return
-  }
-  const vid = getVenueId(entry)
-  if (!vid) {
-    console.warn('[IndexPage] 列表项缺少 ID 字段:', entry)
-    venueData.value = {}
-    return
-  }
-  loading.value = true
-  try {
-    venueData.value = await fetchSeatMapData(vid)
-  } catch (e) {
-    console.error('[IndexPage] 加载座位图数据失败:', e)
-    venueData.value = {}
-  } finally {
-    loading.value = false
-  }
-}
-
+// ==================== Lifecycle & watchers ====================
 onMounted(async () => {
   try {
     seatMaps.value = await fetchSeatMaps()
@@ -180,16 +209,6 @@ onMounted(async () => {
 watch(() => route.query.venue, () => {
   refreshCurrentData()
 })
-
-async function onSaveVenue(data: any) {
-  try {
-    await editVenue(data)
-    alert('保存成功')
-  } catch (e) {
-    console.error('[IndexPage] 保存失败:', e)
-    alert('保存失败：' + (e instanceof Error ? e.message : '未知错误'))
-  }
-}
 </script>
 
 <style scoped>
@@ -233,33 +252,6 @@ async function onSaveVenue(data: any) {
   font-weight: 600;
   color: var(--color-text, #1e293b);
   letter-spacing: -0.01em;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.hdr-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 14px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 6px;
-  background: #fff;
-  font-size: 13px;
-  color: var(--color-text-secondary, #475569);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.hdr-btn:hover {
-  background: var(--color-bg-tertiary, #f1f5f9);
-}
-.hdr-btn :deep(svg) {
-  width: 15px;
-  height: 15px;
 }
 
 /* ==================== Body ==================== */
@@ -357,18 +349,6 @@ async function onSaveVenue(data: any) {
   color: var(--color-text, #1e293b);
   text-align: center;
   line-height: 1.3;
-}
-
-.venue-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  font-size: 10px;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: var(--color-accent, #6366f1);
-  color: #fff;
-  font-weight: 600;
 }
 
 /* ==================== Main ==================== */

@@ -485,11 +485,24 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       (newSections) => {
         if (isSyncingToStore || isApplyingToCanvas) return
 
-        isApplyingToCanvas = true
-
         const currentSectionIds = new Set((newSections ?? []).map(s => s.id))
         const currentRowIds = new Set<string>()
-        ;(newSections ?? []).forEach(s => s.rows?.forEach(r => currentRowIds.add(r.id)))
+        let newRowCount = 0
+        ;(newSections ?? []).forEach(s => s.rows?.forEach(r => {
+          currentRowIds.add(r.id)
+          if (!knownRowIds.has(r.id)) newRowCount++
+        }))
+
+        const newSectionCount = (newSections ?? []).filter(s => !knownSectionIds.has(s.id)).length
+
+        // 大批量加载：跳过昂贵的增量创建，交给 PathEditor.renderAll 一次性渲染
+        if (newSectionCount > 5 || newRowCount > 100) {
+          knownSectionIds = currentSectionIds
+          knownRowIds = currentRowIds
+          return
+        }
+
+        isApplyingToCanvas = true
 
         // 1) 增量创建新 Section
         for (const section of newSections ?? []) {

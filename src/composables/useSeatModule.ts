@@ -199,8 +199,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       seatDraw.lockBaseScale()
     }
     const bs = seatDraw.getBaseScale()
-    // 同步 baseScale 到 store，确保预览端的座位比例与编辑器一致
-    if (venueDataStore.venue.baseScale !== bs) {
+    // 初始化 baseScale 到 store（仅在未设置时），避免渲染过程中反复写 store 触发循环更新
+    if ((venueDataStore.venue.baseScale == null || venueDataStore.venue.baseScale === undefined) && bs != null) {
       venueDataStore.setSectionBaseScale(bs)
     }
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)

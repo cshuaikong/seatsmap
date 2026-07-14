@@ -13,11 +13,11 @@ export function getVenueId(item: SeatMapEntry): string {
 }
 
 export function fetchSeatMaps(): Promise<SeatMapEntry[]> {
-  return request<SeatMapEntry[]>('/venue/list')
+  return request<SeatMapEntry[]>('/api/venue/list')
 }
 
 export async function fetchSeatMapData(venueId: string): Promise<any> {
-  const raw = await request<any>(`/venue?venue_id=${venueId}`)
+  const raw = await request<any>(`/api/venue?venue_id=${venueId}`)
   // 后端返回 { venue: {...} }，提取内层
   return raw.venue || raw
 }
@@ -41,7 +41,7 @@ function mapVenueToApi(venue: any): any {
 }
 
 export function editVenue(data: any): Promise<any> {
-  return request('/venue/edit', {
+  return request('/api/venue/edit', {
     method: 'POST',
     body: JSON.stringify(mapVenueToApi(data)),
   })
@@ -49,7 +49,7 @@ export function editVenue(data: any): Promise<any> {
 
 /** 创建新场馆（后端接口地址请根据实际接口调整） */
 export function createVenue(venue: any): Promise<any> {
-  return request('/venue/create', {
+  return request('/api/venue/create', {
     method: 'POST',
     body: JSON.stringify({ venue: mapVenueToApi(venue) }),
   })

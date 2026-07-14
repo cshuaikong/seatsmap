@@ -165,7 +165,7 @@ watch(() => props.venueData, (data) => {
     venueDataStore.importVenueData(data)
     historyStore.reset()
   }
-}, { immediate: true, deep: true })
+}, { immediate: true })
 
 watch(() => venueDataStore.venue.name, (name) => {
   if (name) chartName.value = name
