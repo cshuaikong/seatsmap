@@ -172,6 +172,19 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
     ;(sectionGroup as any).__sectionName = p.name
     sectionGroupMap.set(p.id, sectionGroup)
     leafer!.add(sectionGroup)
+
+    // 非 focus 模式下直接点选 SectionGroup；focus 模式下交给子元素处理
+    sectionGroup.on(LP.BEFORE_DOWN, (e: any) => {
+      if (focusedSectionId.value) return
+      const ed = editor
+      if (!ed) return
+      if (e.shiftKey) {
+        ed.hasItem(sectionGroup) ? ed.removeItem(sectionGroup) : ed.addItem(sectionGroup)
+      } else {
+        ed.target = sectionGroup
+      }
+      e.stop()
+    })
   } else {
     // 增量更新：同步位置和名称
     sectionGroup.x = p.x ?? 0
@@ -199,7 +212,7 @@ function createPolygonItem(p: { id: string; path: string; x: number; y: number; 
       zIndex: 0,
       editable: false,
       draggable: false,
-      hittable: true,
+      hittable: false,
     })
     ;(body as any).__sectionGroup = sectionGroup
     ;(body as any).__rawPath = p.path
@@ -396,7 +409,7 @@ const seatModule = useSeatModule({
   getS,
   setPanEnabled,
   getAllNonSeatPaths: () => {
-    const result: any[] = [...allPaths]
+    const result: any[] = []
     sectionGroupMap.forEach(g => result.push(g))
     return result
   },
@@ -443,7 +456,7 @@ const vertexEdit = useVertexEdit({
   getLeafer: () => leafer,
   getEditor: () => editor,
   getAllPaths: () => {
-    const result: any[] = [...allPaths]
+    const result: any[] = []
     sectionGroupMap.forEach(g => result.push(g))
     return result
   },
@@ -478,7 +491,7 @@ const seatVertexEdit = useSeatVertexEdit({
   getLeafer: () => leafer,
   getEditor: () => editor,
   getAllPaths: () => {
-    const result: any[] = [...allPaths]
+    const result: any[] = []
     sectionGroupMap.forEach(g => result.push(g))
     return result
   },
@@ -673,12 +686,6 @@ onMounted(() => {
     getEditor: () => editor,
     getEdgeCache: () => edgeCache,
     getVertexTarget: () => vertexEdit.getTarget(),
-    getBorderGroup: (el: any) => {
-      if (el?.__sectionGroup === true) return el
-      if (el?.__sectionGroup && el.__sectionGroup !== true) return el.__sectionGroup
-      if (el?.__sectionBorder && el.parent?.__sectionGroup === true) return el.parent
-      return null
-    },
     onSeatRowsSelected: (_groups: any[]) => {
       seatModule.updateSeatLOD()
     },

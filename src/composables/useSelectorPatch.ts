@@ -6,7 +6,6 @@ export interface SelectorPatchCtx {
   getEditor: () => any
   getEdgeCache: () => WeakMap<object, number[][]>
   getVertexTarget: () => any
-  getBorderGroup: (el: any) => any
   onSeatRowsSelected?: (groups: any[]) => void
   getSectionGroupMap?: () => Map<string, any>
   getFocusedSectionId?: () => string | null
@@ -19,18 +18,19 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const sel = (editor as any).selector
   if (!sel) return
 
-  // ⓪ targetStroker
+  // ⓪ targetStroker：SectionGroup 用 __selectionBorder，SeatRow 用 editBox，都不需要原生矩形描边
   const targetStroker = sel.targetStroker
   if (targetStroker) {
     const _origSetTarget = targetStroker.setTarget.bind(targetStroker)
     targetStroker.setTarget = function (target: any, style?: any) {
+      const isSectionOrRow = (el: any) => el?.__seatRow || el?.__sectionGroup === true
       if (Array.isArray(target)) {
-        target = target.filter((el: any) => !el.__seatRow && el.__sectionGroup !== true)
-      } else if (target?.__seatRow || target?.__sectionGroup === true) {
-        return
+        const filtered = target.filter((el: any) => !isSectionOrRow(el))
+        if (filtered.length === 0) return
+        _origSetTarget(filtered, style)
+      } else if (!isSectionOrRow(target)) {
+        _origSetTarget(target, style)
       }
-      if (Array.isArray(target) && target.length === 0) return
-      _origSetTarget(target, style)
     }
   }
 
@@ -76,11 +76,9 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
   const _origAllow = sel.allow.bind(sel)
   sel.allow = (target: any) => {
     if (ctx.getVertexTarget()) {
-      if (target?.id?.startsWith?.('section-border-')) return false
       if (target?.__seatRow) return false
       return true
     }
-    if (target?.id?.startsWith?.('section-border-')) return false
     if (ctx.getFocusedSectionId?.() && target?.__sectionGroup === true) return false
     if (!target) return _origAllow(target)
     let node = target
@@ -96,57 +94,27 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return _origAllow(target)
   }
 
-  // ③ findUI — 座位排选中由 Group BEFORE_DOWN 事件直接处理，此处只需处理边框/分区
+  // ③ findUI — 仅保留 focus 模式下命中可见座位圆的归一
   const _origFindUI = sel.findUI.bind(sel)
   sel.findUI = function (e: any) {
     const result = _origFindUI(e)
     const path = e.path?.list ?? e.path ?? []
     const focusedId = ctx.getFocusedSectionId?.()
-    // 边框 → SectionGroup
-    const borderGroup = ctx.getBorderGroup(result)
-    if (borderGroup) return borderGroup
     // focus 模式下，命中可见的单个座位圆 → 直接选中座位
     if (focusedId) {
       for (const leaf of path) {
         if (leaf?.__seatId && leaf.visible) return leaf
       }
     }
-    // 路径中有 seatRow 父元素（非座位圆命中时归一到排）
-    for (const leaf of path) {
-      const p = leaf.parent
-      if (p?.__seatRow) return p
-    }
-    // 分区内部 Path → 父 SectionGroup
-    if (result?.__sectionGroup && result.__sectionGroup !== true) {
-      if (focusedId) return null
-      return result.__sectionGroup
-    }
-    // focus 模式拦截 SectionGroup
-    if (result?.__sectionGroup === true && focusedId) return null
     if (result) return result
     return null
   }
 
-  // ④ checkAndSelect
+  // ④ checkAndSelect — 恢复原生，SectionGroup/SeatRow 点选由 BEFORE_DOWN 处理
   const _origCheck = sel.checkAndSelect.bind(sel)
   sel.checkAndSelect = function (e: any) {
     const find = sel.findUI(e)
-
-    // 先执行 focus/row 拦截，再处理已选中对象的早期返回
-    if (find?.__sectionGroup === true && ctx.getFocusedSectionId?.()) return
-
-    if (find?.__seatRow && ctx.getFocusedSectionId?.() && !sel.editor.editing) {
-      const path = e.path?.list ?? e.path ?? []
-      let directlyHit = false
-      for (const leaf of path) {
-        if (leaf === find) { directlyHit = true; break }
-        if (leaf.parent === find) { directlyHit = true; break }
-      }
-      if (!directlyHit) return
-    }
-
     if (find && sel.editor.hasItem(find) && sel.editor.multiple && !sel.isMultipleSelect(e)) return
-
     _origCheck(e)
   }
 
