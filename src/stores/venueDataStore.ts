@@ -622,13 +622,10 @@ export const useVenueDataStore = defineStore('venueData', () => {
 
   function exportVenueData(): VenueData {
     const data = JSON.parse(JSON.stringify(venue.value)) as VenueData
+    // 座位已分离到 seatList，venue 中不再包含座位数据
     data.sections.forEach(section => {
       section.rows.forEach(row => {
-        row.seats.forEach(seat => {
-          seat.sec_id = seat.sec_id || section.id
-          seat.row_id = seat.row_id || row.id
-          seat.ven_id = data.id
-        })
+        row.seats = []
       })
     })
     return data
