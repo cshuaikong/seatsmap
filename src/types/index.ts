@@ -39,6 +39,31 @@ export const SEAT_STATUS = {
 // 座位状态类型（从常量派生）
 export type SeatStatus = typeof SEAT_STATUS[keyof typeof SEAT_STATUS]
 
+// 后端座位状态数字编码（与数据库/接口约定保持一致）
+export const SEAT_STATUS_BACKEND = {
+  AVAILABLE: 1,
+  SOLD: 2,
+  LOCKED: 3,
+  UNAVAILABLE: 0,
+} as const
+
+// 前端状态 → 后端数字
+export const STATUS_TO_BACKEND: Record<SeatStatus, number> = {
+  [SEAT_STATUS.AVAILABLE]: SEAT_STATUS_BACKEND.AVAILABLE,
+  [SEAT_STATUS.SELECTED]: SEAT_STATUS_BACKEND.AVAILABLE,
+  [SEAT_STATUS.BOOKED]: SEAT_STATUS_BACKEND.SOLD,
+  [SEAT_STATUS.RESERVED]: SEAT_STATUS_BACKEND.LOCKED,
+  [SEAT_STATUS.DISABLED]: SEAT_STATUS_BACKEND.UNAVAILABLE,
+}
+
+// 后端数字 → 前端状态
+export const STATUS_FROM_BACKEND: Record<number, SeatStatus> = {
+  [SEAT_STATUS_BACKEND.AVAILABLE]: SEAT_STATUS.AVAILABLE,
+  [SEAT_STATUS_BACKEND.SOLD]: SEAT_STATUS.BOOKED,
+  [SEAT_STATUS_BACKEND.LOCKED]: SEAT_STATUS.RESERVED,
+  [SEAT_STATUS_BACKEND.UNAVAILABLE]: SEAT_STATUS.DISABLED,
+}
+
 // 座位类型
 export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
 
