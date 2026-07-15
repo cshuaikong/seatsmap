@@ -625,17 +625,32 @@ export const useVenueDataStore = defineStore('venueData', () => {
     data.sections.forEach(section => {
       section.rows.forEach(row => {
         row.seats.forEach(seat => {
-          const sectionId = seat.sectionId || section.id
-          const rowId = seat.rowId || row.id
-          seat.sectionId = sectionId
-          seat.rowId = rowId
-          seat.ven_id = data.id
-          seat.sec_id = sectionId
-          seat.row_id = rowId
+          seat.sectionId = seat.sectionId || section.id
+          seat.rowId = seat.rowId || row.id
+          seat.venueId = data.id
         })
       })
     })
     return data
+  }
+
+  /** 导出后端格式的扁平座位列表（字段名为 snake_case） */
+  function exportSeatList(): any[] {
+    const seats: any[] = []
+    const data = venue.value
+    data.sections.forEach(section => {
+      section.rows.forEach(row => {
+        row.seats.forEach(seat => {
+          seats.push({
+            ...seat,
+            ven_id: data.id,
+            sec_id: seat.sectionId || section.id,
+            row_id: seat.rowId || row.id,
+          })
+        })
+      })
+    })
+    return seats
   }
 
   function importVenueData(data: VenueData, seatList?: Seat[]) {
@@ -674,11 +689,17 @@ export const useVenueDataStore = defineStore('venueData', () => {
           const key = `${section.id}|${row.id}`
           const seats = seatMap.get(key)
           if (seats) {
-            row.seats = seats.map(seat => ({
-              ...seat,
-              sectionId: section.id,
-              rowId: row.id,
-            }))
+            row.seats = seats.map(seat => {
+              const s = seat as any
+              // 导入时统一映射为 camelCase，并移除后端 snake_case 字段避免混用
+              const { ven_id, sec_id, row_id, ...rest } = s
+              return {
+                ...rest,
+                venueId: s.ven_id || s.venueId || data.id,
+                sectionId: s.sec_id || s.sectionId || section.id,
+                rowId: s.row_id || s.rowId || row.id,
+              }
+            })
           }
         })
       })
@@ -860,6 +881,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
 
     // Import / Export / Reset
     exportVenueData,
+    exportSeatList,
     importVenueData,
     importLegacyData,
     resetVenue,

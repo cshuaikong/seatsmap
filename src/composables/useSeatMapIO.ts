@@ -18,8 +18,8 @@ export function useSeatMapIO() {
   const lastError = ref<string | null>(null)
   const venueDataStore = useVenueDataStore()
 
-  // 导出座位图数据为 JSON 文件
-  const exportSeatMap = async (venue: VenueData, fileName?: string): Promise<{ success: boolean; method: 'picker' | 'download' | null }> => {
+  // 导出座位图数据为 JSON 文件（venue 和 seatList 分离，与导入格式对称）
+  const exportSeatMap = async (venue: VenueData, seatList: any[], fileName?: string): Promise<{ success: boolean; method: 'picker' | 'download' | null }> => {
     try {
       // 深拷贝，baseScale 优先使用 venue 自带的，否则从 store 取
       const venueCopy: any = JSON.parse(JSON.stringify(venue))
@@ -28,7 +28,8 @@ export function useSeatMapIO() {
       }
       venueCopy.visualConfig = venueDataStore.visualConfig
 
-      const jsonStr = JSON.stringify(venueCopy, null, 2)
+      const payload = { venue: venueCopy, seatList }
+      const jsonStr = JSON.stringify(payload, null, 2)
       const blob = new Blob([jsonStr], { type: 'application/json' })
       const defaultName = fileName || `seatmap-${venue.name || 'export'}-${Date.now()}.json`
 

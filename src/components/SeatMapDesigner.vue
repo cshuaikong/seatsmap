@@ -241,7 +241,8 @@ let importTipTimer: ReturnType<typeof setTimeout> | null = null
 
 const onExportData = async () => {
   const venue = venueDataStore.exportVenueData()
-  const result = await exportSeatMap(venue, `${venue.name || 'seatmap'}.json`)
+  const seatList = venueDataStore.exportSeatList()
+  const result = await exportSeatMap(venue, seatList, `${venue.name || 'seatmap'}.json`)
   if (result.success) {
     exportStatus.value = 'success'
     if (result.method === 'download') {
@@ -278,7 +279,8 @@ const onImportData = async () => {
 
 const onSave = () => {
   const venue = venueDataStore.exportVenueData()
-  emit('save', venue)
+  const seatList = venueDataStore.exportSeatList()
+  emit('save', { venue, seatList })
 }
 
 // ==================== 操作 ====================

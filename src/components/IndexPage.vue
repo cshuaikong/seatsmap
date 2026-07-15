@@ -143,7 +143,7 @@ function onNewVenue() {
 // ==================== Actions: save ====================
 async function onSaveVenue(data: any) {
   try {
-    await editVenue(data)
+    await editVenue({ venue: data.venue, seatlist: data.seatList })
     alert('保存成功')
   } catch (e) {
     showError('保存失败', e)
