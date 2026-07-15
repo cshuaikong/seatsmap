@@ -12,7 +12,7 @@ import type {
   AreaObject,
   SelectedObjectType,
 } from '../types'
-import { defaultSeatMapOptions, SEAT_STATUS } from '../types'
+import { defaultSeatMapOptions, SEAT_STATUS, SEAT_TYPE } from '../types'
 
 export interface PasteInput {
   sections?: Section[]
@@ -195,7 +195,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         y: firstSeat.y + Math.sin(angle) * (newSpacing * i),
         cat_id: i < currentCount ? row.seats[i].cat_id : firstSeat.cat_id,
         status: i < currentCount ? row.seats[i].status : SEAT_STATUS.AVAILABLE,
-        type: 'seat' as const,
+        type: SEAT_TYPE.SEAT,
         sec_id: section.id,
         row_id: row.id,
       }))
@@ -282,7 +282,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         y: firstSeat.y,
         cat_id: firstSeat.cat_id,
         status: SEAT_STATUS.AVAILABLE,
-        type: 'seat',
+        type: SEAT_TYPE.SEAT,
         sec_id: section.id,
         row_id: row.id,
       })
@@ -306,7 +306,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         y: lastSeat.y,
         cat_id: lastSeat.cat_id,
         status: SEAT_STATUS.AVAILABLE,
-        type: 'seat',
+        type: SEAT_TYPE.SEAT,
         sec_id: section.id,
         row_id: row.id,
       })

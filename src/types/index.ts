@@ -37,8 +37,16 @@ export const SEAT_STATUS = {
 // 座位状态类型（从常量派生）
 export type SeatStatus = typeof SEAT_STATUS[keyof typeof SEAT_STATUS]
 
-// 座位类型
-export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
+// 座位类型常量（与后端数字保持一致）
+export const SEAT_TYPE = {
+  SEAT: 1,
+  BOOTH: 2,
+  TABLE: 3,
+  GENERAL: 4,
+  WHEELCHAIR: 5,
+} as const
+
+export type SeatType = typeof SEAT_TYPE[keyof typeof SEAT_TYPE]
 
 // 绘制模式
 export type SeatDrawMode = 'single-seat' | 'row-straight' | 'row-curved' | 'row-segments' | 'section' | 'section-diagonal'
@@ -91,7 +99,7 @@ export interface Seat {
   y: number
   cat_id: string | number
   status: SeatStatus
-  type: 'seat' | 'wheelchair' | 'companion' | 'generalAdmission'
+  type: SeatType
   
   // 可选属性
   radius?: number
