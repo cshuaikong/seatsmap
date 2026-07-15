@@ -208,7 +208,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     for (let i = 0; i < sortedSeats.length; i++) {
       const seat = sortedSeats[i]
       const pos = localPositions[i]
-      const ck = seat.cat_id ?? seat.categoryKey
+      const ck = seat.categoryKey
       const color = categories ? getCategoryColor(ck, categories) : '#A5D6A7'
 
       const ell = new Ellipse({
