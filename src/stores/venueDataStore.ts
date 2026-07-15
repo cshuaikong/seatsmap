@@ -641,14 +641,11 @@ export const useVenueDataStore = defineStore('venueData', () => {
     data.sections.forEach(section => {
       section.rows.forEach(row => {
         row.seats.forEach(seat => {
-          const { categoryKey, objectType, sectionId, rowId, venueId, ...rest } = seat as any
           seats.push({
-            ...rest,
-            cat_id: rest.cat_id ?? categoryKey,
-            type: rest.type ?? objectType,
-            ven_id: rest.ven_id ?? venueId ?? data.id,
-            sec_id: rest.sec_id ?? sectionId ?? section.id,
-            row_id: rest.row_id ?? rowId ?? row.id,
+            ...seat,
+            ven_id: data.id,
+            sec_id: seat.sec_id || section.id,
+            row_id: seat.row_id || row.id,
           })
         })
       })
@@ -694,15 +691,11 @@ export const useVenueDataStore = defineStore('venueData', () => {
           if (seats) {
             row.seats = seats.map(seat => {
               const s = seat as any
-              // 导入时统一映射为 snake_case，并移除旧 camelCase 字段避免混用
-              const { ven_id, sec_id, row_id, cat_id, type, venueId, sectionId, rowId, categoryKey, objectType, ...rest } = s
               return {
-                ...rest,
-                ven_id: ven_id ?? venueId ?? data.id,
-                sec_id: sec_id ?? sectionId ?? section.id,
-                row_id: row_id ?? rowId ?? row.id,
-                cat_id: cat_id ?? categoryKey,
-                type: type ?? objectType,
+                ...s,
+                ven_id: s.ven_id ?? data.id,
+                sec_id: s.sec_id ?? section.id,
+                row_id: s.row_id ?? row.id,
               }
             })
           }
