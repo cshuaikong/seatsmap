@@ -11,8 +11,25 @@ import type {
   TextObject,
   AreaObject,
   SelectedObjectType,
+  SeatStatus,
 } from '../types'
 import { defaultSeatMapOptions } from '../types'
+
+// 座位状态前后端映射：后端用数字，前端用字符串
+const STATUS_TO_BACKEND: Record<string, number> = {
+  available: 1,
+  selected: 1,
+  booked: 2,
+  reserved: 3,
+  disabled: 0,
+}
+
+const STATUS_FROM_BACKEND: Record<number, SeatStatus> = {
+  1: 'available',
+  2: 'booked',
+  3: 'reserved',
+  0: 'disabled',
+}
 
 export interface PasteInput {
   sections?: Section[]
@@ -643,6 +660,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
             ven_id: data.id,
             sec_id: seat.sec_id || section.id,
             row_id: seat.row_id || row.id,
+            status: STATUS_TO_BACKEND[seat.status] ?? 1,
           })
         })
       })
@@ -688,11 +706,13 @@ export const useVenueDataStore = defineStore('venueData', () => {
           if (seats) {
             row.seats = seats.map(seat => {
               const s = seat as any
+              const backendStatus = typeof s.status === 'number' ? s.status : parseInt(s.status, 10)
               return {
                 ...s,
                 ven_id: s.ven_id ?? data.id,
                 sec_id: s.sec_id ?? section.id,
                 row_id: s.row_id ?? row.id,
+                status: STATUS_FROM_BACKEND[backendStatus] ?? 'available',
               }
             })
           }
