@@ -264,13 +264,13 @@ export function createUpdateSeatsCategoryCommand(
   const normalizedKey = String(categoryKey)
   const before = seatIds.map(id => {
     const loc = findSeat(store.venue.sections, id)
-    return loc ? { id, key: loc.seat.categoryKey } : null
+    return loc ? { id, key: loc.seat.cat_id } : null
   }).filter(Boolean) as { id: string; key: string | number }[]
 
   return {
     name: 'updateSeatsCategory',
     execute: () => store.updateSeatsCategory(seatIds, normalizedKey),
-    undo: () => before.forEach(({ id, key }) => store.updateSeat(id, { categoryKey: key })),
+    undo: () => before.forEach(({ id, key }) => store.updateSeat(id, { cat_id: key })),
   }
 }
 

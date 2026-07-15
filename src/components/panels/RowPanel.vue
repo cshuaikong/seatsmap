@@ -259,7 +259,7 @@ const activeCategories = computed(() => {
   const keys = new Set<string>()
   props.nodes.forEach((row: any) => {
     (row.seats || []).forEach((s: any) => {
-      keys.add(String(s.categoryKey ?? 1))
+      keys.add(String(s.cat_id ?? 1))
     })
   })
   return (props.categories as any[]).filter(c => keys.has(String(c.key ?? c.id)))

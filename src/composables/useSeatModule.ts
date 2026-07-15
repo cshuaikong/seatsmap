@@ -208,7 +208,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     for (let i = 0; i < sortedSeats.length; i++) {
       const seat = sortedSeats[i]
       const pos = localPositions[i]
-      const ck = seat.categoryKey
+      const ck = seat.cat_id
       const color = categories ? getCategoryColor(ck, categories) : '#A5D6A7'
 
       const ell = new Ellipse({
@@ -225,7 +225,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       ;ell.__originalStroke = darkenColor(color, 30)
       ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
       ;ell.__seatId = seat.id
-      ;ell.__categoryKey = ck
+      ;ell.__cat_id = ck
       ;ell.__sourceSeat = seat
       group.add(ell)
       ellipses.push(ell)

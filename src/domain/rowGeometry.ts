@@ -70,23 +70,23 @@ export function buildSeatRowFromDrawData(
   const categoryKey = resolveCategoryKey(section, categories)
   const rotation = rotationFromVector(rowData.ux, rowData.uy)
 
-  const rowId = generateId()
-  const sectionId = section?.id
+  const row_id = generateId()
+  const sec_id = section?.id
 
   const seats: Seat[] = Array.from({ length: rowData.count }, (_, i) => ({
     id: generateSeatId(),
     label: String(i + 1),
     x: +(i * rowData.spacing).toFixed(2),
     y: 0,
-    categoryKey,
+    cat_id: categoryKey,
     status: 'available',
-    objectType: 'seat',
-    sectionId,
-    rowId,
+    type: 'seat',
+    sec_id,
+    row_id,
   }))
 
   return {
-    id: rowId,
+    id: row_id,
     label: '',
     x: rowData.x,
     y: rowData.y,

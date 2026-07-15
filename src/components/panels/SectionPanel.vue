@@ -403,7 +403,7 @@ const sectionCategories = computed(() => {
   for (const section of sections) {
     for (const row of section.rows) {
       for (const seat of row.seats) {
-        const key = String(seat.categoryKey ?? 1)
+        const key = String(seat.cat_id ?? 1)
         const existing = categoryMap.get(key)
         if (existing) {
           existing.seatCount++

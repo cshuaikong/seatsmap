@@ -109,8 +109,8 @@ export const useVenueDataStore = defineStore('venueData', () => {
     if (!section) return
     const newRow: SeatRow = { ...row, id: generateId() }
     newRow.seats.forEach(seat => {
-      seat.sectionId = sectionId
-      seat.rowId = newRow.id
+      seat.sec_id = sectionId
+      seat.row_id = newRow.id
     })
     section.rows.push(newRow)
     return newRow.id
@@ -123,8 +123,8 @@ export const useVenueDataStore = defineStore('venueData', () => {
     for (const row of rows) {
       const newRow: SeatRow = { ...row, id: generateId() }
       newRow.seats.forEach(seat => {
-        seat.sectionId = sectionId
-        seat.rowId = newRow.id
+        seat.sec_id = sectionId
+        seat.row_id = newRow.id
       })
       section.rows.push(newRow)
       addedIds.push(newRow.id)
@@ -138,12 +138,12 @@ export const useVenueDataStore = defineStore('venueData', () => {
       if (!row) return
       Object.assign(row, updates)
 
-      // 面板层传的是 categoryId，但实际含义就是 categoryKey
+      // 面板层传的是 categoryId，但实际含义就是 cat_id
       const categoryKey = (updates as any).categoryId
       if (categoryKey !== undefined) {
         const normalizedKey = String(categoryKey)
         row.seats.forEach(seat => {
-          seat.categoryKey = normalizedKey
+          seat.cat_id = normalizedKey
         })
       }
     })
@@ -159,7 +159,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         if (categoryKey !== undefined) {
           const normalizedKey = String(categoryKey)
           row.seats.forEach(seat => {
-            seat.categoryKey = normalizedKey
+            seat.cat_id = normalizedKey
           })
         }
       })
@@ -193,11 +193,11 @@ export const useVenueDataStore = defineStore('venueData', () => {
         label: i < currentCount ? row.seats[i].label : '',
         x: firstSeat.x + Math.cos(angle) * (newSpacing * i),
         y: firstSeat.y + Math.sin(angle) * (newSpacing * i),
-        categoryKey: i < currentCount ? row.seats[i].categoryKey : firstSeat.categoryKey,
+        cat_id: i < currentCount ? row.seats[i].cat_id : firstSeat.cat_id,
         status: i < currentCount ? row.seats[i].status : 'available',
-        objectType: 'seat' as const,
-        sectionId: section.id,
-        rowId: row.id,
+        type: 'seat' as const,
+        sec_id: section.id,
+        row_id: row.id,
       }))
       row.seatSpacing = newSpacing
     })
@@ -251,7 +251,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
     venue.value.sections.forEach(section => {
       section.rows.forEach(row => {
         row.seats.forEach(seat => {
-          if (idSet.has(seat.id)) seat.categoryKey = normalizedKey
+          if (idSet.has(seat.id)) seat.cat_id = normalizedKey
         })
       })
     })
@@ -280,11 +280,11 @@ export const useVenueDataStore = defineStore('venueData', () => {
         label: '',
         x: firstSeat.x - spacing,
         y: firstSeat.y,
-        categoryKey: firstSeat.categoryKey,
+        cat_id: firstSeat.cat_id,
         status: 'available',
-        objectType: 'seat',
-        sectionId: section.id,
-        rowId: row.id,
+        type: 'seat',
+        sec_id: section.id,
+        row_id: row.id,
       })
       renumberRowSeats(row)
       return true
@@ -304,11 +304,11 @@ export const useVenueDataStore = defineStore('venueData', () => {
         label: '',
         x: lastSeat.x + spacing,
         y: lastSeat.y,
-        categoryKey: lastSeat.categoryKey,
+        cat_id: lastSeat.cat_id,
         status: 'available',
-        objectType: 'seat',
-        sectionId: section.id,
-        rowId: row.id,
+        type: 'seat',
+        sec_id: section.id,
+        row_id: row.id,
       })
       renumberRowSeats(row)
       return true
@@ -625,9 +625,9 @@ export const useVenueDataStore = defineStore('venueData', () => {
     data.sections.forEach(section => {
       section.rows.forEach(row => {
         row.seats.forEach(seat => {
-          seat.sectionId = seat.sectionId || section.id
-          seat.rowId = seat.rowId || row.id
-          seat.venueId = data.id
+          seat.sec_id = seat.sec_id || section.id
+          seat.row_id = seat.row_id || row.id
+          seat.ven_id = data.id
         })
       })
     })
@@ -644,11 +644,11 @@ export const useVenueDataStore = defineStore('venueData', () => {
           const { categoryKey, objectType, sectionId, rowId, venueId, ...rest } = seat as any
           seats.push({
             ...rest,
-            cat_id: categoryKey,
-            type: objectType,
-            ven_id: data.id,
-            sec_id: sectionId || section.id,
-            row_id: rowId || row.id,
+            cat_id: rest.cat_id ?? categoryKey,
+            type: rest.type ?? objectType,
+            ven_id: rest.ven_id ?? venueId ?? data.id,
+            sec_id: rest.sec_id ?? sectionId ?? section.id,
+            row_id: rest.row_id ?? rowId ?? row.id,
           })
         })
       })
@@ -694,15 +694,15 @@ export const useVenueDataStore = defineStore('venueData', () => {
           if (seats) {
             row.seats = seats.map(seat => {
               const s = seat as any
-              // 导入时统一映射为 camelCase，并移除后端 snake_case 字段避免混用
-              const { ven_id, sec_id, row_id, cat_id, type, ...rest } = s
+              // 导入时统一映射为 snake_case，并移除旧 camelCase 字段避免混用
+              const { ven_id, sec_id, row_id, cat_id, type, venueId, sectionId, rowId, categoryKey, objectType, ...rest } = s
               return {
                 ...rest,
-                venueId: s.ven_id || s.venueId || data.id,
-                sectionId: s.sec_id || s.sectionId || section.id,
-                rowId: s.row_id || s.rowId || row.id,
-                categoryKey: s.cat_id ?? s.categoryKey,
-                objectType: s.type ?? s.objectType,
+                ven_id: ven_id ?? venueId ?? data.id,
+                sec_id: sec_id ?? sectionId ?? section.id,
+                row_id: row_id ?? rowId ?? row.id,
+                cat_id: cat_id ?? categoryKey,
+                type: type ?? objectType,
               }
             })
           }

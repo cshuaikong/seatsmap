@@ -85,22 +85,21 @@ export interface SeatRow {
 }
 
 // 扩展 Seat 支持 Seats.io 风格
+// 字段名与后端接口保持一致（snake_case），避免导入导出时反复映射
 export interface Seat {
   id: string
   label: string
   x: number
   y: number
-  categoryKey: string | number
+  cat_id: string | number
   status: SeatStatus
-  objectType: 'seat' | 'wheelchair' | 'companion' | 'generalAdmission'
+  type: 'seat' | 'wheelchair' | 'companion' | 'generalAdmission'
   
   // 可选属性
   radius?: number
-  rowId?: string
-  sectionId?: string
-
-  // 后端兼容字段（导入时映射、导出时反映射）
-  venueId?: string
+  row_id?: string
+  sec_id?: string
+  ven_id?: string
   
   // 无障碍设施
   isAccessible?: boolean

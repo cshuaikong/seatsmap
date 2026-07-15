@@ -25,7 +25,7 @@ export interface LeaferElementMeta {
 
   // 座位相关
   __seatId?: string
-  __categoryKey?: string | number
+  __cat_id?: string | number
   __sourceSeat?: any
 
   // 形状/文本/区域相关

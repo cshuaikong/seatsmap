@@ -354,19 +354,19 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
       }
     }
 
-    // 同步 seat categoryKey + label → 更新座位 fill 和标签文本
+    // 同步 seat cat_id + label → 更新座位 fill 和标签文本
     const ellipses = (group.__seatEllipses || []) as any[]
     const storeSeats = rowStore.seats || []
     const categories = venueDataStore.venue.categories ?? []
     for (let i = 0; i < Math.min(ellipses.length, storeSeats.length); i++) {
       const ell = ellipses[i]
       const storeSeat = storeSeats[i] as any
-      // categoryKey → fill
-      const storeCatKey = String(storeSeat.categoryKey ?? 1)
-      const ellCatKey = String(ell.__categoryKey ?? 1)
+      // cat_id → fill
+      const storeCatKey = String(storeSeat.cat_id ?? 1)
+      const ellCatKey = String(ell.__cat_id ?? 1)
       if (storeCatKey !== ellCatKey) {
         const cat = categories.find((c: any) => String(c.key) === storeCatKey)
-        ell.__categoryKey = storeCatKey
+        ell.__cat_id = storeCatKey
         if (cat?.color) {
           ell.fill = cat.color
           ell.stroke = darkenColor(cat.color, 30)
@@ -429,7 +429,7 @@ export function usePathEditorSync(ctx: PathEditorSyncCtx) {
     for (const group of seatRowGroups) {
       const ellipses = (group.__seatEllipses || []) as any[]
       for (const ell of ellipses) {
-        const catKey = String(ell.__categoryKey ?? '1')
+        const catKey = String(ell.__cat_id ?? '1')
         const cat = categories.find(c => String(c.key) === catKey)
         if (cat?.color && ell.fill !== cat.color) {
           ell.fill = cat.color
