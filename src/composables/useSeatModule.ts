@@ -643,7 +643,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         for (const e of ellipses) {
           e.visible = detail
           const seatSelected = selectedSeatSet.has(e.__seatId)
-          e.stroke = seatSelected ? '#3b82f6' : (e.__originalStroke ?? '#81C784')
+          e.stroke = seatSelected ? defaultSeatMapOptions.colors.selectionStroke : (e.__originalStroke ?? '#81C784')
           e.strokeWidth = seatSelected ? (1 / Math.max(seatDraw.getBaseScale(), 0.02)) * 2 : (1 / Math.max(seatDraw.getBaseScale(), 0.02))
           const st = e.__labelText
           if (st) {
@@ -662,7 +662,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         labelText.visible = detail && hasLabel && ellipses && ellipses.length > 1
         if (detail) labelText.fontSize = r * 1.3
       }
-      bar.stroke = sel ? '#3b82f6' : '#81C784'
+      bar.stroke = sel ? defaultSeatMapOptions.colors.selectionStroke : '#81C784'
       bar.opacity = sel ? 0.6 : 0.25
     }
   }

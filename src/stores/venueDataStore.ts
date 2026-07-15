@@ -12,7 +12,7 @@ import type {
   AreaObject,
   SelectedObjectType,
 } from '../types'
-import { defaultSeatMapOptions, STATUS_TO_BACKEND, STATUS_FROM_BACKEND, SEAT_STATUS } from '../types'
+import { defaultSeatMapOptions, SEAT_STATUS } from '../types'
 
 export interface PasteInput {
   sections?: Section[]
@@ -70,7 +70,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
     venue.value.sections.forEach(section => {
       section.rows.forEach(row => {
         row.seats.forEach(seat => {
-          if (seat.status === 'available') count++
+          if (seat.status === SEAT_STATUS.AVAILABLE) count++
         })
       })
     })
@@ -194,7 +194,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         x: firstSeat.x + Math.cos(angle) * (newSpacing * i),
         y: firstSeat.y + Math.sin(angle) * (newSpacing * i),
         cat_id: i < currentCount ? row.seats[i].cat_id : firstSeat.cat_id,
-        status: i < currentCount ? row.seats[i].status : 'available',
+        status: i < currentCount ? row.seats[i].status : SEAT_STATUS.AVAILABLE,
         type: 'seat' as const,
         sec_id: section.id,
         row_id: row.id,
@@ -281,7 +281,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         x: firstSeat.x - spacing,
         y: firstSeat.y,
         cat_id: firstSeat.cat_id,
-        status: 'available',
+        status: SEAT_STATUS.AVAILABLE,
         type: 'seat',
         sec_id: section.id,
         row_id: row.id,
@@ -305,7 +305,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
         x: lastSeat.x + spacing,
         y: lastSeat.y,
         cat_id: lastSeat.cat_id,
-        status: 'available',
+        status: SEAT_STATUS.AVAILABLE,
         type: 'seat',
         sec_id: section.id,
         row_id: row.id,
@@ -643,7 +643,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
             ven_id: data.id,
             sec_id: seat.sec_id || section.id,
             row_id: seat.row_id || row.id,
-            status: STATUS_TO_BACKEND[seat.status] ?? STATUS_TO_BACKEND.available,
+            status: seat.status,
           })
         })
       })
@@ -689,13 +689,15 @@ export const useVenueDataStore = defineStore('venueData', () => {
           if (seats) {
             row.seats = seats.map(seat => {
               const s = seat as any
-              const backendStatus = typeof s.status === 'number' ? s.status : parseInt(s.status, 10)
+              const seatStatus = typeof s.status === 'number'
+                ? s.status
+                : (Number.isFinite(Number(s.status)) ? Number(s.status) : SEAT_STATUS.AVAILABLE)
               return {
                 ...s,
                 ven_id: s.ven_id ?? data.id,
                 sec_id: s.sec_id ?? section.id,
                 row_id: s.row_id ?? row.id,
-                status: STATUS_FROM_BACKEND[backendStatus] ?? SEAT_STATUS.AVAILABLE,
+                status: seatStatus,
               }
             })
           }

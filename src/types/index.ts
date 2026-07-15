@@ -22,47 +22,20 @@ export interface Rect {
   height: number
 }
 
-// 座位状态常量定义（项目级常量）
+// 座位状态常量定义（项目级常量，与后端数字保持一致）
 export const SEAT_STATUS = {
   /** 可选 */
-  AVAILABLE: 'available' as const,
+  AVAILABLE: 1,
   /** 已预订 */
-  BOOKED: 'booked' as const,
+  BOOKED: 2,
   /** 已保留 */
-  RESERVED: 'reserved' as const,
+  RESERVED: 3,
   /** 禁用 */
-  DISABLED: 'disabled' as const,
-  /** 选中 */
-  SELECTED: 'selected' as const,
+  DISABLED: 0,
 } as const
 
 // 座位状态类型（从常量派生）
 export type SeatStatus = typeof SEAT_STATUS[keyof typeof SEAT_STATUS]
-
-// 后端座位状态数字编码（与数据库/接口约定保持一致）
-export const SEAT_STATUS_BACKEND = {
-  AVAILABLE: 1,
-  SOLD: 2,
-  LOCKED: 3,
-  UNAVAILABLE: 0,
-} as const
-
-// 前端状态 → 后端数字
-export const STATUS_TO_BACKEND: Record<SeatStatus, number> = {
-  [SEAT_STATUS.AVAILABLE]: SEAT_STATUS_BACKEND.AVAILABLE,
-  [SEAT_STATUS.SELECTED]: SEAT_STATUS_BACKEND.AVAILABLE,
-  [SEAT_STATUS.BOOKED]: SEAT_STATUS_BACKEND.SOLD,
-  [SEAT_STATUS.RESERVED]: SEAT_STATUS_BACKEND.LOCKED,
-  [SEAT_STATUS.DISABLED]: SEAT_STATUS_BACKEND.UNAVAILABLE,
-}
-
-// 后端数字 → 前端状态
-export const STATUS_FROM_BACKEND: Record<number, SeatStatus> = {
-  [SEAT_STATUS_BACKEND.AVAILABLE]: SEAT_STATUS.AVAILABLE,
-  [SEAT_STATUS_BACKEND.SOLD]: SEAT_STATUS.BOOKED,
-  [SEAT_STATUS_BACKEND.LOCKED]: SEAT_STATUS.RESERVED,
-  [SEAT_STATUS_BACKEND.UNAVAILABLE]: SEAT_STATUS.DISABLED,
-}
 
 // 座位类型
 export type SeatType = 'seat' | 'booth' | 'table' | 'general' | 'wheelchair'
@@ -255,7 +228,6 @@ export const defaultSeatMapOptions: SeatMapOptions = {
       [SEAT_STATUS.BOOKED]: '#F44336',
       [SEAT_STATUS.RESERVED]: '#FF9800',
       [SEAT_STATUS.DISABLED]: '#616161',
-      [SEAT_STATUS.SELECTED]: '#4CAF50',
     },
     sectionDefaultFill: '#d1d5db',
     sectionDefaultStroke: '#9ca3af',

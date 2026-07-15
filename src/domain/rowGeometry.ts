@@ -1,4 +1,5 @@
 import type { SeatRow, Seat, Section, Category } from '../types'
+import { SEAT_STATUS } from '../types'
 import { generateId } from '../utils/id'
 
 /** 从单位向量计算旋转角度（度） */
@@ -79,7 +80,7 @@ export function buildSeatRowFromDrawData(
     x: +(i * rowData.spacing).toFixed(2),
     y: 0,
     cat_id: categoryKey,
-    status: 'available',
+    status: SEAT_STATUS.AVAILABLE,
     type: 'seat',
     sec_id,
     row_id,
