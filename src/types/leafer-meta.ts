@@ -14,6 +14,7 @@ export interface LeaferElementMeta {
   __seatRow?: boolean
   __seatRowData?: any
   __seatEllipses?: any[]
+  __seatLocalPositions?: { x: number; y: number }[]
   __bar?: any
   __rowOriginX?: number
   __rowOriginY?: number

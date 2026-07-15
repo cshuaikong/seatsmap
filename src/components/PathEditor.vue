@@ -562,6 +562,7 @@ function enterSectionFocus(sectionId: string): void {
     sectionGroupMap.forEach((g, id) => {
       if (id !== sectionId) { g.opacity = 0.25; g.hittable = false; g.editable = false; g.draggable = false }
     })
+    seatModule.ensureSeatEllipses(sectionId, props.venueData?.categories)
     seatModule.updateSeatLOD()
     return
   }
@@ -618,6 +619,7 @@ function enterSectionFocus(sectionId: string): void {
   })
   const eb = (editor as any)?.editBox
   if (eb) eb.visible = false
+  seatModule.ensureSeatEllipses(sectionId, props.venueData?.categories)
   seatModule.updateSeatLOD()
 }
 
@@ -630,6 +632,9 @@ function exitSectionFocus(): void {
   if (vertexEdit.isEditing.value) vertexEdit.exitVertexEdit()
   if (seatVertexEdit.isEditing.value) seatVertexEdit.exit()
   ;(editor as any)?.closeGroup?.()
+  // 退出分区编辑后销毁座位圆点，恢复排线模式以提升性能
+  seatModule.clearSeatEllipses()
+  seatModule.updateSeatLOD()
 }
 
 // ==================== 视图控制 ====================

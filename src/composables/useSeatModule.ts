@@ -190,6 +190,97 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     ;group.__labelText = labelText
   }
 
+  /** 为排 Group 创建座位圆点和标签（延迟创建，用于分区编辑模式） */
+  function buildSeatEllipsesForGroup(
+    group: any,
+    sortedSeats: any[],
+    localPositions: { x: number; y: number }[],
+    categories?: any[],
+  ): void {
+    if (group.__seatEllipses && group.__seatEllipses.length > 0) return
+
+    const bs = seatDraw.getBaseScale()
+    const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
+    const size = radius * 2
+    const sw = 1 / Math.max(bs, 0.02)
+
+    const ellipses: any[] = []
+    for (let i = 0; i < sortedSeats.length; i++) {
+      const seat = sortedSeats[i]
+      const pos = localPositions[i]
+      const ck = seat.cat_id ?? seat.categoryKey
+      const color = categories ? getCategoryColor(ck, categories) : '#A5D6A7'
+
+      const ell = new Ellipse({
+        x: pos.x, y: pos.y,
+        width: size, height: size,
+        fill: color,
+        stroke: darkenColor(color, 30),
+        strokeWidth: sw,
+        around: 'center',
+        hittable: true,
+        draggable: false,
+        visible: false,
+      }) as MetaEllipse
+      ;ell.__originalStroke = darkenColor(color, 30)
+      ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
+      ;ell.__seatId = seat.id
+      ;ell.__categoryKey = ck
+      ;ell.__sourceSeat = seat
+      group.add(ell)
+      ellipses.push(ell)
+    }
+
+    // 座位标签文本（正中间）
+    for (let i = 0; i < ellipses.length; i++) {
+      const ell = ellipses[i]
+      const seat = sortedSeats[i]
+      const st = new Text({
+        text: seat.label || '',
+        x: ell.x, y: ell.y,
+        fontSize: radius,
+        fill: '#1F2937',
+        textAlign: 'center',
+        verticalAlign: 'middle',
+        around: 'center',
+        editable: false,
+        hittable: false,
+      }) as MetaText
+      ;st.__seatLabelText = true
+      group.add(st)
+      ;ell.__labelText = st
+    }
+
+    ;group.__seatRadius = radius
+    ;group.__seatEllipses = ellipses
+  }
+
+  /** 为指定分区下的所有排延迟创建座位圆点 */
+  function ensureSeatEllipses(sectionId: string, categories?: any[]): void {
+    for (const g of seatRowGroups) {
+      if (g.__sectionId !== sectionId) continue
+      if (g.__seatEllipses && g.__seatEllipses.length > 0) continue
+      const rawSeats = g.__rawSeats as any[] | undefined
+      const localPositions = g.__seatLocalPositions as { x: number; y: number }[] | undefined
+      if (!rawSeats || !localPositions || rawSeats.length !== localPositions.length) continue
+      buildSeatEllipsesForGroup(g, rawSeats, localPositions, categories)
+    }
+  }
+
+  /** 销毁所有座位圆点和标签，回退到排线模式 */
+  function clearSeatEllipses(): void {
+    for (const g of seatRowGroups) {
+      const ellipses = g.__seatEllipses as any[] | undefined
+      if (!ellipses || ellipses.length === 0) continue
+      for (const e of ellipses) {
+        const st = e.__labelText
+        try { st?.remove() } catch (_) {}
+        try { e.remove() } catch (_) {}
+      }
+      g.__seatEllipses = []
+    }
+  }
+
   /** 从 venue data 的 sections[].rows[].seats[] 渲染座位排
    *  动态计算 rotation/curve 的世界位置，不修改原始数据，按独立 Ellipse 绘制
    */
@@ -207,7 +298,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const radius = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const size = radius * 2
     const lineWidth = size
-    const sw = 1 / Math.max(bs, 0.02)
     let totalSeats = 0
 
     for (const section of sections) {
@@ -279,37 +369,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         ;group.__rowOriginY = rowY
         ;group.__rawSeats = sortedSeats
 
-        const ellipses: any[] = []
-        for (let i = 0; i < sortedSeats.length; i++) {
-          const seat = sortedSeats[i]
-          const sx = worldPositions[i].x
-          const sy = worldPositions[i].y
-
-          const ck = seat.cat_id ?? seat.categoryKey
-          const color = categories
-            ? getCategoryColor(ck, categories)
-            : '#A5D6A7'
-
-          const ell = new Ellipse({
-            x: sx, y: sy,
-            width: size, height: size,
-            fill: color,
-            stroke: darkenColor(color, 30),
-            strokeWidth: sw,
-            around: 'center',
-            hittable: true,
-            draggable: false,
-            visible: false,
-          }) as MetaEllipse
-          ;ell.__originalStroke = darkenColor(color, 30)
-          ;ell.editConfig = { moveable: false, rotateable: false, resizeable: false }
-          ;ell.__seatId = seat.id
-          ;ell.__categoryKey = ck
-          ;ell.__sourceSeat = seat
-          group.add(ell)
-          ellipses.push(ell)
-        }
-
         const barPts: number[] = []
         for (const wp of worldPositions) { barPts.push(wp.x, wp.y) }
         const bar = new Line({
@@ -323,8 +382,6 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         })
         group.add(bar)
 
-        ;group.__seatRadius = radius
-        ;group.__seatEllipses = ellipses
         ;group.__bar = bar
 
         // 确定归属 SectionGroup 并转局部坐标
@@ -342,6 +399,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
         let localFirstX = firstSX, localFirstY = firstSY
         let localLastX = lastSX, localLastY = lastSY
 
+        let localPositions = worldPositions
 
         if (needConvert) {
           // 世界→局部：考虑父 Group 的平移+旋转（之前只做了减法，旋转时手柄偏移）
@@ -357,36 +415,25 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           localLastX = ll.x; localLastY = ll.y
 
           const barLocalPts: number[] = []
+          localPositions = []
           for (let i = 0; i < worldPositions.length; i++) {
             const lp = w2l(worldPositions[i].x, worldPositions[i].y)
             barLocalPts.push(lp.x, lp.y)
+            localPositions.push(lp)
           }
           bar.points = barLocalPts
-          for (let i = 0; i < ellipses.length; i++) {
-            const lp = w2l(worldPositions[i].x, worldPositions[i].y)
-            ellipses[i].x = lp.x
-            ellipses[i].y = lp.y
-          }
         }
 
-        // 座位标签文本（正中间）
-        for (let i = 0; i < ellipses.length; i++) {
-          const ell = ellipses[i]
-          const seat = sortedSeats[i]
-          const st = new Text({
-            text: seat.label || '',
-            x: ell.x, y: ell.y,
-            fontSize: radius,
-            fill: '#1F2937',
-            textAlign: 'center',
-            verticalAlign: 'middle',
-            around: 'center',
-            editable: false,
-            hittable: false,
-          }) as MetaText
-          ;st.__seatLabelText = true
-          group.add(st)
-          ;ell.__labelText = st
+        // 保存座位局部坐标，供后续进入分区编辑时延迟创建 Ellipse
+        ;group.__seatLocalPositions = localPositions
+
+        // 仅聚焦分区初始创建座位圆；其他分区按排线显示以提升性能
+        const focusedSectionId = ctx.getFocusedSectionId?.()
+        if (focusedSectionId && focusedSectionId === section.id) {
+          buildSeatEllipsesForGroup(group, sortedSeats, localPositions, categories)
+        } else {
+          ;group.__seatRadius = radius
+          ;group.__seatEllipses = []
         }
 
         const ldx = localLastX - localFirstX
@@ -590,8 +637,9 @@ export function useSeatModule(ctx: SeatModuleCtx) {
       const ellipses = g.__seatEllipses as any[] | undefined
       if (r == null || !bar) continue
       const sel = selectedSet.has(g)
-      const detail = r * s >= threshold
-      if (ellipses && ellipses.length > 0) {
+      const hasEllipses = ellipses && ellipses.length > 0
+      const detail = hasEllipses && (r * s >= threshold)
+      if (hasEllipses) {
         for (const e of ellipses) {
           e.visible = detail
           const seatSelected = selectedSeatSet.has(e.__seatId)
@@ -605,7 +653,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           }
         }
       }
-      // 座位条和座位圆互斥：没有座位圆时显示排线
+      // 座位条和座位圆互斥：没有座位圆时始终显示排线
       bar.visible = !detail
       const labelText = g.__labelText
       if (labelText) {
@@ -698,6 +746,8 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     clearSeatElements,
     rebuildSeatRow,
     updateSeatLOD,
+    ensureSeatEllipses,
+    clearSeatEllipses,
     modeHandlers,
     getBaseScale: seatDraw.getBaseScale,
   }
