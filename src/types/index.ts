@@ -38,12 +38,10 @@ export const SEAT_STATUS = {
 export type SeatStatus = typeof SEAT_STATUS[keyof typeof SEAT_STATUS]
 
 // 座位类型常量（与后端数字保持一致）
+// 当前实际使用：1=普通座位，2=轮椅位
 export const SEAT_TYPE = {
   SEAT: 1,
-  BOOTH: 2,
-  TABLE: 3,
-  GENERAL: 4,
-  WHEELCHAIR: 5,
+  WHEELCHAIR: 2,
 } as const
 
 export type SeatType = typeof SEAT_TYPE[keyof typeof SEAT_TYPE]
