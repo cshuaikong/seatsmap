@@ -113,7 +113,7 @@ import { Icon } from '@iconify/vue'
 import RightPanel from './RightPanel.vue'
 import LeftToolbar from './LeftToolbar.vue'
 import PathEditor from './PathEditor.vue'
-import type { VenueData, SeatMapOptions } from '../types'
+import type { VenueData, SeatMapOptions, Seat } from '../types'
 import { defaultSeatMapOptions } from '../types'
 import { useVenueDataStore } from '../stores/venueDataStore'
 
@@ -168,27 +168,19 @@ const editorStore = useEditorStore()
 const historyStore = useHistoryStore()
 const { exportSeatMap, importSeatMap, triggerImport } = useSeatMapIO()
 
-const chartName = ref(props.venueData?.name || venueDataStore.venue.name || '未命名座位图')
+const chartName = computed(() => venueDataStore.venue.name || '未命名座位图')
 // PathEditor 始终渲染 store 中的数据；props.venueData 仅作为外部初始数据源导入 store
 const effectiveVenueData = computed(() => venueDataStore.venue)
 
 // ==================== 数据加载 ====================
 
-watch(() => props.venueData?.name, (name) => {
-  if (name) chartName.value = name
-})
-
-// 外部传入的 venueData 同步到 store，使 store 成为唯一真相源
-watch(() => props.venueData, (data) => {
-  if (data && data.sections && data.sections.length > 0) {
-    venueDataStore.importVenueData(data)
+// 外部传入的 venueData / seatList 同步到 store，使 store 成为唯一真相源
+watch([() => props.venueData, () => props.seatList], ([data, seats]) => {
+  if (data && data.id) {
+    venueDataStore.importVenueData(data, seats as Seat[])
     historyStore.reset()
   }
 }, { immediate: true })
-
-watch(() => venueDataStore.venue.name, (name) => {
-  if (name) chartName.value = name
-})
 
 onMounted(() => {
 })
@@ -340,8 +332,16 @@ const onDeleteCategory = (categoryId: string) => {
   historyStore.execute(createDeleteCategoryCommand(venueDataStore, categoryId))
 }
 
+function clearCanvas() {
+  venueDataStore.resetVenue()
+  historyStore.reset()
+  editorStore.clearSelection()
+  rendererRef.value?.renderAll?.(venueDataStore.venue)
+}
+
 defineExpose({
-  getEditor: () => rendererRef.value
+  getEditor: () => rendererRef.value,
+  clearCanvas,
 })
 </script>
 

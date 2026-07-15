@@ -2,7 +2,24 @@
   <div class="chart-overview-panel">
     <!-- 图表名称 -->
     <div class="panel-header">
-      <h2 class="panel-title">{{ chartName }}</h2>
+      <div v-show="!isEditingName" class="name-display">
+        <h2 class="panel-title">{{ chartName }}</h2>
+        <button
+          class="edit-name-btn"
+          title="编辑名称"
+          @click="startEditName"
+        >
+          <Icon icon="lucide:pencil" class="edit-name-icon" />
+        </button>
+      </div>
+      <input
+        v-show="isEditingName"
+        ref="nameInputRef"
+        v-model="editingName"
+        class="name-input"
+        @blur="confirmEditName"
+        @keydown.enter="confirmEditName"
+      />
     </div>
 
     <!-- Categories 区域 -->
@@ -63,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 
 interface Category {
@@ -73,7 +90,7 @@ interface Category {
   accessible?: boolean
 }
 
-defineProps<{
+const props = defineProps<{
   chartName: string
   categories: Category[]
   totalSeats: number
@@ -81,9 +98,31 @@ defineProps<{
 
 const emit = defineEmits<{
   'manage-categories': []
+  'update-chart-name': [name: string]
 }>()
 
 const showCategories = ref(true)
+const isEditingName = ref(false)
+const editingName = ref('')
+const nameInputRef = ref<HTMLInputElement>()
+
+function startEditName() {
+  editingName.value = props.chartName
+  isEditingName.value = true
+  nextTick(() => {
+    nameInputRef.value?.focus()
+    nameInputRef.value?.select()
+  })
+}
+
+function confirmEditName() {
+  if (!isEditingName.value) return
+  const name = editingName.value.trim()
+  if (name && name !== props.chartName) {
+    emit('update-chart-name', name)
+  }
+  isEditingName.value = false
+}
 
 const validationItems = [
   // EN: No duplicate objects
@@ -108,16 +147,61 @@ const validationItems = [
 
 /* 图表概览头部 */
 .panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 16px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
+.name-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
 .panel-title {
   margin: 0;
+  flex: 1;
   font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.edit-name-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.edit-name-btn:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.edit-name-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.name-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  outline: none;
 }
 
 /* Categories */

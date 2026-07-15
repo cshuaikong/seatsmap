@@ -3,6 +3,7 @@
     <!-- Section 分区选中面板 -->
     <template v-if="selectedSection">
       <SectionPanel
+        key="section-panel"
         :section="selectedSection"
         :active-point-index="activePathPointIndex"
         :is-multi="isMultiSectionSelected"
@@ -19,6 +20,7 @@
 
     <!-- 选中对象面板 -->
     <template v-else-if="shouldShowSelectionPanel">
+      <div key="selection-panel" class="selection-wrapper">
       <!-- 面板标题栏 -->
       <div class="selection-header">
         <div class="selection-title">
@@ -102,15 +104,18 @@
           <p>未知对象类型</p>
         </div>
       </div>
+    </div>
     </template>
 
     <!-- 图表概览（无选中时） -->
     <template v-else>
       <ChartOverviewPanel
+        key="chart-overview"
         :chart-name="chartName"
         :categories="categories as any"
         :total-seats="totalSeats"
         @manage-categories="emit('manage-categories')"
+        @update-chart-name="handleUpdateChartName"
       />
     </template>
   </div>
@@ -401,6 +406,8 @@ const shouldShowSelectionPanel = computed(() => {
   if (!props.selection) return false
   return props.selection.type !== 'none'
 })
+
+
 
 // 面板类型映射
 const panelType = computed(() => {
@@ -881,6 +888,11 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
   if (commands.length) historyStore.execute(createBatchCommand(commands))
 }
 
+// 处理场馆名称变更
+const handleUpdateChartName = (name: string) => {
+  venueDataStore.venue.name = name
+}
+
 // 处理分类变更
 const handleCategoryChange = (categoryId: string) => {
   const type = currentSelectionType.value
@@ -924,6 +936,13 @@ const handleCategoryChange = (categoryId: string) => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+.selection-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 /* 选中对象面板标题栏 */

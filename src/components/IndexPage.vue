@@ -8,35 +8,14 @@
       </div>
     </header>
 
-    <!-- 新建场馆弹框 -->
-    <div v-if="isCreateModalOpen" class="modal-overlay" @click.self="closeCreateModal">
-      <div class="modal-card">
-        <div class="modal-header">
-          <Icon icon="lucide:plus-circle" class="modal-icon" />
-          <span>新增场馆</span>
-        </div>
-        <div class="modal-body">
-          <label class="modal-label">场馆名称</label>
-          <input
-            v-model="newVenueName"
-            class="modal-input"
-            placeholder="请输入场馆名称"
-            @keydown.enter="confirmCreateVenue"
-          />
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn modal-btn--secondary" @click="closeCreateModal">取消</button>
-          <button class="modal-btn modal-btn--primary" :disabled="!newVenueName.trim() || creating" @click="confirmCreateVenue">
-            {{ creating ? '创建中...' : '确定' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- 主体：左侧列表 + 右侧设计器 -->
     <div class="app-body">
       <aside class="sidebar">
-        <button class="sidebar-add-btn" @click="openCreateModal">
+        <button
+          class="sidebar-add-btn"
+          :class="{ 'sidebar-add-btn--active': isNewVenueActive }"
+          @click="onNewVenue"
+        >
           <Icon icon="lucide:plus" class="add-btn-icon" />
           <span>新增场馆</span>
         </button>
@@ -44,7 +23,7 @@
           v-for="(item, i) in venueList"
           :key="getVenueId(item)"
           class="venue-card"
-          :class="{ 'venue-card--active': i === activeIndex }"
+          :class="{ 'venue-card--active': !isNewVenueActive && i === activeIndex }"
           @click="onCardClick(i)"
         >
           <div class="venue-preview" :style="{ background: item.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length] }">
@@ -56,6 +35,7 @@
 
       <main class="main-area">
         <SeatMapDesigner
+          ref="designerRef"
           :venue-data="venueData"
           :seat-list="seatList"
           :options="designerOptions"
@@ -73,13 +53,11 @@ import { ref, shallowRef, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import SeatMapDesigner from './SeatMapDesigner.vue'
-import type { VenueData } from '../types'
 import {
   fetchSeatMaps,
   fetchSeatMapData,
   fetchSeatList,
   editVenue,
-  createVenue,
   getVenueId,
   type VenueListItem,
 } from '../api/seatMap'
@@ -88,12 +66,6 @@ type SeatMapDesignerProps = InstanceType<typeof SeatMapDesigner>['$props']
 
 // ==================== Constants ====================
 const DEFAULT_COLORS = ['#e0f2fe', '#fef3c7', '#f1f5f9', '#fce7f3', '#e0e7ff', '#d1fae5']
-
-const DEFAULT_VENUE_CATEGORIES = [
-  { key: 1, label: '普通区', color: '#4CAF50', accessible: false },
-  { key: 2, label: 'VIP区', color: '#E91E63', accessible: false },
-  { key: 3, label: '轮椅区', color: '#2196F3', accessible: true },
-]
 
 // ==================== Router ====================
 const route = useRoute()
@@ -109,17 +81,16 @@ const seatList = shallowRef<any[]>([])
 
 const designerOptions = ref<SeatMapDesignerProps['options']>({})
 
+const designerRef = ref<InstanceType<typeof SeatMapDesigner>>()
+
+const isNewVenueActive = ref(false)
+
 const activeIndex = computed(() => {
   const id = route.query.venue
   if (!id) return 0
   const idx = venueList.value.findIndex(m => getVenueId(m) === id)
   return idx >= 0 ? idx : 0
 })
-
-// ==================== State: create modal ====================
-const isCreateModalOpen = ref(false)
-const newVenueName = ref('')
-const creating = ref(false)
 
 // ==================== Helpers ====================
 function showError(context: string, e: unknown) {
@@ -158,8 +129,15 @@ async function refreshCurrentData() {
 
 // ==================== Actions: venue list ====================
 function onCardClick(index: number) {
+  isNewVenueActive.value = false
   const vid = getVenueId(venueList.value[index])
   router.push({ query: { venue: vid } })
+}
+
+// ==================== Actions: new venue ====================
+function onNewVenue() {
+  isNewVenueActive.value = true
+  designerRef.value?.clearCanvas()
 }
 
 // ==================== Actions: save ====================
@@ -169,48 +147,6 @@ async function onSaveVenue(data: any) {
     alert('保存成功')
   } catch (e) {
     showError('保存失败', e)
-  }
-}
-
-// ==================== Modal ====================
-function openCreateModal() {
-  newVenueName.value = ''
-  isCreateModalOpen.value = true
-}
-
-function closeCreateModal() {
-  isCreateModalOpen.value = false
-}
-
-async function confirmCreateVenue() {
-  const name = newVenueName.value.trim()
-  if (!name || creating.value) return
-
-  creating.value = true
-  try {
-    const venue: Omit<VenueData, 'id'> = {
-      name,
-      type: 'WITH_SECTIONS',
-      categories: DEFAULT_VENUE_CATEGORIES.map(c => ({ ...c })),
-      sections: [],
-      baseScale: 1,
-    }
-
-    const res = await createVenue(venue)
-    const realId = res?.id || res?.venue?.id
-
-    if (!realId) {
-      throw new Error('后端未返回场馆 ID')
-    }
-
-    venueList.value = await fetchSeatMaps()
-    router.push({ query: { venue: realId } })
-    closeCreateModal()
-    alert('场馆创建成功')
-  } catch (e) {
-    showError('创建场馆失败', e)
-  } finally {
-    creating.value = false
   }
 }
 
@@ -314,6 +250,12 @@ watch(() => route.query.venue, () => {
   background: var(--color-accent-soft);
 }
 
+.sidebar-add-btn--active {
+  border-color: var(--color-accent, #6366f1);
+  color: var(--color-accent, #6366f1);
+  background: rgba(99, 102, 241, 0.12);
+}
+
 .add-btn-icon {
   width: 16px;
   height: 16px;
@@ -371,95 +313,5 @@ watch(() => route.query.venue, () => {
   flex: 1;
   overflow: hidden;
   min-width: 0;
-}
-
-/* ==================== Modal ==================== */
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(45, 42, 38, 0.45);
-  z-index: 100;
-}
-
-.modal-card {
-  width: 360px;
-  padding: 20px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(45, 42, 38, 0.18);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 18px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.modal-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--color-accent);
-}
-
-.modal-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-
-.modal-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.modal-input:focus {
-  border-color: var(--color-accent);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.modal-btn {
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: opacity 0.15s;
-}
-
-.modal-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modal-btn--primary {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-.modal-btn--secondary {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
 }
 </style>

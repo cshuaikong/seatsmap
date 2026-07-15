@@ -98,6 +98,11 @@ export interface Seat {
   radius?: number
   rowId?: string
   sectionId?: string
+
+  // 后端兼容字段（导出/保存时填充）
+  ven_id?: string
+  sec_id?: string
+  row_id?: string
   
   // 无障碍设施
   isAccessible?: boolean

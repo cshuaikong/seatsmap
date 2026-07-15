@@ -108,6 +108,10 @@ export const useVenueDataStore = defineStore('venueData', () => {
     const section = venue.value.sections.find(s => s.id === sectionId)
     if (!section) return
     const newRow: SeatRow = { ...row, id: generateId() }
+    newRow.seats.forEach(seat => {
+      seat.sectionId = sectionId
+      seat.rowId = newRow.id
+    })
     section.rows.push(newRow)
     return newRow.id
   }
@@ -118,6 +122,10 @@ export const useVenueDataStore = defineStore('venueData', () => {
     const addedIds: string[] = []
     for (const row of rows) {
       const newRow: SeatRow = { ...row, id: generateId() }
+      newRow.seats.forEach(seat => {
+        seat.sectionId = sectionId
+        seat.rowId = newRow.id
+      })
       section.rows.push(newRow)
       addedIds.push(newRow.id)
     }
@@ -187,7 +195,9 @@ export const useVenueDataStore = defineStore('venueData', () => {
         y: firstSeat.y + Math.sin(angle) * (newSpacing * i),
         categoryKey: i < currentCount ? row.seats[i].categoryKey : firstSeat.categoryKey,
         status: i < currentCount ? row.seats[i].status : 'available',
-        objectType: 'seat' as const
+        objectType: 'seat' as const,
+        sectionId: section.id,
+        rowId: row.id,
       }))
       row.seatSpacing = newSpacing
     })
@@ -260,7 +270,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
   }
 
   function addSeatAtRowStart(rowId: string) {
-    mutateRow(rowId, row => {
+    mutateRow(rowId, (row, section) => {
       if (row.seats.length === 0) return false
       const firstSeat = row.seats[0]
       const secondSeat = row.seats[1]
@@ -272,7 +282,9 @@ export const useVenueDataStore = defineStore('venueData', () => {
         y: firstSeat.y,
         categoryKey: firstSeat.categoryKey,
         status: 'available',
-        objectType: 'seat'
+        objectType: 'seat',
+        sectionId: section.id,
+        rowId: row.id,
       })
       renumberRowSeats(row)
       return true
@@ -280,7 +292,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
   }
 
   function addSeatAtRowEnd(rowId: string) {
-    mutateRow(rowId, row => {
+    mutateRow(rowId, (row, section) => {
       if (row.seats.length === 0) return false
       const lastSeat = row.seats[row.seats.length - 1]
       const secondLastSeat = row.seats[row.seats.length - 2]
@@ -294,7 +306,9 @@ export const useVenueDataStore = defineStore('venueData', () => {
         y: lastSeat.y,
         categoryKey: lastSeat.categoryKey,
         status: 'available',
-        objectType: 'seat'
+        objectType: 'seat',
+        sectionId: section.id,
+        rowId: row.id,
       })
       renumberRowSeats(row)
       return true
@@ -325,10 +339,10 @@ export const useVenueDataStore = defineStore('venueData', () => {
     })
   }
 
-  function mutateRow(rowId: string, mutator: (row: SeatRow) => boolean) {
+  function mutateRow(rowId: string, mutator: (row: SeatRow, section: Section) => boolean) {
     for (const section of venue.value.sections) {
       const row = section.rows.find(r => r.id === rowId)
-      if (row) return mutator(row)
+      if (row) return mutator(row, section)
     }
     return false
   }
@@ -607,10 +621,24 @@ export const useVenueDataStore = defineStore('venueData', () => {
   // ==================== Import / Export ====================
 
   function exportVenueData(): VenueData {
-    return JSON.parse(JSON.stringify(venue.value))
+    const data = JSON.parse(JSON.stringify(venue.value)) as VenueData
+    data.sections.forEach(section => {
+      section.rows.forEach(row => {
+        row.seats.forEach(seat => {
+          const sectionId = seat.sectionId || section.id
+          const rowId = seat.rowId || row.id
+          seat.sectionId = sectionId
+          seat.rowId = rowId
+          seat.ven_id = data.id
+          seat.sec_id = sectionId
+          seat.row_id = rowId
+        })
+      })
+    })
+    return data
   }
 
-  function importVenueData(data: VenueData) {
+  function importVenueData(data: VenueData, seatList?: Seat[]) {
     if (!data) {
       console.error('导入失败: 数据为空')
       return
@@ -626,22 +654,46 @@ export const useVenueDataStore = defineStore('venueData', () => {
 
     const normalizedSections: Section[] = data.sections.map(section => ({
       ...section,
-      type: (section as any).type || (section as any).borderType || undefined,
       readonly: false,
-      rows: Array.isArray(section.rows) ? section.rows : []
+      rows: Array.isArray(section.rows)
+        ? section.rows.map(row => ({ ...row, seats: Array.isArray(row.seats) ? row.seats : [] }))
+        : []
     }))
 
-    normalizedSections.forEach(section => {
-      section.rows = section.rows.map(row => ({
-        ...row,
-        seats: Array.isArray(row.seats)
-          ? row.seats.map(seat => ({
+    // 如果后端传了独立的 seatList，按 sec_id/row_id 合并到对应 rows
+    if (Array.isArray(seatList) && seatList.length > 0) {
+      const seatMap = new Map<string, any[]>()
+      seatList.forEach(seat => {
+        const key = `${(seat as any).sec_id || ''}|${(seat as any).row_id || ''}`
+        if (!seatMap.has(key)) seatMap.set(key, [])
+        seatMap.get(key)!.push(seat)
+      })
+
+      normalizedSections.forEach(section => {
+        section.rows.forEach(row => {
+          const key = `${section.id}|${row.id}`
+          const seats = seatMap.get(key)
+          if (seats) {
+            row.seats = seats.map(seat => ({
               ...seat,
-              categoryKey: seat.categoryKey ?? (seat as any).cat_id ?? (seat as any).category ?? 1
+              sectionId: section.id,
+              rowId: row.id,
             }))
-          : []
-      }))
-    })
+          }
+        })
+      })
+
+      // DEBUG: 打印合并结果
+      const totalMerged = normalizedSections.reduce((sum, s) => sum + s.rows.reduce((rSum, r) => rSum + r.seats.length, 0), 0)
+      console.log('[importVenueData] seatList 总数:', seatList.length, '合并后座位总数:', totalMerged)
+      normalizedSections.forEach(s => {
+        s.rows.forEach(r => {
+          if (r.seats.length > 0) {
+            console.log(`[importVenueData] section=${s.id}, row=${r.id}, seats=${r.seats.length}, firstSeat=`, r.seats[0])
+          }
+        })
+      })
+    }
 
     venue.value = {
       id: data.id || generateId(),
@@ -691,24 +743,6 @@ export const useVenueDataStore = defineStore('venueData', () => {
               y: row.y || 0,
               rotation: row.rotation || 0,
               seats: []
-            }
-            if (Array.isArray(row.seats)) {
-              row.seats.forEach((seat: any) => {
-                seatRow.seats.push({
-                  id: seat.id || generateId(),
-                  label: seat.label || '',
-                  x: seat.x || 0,
-                  y: seat.y || 0,
-                  categoryKey: seat.categoryId || seat.category || 1,
-                  status: seat.status || 'available',
-                  objectType: seat.isWheelchair ? 'wheelchair' : 'seat',
-                  radius: seat.radius,
-                  rowId: row.id,
-                  sectionId: sec.id,
-                  isAccessible: seat.isWheelchair || false,
-                  isCompanionSeat: seat.isCompanion || false
-                })
-              })
             }
             section.rows.push(seatRow)
           })
@@ -763,7 +797,6 @@ export const useVenueDataStore = defineStore('venueData', () => {
     return [
       { key: 1, label: '普通区', color: '#A5D6A7', accessible: false },
       { key: 2, label: 'VIP区', color: '#FF8A80', accessible: false },
-      { key: 3, label: '轮椅区', color: '#90CAF9', accessible: true }
     ]
   }
 
