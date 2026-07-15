@@ -171,6 +171,7 @@ const generateSeatLabels = (scheme: string, count: number, start?: string, direc
   return labels
 }
 
+import { defaultSeatMapOptions } from '../types'
 import type { PanelSelection, SelectedObjectType, Section } from '../types'
 import ChartOverviewPanel from './panels/ChartOverviewPanel.vue'
 import ShapePanel from './panels/ShapePanel.vue'
@@ -574,7 +575,7 @@ const handlePropertyUpdate = (updates: Record<string, any>) => {
     const spacingData = updates.seatSpacing as { spacings: number[], resetCurve: boolean }
     const rowIds = editorStore.selectedRowIds
     const commands = rowIds.map((rowId, index) => {
-      const newSpacing = spacingData.spacings[index] || spacingData.spacings[0] || 18
+      const newSpacing = spacingData.spacings[index] || spacingData.spacings[0] || defaultSeatMapOptions.seats.spacing
       return createUpdateRowSeatSpacingCommand(venueDataStore, rowId, newSpacing, spacingData.resetCurve)
     })
     historyStore.execute(createBatchCommand(commands))

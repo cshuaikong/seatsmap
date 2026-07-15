@@ -12,6 +12,7 @@ import type {
   AreaObject,
   SelectedObjectType,
 } from '../types'
+import { defaultSeatMapOptions } from '../types'
 
 export interface PasteInput {
   sections?: Section[]
@@ -43,12 +44,13 @@ export const useVenueDataStore = defineStore('venueData', () => {
   const venue = ref<VenueData>(createDefaultVenue())
 
   // 默认的座位视觉配置（用户在屏幕上期望看到的像素大小）
-  // TODO: 后续应移到配置层或编辑器 Store，不属于场馆持久化数据
+  // 统一从 defaultSeatMapOptions 取值，避免重复定义
+  const seatDefaults = defaultSeatMapOptions.seats
   const visualConfig = {
-    radius: 6,      // 期望在屏幕上看到的半径 6px
-    gap: 18,        // 期望在屏幕上看到的间距 18px
-    rowGap: 24,     // 期望在屏幕上看到的行距 24px
-    width: 2        // 期望在屏幕上看到的边框宽度 2px
+    radius: seatDefaults.radius,
+    gap: seatDefaults.spacing,
+    rowGap: seatDefaults.rowSpacing,
+    width: seatDefaults.strokeWidth
   }
 
   // ==================== Getters ====================
@@ -170,7 +172,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
       if (!row || row.seats.length === newSeatCount) return
 
       const currentCount = row.seats.length
-      const currentSpacing = row.seatSpacing || 18
+      const currentSpacing = row.seatSpacing || seatDefaults.spacing
       const totalLength = (currentCount - 1) * currentSpacing
       const newSpacing = newSeatCount > 1 ? totalLength / (newSeatCount - 1) : currentSpacing
 
@@ -203,7 +205,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
       const row = section.rows.find(r => r.id === rowId)
       if (!row) return
 
-      const oldSpacing = row.seatSpacing || 18
+      const oldSpacing = row.seatSpacing || seatDefaults.spacing
       const seatCount = row.seats.length
       if (seatCount < 2 || oldSpacing === newSpacing) return
 
@@ -262,7 +264,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
       if (row.seats.length === 0) return false
       const firstSeat = row.seats[0]
       const secondSeat = row.seats[1]
-      const spacing = row.seats.length > 1 ? secondSeat.x - firstSeat.x : (row.seatSpacing || 28)
+      const spacing = row.seats.length > 1 ? secondSeat.x - firstSeat.x : (row.seatSpacing || seatDefaults.singleSeatSpacing)
       row.seats.unshift({
         id: generateId(),
         label: '',
@@ -284,7 +286,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
       const secondLastSeat = row.seats[row.seats.length - 2]
       const spacing = row.seats.length > 1
         ? lastSeat.x - secondLastSeat.x
-        : (row.seatSpacing || 28)
+        : (row.seatSpacing || seatDefaults.singleSeatSpacing)
       row.seats.push({
         id: generateId(),
         label: '',
@@ -647,7 +649,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
       type: data.type || 'SIMPLE',
       categories: data.categories.length > 0 ? data.categories : defaultCategories(),
       sections: normalizedSections,
-      baseScale: (data as any).baseScale ?? (data as any).scale ?? null
+      baseScale: data.baseScale ?? undefined
     }
   }
 
@@ -721,7 +723,7 @@ export const useVenueDataStore = defineStore('venueData', () => {
       type: data.type || 'SIMPLE',
       categories: categories.length > 0 ? categories : defaultCategories(),
       sections,
-      baseScale: (data as any).baseScale ?? (data as any).scale ?? null
+      baseScale: data.baseScale ?? undefined
     }
   }
 

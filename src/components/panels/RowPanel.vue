@@ -229,6 +229,7 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import PanelSection from './controls/PanelSection.vue'
+import { defaultSeatMapOptions } from '../../types'
 
 interface Category {
   id: string
@@ -480,7 +481,7 @@ const readFromNodes = () => {
   
   // 读取所有选中排的座位间距
   localSeatSpacings.value = props.nodes.map(node => {
-    return node.getAttr?.('seatSpacing') || node.seatSpacing || 18
+    return node.getAttr?.('seatSpacing') || node.seatSpacing || defaultSeatMapOptions.seats.spacing
   })
   
   // 读取所有选中排的行间距（注意：0 是有效值，不能作为默认值）

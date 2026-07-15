@@ -1,9 +1,10 @@
 import { Ellipse, Line, Text, Group } from 'leafer-ui'
+import { defaultSeatMapOptions } from '../types'
 
 export const SEAT_CONFIG = {
-  radius: 6,       // 座位半径（逻辑像素）
-  spacing: 18,     // 座位间距
-  rowSpacing: 24,  // 排间距
+  radius: defaultSeatMapOptions.seats.radius,       // 座位半径（逻辑像素）
+  spacing: defaultSeatMapOptions.seats.spacing,     // 座位间距
+  rowSpacing: defaultSeatMapOptions.seats.rowSpacing,  // 排间距
 } as const
 
 const SEAT_SPACING = SEAT_CONFIG.spacing

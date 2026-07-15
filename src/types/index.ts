@@ -51,10 +51,10 @@ export type SeatDrawMode = 'single-seat' | 'row-straight' | 'row-curved' | 'row-
 export interface VenueData {
   id: string
   name: string
-  type: 'SIMPLE' | 'WITH_SECTIONS' | 'WITH_SECTIONS_AND_FLOORS'
+  type: 'SIMPLE' | 'WITH_SECTIONS' | 'WITH_FLOORS'
   categories: Category[]
   sections: Section[]
-  baseScale?: number | null  // 座位绘制基准缩放，随数据源持久化
+  baseScale?: number   // 座位绘制基准缩放，随数据源持久化
 }
 
 // 扩展 Category 支持 key 字段
@@ -153,48 +153,109 @@ export interface Section {
   readonly?: boolean
 }
 
-// 座位图配置接口
-export interface SeatMapConfig {
-  defaultSeatRadius: number
-  defaultSeatSpacing: number
-  defaultRowSpacing: number
-  showRowLabels: boolean
-  showSeatLabels: boolean
-  statusColors: Record<SeatStatus, string>
-  categoryColors: Record<string, string>
-  // 区块配置
-  sectionConfig: {
-    seatsPerRow: number
-    rowCount: number
+// 座位图配置选项（用户可配置的全部行为/外观参数）
+export interface SeatMapOptions {
+  /** 座位视觉 */
+  seats: {
+    radius: number           // 座位圆点半径 (屏幕像素)，默认 6
+    spacing: number          // 座位间距 (屏幕像素)，默认 18
+    rowSpacing: number       // 排间距 (屏幕像素)，默认 24
+    strokeWidth: number      // 座位边框宽度 (屏幕像素)，默认 2
+    singleSeatSpacing: number // 单行座位时的回退间距 (屏幕像素)，默认 28
+  }
+  /** 标签显示 */
+  labels: {
+    showRowLabels: boolean
+    showSeatLabels: boolean
+    sectionNameFontSize: number  // 默认 14
+  }
+  /** 颜色体系 */
+  colors: {
+    categoryColors: Record<string, string>
+    statusColors: Record<SeatStatus, string>
+    sectionDefaultFill: string
+    sectionDefaultStroke: string
+    seatDefaultFill: string
+    seatStrokeDarken: number          // 暗化量 0-100，默认 30
+    selectionStroke: string
+    previewFill: string
+  }
+  /** 编辑行为 */
+  editor: {
+    handleSize: number       // 控制点屏幕像素，默认 6
+    strokeWidth: number      // 编辑器描边宽度，默认 1
+    closeThreshold: number   // 绘制闭合阈值 (像素)，默认 15
+    zoomMin: number          // 默认 0.05
+    zoomMax: number          // 默认 20
+  }
+  /** LOD / 性能 */
+  lod: {
+    seatDotMinRadius: number       // 屏幕半径低于此值只画圆点，默认 3
+    seatFullMinRadius: number      // 屏幕半径高于此值画完整座位，默认 6
+    sectionNameMinScale: number    // 缩放低于此值隐藏分区名，默认 0.8
+  }
+  /** 新建区段默认值 */
+  sectionDefaults: {
+    seatsPerRow: number      // 默认 8
+    rowCount: number         // 默认 5
+  }
+  /** 功能开关 */
+  features: {
+    showMinimap: boolean
+    showGrid: boolean
   }
 }
 
-// 默认座位图配置
-export const defaultSeatMapConfig: SeatMapConfig = {
-  defaultSeatRadius: 6,
-  defaultSeatSpacing: 18,
-  defaultRowSpacing: 24,  // 行间距
-  showRowLabels: true,
-  showSeatLabels: true,
-  
-  statusColors: {
-    [SEAT_STATUS.AVAILABLE]: '#9E9E9E',
-    [SEAT_STATUS.BOOKED]: '#F44336',
-    [SEAT_STATUS.RESERVED]: '#FF9800',
-    [SEAT_STATUS.DISABLED]: '#616161',
-    [SEAT_STATUS.SELECTED]: '#4CAF50',  // 选中状态颜色（绿色）
+export const defaultSeatMapOptions: SeatMapOptions = {
+  seats: {
+    radius: 6,
+    spacing: 18,
+    rowSpacing: 24,
+    strokeWidth: 2,
+    singleSeatSpacing: 28,
   },
-  
-  categoryColors: {
-    'VIP': '#FFD700',
-    '普通席': '#4CAF50',
-    '特价席': '#2196F3',
-    '无障碍': '#9C27B0',
+  labels: {
+    showRowLabels: true,
+    showSeatLabels: true,
+    sectionNameFontSize: 14,
   },
-  
-  sectionConfig: {
+  colors: {
+    categoryColors: {
+      '普通席': '#4CAF50',
+    },
+    statusColors: {
+      [SEAT_STATUS.AVAILABLE]: '#9E9E9E',
+      [SEAT_STATUS.BOOKED]: '#F44336',
+      [SEAT_STATUS.RESERVED]: '#FF9800',
+      [SEAT_STATUS.DISABLED]: '#616161',
+      [SEAT_STATUS.SELECTED]: '#4CAF50',
+    },
+    sectionDefaultFill: '#d1d5db',
+    sectionDefaultStroke: '#9ca3af',
+    seatDefaultFill: '#A5D6A7',
+    seatStrokeDarken: 30,
+    selectionStroke: '#3b82f6',
+    previewFill: 'rgba(59,130,246,0.18)',
+  },
+  editor: {
+    handleSize: 6,
+    strokeWidth: 1,
+    closeThreshold: 15,
+    zoomMin: 0.05,
+    zoomMax: 20,
+  },
+  lod: {
+    seatDotMinRadius: 3,
+    seatFullMinRadius: 6,
+    sectionNameMinScale: 0.8,
+  },
+  sectionDefaults: {
     seatsPerRow: 8,
     rowCount: 5,
+  },
+  features: {
+    showMinimap: true,
+    showGrid: false,
   },
 }
 

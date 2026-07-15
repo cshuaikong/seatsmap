@@ -323,9 +323,9 @@ function renderAll(data: VenueData): void {
       }
     })
 
-    // 从 venue data 渲染座位（sections[].rows[].seats[]），兼容 API 的 scale 字段
+    // 从 venue data 渲染座位（sections[].rows[].seats[]）
     const raw: any = data
-    const bs = raw?.baseScale ?? raw?.scale
+    const bs = raw?.baseScale
     seatModule.createSeatsFromVenueData(sections, bs != null ? parseFloat(bs) : bs, data?.categories)
 
     // 分区名称文本初始定位（rAF 确保 LeaferJS 布局就绪）
@@ -551,7 +551,7 @@ function enterSectionFocus(sectionId: string): void {
     const cx = pathCenter ? (section.x ?? 0) + pathCenter.cx : (section.x ?? 0)
     const cy = pathCenter ? (section.y ?? 0) + pathCenter.cy : (section.y ?? 0)
     const raw: any = props.venueData || {}
-    const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null) ?? seatModule.getBaseScale()
+    const baseScale = raw.baseScale ?? seatModule.getBaseScale()
     const currentS = getS()
     const targetScale = baseScale
     if (Math.abs(targetScale - currentS) > 0.001) {
@@ -588,7 +588,7 @@ function enterSectionFocus(sectionId: string): void {
     }
   } catch (_) {}
   const raw: any = props.venueData || {}
-  const baseScale = raw.baseScale ?? (raw.scale != null ? parseFloat(raw.scale) : null) ?? seatModule.getBaseScale()
+  const baseScale = raw.baseScale ?? seatModule.getBaseScale()
   const currentS = getS()
   const targetScale = baseScale
   if (Math.abs(targetScale - currentS) > 0.001) {

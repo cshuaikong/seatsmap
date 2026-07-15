@@ -41,7 +41,7 @@
           <span>新增场馆</span>
         </button>
         <div
-          v-for="(item, i) in seatMaps"
+          v-for="(item, i) in venueList"
           :key="getVenueId(item)"
           class="venue-card"
           :class="{ 'venue-card--active': i === activeIndex }"
@@ -57,7 +57,8 @@
       <main class="main-area">
         <SeatMapDesigner
           :venue-data="venueData"
-          :options="{}"
+          :seat-list="seatList"
+          :options="designerOptions"
           embedded
           @save="onSaveVenue"
         />
@@ -71,16 +72,19 @@
 import { ref, shallowRef, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { nanoid } from 'nanoid'
 import SeatMapDesigner from './SeatMapDesigner.vue'
+import type { VenueData } from '../types'
 import {
   fetchSeatMaps,
   fetchSeatMapData,
+  fetchSeatList,
   editVenue,
   createVenue,
   getVenueId,
-  type SeatMapEntry,
+  type VenueListItem,
 } from '../api/seatMap'
+
+type SeatMapDesignerProps = InstanceType<typeof SeatMapDesigner>['$props']
 
 // ==================== Constants ====================
 const DEFAULT_COLORS = ['#e0f2fe', '#fef3c7', '#f1f5f9', '#fce7f3', '#e0e7ff', '#d1fae5']
@@ -96,15 +100,19 @@ const route = useRoute()
 const router = useRouter()
 
 // ==================== State: venue list ====================
-const seatMaps = ref<SeatMapEntry[]>([])
+const venueList = ref<VenueListItem[]>([])
 
 // ==================== State: current venue ====================
 const venueData = shallowRef<any>({})
 
+const seatList = shallowRef<any[]>([])
+
+const designerOptions = ref<SeatMapDesignerProps['options']>({})
+
 const activeIndex = computed(() => {
   const id = route.query.venue
   if (!id) return 0
-  const idx = seatMaps.value.findIndex(m => getVenueId(m) === id)
+  const idx = venueList.value.findIndex(m => getVenueId(m) === id)
   return idx >= 0 ? idx : 0
 })
 
@@ -122,28 +130,35 @@ function showError(context: string, e: unknown) {
 
 // ==================== Data fetching ====================
 async function refreshCurrentData() {
-  const entry = seatMaps.value[activeIndex.value]
+  const entry = venueList.value[activeIndex.value]
   if (!entry) {
     venueData.value = {}
+    seatList.value = []
     return
   }
   const vid = getVenueId(entry)
   if (!vid) {
-    console.warn('[IndexPage] 列表项缺少 ID 字段:', entry)
     venueData.value = {}
+    seatList.value = []
     return
   }
   try {
-    venueData.value = await fetchSeatMapData(vid)
+    const [venue, seats] = await Promise.all([
+      fetchSeatMapData(vid),
+      fetchSeatList(vid),
+    ])
+    venueData.value = venue.venue || {}
+    seatList.value =  seats.seatlist || []
   } catch (e) {
-    console.error('[IndexPage] 加载座位图数据失败:', e)
+    showError('数据加载失败', e)
     venueData.value = {}
+    seatList.value = []
   }
 }
 
 // ==================== Actions: venue list ====================
 function onCardClick(index: number) {
-  const vid = getVenueId(seatMaps.value[index])
+  const vid = getVenueId(venueList.value[index])
   router.push({ query: { venue: vid } })
 }
 
@@ -173,22 +188,25 @@ async function confirmCreateVenue() {
 
   creating.value = true
   try {
-    const id = nanoid()
-    const venue = {
-      id,
+    const venue: Omit<VenueData, 'id'> = {
       name,
-      type: 'WITH_SECTION',
-      categories: DEFAULT_VENUE_CATEGORIES,
+      type: 'WITH_SECTIONS',
+      categories: DEFAULT_VENUE_CATEGORIES.map(c => ({ ...c })),
       sections: [],
-      scale: 1,
+      baseScale: 1,
     }
 
     const res = await createVenue(venue)
-    const realId = res?.id || id
+    const realId = res?.id || res?.venue?.id
 
-    seatMaps.value = await fetchSeatMaps()
+    if (!realId) {
+      throw new Error('后端未返回场馆 ID')
+    }
+
+    venueList.value = await fetchSeatMaps()
     router.push({ query: { venue: realId } })
     closeCreateModal()
+    alert('场馆创建成功')
   } catch (e) {
     showError('创建场馆失败', e)
   } finally {
@@ -198,11 +216,7 @@ async function confirmCreateVenue() {
 
 // ==================== Lifecycle & watchers ====================
 onMounted(async () => {
-  try {
-    seatMaps.value = await fetchSeatMaps()
-  } catch (e) {
-    console.error('加载座位图列表失败:', e)
-  }
+  venueList.value = await fetchSeatMaps()
   refreshCurrentData()
 })
 

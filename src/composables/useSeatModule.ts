@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { Group, Line, Ellipse, Text, PointerEvent } from 'leafer-ui'
 import type { LeaferElementMeta } from '../types/leafer-meta'
 import { useSeatDraw, SEAT_CONFIG } from './useSeatDraw'
+import { defaultSeatMapOptions } from '../types'
 
 // 带业务元数据的 Leafer 元素类型
 export type MetaGroup = Group & LeaferElementMeta
@@ -168,7 +169,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
     const ux = dx / len
     const uy = dy / len
     const angle = Math.atan2(dy, dx) * 180 / Math.PI
-    const spacing = group.__seatSpacing ?? (group.__seatRowData?.spacing ?? 18)
+    const spacing = group.__seatSpacing ?? (group.__seatRowData?.spacing ?? defaultSeatMapOptions.seats.spacing)
     const bs = seatDraw.getBaseScale()
     const seatR = SEAT_CONFIG.radius / Math.max(bs, 0.02)
     const labelText = new Text({
@@ -561,7 +562,7 @@ export function useSeatModule(ctx: SeatModuleCtx) {
           const dx2 = lx2 - fx2, dy2 = ly2 - fy2
           const len2 = Math.hypot(dx2, dy2) || 1
           const ux2 = dx2 / len2, uy2 = dy2 / len2
-          const sp = group.__seatSpacing ?? (group.__seatRowData?.spacing ?? 18)
+          const sp = group.__seatSpacing ?? (group.__seatRowData?.spacing ?? defaultSeatMapOptions.seats.spacing)
           labelText.x = fx2 - ux2 * sp * 0.8
           labelText.y = fy2 - uy2 * sp * 0.8
           labelText.rotation = Math.atan2(dy2, dx2) * 180 / Math.PI

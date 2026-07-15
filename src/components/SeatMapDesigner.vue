@@ -62,7 +62,7 @@
           <PathEditor
             ref="rendererRef"
             :venue-data="effectiveVenueData"
-            :seat-list="[]"
+            :seat-list="props.seatList"
             :current-tool="currentTool"
             hide-toolbar
             @body-double-tap="onPathDoubleTap"
@@ -108,12 +108,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, provide } from 'vue'
 import { Icon } from '@iconify/vue'
 import RightPanel from './RightPanel.vue'
 import LeftToolbar from './LeftToolbar.vue'
 import PathEditor from './PathEditor.vue'
-import type { VenueData } from '../types'
+import type { VenueData, SeatMapOptions } from '../types'
+import { defaultSeatMapOptions } from '../types'
 import { useVenueDataStore } from '../stores/venueDataStore'
 
 import type { ToolId } from '../domain/toolRegistry'
@@ -134,14 +135,32 @@ const emit = defineEmits<{
 
 const props = withDefaults(defineProps<{
   venueData?: VenueData
+  seatList?: any[]
+  options?: Partial<SeatMapOptions>
   embedded?: boolean
 }>(), {
   venueData: () => ({}) as VenueData,
+  seatList: () => [],
+  options: () => ({}),
   embedded: false,
 })
 
 const currentTool = ref<ToolId>('select')
 const vertexEditActive = ref(false)
+
+const mergedOptions = computed<SeatMapOptions>(() => ({
+  ...defaultSeatMapOptions,
+  ...props.options,
+  seats: { ...defaultSeatMapOptions.seats, ...props.options?.seats },
+  labels: { ...defaultSeatMapOptions.labels, ...props.options?.labels },
+  colors: { ...defaultSeatMapOptions.colors, ...props.options?.colors },
+  editor: { ...defaultSeatMapOptions.editor, ...props.options?.editor },
+  lod: { ...defaultSeatMapOptions.lod, ...props.options?.lod },
+  sectionDefaults: { ...defaultSeatMapOptions.sectionDefaults, ...props.options?.sectionDefaults },
+  features: { ...defaultSeatMapOptions.features, ...props.options?.features },
+}))
+
+provide('seatMapOptions', mergedOptions)
 
 const rendererRef = ref<InstanceType<typeof PathEditor>>()
 const venueDataStore = useVenueDataStore()
