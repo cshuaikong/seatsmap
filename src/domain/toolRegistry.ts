@@ -12,7 +12,7 @@ export type ToolId =
   | 'selectseat'
   | 'seat-row'
   | 'seat-diagonal'
-  | 'drawPolygon'
+  | 'drawSection'
   | 'text'
   | 'image'
 
@@ -88,7 +88,7 @@ export const ALL_TOOLS: ToolConfig[] = [
     visible: (ctx) => ctx.venueType === 'SIMPLE' || ctx.sectionFocused,
   },
   {
-    id: 'drawPolygon',
+    id: 'drawSection',
     label: '绘制分区',
     title: '绘制分区',
     iconSet: 'iconfont',

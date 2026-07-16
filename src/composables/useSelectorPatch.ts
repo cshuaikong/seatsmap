@@ -128,6 +128,34 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
     return _origAllowDrag(e)
   }
 
+  // ⑤‑1 onDragStart — 框选起点，强制刷新布局避免第一次拖拽时 __world 未计算导致 bounds 为 0,0
+  sel.onDragStart = function (e: any) {
+    if (e.multiTouch) return
+    if (this.waitSelect) this.waitSelect()
+
+    if (this.allowDrag(e)) {
+      const { editor } = this
+      const { stroke, area } = editor.mergeConfig
+
+      // 关键：第一次拖拽时 selector/editor 的世界矩阵可能还没刷新，
+      // 导致 e.getInnerPoint(this) 取到错误起点 (0,0)，选框从左上角开始。
+      // 这里先强制更新布局，确保 worldTransform 已生效。
+      try {
+        this.updateLayout?.()
+        editor?.updateLayout?.()
+        editor?.app?.updateLayout?.()
+      } catch (_) {}
+
+      const { x, y } = e.getInnerPoint(this)
+      this.bounds.set(x, y)
+
+      this.selectArea.setStyle({ visible: true, stroke, x, y }, area)
+      this.selectArea.setBounds(this.bounds.get())
+
+      this.originList = editor.leafList.clone()
+    }
+  }
+
   // ⑥ onDrag — 框选
   const { findByBounds } = EditSelectHelper
 
@@ -240,18 +268,17 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
       const total = e.getInnerTotal(this)
       const dragBounds = this.bounds.clone().unsign()
 
+      // 使用鼠标按下时的世界坐标作为选框起点，不依赖 this.bounds 与 __world 矩阵，
+      // 避免初次拖拽时 bounds 为 0,0 导致选框从左上角开始。
+      const startWorldX = e.x - e.totalX
+      const startWorldY = e.y - e.totalY
       const worldBounds = dragBounds.clone()
-      const sw = (this as any).__world
-      if (sw) {
-        const startWX = this.bounds.x * sw.a + this.bounds.y * sw.c + sw.e
-        const startWY = this.bounds.x * sw.b + this.bounds.y * sw.d + sw.f
-        worldBounds.set(
-          Math.min(startWX, e.x),
-          Math.min(startWY, e.y),
-          Math.abs(e.x - startWX),
-          Math.abs(e.y - startWY),
-        )
-      }
+      worldBounds.set(
+        Math.min(startWorldX, e.x),
+        Math.min(startWorldY, e.y),
+        Math.abs(e.x - startWorldX),
+        Math.abs(e.y - startWorldY),
+      )
       const wr = worldBounds.get()
       const focusedId = ctx.getFocusedSectionId?.()
 
@@ -298,8 +325,13 @@ export function useSelectorPatch(ctx: SelectorPatchCtx): void {
         if (seen.has(target)) continue
 
         if (isSection) {
-          seen.add(target)
-          hits.push(target)
+          // 分区 Group 的 __world 可能因为选中边框（粗 stroke / visible=false）
+          // 或文本标签而变得很大，不能直接用包围盒命中。改用 body Path 精确检测。
+          const body = target.children?.find((c: any) => c.tag === 'Path' && !c.__sectionBorder)
+          if (body && pathHitsRect(body, wr.x, wr.y, wr.width, wr.height)) {
+            seen.add(target)
+            hits.push(target)
+          }
         } else if (parentGroup) {
           if (pathHitsRect(el, wr.x, wr.y, wr.width, wr.height)) {
             seen.add(target)

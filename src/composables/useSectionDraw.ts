@@ -3,7 +3,7 @@ import { Rect, Path } from 'leafer-ui'
 const r = (n: number) => +n.toFixed(2)
 const DRAW_CLOSE_THRESHOLD = 15
 
-export interface PolygonDrawCtx {
+export interface SectionDrawCtx {
   getLeafer: () => any
   getEditor: () => any
   getCanvas: () => HTMLCanvasElement | null
@@ -14,7 +14,7 @@ export interface PolygonDrawCtx {
   onToolChange: (tool: string) => void
 }
 
-export function usePolygonDraw(ctx: PolygonDrawCtx) {
+export function useSectionDraw(ctx: SectionDrawCtx) {
   let points: { x: number; y: number }[] = []
   let previewPath: any = null
   let vertexDots: any[] = []
