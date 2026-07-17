@@ -1,11 +1,12 @@
 import { ref } from 'vue'
 import { Rect, Ellipse, DragEvent } from 'leafer-ui'
 import { toWorld, toLocal } from '../utils/pathUtils'
+import type { CanvasContext } from './useCanvasContext'
 
 const r = (n: number) => +n.toFixed(2)
 
 export interface VertexEditCtx {
-  getLeafer: () => any
+  getCanvasContext: () => CanvasContext
   getEditor: () => any
   getAllPaths: () => any[]
   getS: () => number
@@ -133,8 +134,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
   function createAllHandles(): void {
     const el = target
     if (!el) return
-    const leafer = ctx.getLeafer()
-    if (!leafer) return
+    const sky = ctx.getCanvasContext().sky
     const { ox, oy, angle } = getCombinedTransform()
     const n = verts.length
     const hs = Math.max(ctx.getS(), 0.02)
@@ -165,7 +165,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
         notifyPathChange()
       })
 
-      leafer.add(h)
+      sky.add(h)
       handles.push(h)
     }
 
@@ -200,7 +200,7 @@ export function useVertexEdit(ctx: VertexEditCtx) {
         notifyPathChange()
       })
 
-      leafer.add(h)
+      sky.add(h)
       edgeHandles.push(h)
     }
 

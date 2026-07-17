@@ -1,10 +1,11 @@
 import { Rect, Path } from 'leafer-ui'
+import type { CanvasContext } from './useCanvasContext'
 
 const r = (n: number) => +n.toFixed(2)
 const DRAW_CLOSE_THRESHOLD = 15
 
 export interface SectionDrawCtx {
-  getLeafer: () => any
+  getCanvasContext: () => CanvasContext
   getEditor: () => any
   getCanvas: () => HTMLCanvasElement | null
   getAllPaths: () => any[]
@@ -60,8 +61,7 @@ export function useSectionDraw(ctx: SectionDrawCtx) {
 
   function addPoint(x: number, y: number): void {
     points.push({ x, y })
-    const leafer = ctx.getLeafer()
-    if (!leafer) return
+    const sky = ctx.getCanvasContext().sky
     const hs = Math.max(ctx.getS(), 0.02)
     const size = 6 / hs
     const dot = new Rect({
@@ -71,13 +71,12 @@ export function useSectionDraw(ctx: SectionDrawCtx) {
       around: 'center',
       draggable: false, hittable: false,
     })
-    leafer.add(dot)
+    sky.add(dot)
     vertexDots.push(dot)
   }
 
   function updatePreview(mx: number, my: number): void {
-    const leafer = ctx.getLeafer()
-    if (!leafer) return
+    const sky = ctx.getCanvasContext().sky
     previewPath?.remove()
     previewPath = null
     if (points.length === 0) return
@@ -99,7 +98,7 @@ export function useSectionDraw(ctx: SectionDrawCtx) {
       strokeWidth: 1.5 / hs,
       editable: false, draggable: false, hittable: false,
     })
-    leafer.add(previewPath)
+    sky.add(previewPath)
   }
 
   function finish(): void {

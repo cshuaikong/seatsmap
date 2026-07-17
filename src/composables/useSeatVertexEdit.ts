@@ -1,9 +1,10 @@
 import { ref } from 'vue'
 import { Rect, DragEvent } from 'leafer-ui'
 import type { SeatDrawRowData } from './useSeatDraw'
+import type { CanvasContext } from './useCanvasContext'
 
 export interface SeatVertexEditCtx {
-  getLeafer: () => any
+  getCanvasContext: () => CanvasContext
   getEditor: () => any
   getAllPaths: () => any[]
   getS: () => number
@@ -76,12 +77,12 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
   function exit(silent?: boolean): void {
     handles.forEach(h => { try { h.remove() } catch (_) {} })
     handles = []
-    // 兜底：清理 leafer 上可能残留的手柄（防止 remove 静默失败导致重复）
-    const leafer = ctx.getLeafer()
-    if (leafer) {
+    // 兜底：清理 sky 上可能残留的手柄（防止 remove 静默失败导致重复）
+    const sky = ctx.getCanvasContext().sky
+    if (sky) {
       const stray: any[] = []
-      leafer.children?.forEach((c: any) => { if (c.__seatHandleIdx != null) stray.push(c) })
-      stray.forEach(c => { try { leafer.remove(c) } catch (_) {} })
+      sky.children?.forEach((c: any) => { if (c.__seatHandleIdx != null) stray.push(c) })
+      stray.forEach(c => { try { sky.remove(c) } catch (_) {} })
       if (stray.length > 0) console.log('[seatVertex exit] 清理残留手柄:', stray.length)
     }
     target = null
@@ -102,8 +103,8 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
   }
 
   function createHandles(): void {
-    const leafer = ctx.getLeafer()
-    if (!leafer || !rowData) return
+    const sky = ctx.getCanvasContext().sky
+    if (!sky || !rowData) return
 
     const s = Math.max(ctx.getS(), 0.02)
     const size = 6 / s
@@ -136,14 +137,14 @@ export function useSeatVertexEdit(ctx: SeatVertexEditCtx) {
     ;(h0 as any).__seatHandleIdx = 0
     h0.on_(DragEvent.DRAG, () => onHandleDrag(0))
     h0.on_(DragEvent.END, () => onHandleDragEnd(0))
-    leafer.add(h0)
+    sky.add(h0)
     handles.push(h0)
 
     const h1 = new Rect({ ...handleBase, x: wp1.x, y: wp1.y })
     ;(h1 as any).__seatHandleIdx = 1
     h1.on_(DragEvent.DRAG, () => onHandleDrag(1))
     h1.on_(DragEvent.END, () => onHandleDragEnd(1))
-    leafer.add(h1)
+    sky.add(h1)
     handles.push(h1)
   }
 

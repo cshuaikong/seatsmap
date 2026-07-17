@@ -1,14 +1,17 @@
 const r = (n: number) => +n.toFixed(2)
 
-export function exportPNG(leafer: any): void {
-  const cv = leafer?.canvas?.view as HTMLCanvasElement | undefined
+import type { CanvasContext } from './useCanvasContext'
+
+export function exportPNG(ctx: CanvasContext): void {
+  const cv = ctx.canvas
   if (!cv) return
   const url = cv.toDataURL('image/png')
   downloadURL(url, 'canvas.png')
 }
 
-export function exportSVG(leafer: any, sectionGroupMap: Map<string, any>): void {
-  const w = leafer?.width ?? 1000, h = leafer?.height ?? 700
+export function exportSVG(ctx: CanvasContext, sectionGroupMap: Map<string, any>): void {
+  const tree = ctx.tree
+  const w = tree?.width ?? 1000, h = tree?.height ?? 700
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
   sectionGroupMap.forEach((group) => {
     const pathChild = group.children?.find((c: any) => c.tag === 'Path')

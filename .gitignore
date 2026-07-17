@@ -56,3 +56,9 @@ Thumbs.db
 skills/
 skills-lock.json
 .*/skills/
+
+# Playwright MCP generated artifacts
+.playwright-mcp/
+
+# Generated screenshots
+phase4-*.png

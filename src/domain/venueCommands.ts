@@ -4,9 +4,23 @@ import type { useVenueDataStore, PasteInput, PasteResult } from '../stores/venue
 
 type VenueDataStore = ReturnType<typeof useVenueDataStore>
 
-/** 深拷贝 */
+/** 深拷贝（保留 Date，跳过函数与不可序列化的引用） */
 function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value))
+  if (value === null || typeof value !== 'object') return value
+  if (value instanceof Date) return new Date(value.getTime()) as unknown as T
+  if (Array.isArray(value)) return value.map(clone) as unknown as T
+  const result = {} as Record<string, any>
+  for (const key of Object.keys(value)) {
+    const v = (value as Record<string, any>)[key]
+    if (v !== null && typeof v === 'object') {
+      // 跳过 Leafer 元素、DOM 节点、函数等不可序列化引用
+      if (v.constructor && v.constructor !== Object && !(v instanceof Date) && !Array.isArray(v)) continue
+    }
+    if (typeof v !== 'function') {
+      result[key] = clone(v)
+    }
+  }
+  return result as T
 }
 
 /** 查找 row */
