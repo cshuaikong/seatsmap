@@ -99,10 +99,7 @@ onMounted(() => {
       <Transition name="loading-fade">
         <div v-if="loading" class="loading-overlay">
           <div class="loading-spinner">
-            <svg class="spinner" viewBox="0 0 50 50">
-              <circle class="spinner-track" cx="25" cy="25" r="20" fill="none" stroke-width="4" />
-              <circle class="spinner-head" cx="25" cy="25" r="20" fill="none" stroke-width="4" stroke-linecap="round" />
-            </svg>
+            <span class="spinner-ring"></span>
             <span class="loading-text">加载场馆数据…</span>
           </div>
         </div>
@@ -147,21 +144,14 @@ onMounted(() => {
   gap: 16px;
 }
 
-.spinner {
-  width: 48px;
-  height: 48px;
-  animation: spin 0.9s linear infinite;
-}
-
-.spinner-track {
-  stroke: #e8e8e8;
-}
-
-.spinner-head {
-  stroke: #4a7cff;
-  stroke-dasharray: 90 150;
-  stroke-dashoffset: 0;
-  animation: dash 1.4s ease-in-out infinite;
+/* border + transform 动画跑在合成线程，主线程阻塞也不卡 */
+.spinner-ring {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e8e8e8;
+  border-top-color: #4a7cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .loading-text {
@@ -171,13 +161,7 @@ onMounted(() => {
 }
 
 @keyframes spin {
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes dash {
-  0%   { stroke-dasharray: 1 150; stroke-dashoffset: 0; }
-  50%  { stroke-dasharray: 90 150; stroke-dashoffset: -35; }
-  100% { stroke-dasharray: 90 150; stroke-dashoffset: -124; }
+  to { transform: rotate(360deg); }
 }
 
 /* ==================== 过渡动画 ==================== */
