@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import TopHeader from './components/TopHeader.vue'
 import LeftSidebar from './components/LeftSidebar.vue'
 import EditorArea from './components/EditorArea.vue'
 import { fetchVenueDetail, fetchVenueSeats } from './api/index.js'
@@ -80,7 +79,6 @@ onMounted(() => {
 
 <template>
   <div class="layout">
-    <TopHeader />
     <div class="main">
       <LeftSidebar
         :key="listKey"

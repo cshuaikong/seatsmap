@@ -70,10 +70,6 @@ onMounted(() => {
         :class="['venue-card', { active: activeVenueId === venue.id }]"
         @click="handleSelect(venue)"
       >
-        <div class="venue-image">
-          <img v-if="venue.image" :src="venue.image" :alt="venue.name" />
-          <span v-else class="image-placeholder">暂无图片</span>
-        </div>
         <div class="venue-info">
           <span class="venue-name">{{ venue.name }}</span>
           <button class="delete-btn" @click.stop="handleDelete(venue.id)">删除</button>
@@ -156,29 +152,6 @@ onMounted(() => {
 .venue-card.active {
   border-color: #4a7cff;
   background: #f0f5ff;
-}
-
-.venue-image {
-  width: 100%;
-  height: 100px;
-  background: #fafafa;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
-  overflow: hidden;
-}
-
-.venue-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.image-placeholder {
-  font-size: 12px;
-  color: #bbb;
 }
 
 .venue-info {
