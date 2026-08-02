@@ -1,1 +1,0 @@
-import{v as s,x as a,y as o,O as t}from"./index-C6PrccL8.js";const r=(t=>(r,c=o())=>{!s&&a(t,r,c)})(t,2),c="/seatmap-api",n=(s,a)=>{const o=s.__vccOpts||s;for(const[t,r]of a)o[t]=r;return o};export{c as A,n as _,r as o};
