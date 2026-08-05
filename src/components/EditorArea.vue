@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import SeatMapDesigner from 'seatmap-designer'
 import 'seatmap-designer/style.css'
-import { saveVenue } from '../api/index.js'
+import { saveVenue, uploadImage } from '../api/index.js'
 
 const emit = defineEmits(['dirty', 'save', 'error'])
 
@@ -26,6 +26,7 @@ function initVenue(venue, seatlist) {
 onMounted(() => {
   designer = new SeatMapDesigner(editorRef.value, {
     saveHandler: saveVenue,
+    uploadHandler: uploadImage,
   })
 
   designer.on('dirty', (v) => emit('dirty', v))

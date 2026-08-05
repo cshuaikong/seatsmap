@@ -31,6 +31,19 @@ export async function saveVenue(data) {
   return true
 }
 
+/** 图片上传（底图/水印共用）。uploadHandler 契约：入参 File（PNG），返回图片 URL 字符串 */
+export async function uploadImage(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await http.post('/upload', form)
+  if (res.data?.code !== undefined && res.data.code !== 0) {
+    throw new Error(res.data.msg || '图片上传失败')
+  }
+  const url = res.data?.data?.url
+  if (!url) throw new Error('图片上传失败：接口未返回图片地址')
+  return url
+}
+
 /** 删除场馆 */
 export function deleteVenue(venueId) {
   return http.post('/venue/delete', null, { params: { venue_id: venueId } })
