@@ -1,1 +1,0 @@
-import{v as s,x as t,y as a,O as o}from"./index-CqXgsJSh.js";const c=(o=>(c,n=a())=>{!s&&t(o,c,n)})(o,2),n="https://seatmap.web.jinsc.cn",r=(s,t)=>{const a=s.__vccOpts||s;for(const[o,c]of t)a[o]=c;return a};export{n as A,r as _,c as o};
