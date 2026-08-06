@@ -27,7 +27,11 @@ onMounted(() => {
   designer = new SeatMapDesigner(editorRef.value, {
     saveHandler: saveVenue,
     uploadHandler: uploadImage,
+    zoom: { max: 100 },
   })
+
+  // 确保 zoom 配置生效（部分配置可能在内部树初始化后被覆盖）
+  designer.setOptions({ zoom: { max: 100 } })
 
   designer.on('dirty', (v) => emit('dirty', v))
   designer.on('save', (p) => emit('save', p))
