@@ -1,0 +1,34 @@
+{
+  "name": "seatmap-designer",
+  "version": "1.0.0",
+  "description": "Seatmap Designer — 座位图编辑器组件库",
+  "type": "module",
+  "main": "seatmap-designer.umd.js",
+  "module": "seatmap-designer.es.js",
+  "style": "seatmap-designer.css",
+  "exports": {
+    ".": {
+      "import": "./seatmap-designer.es.js",
+      "require": "./seatmap-designer.umd.js",
+      "default": "./seatmap-designer.umd.js"
+    },
+    "./style.css": "./seatmap-designer.css",
+    "./seatmap-designer.css": "./seatmap-designer.css",
+    "./dist/style.css": "./seatmap-designer.css"
+  },
+  "files": [
+    "*.js",
+    "*.css",
+    "package.json",
+    "README.md",
+    "api-contract.md"
+  ],
+  "keywords": [
+    "seatmap",
+    "seatmap-designer",
+    "seat-map",
+    "floorplan",
+    "venue"
+  ],
+  "license": "UNLICENSED"
+}
