@@ -2375,7 +2375,7 @@ var K = {
 		});
 	},
 	setSeatsStatus(e, t) {
-		mt[t] || (t = "available");
+		mt[t] ?? (t = "available");
 		let n = [], r = /* @__PURE__ */ new Set();
 		for (let i of e) {
 			let e = Ft.get(i);
@@ -13315,14 +13315,14 @@ var Zy = (e, t) => {
 		name: "选择",
 		kbd: "V",
 		icon: "<path d=\"M5 3 19 12.5 12.8 13.4 16 20 13.5 21 10.3 14.5 5 18.5Z\"/>",
-		hint: "单击选中分区，拖拽框选多选，拖动移动；双击进入分区；分区编辑模式下以排为单位选择"
+		hint: "选择：单击单选，框选多选，拖动移动。Shift 加减选，双击进编辑。座位编辑下点选取整排"
 	},
 	{
 		key: "lasso",
 		name: "套索",
 		kbd: "L",
 		icon: "<ellipse cx=\"10.5\" cy=\"14.5\" rx=\"7\" ry=\"5\" stroke-dasharray=\"2.6 2.2\"/><path d=\"M15.8 10.4C17.6 8.2 19.2 5.6 20.4 3\"/>",
-		hint: "套索：按住拖出自由笔画，路过的座位排/分区即被选中（Shift 加选），松开完成；选中后拖动移动、拖手柄旋转；单击=点选；Esc 取消"
+		hint: "套索：自由笔画圈选。路过排=选整排，Ctrl=逐座，闭合圈=圈入内部。Shift 加选，Esc 取消"
 	},
 	{
 		key: "seat",
@@ -47830,7 +47830,7 @@ function FU(e) {
 		return f(e) ? d() ? e.id === U.editingSectionId : !!e.loose && wn() : !1;
 	}
 	function I(e, t) {
-		if (U.selection.has(e.id)) return B;
+		if (e.status === "available" && U.selection.has(e.id)) return B;
 		let n = P(e);
 		return e.status === "available" || F(t) ? n : Yy(n);
 	}
@@ -48013,7 +48013,7 @@ function FU(e) {
 		for (let a of e.rows) {
 			if (!a.seats.length) continue;
 			let o = we(a), s = [], c = 0;
-			for (let e = 1; e < o.length; e++) Math.hypot(o[e].x - o[e - 1].x, o[e].y - o[e - 1].y) > i && (s.push(o.slice(c, e)), c = e);
+			for (let e = 1; e < o.length; e++) (Math.hypot(o[e].x - o[e - 1].x, o[e].y - o[e - 1].y) > i || o[e].status !== o[e - 1].status) && (s.push(o.slice(c, e)), c = e);
 			s.push(o.slice(c));
 			for (let i of s) {
 				let o = i[0], s = i[i.length - 1], c = I(o, e);
@@ -48218,10 +48218,10 @@ function FU(e) {
 			y: -i,
 			width: r,
 			height: r,
-			fill: "#fff",
-			stroke: B,
-			strokeWidth: 1,
-			cornerRadius: 1.5,
+			fill: "#637cb4",
+			stroke: "#fff",
+			strokeWidth: r / 6,
+			cornerRadius: 0,
 			cursor: "pointer"
 		})), a;
 	}
