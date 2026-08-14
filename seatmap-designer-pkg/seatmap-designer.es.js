@@ -14047,7 +14047,7 @@ var hx = { class: "val" }, gx = ["value", "data-key"], _x = {
 			onChange: u
 		}), null, 16, Lx), e.jog ? (v(), a("span", Rx)) : i("", !0)], 2));
 	}
-}), [["__scopeId", "data-v-aa67af8b"]]), Bx = { class: "sidepanel" }, Vx = {
+}), [["__scopeId", "data-v-a5af417d"]]), Bx = { class: "sidepanel" }, Vx = {
 	key: 0,
 	class: "panel-context"
 }, Hx = { class: "card-head" }, Ux = ["title"], Wx = { class: "prop" }, Gx = {

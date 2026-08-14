@@ -20,8 +20,7 @@
     "*.js",
     "*.css",
     "package.json",
-    "README.md",
-    "api-contract.md"
+    "README.md"
   ],
   "keywords": [
     "seatmap",
