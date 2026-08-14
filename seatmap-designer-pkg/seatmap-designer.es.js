@@ -2125,7 +2125,7 @@ var K = {
 			if (Rt) {
 				if (await Rt(i) !== !0) throw Error("宿主保存接口返回失败");
 			} else throw Error("未配置保存通道：请用 setSaveHandler 注入宿主导函数");
-			return zt = bt(U.venue), Bt = r, U.dirty = !1, e && Gt("venue", U.venue.backendId), Gt("save", i), { saved: !0 };
+			return zt = bt(U.venue), Bt = r, U.dirty = !1, e && Gt("venue", U.venue.backendId), { saved: !0 };
 		} finally {
 			U.saving = !1;
 		}
@@ -49884,12 +49884,19 @@ var IU = { class: "seatmap-designer" }, LU = {
 		theme: {
 			type: String,
 			default: null
+		},
+		venue: {
+			type: Object,
+			default: null
+		},
+		seatlist: {
+			type: Array,
+			default: null
 		}
 	},
 	emits: [
 		"ready",
 		"change",
-		"save",
 		"error",
 		"venue",
 		"dirty"
@@ -49901,31 +49908,41 @@ var IU = { class: "seatmap-designer" }, LU = {
 			ft(U.tool) || K.setTool(ft("select") ? "select" : H.tools?.[0] ?? "select");
 		}
 		f();
-		let p = b(null), _ = b(null), y = null, x = null, w = null, T = t(() => {
+		let p = b(null), _ = b(null), y = null, x = null, w = t(() => {
 			U.sectionsTick;
 			let e = U.venue.sections.find((e) => e.id === U.editingSectionId);
 			return e ? Be(e) : "";
-		}), D = t(() => ({
+		}), T = t(() => ({
 			gridTemplateRows: `${H.ui.topBar ? "46px" : "0"} 1fr ${H.ui.statusBar ? "28px" : "0"}`,
 			gridTemplateColumns: `${H.ui.toolBar ? "52px" : "0"} 1fr ${H.ui.sidePanel ? "300px" : "0"}`,
 			"--side-w": H.ui.sidePanel ? "300px" : "0px"
 		}));
 		E(() => U.imagePickTick, () => _.value?.click());
-		function O(e) {
+		function D(e) {
 			let t = e.target.files?.[0];
 			e.target.value = "", t && jt(t).then((e) => K.replaceVenueImage(e)).catch((e) => alert(e.message));
 		}
 		E(() => U.canvasTick + U.sectionsTick + U.imageTick, () => d("change")), E(() => U.dirty, (e) => d("dirty", e));
-		let k = b("");
+		let O = b(""), k = null;
+		function A(e) {
+			k = u.seatlist ?? k ?? [], K.setData(e, k);
+		}
+		function j(e) {
+			e != null && (k = e, U.venue.sections.length && K.mergeBackendSeats(e));
+		}
 		g(async () => {
 			try {
 				y = FU(p.value);
 			} catch (e) {
-				console.error("[seatmap] 画布初始化失败", e), k.value = String(e?.message || e), d("error", e);
+				console.error("[seatmap] 画布初始化失败", e), O.value = String(e?.message || e), d("error", e);
 			}
-			x = K.on("save", (e) => d("save", e)), w = K.on("venue", (e) => d("venue", e)), setTimeout(() => {
+			x = K.on("venue", (e) => d("venue", e)), u.venue && A(u.venue), E(() => u.venue, (e) => {
+				e && A(e);
+			}), E(() => u.seatlist, (e) => {
+				j(e);
+			}), setTimeout(() => {
 				y?.fit(), d("ready");
-			}, 100), document.addEventListener("keydown", A, !0), E(() => U.theme, (e) => {
+			}, 100), document.addEventListener("keydown", M, !0), E(() => U.theme, (e) => {
 				let t = document.querySelector(".seatmap-designer");
 				t && t.setAttribute("data-theme", e), y && y.setCanvasFill(e === "dark" ? "#1e2128" : "#ffffff");
 			}, { immediate: !0 }), window.__seatmap = {
@@ -49938,9 +49955,9 @@ var IU = { class: "seatmap-designer" }, LU = {
 				applyOptions: dt
 			};
 		}), h(() => {
-			document.removeEventListener("keydown", A, !0), x?.(), w?.(), y?.destroy();
+			document.removeEventListener("keydown", M, !0), x?.(), y?.destroy();
 		});
-		function A(e) {
+		function M(e) {
 			if (e.target.matches("input, textarea, select")) return;
 			let t = e.key.toLowerCase(), n = e.ctrlKey || e.metaKey;
 			if (n && t === "s") {
@@ -50017,7 +50034,7 @@ var IU = { class: "seatmap-designer" }, LU = {
 			exportPNG: (e) => y?.exportPNG(e)
 		}), (e, t) => (v(), a("div", IU, [o("div", {
 			class: "app-shell",
-			style: m(D.value)
+			style: m(T.value)
 		}, [
 			C(H).ui.topBar ? (v(), r(kb, { key: 0 })) : i("", !0),
 			C(H).ui.toolBar ? (v(), r(Jb, { key: 1 })) : i("", !0),
@@ -50032,18 +50049,18 @@ var IU = { class: "seatmap-designer" }, LU = {
 					type: "file",
 					accept: "image/*,.svg",
 					style: { display: "none" },
-					onChange: O
+					onChange: D
 				}, null, 544),
 				C(U).saving ? (v(), a("div", LU, [...t[1] ||= [o("span", { class: "saving-spinner" }, null, -1), c("保存中…", -1)]])) : C(U).loadPhase === "venue" ? (v(), a("div", RU, [...t[2] ||= [o("span", { class: "saving-spinner" }, null, -1), c("场馆加载中…", -1)]])) : i("", !0),
 				C(U).loadPhase === "seats" ? (v(), a("div", zU, [...t[3] ||= [o("span", { class: "saving-spinner" }, null, -1), c("座位加载中…", -1)]])) : i("", !0),
-				k.value ? (v(), a("div", BU, [
-					c(" 画布初始化失败：" + S(k.value), 1),
+				O.value ? (v(), a("div", BU, [
+					c(" 画布初始化失败：" + S(O.value), 1),
 					t[4] ||= o("br", null, null, -1),
 					t[5] ||= c("请刷新页面（Ctrl+F5）；反复出现请把本提示截图反馈 ", -1)
 				])) : i("", !0),
 				C(U).mode === "seats" ? (v(), a("div", VU, [
 					t[6] ||= c(" ✏ 正在编辑分区：", -1),
-					o("b", null, S(T.value), 1),
+					o("b", null, S(w.value), 1),
 					t[7] ||= o("span", { class: "muted" }, "框选座位可移动/旋转，双击空白退出", -1),
 					o("button", {
 						class: "btn",
@@ -50082,7 +50099,6 @@ var IU = { class: "seatmap-designer" }, LU = {
 			theme: a,
 			onReady: r("ready"),
 			onChange: r("change"),
-			onSave: r("save"),
 			onError: r("error"),
 			onVenue: r("venue"),
 			onDirty: r("dirty")

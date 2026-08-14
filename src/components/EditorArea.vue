@@ -10,6 +10,17 @@ const editorRef = ref(null)
 let designer = null
 
 /**
+ * 保存回调（新版组件已不再派发「save」事件）。
+ * 把 saveVenue 包装一层：保存成功（契约：返回 true）后复刻旧版 save 事件，
+ * 携带本次保存的请求载荷通知父级（用于首存后更新地址栏 venue_id、刷新列表）。
+ */
+async function handleSave(payload) {
+  const ok = await saveVenue(payload)
+  if (ok === true) emit('save', payload)
+  return ok
+}
+
+/**
  * 喂入数据：已有场馆调用 setData，新建调用 newVenue
  * @param {Object|null} venue  场馆主体（含 sections），null = 空白新建
  * @param {Array}      seatlist 座位列表
@@ -25,7 +36,7 @@ function initVenue(venue, seatlist) {
 
 onMounted(() => {
   designer = new SeatMapDesigner(editorRef.value, {
-    saveHandler: saveVenue,
+    saveHandler: handleSave,
     uploadHandler: uploadImage,
     zoom: { max: 100 },
   })
@@ -34,7 +45,7 @@ onMounted(() => {
   designer.setOptions({ zoom: { max: 100 } })
 
   designer.on('dirty', (v) => emit('dirty', v))
-  designer.on('save', (p) => emit('save', p))
+  // 新版组件已移除「save」事件，保存成功通知改由 handleSave 包装实现
   designer.on('error', (e) => emit('error', e))
 })
 
