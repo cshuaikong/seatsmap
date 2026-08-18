@@ -1,0 +1,1 @@
+import{C as s,D as a,v as t,O as n,E as o}from"./index-D3BIIbHV.js";function r(s,a){return"string"==typeof s?a:s}const c=(n,o=0)=>(o,r=t())=>{!s&&a(n,o,r)},e=c(n,2),p=c(o,2),f=6,i="https://seatmap.web.jinsc.cn",m=(s,a)=>{const t=s.__vccOpts||s;for(const[n,o]of a)t[n]=o;return t};export{i as A,f as M,m as _,p as a,e as o,r};
