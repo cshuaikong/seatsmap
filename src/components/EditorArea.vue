@@ -4,7 +4,7 @@ import SeatMapDesigner from 'seatmap-designer'
 import 'seatmap-designer/style.css'
 import { saveVenue, uploadImage } from '../api/index.js'
 
-const emit = defineEmits(['dirty', 'save', 'error'])
+const emit = defineEmits(['dirty', 'save'])
 
 const editorRef = ref(null)
 let designer = null
@@ -46,8 +46,6 @@ onMounted(() => {
   designer.setOptions({ zoom: { max: 100 } })
 
   designer.on('dirty', (v) => emit('dirty', v))
-  // 新版组件已移除「save」事件，保存成功通知改由 handleSave 包装实现
-  designer.on('error', (e) => emit('error', e))
 })
 
 onBeforeUnmount(() => {
