@@ -10,7 +10,7 @@ const editorRef = ref(null)
 let designer = null
 
 /**
- * 保存回调（新版组件已不再派发「save」事件）。
+ * 保存回调
  * 把 saveVenue 包装一层：保存成功（契约：返回 true）后复刻旧版 save 事件，
  * 携带本次保存的请求载荷通知父级（用于首存后更新地址栏 venue_id、刷新列表）。
  */
@@ -36,6 +36,7 @@ function initVenue(venue, seatlist) {
 
 onMounted(() => {
   designer = new SeatMapDesigner(editorRef.value, {
+    // debug: true, // 性能排查时手动取消注释；控制台会输出归一化、首屏、进分区等耗时
     saveHandler: handleSave,
     uploadHandler: uploadImage,
     zoom: { max: 100 },

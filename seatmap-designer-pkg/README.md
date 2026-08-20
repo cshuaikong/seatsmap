@@ -22,6 +22,7 @@
   const designer = new SeatMapDesigner(document.getElementById('map'), {
     saveHandler:   async (p) => { /* POST 保存 */ return ok },
     uploadHandler: async (f) => { /* POST 上传 */ return url },
+    debug: true, // 开发排查时开启；生产删除或设为 false
   })
   designer.setData(venue, seatlist)   // 后端原始格式
 </script>
@@ -46,6 +47,7 @@ import 'seatmap-designer/style.css'
 - 组件**不发网络请求**：宿主用 `setData` 喂数据、`saveHandler` 回收保存、`uploadHandler` 上传图片。
 - `saveHandler` 只有 `return true` 才算保存成功，否则保留脏标记下次重发。
 - 同一页面只挂**一个**实例；样式已加 `.seatmap-designer` 前缀隔离。
+- 性能排查：构造参数加 `debug: true`，即可在控制台查看归一化、首屏、进分区等指标；默认关闭。
 
 ## 完整文档
 
