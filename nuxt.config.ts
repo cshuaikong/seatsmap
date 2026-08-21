@@ -44,24 +44,6 @@ export default defineNuxtConfig({
   // ---- 全局 CSS ----
   css: ['~/assets/css/global.css'],
 
-  // ---- Vite 配置 ----
-  vite: {
-    // 本地 pkg 预构建配置：排除以避免已压缩代码的变量名冲突
-    optimizeDeps: {
-      exclude: ['seatmap-designer'],
-    },
-    build: {
-      // 将 seatmap-designer 作为外部依赖，不参与 Rollup 打包
-      rollupOptions: {
-        external: ['seatmap-designer'],
-      },
-    },
-    // SSR 构建也排除
-    ssr: {
-      noExternal: [],
-    },
-  },
-
   // ---- 模块 ----
   modules: [
     '@nuxt/content',  // 内容管理模块，支持 Markdown 预渲染

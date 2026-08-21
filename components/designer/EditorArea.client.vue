@@ -1,12 +1,11 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import SeatMapDesigner from 'seatmap-designer'
+import { ref, nextTick } from 'vue'
+import { SeatMapDesignerVue } from 'seatmap-designer'
 import 'seatmap-designer/style.css'
 
 const emit = defineEmits(['dirty', 'save', 'ready'])
 
-const editorRef = ref(null)
-let designer = null
+const designerRef = ref(null)
 
 const { saveVenue, uploadImage } = useApi()
 
@@ -21,12 +20,17 @@ async function handleSave(payload) {
   return ok
 }
 
+const designerOptions = {
+  zoom: { max: 100 },
+}
+
 /**
  * 喂入数据：已有场馆调用 setData，新建调用 newVenue
  * @param {Object|null} venue  场馆主体（含 sections），null = 空白新建
  * @param {Array}      seatlist 座位列表
  */
 function initVenue(venue, seatlist) {
+  const designer = designerRef.value
   if (!designer) return
   if (venue?.sections) {
     designer.setData(venue, seatlist)
@@ -35,38 +39,25 @@ function initVenue(venue, seatlist) {
   }
 }
 
-onMounted(async () => {
-  // .client.vue 延迟渲染，需等 nextTick 确保模板 ref 已绑定到 DOM
+async function handleReady() {
   await nextTick()
-  if (!editorRef.value) {
-    console.error('[EditorArea] 缺少挂载容器 el')
-    return
-  }
-  designer = new SeatMapDesigner(editorRef.value, {
-    // debug: true,
-    saveHandler: handleSave,
-    uploadHandler: uploadImage,
-    zoom: { max: 100 },
-  })
-
-  // 确保 zoom 配置生效
-  designer.setOptions({ zoom: { max: 100 } })
-
-  designer.on('dirty', (v) => emit('dirty', v))
   emit('ready')
-})
-
-onBeforeUnmount(() => {
-  designer?.destroy()
-  designer = null
-})
+}
 
 defineExpose({ initVenue })
 </script>
 
 <template>
   <main class="editor">
-    <div ref="editorRef" class="designer-container"></div>
+    <SeatMapDesignerVue
+      ref="designerRef"
+      class="designer-container"
+      :save-handler="handleSave"
+      :upload-handler="uploadImage"
+      :options="designerOptions"
+      @dirty="emit('dirty', $event)"
+      @ready="handleReady"
+    />
   </main>
 </template>
 
