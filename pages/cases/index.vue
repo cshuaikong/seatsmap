@@ -1,26 +1,29 @@
 <template>
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-8">案例研究</h1>
+  <div class="content-page">
+    <div class="content-container">
+    <p class="content-eyebrow">USE CASES</p>
+    <h1>案例与设计示范</h1>
+    <p class="content-intro">从体育场馆到剧院，展示座位图如何帮助用户理解空间、完成选位并支持运营规则。</p>
     
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <NuxtLink 
         v-for="article in articles" 
         :key="article._path"
         :to="article._path"
-        class="block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300"
+        class="content-card"
       >
-        <div class="p-6">
-          <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ article.title }}</h2>
-          <p class="text-gray-600 text-sm mb-3">{{ article.description }}</p>
-          <div class="flex items-center justify-between text-xs text-gray-500">
+        <div>
+          <h2>{{ article.title }}</h2>
+          <p>{{ article.description }}</p>
+          <div class="content-meta">
             <span>{{ article.date }}</span>
             <span>{{ article.author }}</span>
           </div>
-          <div class="mt-3 flex flex-wrap gap-1">
+          <div class="content-tags">
             <span 
               v-for="tag in article.tags" 
               :key="tag" 
-              class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
+              class="content-tag"
             >
               {{ tag }}
             </span>
@@ -28,7 +31,7 @@
         </div>
       </NuxtLink>
     </div>
-  </div>
+    </div></div>
 </template>
 
 <script setup>

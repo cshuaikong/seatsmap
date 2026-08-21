@@ -12,7 +12,7 @@ const navLinks = [
 <template>
   <header class="site-header">
     <div class="header-inner">
-      <NuxtLink to="/welcome" class="logo">
+      <NuxtLink to="/" class="logo">
         <span class="logo-icon">◧</span>
         <span class="logo-text">SeatsMap</span>
       </NuxtLink>

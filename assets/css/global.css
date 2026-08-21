@@ -37,3 +37,16 @@ img {
   max-width: 100%;
   height: auto;
 }
+
+.content-page { padding: 72px 0; background: linear-gradient(180deg, #f5f8ff, #fff 300px); }
+.content-container, .article-container { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+.content-eyebrow { margin: 0 0 10px; color: #5279f5; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.content-page h1 { margin: 0 0 12px; color: #112044; font-size: clamp(32px, 4vw, 46px); letter-spacing: -.04em; }
+.content-intro { max-width: 700px; margin: 0 0 40px; color: #5d6980; line-height: 1.75; }
+.content-page .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.content-card { display: block; min-height: 240px; padding: 26px; border: 1px solid #e6ebf5; border-radius: 14px; color: inherit; background: #fff; text-decoration: none; transition: transform .18s, box-shadow .18s; }
+.content-card:hover { box-shadow: 0 14px 30px rgba(30, 60, 130, .1); transform: translateY(-3px); text-decoration: none; }
+.content-card h2 { margin: 0 0 10px; color: #152446; font-size: 19px; line-height: 1.4; }.content-card p { color: #5d6980; font-size: 14px; line-height: 1.7; }
+.content-meta { display: flex; justify-content: space-between; margin-top: 20px; color: #8a95a9; font-size: 12px; }.content-tags, .article-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }.content-tag, .article-tag { padding: 4px 8px; border-radius: 99px; color: #416cec; background: #edf2ff; font-size: 12px; }
+.article-page { padding: 54px 0 86px; }.article-container { max-width: 800px; }.article-header { margin-bottom: 35px; padding-bottom: 26px; border-bottom: 1px solid #e6ebf5; }.article-header h1 { margin: 0 0 14px; color: #112044; font-size: clamp(30px, 4vw, 44px); line-height: 1.24; letter-spacing: -.04em; }.article-meta { color: #7e899b; font-size: 13px; }.article-meta .mx-2 { margin: 0 8px; }.article-body { color: #435066; font-size: 16px; line-height: 1.9; }.article-body h2 { margin: 42px 0 12px; color: #16284f; font-size: 24px; }.article-body h3 { color: #16284f; }.article-body li { margin: 6px 0; }.article-body blockquote { margin: 22px 0; padding: 12px 18px; border-left: 3px solid #597df0; color: #60708a; background: #f5f8ff; }
+@media (max-width: 800px) { .content-page { padding: 48px 0; }.content-page .grid { grid-template-columns: 1fr; }.content-container, .article-container { width: min(100% - 32px, 800px); } }

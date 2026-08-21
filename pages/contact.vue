@@ -1,8 +1,30 @@
 <script setup>
+import { reactive, ref } from 'vue'
+
 useHead({
   title: '联系我们 - SeatsMap',
   meta: [{ name: 'description', content: '联系 SeatsMap 团队，获取产品试用、技术方案咨询和接入支持。' }],
 })
+
+const form = reactive({ name: '', company: '', email: '', message: '', website: '' })
+const submitting = ref(false)
+const submitState = ref('')
+const submitError = ref('')
+
+async function submitContact() {
+  submitState.value = ''
+  submitError.value = ''
+  submitting.value = true
+  try {
+    await $fetch('/contact', { method: 'POST', body: form })
+    submitState.value = '提交成功，我们会尽快回复您。'
+    Object.assign(form, { name: '', company: '', email: '', message: '', website: '' })
+  } catch (error) {
+    submitError.value = error?.data?.statusMessage || '提交失败，请稍后重试或直接发送邮件联系我们。'
+  } finally {
+    submitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -19,24 +41,27 @@ useHead({
         <div class="contact-card">
           <h3>产品试用</h3>
           <p>填写以下信息，我们将在 1 个工作日内联系您开通试用。</p>
-          <form class="contact-form" @submit.prevent>
+          <form class="contact-form" @submit.prevent="submitContact">
             <div class="form-group">
               <label>姓名</label>
-              <input type="text" placeholder="您的姓名" />
+              <input v-model="form.name" type="text" placeholder="您的姓名" autocomplete="name" required :disabled="submitting" />
             </div>
             <div class="form-group">
               <label>公司</label>
-              <input type="text" placeholder="公司 / 组织名称" />
+              <input v-model="form.company" type="text" placeholder="公司 / 组织名称" autocomplete="organization" :disabled="submitting" />
             </div>
             <div class="form-group">
               <label>邮箱</label>
-              <input type="email" placeholder="工作邮箱" />
+              <input v-model="form.email" type="email" placeholder="工作邮箱" autocomplete="email" required :disabled="submitting" />
             </div>
             <div class="form-group">
               <label>需求描述</label>
-              <textarea rows="4" placeholder="简述您的场景和需求"></textarea>
+              <textarea v-model="form.message" rows="4" placeholder="简述您的场景和需求" required :disabled="submitting"></textarea>
             </div>
-            <button type="submit" class="btn btn-primary">提交申请</button>
+            <input v-model="form.website" class="honeypot" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" />
+            <button type="submit" class="btn btn-primary" :disabled="submitting">{{ submitting ? '正在提交…' : '提交申请' }}</button>
+            <p v-if="submitState" class="form-success" role="status">{{ submitState }}</p>
+            <p v-if="submitError" class="form-error" role="alert">{{ submitError }}</p>
           </form>
         </div>
 
@@ -44,8 +69,8 @@ useHead({
           <div class="info-card">
             <h3>其他联系方式</h3>
             <div class="info-item">
-              <strong>技术咨询</strong>
-              <p>如有技术接入问题，请通过控制台提交工单。</p>
+              <strong>联系邮箱</strong>
+              <p><a href="mailto:contact@seatmap.page">contact@seatmap.page</a></p>
             </div>
             <div class="info-item">
               <strong>商务合作</strong>
@@ -86,6 +111,10 @@ useHead({
 .btn { display: inline-flex; padding: 10px 24px; font-size: 14px; font-weight: 500; border-radius: 8px; text-decoration: none; cursor: pointer; border: none; }
 .btn-primary { background: #4a7cff; color: #fff; }
 .btn-primary:hover { background: #3a6ae8; }
+.btn:disabled { cursor: not-allowed; opacity: .65; }
+.honeypot { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.form-success, .form-error { margin: -4px 0 0; font-size: 13px; }
+.form-success { color: #138a55; }.form-error { color: #c33131; }
 
 .info-card { padding: 24px; background: #f8faff; border-radius: 12px; }
 .info-card h3 { font-size: 16px; font-weight: 600; color: #111; margin: 0 0 16px; }
