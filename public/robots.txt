@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /console/
-Disallow: /login
+Disallow: /login 
 Disallow: /register
 
 Sitemap: https://seatmap.page/sitemap.xml
