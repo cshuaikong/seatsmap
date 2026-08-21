@@ -10,7 +10,7 @@ const props = defineProps({
   url: { type: String, default: '' },
 })
 
-const siteUrl = 'https://seatmap.web.jinsc.cn'
+const siteUrl = 'https://seatmap.page'
 const fullUrl = props.url ? `${siteUrl}${props.url}` : siteUrl
 
 useHead({

@@ -5,7 +5,7 @@ export default defineNuxtConfig({
 
   // ---- 站点元信息 ----
   site: {
-    url: 'https://seatmap.web.jinsc.cn',
+    url: 'https://seatmap.page',
     name: 'SeatsMap - 在线座位图设计器',
   },
 

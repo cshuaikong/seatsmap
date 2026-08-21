@@ -1,4 +1,4 @@
-const SITE_URL = 'https://seatmap.web.jinsc.cn'
+const SITE_URL = 'https://seatmap.page'
 
 export function useSeo(meta) {
   const { title, description, image = '/seatmap-hero.png', type = 'website', noindex = false } = meta

@@ -10,7 +10,7 @@ const props = defineProps({
   },
 })
 
-const siteUrl = 'https://seatmap.web.jinsc.cn'
+const siteUrl = 'https://seatmap.page'
 
 const jsonLdData = computed(() => ({
   '@context': 'https://schema.org',
