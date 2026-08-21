@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-05-15',
   ssr: true,
 
-  // ---- 站点元信息（供 sitemap / SEO 模块使用）----
+  // ---- 站点元信息 ----
   site: {
     url: 'https://seatmap.web.jinsc.cn',
     name: 'SeatsMap - 在线座位图设计器',
@@ -11,16 +11,18 @@ export default defineNuxtConfig({
 
   // ---- 运行时配置 ----
   runtimeConfig: {
-    // 服务端私有：后端 API 真实地址（生产环境代理用）
     apiBackend: process.env.NUXT_API_BACKEND || 'https://seatmap.web.jinsc.cn',
-    // 客户端公开：前端请求的 API 基地址
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
     },
   },
 
-  // ---- 开发环境 API 代理（等价于旧 vite proxy）----
+  // ---- Nitro 配置 ----
   nitro: {
+    // Cloudflare Pages 部署时通过环境变量 NITRO_PRESET=cloudflare-pages 指定
+    // 本地开发无需设置，默认 Node.js
+
+    // 开发环境 API 代理（仅本地开发生效）
     devProxy: {
       '/api': {
         target: 'https://seatmap.web.jinsc.cn',
@@ -32,41 +34,80 @@ export default defineNuxtConfig({
     },
   },
 
-  // ---- 按路由覆盖渲染模式 ----
-  routeRules: {
-    // 控制台 / 设计器：纯 CSR
-    '/console/**': { ssr: false },
-    // 登录 / 注册：CSR + noindex
-    '/login': { ssr: false },
-    '/register': { ssr: false },
-  },
-
   // ---- 全局 CSS ----
   css: ['~/assets/css/global.css'],
 
   // ---- Vite 配置 ----
   vite: {
-    // 确保本地 pkg 不被预构建（开发时热更新友好）
+    // 本地 pkg 预构建配置：排除以避免已压缩代码的变量名冲突
     optimizeDeps: {
-      include: ['seatmap-designer'],
+      exclude: ['seatmap-designer'],
+    },
+    build: {
+      // 将 seatmap-designer 作为外部依赖，不参与 Rollup 打包
+      rollupOptions: {
+        external: ['seatmap-designer'],
+      },
+    },
+    // SSR 构建也排除
+    ssr: {
+      noExternal: [],
     },
   },
 
   // ---- 模块 ----
   modules: [
-    '@nuxtjs/sitemap',
-    '@nuxtjs/seo',
+    '@nuxt/content',  // 内容管理模块，支持 Markdown 预渲染
   ],
 
-  // ---- Sitemap 配置 ----
-  sitemap: {
-    hostname: 'https://seatmap.web.jinsc.cn',
-    exclude: ['/console/**', '/login', '/register'],
+  // ---- 内容模块配置 ----
+  content: {
+    // 启用文档驱动模式
+    documentDriven: true,
+    
+    // 本地文件系统驱动
+    sources: {
+      local: {
+        driver: 'fs',
+        base: 'content'
+      }
+    },
+    
+    // 代码高亮
+    highlight: {
+      preload: ['ts', 'js', 'vue', 'md', 'json'],
+      theme: {
+        default: 'github-light',
+        dark: 'github-dark'
+      }
+    },
+    
+    // Markdown 扩展
+    markdown: {
+      anchorLinks: {
+        depth: 3,
+        exclude: [1]
+      }
+    },
+    
+    // 实验性功能
+    experimental: {
+      clientDB: false // Cloudflare Pages 不支持 IndexedDB
+    }
   },
 
-  // ---- OG Image 配置（暂时禁用，后续按需启用）----
-  ogImage: {
-    enabled: false,
+  // ---- 按路由覆盖渲染模式 ----
+  routeRules: {
+    '/console/**': { ssr: false },
+    '/login': { ssr: false },
+    '/register': { ssr: false },
+    
+    // 内容页面预渲染
+    '/blog/**': { prerender: true },
+    '/cases/**': { prerender: true },
+    
+    // API 路由
+    '/api/_content/**': { cors: true },
   },
 
   // ---- 开发工具 ----
