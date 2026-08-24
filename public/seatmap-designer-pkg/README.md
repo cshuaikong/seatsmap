@@ -7,9 +7,9 @@
 | 文件 | 作用 |
 |---|---|
 | `seatmap-designer.umd.js` | UMD 单文件（vue / leafer / css 全内置 + CSS 注入）—— 静态页 / jQuery / Vue2 |
-| `seatmap-designer.es.js` + `seatmap-designer.css` | ES 组件（leafer 内置，仅 vue 走外部依赖）—— Vue3 / Vite / webpack |
+| `seatmap-designer.es.js` + `seatmap-designer.css` | ES **单文件**组件（leafer 内置，仅 vue 走外部依赖）—— Vue3 / Vite / webpack |
 | `package.json` | npm 包元信息（安装 / 引用入口） |
-| `*.js` chunk 文件 | ES 入口的运行时依赖，随入口懒加载；**保留整个目录，勿删、勿单独引用** |
+| `README.md` | 本地快速接入说明与在线文档入口 |
 
 ## 快速开始
 
@@ -41,6 +41,8 @@ import 'seatmap-designer/style.css'
 </script>
 <template><SeatMapDesigner :save-handler="onSave" /></template>
 ```
+
+> ES 入口已扁平化为单个 `seatmap-designer.es.js`，没有额外 JS chunk；解压后按目录安装即可。
 
 ## 关键约定
 
