@@ -3515,7 +3515,7 @@ var K = {
 			i.set(e.id, r.id), r.id = je("sec"), i.set(e.id, r.id);
 			for (let e of r.rows) {
 				let r = je("r");
-				i.set(e.id, r), e.id = r, e.label = "";
+				i.set(e.id, r), e.id = r;
 				for (let r of e.seats) {
 					let e = je("s");
 					i.set(r.id, e), r.id = e, r.x = Math.round((r.x + t) * 100) / 100, r.y = Math.round((r.y + n) * 100) / 100;
