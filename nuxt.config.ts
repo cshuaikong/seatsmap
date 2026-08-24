@@ -11,7 +11,6 @@ export default defineNuxtConfig({
 
   // ---- 运行时配置 ----
   runtimeConfig: {
-    apiBackend: process.env.NUXT_API_BACKEND || 'https://seatmap.web.jinsc.cn',
     // 联系表单邮件服务：仅在服务端读取，绝不暴露给浏览器。
     // 生产环境优先配置 NUXT_RESEND_API_KEY。
     resendApiKey: process.env.NUXT_RESEND_API_KEY || process.env.RESEND_API_KEY || '',
@@ -22,23 +21,6 @@ export default defineNuxtConfig({
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://seatmap.web.jinsc.cn',
       // GA4 衡量 ID（例如 G-XXXXXXXXXX）。未配置时不加载 Google 统计脚本。
       googleAnalyticsId: process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_ID || '',
-    },
-  },
-
-  // ---- Nitro 配置 ----
-  nitro: {
-    // Cloudflare Pages 部署时通过环境变量 NITRO_PRESET=cloudflare-pages 指定
-    // 本地开发无需设置，默认 Node.js
-
-    // 开发环境 API 代理（仅本地开发生效）
-    devProxy: {
-      '/api': {
-        target: 'https://seatmap.web.jinsc.cn',
-        changeOrigin: true,
-        headers: {
-          'X-Forwarded-Host': 'seatmap.web.jinsc.cn',
-        },
-      },
     },
   },
 
