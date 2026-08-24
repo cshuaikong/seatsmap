@@ -18,7 +18,8 @@ export default defineNuxtConfig({
     contactInbox: process.env.NUXT_CONTACT_INBOX || 'contact@seatmap.page',
     contactFromEmail: process.env.NUXT_CONTACT_FROM_EMAIL || 'SeatsMap <contact@seatmap.page>',
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || '/api',
+      // 生产环境直接调用独立后端域名；不经 seatmap.page 的 /api 反向代理。
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://seatmap.web.jinsc.cn',
       // GA4 衡量 ID（例如 G-XXXXXXXXXX）。未配置时不加载 Google 统计脚本。
       googleAnalyticsId: process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_ID || '',
     },
