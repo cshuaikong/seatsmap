@@ -5,7 +5,8 @@
  * 当前仅做透传，不做拦截
  */
 export default defineEventHandler((event) => {
-  const url = event.node.req.url || ''
+  // 不访问 event.node.req：该 Node 兼容对象在 Cloudflare Workers 下不可靠。
+  const url = getRequestURL(event).pathname
 
   // 仅对 /api/ 开头的请求做鉴权处理
   if (!url.startsWith('/api/')) return
