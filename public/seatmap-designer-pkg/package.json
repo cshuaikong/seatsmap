@@ -6,6 +6,9 @@
   "main": "seatmap-designer.umd.js",
   "module": "seatmap-designer.es.js",
   "style": "seatmap-designer.css",
+  "peerDependencies": {
+    "vue": ">=3.5.0 <4"
+  },
   "exports": {
     ".": {
       "import": "./seatmap-designer.es.js",
