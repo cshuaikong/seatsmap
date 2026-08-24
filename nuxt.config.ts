@@ -11,16 +11,15 @@ export default defineNuxtConfig({
 
   // ---- 运行时配置 ----
   runtimeConfig: {
-    // 联系表单邮件服务：仅在服务端读取，绝不暴露给浏览器。
-    // 生产环境优先配置 NUXT_RESEND_API_KEY。
-    resendApiKey: process.env.NUXT_RESEND_API_KEY || process.env.RESEND_API_KEY || '',
-    contactInbox: process.env.NUXT_CONTACT_INBOX || 'contact@seatmap.page',
-    contactFromEmail: process.env.NUXT_CONTACT_FROM_EMAIL || 'SeatsMap <contact@seatmap.page>',
+    // 仅服务端可见；分别由 NUXT_RESEND_API_KEY、NUXT_CONTACT_INBOX、
+    // NUXT_CONTACT_FROM_EMAIL 覆盖。
+    resendApiKey: '',
+    contactInbox: 'contact@seatmap.page',
+    contactFromEmail: 'SeatsMap <contact@seatmap.page>',
     public: {
-      // 生产环境直接调用独立后端域名；不经 seatmap.page 的 /api 反向代理。
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'https://seatmap.web.jinsc.cn',
-      // GA4 衡量 ID（例如 G-XXXXXXXXXX）。未配置时不加载 Google 统计脚本。
-      googleAnalyticsId: process.env.NUXT_PUBLIC_GOOGLE_ANALYTICS_ID || '',
+      // 浏览器可见；由 NUXT_PUBLIC_API_BASE、NUXT_PUBLIC_GOOGLE_ANALYTICS_ID 覆盖。
+      apiBase: 'https://seatmap.web.jinsc.cn',
+      googleAnalyticsId: 'G-H2N7YVT1TC',
     },
   },
 
