@@ -20,6 +20,13 @@ async function handleSave(payload) {
   return ok
 }
 
+// 演示：后台预建区域列表（真实场景由后端接口返回；此处硬编码演示「绑定区域」交互）
+const demoAreaList = [
+  { area_id: 101, area_name: '东区' },
+  { area_id: 102, area_name: '西区' },
+  { area_id: 103, area_name: 'VIP 区' },
+]
+
 const designerOptions = {
   zoom: { max: 100 },
 }
@@ -55,6 +62,7 @@ defineExpose({ initVenue })
       :save-handler="handleSave"
       :upload-handler="uploadImage"
       :options="designerOptions"
+      :area-list="demoAreaList"
       @dirty="emit('dirty', $event)"
       @ready="handleReady"
     />
