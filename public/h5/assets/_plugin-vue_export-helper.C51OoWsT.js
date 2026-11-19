@@ -1,0 +1,1 @@
+import{E as s,G as t,z as a,O as n}from"./index-CVxzY-wT.js";function o(s,t){return"string"==typeof s?t:s}const r=(n=>(o,r=a())=>{!s&&t(n,o,r)})(n,2),c=6,e="https://seatmap.web.jinsc.cn",p=(s,t)=>{const a=s.__vccOpts||s;for(const[n,o]of t)a[n]=o;return a};export{e as A,c as M,p as _,r as o,o as r};
