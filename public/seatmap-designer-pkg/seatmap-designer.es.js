@@ -13061,7 +13061,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		isHomeView: C
 	});
 	function T() {
-		at(), x.tree.zoom("fit", 24), dt(), Ge(), w && w.update(P());
+		ot(), x.tree.zoom("fit", 24), ft(), Ke(), w && w.update(P());
 	}
 	let E = null, D = /* @__PURE__ */ new Map(), O = null, k = /* @__PURE__ */ new Map(), A = null, j = s > 0 ? Math.floor(s) : 0, M = /* @__PURE__ */ new Map(), N = /* @__PURE__ */ new Map();
 	function P() {
@@ -13080,16 +13080,16 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		};
 	}
 	function F(e) {
-		if (g && !Ke) {
+		if (g && !qe) {
 			w?.atHome?.() || e && e.x <= Sx ? h?.() : T();
 			return;
 		}
 		let t = w?.toWorld(e.x, e.y);
-		t && (ee(t), Ge(), w.update(P()));
+		t && (ee(t), Ke(), w.update(P()));
 	}
 	function ee(e) {
 		if (!e) return;
-		at();
+		ot();
 		let t = x.tree.width || n || 0, i = x.tree.height || r || 0, a = x.tree.scaleX || 1, o = x.tree.getPagePoint({
 			x: t / 2,
 			y: i / 2
@@ -13097,7 +13097,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		x.tree.zoomLayer?.move({
 			x: (o.x - e.x) * a,
 			y: (o.y - e.y) * a
-		}), dt();
+		}), ft();
 	}
 	function I(e) {
 		return E?.categories?.find((t) => t.key === e)?.color || "#9ca3af";
@@ -13202,8 +13202,8 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		let n = D.has(e), r = N.get(t.section.id)?.ss || 10, i = te.get(e);
 		i && (ae(t.seat, i, r, r * (x.tree.scaleX || 1)), le(t, i, r, n && i.visible));
 	}
-	let me = .3;
-	function he(e) {
+	let me = .3, he = !1;
+	function ge(e) {
 		let t = new Rp({
 			visible: !1,
 			hittable: !1
@@ -13233,16 +13233,16 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			ref: e
 		};
 	}
-	function ge() {
+	function _e() {
 		O = new Rp({ hittable: !1 }), k.clear(), S.add(O);
 	}
-	function _e(e = x.tree.scaleX || 1) {
+	function ve(e = x.tree.scaleX || 1) {
 		if (!O) return;
 		let t = px(E?.baseScale) * e < 8;
 		for (let [e, t] of k) D.has(e) || (t.group.remove(), k.delete(e));
 		for (let [n, r] of D) {
 			let i = k.get(n);
-			i || (i = he(r), k.set(n, i)), i.ref = r, i.group.set({
+			i || (i = ge(r), k.set(n, i)), i.ref = r, i.group.set({
 				x: r.seat.x,
 				y: r.seat.y,
 				scaleX: 1 / Math.max(e, .001),
@@ -13251,40 +13251,40 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			});
 		}
 	}
-	function ve(e = x.tree.scaleX || 1) {
+	function ye(e = x.tree.scaleX || 1) {
 		let t = 1 / Math.max(e, .001);
 		for (let e of k.values()) e.group.set({
 			scaleX: t,
 			scaleY: t
 		});
 	}
-	function ye(e) {
+	function be(e) {
 		if (!e) return null;
 		let t = 20 / Math.max(x.tree.scaleX || 1, .001);
 		for (let n of k.values()) if (n.group.visible && Math.hypot(e.x - n.ref.seat.x, e.y - n.ref.seat.y) <= t) return n.ref;
 		return null;
 	}
-	function be(e) {
+	function xe(e) {
 		if (!e) return;
 		ee(e.seat);
-		let t = x.tree.scaleX || 1, i = pt / px(E?.baseScale) / t;
+		let t = x.tree.scaleX || 1, i = mt / px(E?.baseScale) / t;
 		if (x.tree.getValidScale && (i = x.tree.getValidScale(i)), i > 1.01) {
 			let e = x.tree.width || n || 0, t = x.tree.height || r || 0;
 			x.tree.zoomLayer?.scaleOfWorld({
 				x: e / 2,
 				y: t / 2
-			}, i, { duration: .25 }), wt(300), setTimeout(() => {
-				dt(), Ge(), w && (w.update(P()), w.recover());
+			}, i, { duration: .25 }), Tt(300), setTimeout(() => {
+				ft(), Ke(), w && (w.update(P()), w.recover());
 			}, 300);
-		} else dt(), Ge(), w && w.update(P());
+		} else ft(), Ke(), w && w.update(P());
 	}
-	let xe = {
+	let Se = {
 		visibleSeats: 0,
 		mountedSeats: 0,
 		scale: 0
-	}, Se = (...e) => {
+	}, Ce = (...e) => {
 		l && console.log("[seatmap][debug]", ...e);
-	}, Ce = {
+	}, we = {
 		venue: {},
 		timing: {
 			buildMs: 0,
@@ -13299,36 +13299,36 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		},
 		errors: []
 	};
-	function we(e, t, n = {}) {
+	function Te(e, t, n = {}) {
 		let r = {
 			code: "RENDER",
 			stage: e,
 			message: t?.message || String(t),
 			...n
 		};
-		Ce.errors.length >= 50 && Ce.errors.shift(), Ce.errors.push(r), console.warn(`[seatmap] 渲染异常 [${e}]`, t);
+		we.errors.length >= 50 && we.errors.shift(), we.errors.push(r), console.warn(`[seatmap] 渲染异常 [${e}]`, t);
 	}
-	function Te() {
-		let e = Ce.timing, t = (e.custom || {}).normalize || 0;
+	function Ee() {
+		let e = we.timing, t = (e.custom || {}).normalize || 0;
 		return {
 			debug: l,
 			pixelRatio: x.tree.canvas?.pixelRatio || 0,
 			stats: {
-				visibleSeats: xe.visibleSeats,
-				mountedSeats: xe.mountedSeats,
-				scale: xe.scale
+				visibleSeats: Se.visibleSeats,
+				mountedSeats: Se.mountedSeats,
+				scale: Se.scale
 			},
-			venue: { ...Ce.venue },
+			venue: { ...we.venue },
 			timing: {
 				...e,
 				custom: { ...e.custom || {} },
 				syncAvgMs: e.syncCount ? +(e.syncTotalMs / e.syncCount).toFixed(2) : 0,
 				ttfMs: +(t + e.buildMs + e.chunkMs + (e.revealMs || 0)).toFixed(2)
 			},
-			errors: Ce.errors.map((e) => ({ ...e }))
+			errors: we.errors.map((e) => ({ ...e }))
 		};
 	}
-	function Ee(e) {
+	function De(e) {
 		let t = e.timing, n = e.venue || {}, r = [
 			"── 场馆加载 ──",
 			`场馆: ${n.name || ""}`,
@@ -13341,17 +13341,17 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		];
 		return e.errors?.length && r.push(`非致命渲染错误: ${e.errors.length} 条（getDebugInfo().errors 查看）`), r.join("\n  ");
 	}
-	let De = null, Oe = 0;
-	function ke(e, t, n) {
-		De || (De = new im({
+	let Oe = null, ke = 0;
+	function Ae(e, t, n) {
+		Oe || (Oe = new im({
 			fill: "transparent",
 			stroke: n,
 			strokeWidth: 1.8,
 			hittable: !1,
 			visible: !1
-		}), S.add(De));
+		}), S.add(Oe));
 		let r = px(E?.baseScale) * 1.4, i = r * .5;
-		H(Oe), De.set({
+		Ct(ke), Oe.set({
 			stroke: n,
 			x: e - i / 2,
 			y: t - i / 2,
@@ -13362,17 +13362,17 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		});
 		let a = Date.now(), o = () => {
 			let n = Math.min(1, (Date.now() - a) / 220), s = 1 - (1 - n) ** 3, c = i + (r * 1.5 - i) * s;
-			De.set({
+			Oe.set({
 				x: e - c / 2,
 				y: t - c / 2,
 				width: c,
 				height: c,
 				opacity: .55 * (1 - s)
-			}), n < 1 ? Oe = St(o) : De.visible = !1;
+			}), n < 1 ? ke = H(o) : Oe.visible = !1;
 		};
 		o();
 	}
-	function Ae() {
+	function je() {
 		let e = P(), t = Math.abs(e.maxX - e.minX) * me, n = Math.abs(e.maxY - e.minY) * me;
 		return {
 			minX: e.minX - t,
@@ -13381,13 +13381,13 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			maxY: e.maxY + n
 		};
 	}
-	function je(e) {
+	function Me(e) {
 		for (let t of N.values()) {
 			let n = t.bbox;
 			t.group.visible = !n || n.maxX >= e.minX && n.minX <= e.maxX && n.maxY >= e.minY && n.minY <= e.maxY;
 		}
 	}
-	function Me(e) {
+	function Ne(e) {
 		let t = String(e || "#fafafa").replace("#", "");
 		t.length === 3 && (t = t.split("").map((e) => e + e).join(""));
 		let n = parseInt(t, 16), r = Number.isFinite(n) ? [
@@ -13404,10 +13404,10 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		}), u = .2126 * s + .7152 * c + .0722 * l;
 		return o >= .35 && u <= .86 ? "#ffffff" : (u + .05) / .05 >= 1.05 / (u + .05) ? "#111827" : "#ffffff";
 	}
-	function Ne(e) {
-		e.label && (e.label.fill = Me(e.currentFill || e.outlineColor));
+	function Pe(e) {
+		e.label && (e.label.fill = Ne(e.currentFill || e.outlineColor));
 	}
-	function Pe(e, t, n, r, i) {
+	function Fe(e, t, n, r, i) {
 		let a = e.path ? zb(e.path) : [
 			{
 				x: t.cx - t.w / 2,
@@ -13475,7 +13475,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		}
 		return f;
 	}
-	function Fe(e, t) {
+	function Ie(e, t) {
 		if (!e.label) return;
 		let n = e.labelFontSize * t, r = n > 0 ? Math.max(1, 11 / n) : 1, i = Math.min(r, e.labelFitBoost || 1);
 		e.label.set({
@@ -13483,66 +13483,66 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			scaleY: i
 		});
 	}
-	function Ie(e) {
-		for (let t of N.values()) Fe(t, e);
+	function Le(e) {
+		for (let t of N.values()) Ie(t, e);
 	}
-	function Le(e, t) {
+	function Re(e, t) {
 		let n = rx(e), r = n.text ? n.fontSize * t : 0, i = n.logo?.src ? n.logo : null, a = i ? (i.width > 0 ? i.width : 20) * (i.ratio > 0 ? i.ratio : .6) * t : 0;
 		return Math.max(r, a) >= 6;
 	}
-	function Re(e) {
+	function ze(e) {
 		for (let t of N.values()) {
-			let n = t.ss * e, r = t.group.visible && Le(t.section, e);
+			let n = t.ss * e, r = t.group.visible && Re(t.section, e);
 			if (r && !t.watermark) {
-				let e = jt(t.section);
+				let e = Mt(t.section);
 				e && (t.group.addAt(e, t.watermarkIndex), t.watermark = e);
 			}
 			if (t.watermark && (r ? t.watermark.visible = !0 : (t.watermark.remove(), t.watermark.destroy(), t.watermark = null)), t.label) {
 				let r = t.soldOut && n < 8 ? "售罄" : t.labelText;
-				t.label.text !== r && (t.label.text = r, t.label.x = t.labelCenterX - ux(r, t.labelFontSize) / 2), Fe(t, e), t.label.visible = !0, t.label.opacity = A != null && t.catMatch === !1 ? .35 : 1, Ne(t);
+				t.label.text !== r && (t.label.text = r, t.label.x = t.labelCenterX - ux(r, t.labelFontSize) / 2), Ie(t, e), t.label.visible = !0, t.label.opacity = A != null && t.catMatch === !1 ? .35 : 1, Pe(t);
 			}
 		}
 	}
-	let ze = /* @__PURE__ */ new Set(), Be = 0;
-	function Ve(e, t) {
+	let Be = /* @__PURE__ */ new Set(), Ve = 0;
+	function He(e, t) {
 		if ((e.section.type || "section") !== "section") return e.outlineColor;
 		let n = !e.hasSeats || !t ? Nb : A != null && e.catMatch !== !1 ? E?.categories?.find((e) => String(e.key) === String(A))?.color || e.mixedColor || e.outlineColor : Xb(e.section, E?.categories) || e.mixedColor || e.outlineColor, r = e.soldOut && t ? Kb(n, .88) : n;
 		return A != null && e.catMatch === !1 ? qb(r, .85) : r;
 	}
-	function He(e, t) {
+	function Ue(e, t) {
 		if (!e.outline) return;
-		let n = Ve(e, t);
+		let n = He(e, t);
 		if (e.currentFill = n, e.outline.fill = Ub(n, 1), (e.section.type || "section") !== "section") return;
 		let r = A != null && e.catMatch === !1, i = e.hasSeats && !r, a = i ? Xb(e.section, E?.categories) || e.mixedColor || e.outlineColor : n;
 		e.outline.stroke = Gb(a, i ? .775 : .55);
 	}
-	function Ue(e) {
+	function We(e) {
 		let t = px(E?.baseScale);
 		return Math.max(1, t * e * Fb) / e;
 	}
-	function We(e = x.tree.scaleX || 1) {
-		let t = Ue(e);
+	function Ge(e = x.tree.scaleX || 1) {
+		let t = We(e);
 		for (let e of N.values()) e.outline && (e.outline.strokeWidth = t);
 	}
-	function Ge() {
-		let e = Date.now(), t = x.tree.scaleX || 1, n = Ae(), r = 0, i = 0;
+	function Ke() {
+		let e = Date.now(), t = x.tree.scaleX || 1, n = je(), r = 0, i = 0;
 		for (let e of N.values()) e.ss > i && (i = e.ss);
-		let a = i * t < 8, o = /* @__PURE__ */ new Set();
+		let a = !he && i * t < 8, o = /* @__PURE__ */ new Set();
 		if (!a) {
 			let e = Math.floor(n.minX / 500), t = Math.floor(n.maxX / 500), r = Math.floor(n.minY / 500), i = Math.floor(n.maxY / 500);
 			for (let n = e; n <= t; n++) for (let e = r; e <= i; e++) for (let t of ue.get(`${n}:${e}`) || []) o.add(t);
 		}
-		let s = Math.abs(t - Be) > .001;
-		for (let e of ze) {
+		let s = Math.abs(t - Ve) > .001;
+		for (let e of Be) {
 			if (o.has(e)) continue;
 			let t = V.get(e);
 			if (t) for (let { seat: e } of t) B(e.id);
 		}
-		if (a) for (let e of N.values()) He(e, !0);
+		if (a) for (let e of N.values()) Ue(e, !0);
 		for (let e of o) {
 			let i = V.get(e);
 			if (!i) continue;
-			let a = !ze.has(e), o = de.get(e), c = o?.ss || 10, l = c * t, u = l >= 8, d = u;
+			let a = !Be.has(e), o = de.get(e), c = o?.ss || 10, l = c * t, u = he || l >= 8, d = u;
 			for (let { seat: e } of i) {
 				if (e.x < n.minX || e.x > n.maxX || e.y < n.minY || e.y > n.maxY) {
 					B(e.id);
@@ -13555,14 +13555,14 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 				}
 				i ||= se(M.get(e.id), o), (a || s || !i.visible) && (ae(e, i, c, l), i.visible = !0), le(M.get(e.id), i, c, D.has(e.id)), t && r++;
 			}
-			He(o, !u);
+			Ue(o, !u);
 		}
-		je(n), We(t), Re(t), _e(t), ze = o, Be = t, xe.visibleSeats = r, xe.mountedSeats = te.size, xe.scale = t;
-		let c = Date.now() - e, l = Ce.timing;
+		Me(n), Ge(t), ze(t), ve(t), Be = o, Ve = t, Se.visibleSeats = r, Se.mountedSeats = te.size, Se.scale = t;
+		let c = Date.now() - e, l = we.timing;
 		l.firstSyncMs ||= c, l.syncCount++, l.syncTotalMs += c, c > l.syncMaxMs && (l.syncMaxMs = c);
 	}
-	let Ke = !1, qe = 0, Je = 0, Ye = "";
-	function Xe() {
+	let qe = !1, Je = 0, Ye = 0, Xe = "";
+	function Ze() {
 		for (let e of N.values()) e.watermark && (e.watermark.visible = !1);
 		if (!(te.size < 800)) {
 			ie = !0;
@@ -13572,7 +13572,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			});
 		}
 	}
-	function Ze() {
+	function Qe() {
 		if (!ie) return;
 		ie = !1;
 		let e = x.tree.scaleX || 1;
@@ -13583,32 +13583,32 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			ae(r.seat, n, i, i * e);
 		}
 	}
-	function Qe(e) {
-		clearTimeout(Je), Je = setTimeout(et, e);
+	function $e(e) {
+		clearTimeout(Ye), Ye = setTimeout(tt, e);
 	}
-	function $e() {
-		it(), Ke || (Ke = !0, Xe(), w?.setBusy(!0)), qe ||= setTimeout(() => {
-			if (qe = 0, !Ke) return;
-			let e = Ae(), t = [
+	function et() {
+		at(), qe || (qe = !0, Ze(), w?.setBusy(!0)), Je ||= setTimeout(() => {
+			if (Je = 0, !qe) return;
+			let e = je(), t = [
 				e.minX,
 				e.maxX,
 				e.minY,
 				e.maxY
 			].map((e) => Math.round(e)).join(",");
-			t !== Ye && (Ye = t, w && w.update(P()));
-		}, 100), Qe(600);
+			t !== Xe && (Xe = t, w && w.update(P()));
+		}, 100), $e(600);
 	}
-	function et() {
-		clearTimeout(Je), qe &&= (clearTimeout(qe), 0), Ke && (Ke = !1, Ye = "", nt || ut(), Ze(), Ge(), w && (w.setBusy(!1), w.update(P()), w.recover()));
+	function tt() {
+		clearTimeout(Ye), Je &&= (clearTimeout(Je), 0), qe && (qe = !1, Xe = "", rt || dt(), Qe(), Ke(), w && (w.setBusy(!1), w.update(P()), w.recover()));
 	}
-	let tt = !1, nt = !1, rt = 0;
-	function it() {
-		rt && H(rt), rt = 0, nt = !1;
-	}
+	let nt = !1, rt = !1, it = 0;
 	function at() {
-		it();
+		it && Ct(it), it = 0, rt = !1;
 	}
 	function ot() {
+		at();
+	}
+	function st() {
 		let e = x.tree.zoomLayer, t = e?.boxBounds, n = x.tree.width || v || 0, r = x.tree.height || y || 0;
 		if (!e || !t || !t.width || !t.height || !n || !r) return null;
 		let i = x.tree.scaleX || 1, a = t.width * i, o = t.height * i, s = (n - a) / 2 - t.x * i, c = (r - o) / 2 - t.y * i, l = a / 2, u = o / 2;
@@ -13619,77 +13619,77 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			maxY: o <= r ? c + u : -t.y * i
 		};
 	}
-	function st(e, t) {
+	function ct(e, t) {
 		let n = x.tree.zoomLayer;
-		if (!(!n || tt)) {
-			tt = !0;
+		if (!(!n || nt)) {
+			nt = !0;
 			try {
 				n.move({
 					x: e - x.tree.x,
 					y: t - x.tree.y
 				});
 			} finally {
-				tt = !1;
+				nt = !1;
 			}
 		}
 	}
-	function ct(e, t, n) {
+	function lt(e, t, n) {
 		return e < t ? t : e > n ? n : e;
 	}
-	function lt() {
-		if (tt || nt) return;
-		let e = ot();
-		if (!e) return;
-		let t = ct(x.tree.x, e.minX, e.maxX), n = ct(x.tree.y, e.minY, e.maxY);
-		(Math.abs(t - x.tree.x) > .01 || Math.abs(n - x.tree.y) > .01) && st(t, n);
-	}
 	function ut() {
-		it();
-		let e = ot();
+		if (nt || rt) return;
+		let e = st();
 		if (!e) return;
-		let t = x.tree.x, n = x.tree.y, r = ct(t, e.minX, e.maxX), i = ct(n, e.minY, e.maxY);
+		let t = lt(x.tree.x, e.minX, e.maxX), n = lt(x.tree.y, e.minY, e.maxY);
+		(Math.abs(t - x.tree.x) > .01 || Math.abs(n - x.tree.y) > .01) && ct(t, n);
+	}
+	function dt() {
+		at();
+		let e = st();
+		if (!e) return;
+		let t = x.tree.x, n = x.tree.y, r = lt(t, e.minX, e.maxX), i = lt(n, e.minY, e.maxY);
 		if (Math.abs(r - t) <= .01 && Math.abs(i - n) <= .01) return;
 		let a = Date.now();
-		nt = !0;
+		rt = !0;
 		let o = () => {
-			if (!nt) return;
+			if (!rt) return;
 			let e = Math.min(1, (Date.now() - a) / 180), s = 1 - (1 - e) ** 3;
-			st(t + (r - t) * s, n + (i - n) * s), e < 1 ? rt = St(o) : (rt = 0, nt = !1, st(r, i));
+			ct(t + (r - t) * s, n + (i - n) * s), e < 1 ? it = H(o) : (it = 0, rt = !1, ct(r, i));
 		};
 		o();
 	}
-	function dt() {
-		at(), lt();
+	function ft() {
+		ot(), ut();
 	}
 	x.tree.on(oh.END, () => {
-		ut(), Qe(90);
+		dt(), $e(90);
 	}), x.tree.on(uh.END, () => {
-		ut(), Qe(90);
+		dt(), $e(90);
 	}), x.tree.on("property.change", (e) => {
-		e.target === x.tree.zoomLayer && (e.attrName === "scaleX" || e.attrName === "scaleY") && (We(), Ie(x.tree.scaleX || 1));
+		e.target === x.tree.zoomLayer && (e.attrName === "scaleX" || e.attrName === "scaleY") && (Ge(), Le(x.tree.scaleX || 1));
 	}), x.tree.on(uh.ZOOM, () => {
-		tt || ($e(), ve());
+		nt || (et(), ye());
 	}), x.tree.on(oh.MOVE, () => {
-		tt || $e();
+		nt || et();
 	});
-	function ft(e) {
+	function pt(e) {
 		let { seat: t, row: n, section: r } = e;
-		if (Se("点击命中:", r?.name || r?.id, n?.label || "", t.n || t.id), t.status !== "available") {
-			Se("  ↳ 状态不可售，忽略:", t.status), m?.({
+		if (Ce("点击命中:", r?.name || r?.id, n?.label || "", t.n || t.id), t.status !== "available") {
+			Ce("  ↳ 状态不可售，忽略:", t.status), m?.({
 				seat: lx(e, E),
 				action: "blocked",
 				reason: "unavailable"
 			});
 			return;
 		}
-		if (D.has(t.id)) D.delete(t.id), Se("  ↳ 取消选中"), m?.({
+		if (D.has(t.id)) D.delete(t.id), Ce("  ↳ 取消选中"), m?.({
 			seat: lx(e, E),
 			action: "deselect"
 		});
 		else if (j && D.size >= j) {
-			Se("  ↳ 限购拦截:", j);
+			Ce("  ↳ 限购拦截:", j);
 			try {
-				ke(t.x, t.y, fx);
+				Ae(t.x, t.y, fx);
 			} catch (e) {
 				console.warn("[seatmap] 限购反馈动画异常:", e?.message);
 			}
@@ -13699,20 +13699,20 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 				reason: "limit"
 			});
 			return;
-		} else D.set(t.id, e), Se("  ↳ 选中"), m?.({
+		} else D.set(t.id, e), Ce("  ↳ 选中"), m?.({
 			seat: lx(e, E),
 			action: "select"
 		});
-		pe(t.id), _e();
+		pe(t.id), ve();
 		try {
-			ke(t.x, t.y, L(t));
+			Ae(t.x, t.y, L(t));
 		} catch (e) {
 			console.warn("[seatmap] 点击反馈动画异常:", e?.message);
 		}
 		R();
 	}
-	let pt = 12, mt = c > 0 ? c : 24, ht = Math.min(24, mt);
-	function gt(e, t) {
+	let mt = 12, ht = c > 0 ? c : 24, gt = Math.min(24, ht);
+	function _t(e, t) {
 		let n = Math.floor(e / 500), r = Math.floor(t / 500), i = null, a = Infinity;
 		for (let o of N.values()) {
 			let s = o.ss / 2 + 1, c = o.bbox;
@@ -13728,59 +13728,68 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		}
 		return i;
 	}
-	function _t(e) {
+	function vt(e) {
 		if (!E) return;
-		let t = x.tree.getPagePoint(e), n = ye(t);
+		let t = x.tree.getPagePoint(e), n = be(t);
 		if (n) {
-			be(n);
+			xe(n);
 			return;
 		}
-		let r = gt(t.x, t.y), i = px(E?.baseScale), a = x.tree.scaleX || 1, o = i * a >= 8;
+		let r = _t(t.x, t.y), i = px(E?.baseScale), a = x.tree.scaleX || 1, o = i * a >= 8;
 		if (o && !r) return;
 		let s = !!(r && o);
-		s && ft(r);
-		let c = o ? ht : Math.min(12, mt), l = c / i / a;
-		x.tree.getValidScale && (l = x.tree.getValidScale(l)), l > 1.05 ? (x.tree.zoomLayer.scaleOfWorld(e, l, { duration: .25 }), wt(300), setTimeout(() => {
-			dt(), Ge(), w && (w.update(P()), w.recover());
-		}, 300)) : r && !s && c >= ht && ft(r);
+		s && pt(r);
+		let c = o ? gt : Math.min(12, ht), l = c / i / a;
+		if (x.tree.getValidScale && (l = x.tree.getValidScale(l)), l > 1.05) {
+			x.tree.zoomLayer.scaleOfWorld(e, l, { duration: .25 }), Tt(300);
+			let t = 0, n = () => {
+				let e = x.tree.scaleX || 1;
+				if (e === t) {
+					ft(), Ke(), w && (w.update(P()), w.recover());
+					return;
+				}
+				t = e, setTimeout(n, 50);
+			};
+			setTimeout(n, 250);
+		} else r && !s && c >= gt && pt(r);
 	}
-	let vt = null, yt = (e) => {
-		vt = {
+	let yt = null, bt = (e) => {
+		yt = {
 			x: e.clientX,
 			y: e.clientY
 		};
-	}, bt = (t) => {
-		if (!vt) return;
-		let n = Math.hypot(t.clientX - vt.x, t.clientY - vt.y);
-		if (vt = null, n > 6) return;
+	}, xt = (t) => {
+		if (!yt) return;
+		let n = Math.hypot(t.clientX - yt.x, t.clientY - yt.y);
+		if (yt = null, n > 6) return;
 		let r = e.getBoundingClientRect();
-		_t({
+		vt({
 			x: t.clientX - r.left,
 			y: t.clientY - r.top
 		});
 	};
 	if (!g) {
-		e.addEventListener("pointerdown", yt), e.addEventListener("pointerup", bt);
+		e.addEventListener("pointerdown", bt), e.addEventListener("pointerup", xt);
 		let t = () => {
 			let t = e.getBoundingClientRect();
-			t.width > 0 && t.height > 0 && (x.tree.width = t.width, x.tree.height = t.height, dt(), Ge(), w && w.update(P()));
+			t.width > 0 && t.height > 0 && (x.tree.width = t.width, x.tree.height = t.height, ft(), Ke(), w && w.update(P()));
 		};
 		window.addEventListener("resize", t), e._seatPickerResize = t;
 	}
-	let xt = g && typeof e.requestAnimationFrame == "function", St = xt ? e.requestAnimationFrame.bind(e) : typeof requestAnimationFrame < "u" ? requestAnimationFrame : (e) => setTimeout(e, 16), H = xt && typeof e.cancelAnimationFrame == "function" ? e.cancelAnimationFrame.bind(e) : xt ? () => {} : typeof cancelAnimationFrame < "u" ? cancelAnimationFrame : clearTimeout, Ct = 0;
-	function wt(e) {
-		H(Ct);
+	let St = g && typeof e.requestAnimationFrame == "function", H = St ? e.requestAnimationFrame.bind(e) : typeof requestAnimationFrame < "u" ? requestAnimationFrame : (e) => setTimeout(e, 16), Ct = St && typeof e.cancelAnimationFrame == "function" ? e.cancelAnimationFrame.bind(e) : St ? () => {} : typeof cancelAnimationFrame < "u" ? cancelAnimationFrame : clearTimeout, wt = 0;
+	function Tt(e) {
+		Ct(wt);
 		let t = Date.now(), n = () => {
-			ve(), Ct = Date.now() - t < e ? St(n) : 0;
+			ye(), wt = Date.now() - t < e ? H(n) : 0;
 		};
 		n();
 	}
-	let Tt = 0, Et = null;
-	function Dt() {
-		Tt = 0, Et &&= (x.tree.receiveEvent?.(Et), null);
+	let Et = 0, Dt = null;
+	function Ot() {
+		Et = 0, Dt &&= (x.tree.receiveEvent?.(Dt), null);
 	}
-	let Ot = null;
-	function kt(e) {
+	let kt = null;
+	function At(e) {
 		return e ? e.x != null && e.y != null ? {
 			x: e.x,
 			y: e.y
@@ -13789,22 +13798,22 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			y: e.clientY - i.y
 		} : null : null;
 	}
-	function At(e) {
+	function jt(e) {
 		if (e.type === "touchmove") {
-			Et = e, Tt ||= St(Dt);
+			Dt = e, Et ||= H(Ot);
 			return;
 		}
-		Dt(), x.tree.receiveEvent?.(e);
-		let t = kt(e.touches?.[0] || e.changedTouches?.[0]);
+		Ot(), x.tree.receiveEvent?.(e);
+		let t = At(e.touches?.[0] || e.changedTouches?.[0]);
 		if (t) {
-			if (e.type === "touchstart") Ot = t;
-			else if (e.type === "touchend" && Ot) {
-				let e = Math.hypot(t.x - Ot.x, t.y - Ot.y);
-				Ot = null, e <= 6 && _t(t);
+			if (e.type === "touchstart") kt = t;
+			else if (e.type === "touchend" && kt) {
+				let e = Math.hypot(t.x - kt.x, t.y - kt.y);
+				kt = null, e <= 6 && vt(t);
 			}
 		}
 	}
-	function jt(e) {
+	function Mt(e) {
 		let t = rx(e), n = !!t.text, r = t.logo && t.logo.src ? t.logo : null;
 		if (!t.visible || !n && !r || !e.path || e.loose) return null;
 		let i = $b(e);
@@ -13857,13 +13866,13 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		}
 		return d.add(f), d;
 	}
-	function Mt(e) {
+	function Nt(e) {
 		if ((e.type || "section") !== "section") return !1;
 		let t = !1;
 		for (let n of e.rows) for (let e of n.seats) if (t = !0, e.status === "available") return !1;
 		return t;
 	}
-	function Nt(e) {
+	function Pt(e) {
 		if (!e.visible) return;
 		let t = new Rp({ data: { sectionId: e.id } });
 		t.opacity = e.opacity ?? 1;
@@ -13873,12 +13882,12 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			row: t,
 			section: e
 		}), n.x < r && (r = n.x), n.x > a && (a = n.x), n.y < i && (i = n.y), n.y > o && (o = n.y);
-		let s = (e.type || "section") === "section", c = e.rows.some((e) => e.seats.length), l = Mt(e), u = e.color || "#fafafa", d = c ? Xb(e, E?.categories) || Zb(e, E?.categories) || u : Nb, f = s ? l ? Kb(d, .88) : d : u, p = s ? Gb(f, c ? .775 : .55) : Qb(e, E?.categories), m = null;
+		let s = (e.type || "section") === "section", c = e.rows.some((e) => e.seats.length), l = Nt(e), u = e.color || "#fafafa", d = c ? Xb(e, E?.categories) || Zb(e, E?.categories) || u : Nb, f = s ? l ? Kb(d, .88) : d : u, p = s ? Gb(f, c ? .775 : .55) : Qb(e, E?.categories), m = null;
 		e.path && !e.loose && (m = new Fm({
 			path: e.path,
 			fill: Ub(f, 1),
 			stroke: p,
-			strokeWidth: Ue(x.tree.scaleX || 1),
+			strokeWidth: We(x.tree.scaleX || 1),
 			strokeAlign: "inside",
 			strokeJoin: "round",
 			strokeCap: "round"
@@ -13928,7 +13937,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 			let n = $b(e);
 			if (n) {
 				let r = v.fontSize > 0 ? v.fontSize : 14, i = ux(y, r);
-				_.labelFontSize = r, _.labelCenterX = n.cx + (v.dx || 0), _.labelFitBoost = Pe(e, n, v, i, r), _.label = new Pm({
+				_.labelFontSize = r, _.labelCenterX = n.cx + (v.dx || 0), _.labelFitBoost = Fe(e, n, v, i, r), _.label = new Pm({
 					text: y,
 					fontSize: r,
 					fontWeight: "bold",
@@ -13938,7 +13947,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 					x: _.labelCenterX - i / 2,
 					y: n.cy + (v.dy || 0) - r / 2,
 					hittable: !1
-				}), t.add(_.label), Ne(_), Fe(_, x.tree.scaleX || 1);
+				}), t.add(_.label), Pe(_), Ie(_, x.tree.scaleX || 1);
 			}
 		}
 		S.add(t);
@@ -13949,9 +13958,9 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 		},
 		setVenue(e) {
 			let t = Date.now();
-			E = e, D.clear(), A = null, M.clear(), N.clear(), te.clear(), z.clear(), S.removeAll(), De = null, O = null, k.clear();
-			let n = Ce.timing;
-			if (n.buildMs = 0, n.chunkMs = 0, n.chunkFrames = 0, n.revealMs = 0, n.firstSyncMs = 0, Ce.venue = {}, l) {
+			E = e, D.clear(), A = null, M.clear(), N.clear(), te.clear(), z.clear(), S.removeAll(), Oe = null, O = null, k.clear();
+			let n = we.timing;
+			if (n.buildMs = 0, n.chunkMs = 0, n.chunkFrames = 0, n.revealMs = 0, n.firstSyncMs = 0, we.venue = {}, l) {
 				let t = 0, n = 0, r = 0, i = {}, a = {};
 				for (let o of e.sections || []) {
 					t++, n += o.rows?.length || 0;
@@ -13963,7 +13972,7 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 						a[n] = (a[n] || 0) + 1;
 					}
 				}
-				Ce.venue = {
+				we.venue = {
 					sectionCount: t,
 					rowCount: n,
 					seatCount: r,
@@ -13973,43 +13982,46 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 					byCat: a
 				};
 			}
-			let r = [...e.sections || []].map((e, t) => ({
+			let r = 0;
+			for (let t of e.sections || []) if (t.visible !== !1 && (t.type || "section") === "section" && (t.rows || []).some((e) => e.seats?.length) && (r++, r > 1)) break;
+			he = r === 1;
+			let i = [...e.sections || []].map((e, t) => ({
 				s: e,
 				i: t
 			})).sort((e, t) => Yb(e.s) - Yb(t.s) || e.i - t.i);
-			for (let { s: e } of r) try {
-				Nt(e);
+			for (let { s: e } of i) try {
+				Pt(e);
 			} catch (t) {
-				we("render-section", t, { sectionId: e?.id });
+				Te("render-section", t, { sectionId: e?.id });
 			}
-			ge(), fe(), w && w.build(e), ze.clear(), Be = 0, ie = !1;
-			let i = x.tree.zoomLayer?.boxBounds, a = x.tree.width || 0, o = x.tree.height || 0, s = 0;
-			x.config?.zoom && i && i.width && i.height && a && o && (s = Math.min((a - 48) / i.width, (o - 48) / i.height), s > 0 && (x.config.zoom.min = Math.min(.1, s * .9))), x.tree.zoom("fit", 24);
-			let c = e.baseScale || 1;
-			x.config?.zoom && (x.config.zoom.max = Math.max(mt / 12 * c, s)), dt(), Ce.timing.buildMs = Date.now() - t;
-			let u = Date.now();
-			Ge(), w && w.update(P()), Ce.timing.revealMs = Date.now() - u, Se(Ee(Te()));
+			_e(), fe(), w && w.build(e), Be.clear(), Ve = 0, ie = !1;
+			let a = x.tree.zoomLayer?.boxBounds, o = x.tree.width || 0, s = x.tree.height || 0, c = 0;
+			x.config?.zoom && a && a.width && a.height && o && s && (c = Math.min((o - 48) / a.width, (s - 48) / a.height), c > 0 && (x.config.zoom.min = Math.min(.1, c * .9))), x.tree.zoom("fit", 24);
+			let u = e.baseScale || 1;
+			x.config?.zoom && (x.config.zoom.max = Math.max(ht / 12 * u, c)), ft(), we.timing.buildMs = Date.now() - t;
+			let d = Date.now();
+			Ke(), w && w.update(P()), we.timing.revealMs = Date.now() - d, Ce(De(Ee()));
 		},
 		getSelection() {
-			return Se("getSelection 已选座位:", D, [...D.values()]), [...D.values()].map((e) => lx(e, E));
+			return Ce("getSelection 已选座位:", D, [...D.values()]), [...D.values()].map((e) => lx(e, E));
 		},
 		deselectSeat(e) {
-			D.get(e) && (D.delete(e), pe(e), _e(), R());
+			D.get(e) && (D.delete(e), pe(e), ve(), R());
 		},
 		clearSelection() {
 			if (!D.size) return;
 			let e = [...D.keys()];
 			D.clear();
 			for (let t of e) pe(t);
-			_e(), R();
+			ve(), R();
 		},
-		setActiveCat(e) {
+		setActiveCat(e, t = !1) {
 			if (A = e === "" || e == null ? null : e, E) {
 				for (let e of E.sections) {
 					let t = N.get(e.id);
 					t && (t.catMatch = A == null || (e.type || "section") !== "section" || e.rows.some((e) => e.seats.some((e) => String(e.cat) === String(A))));
 				}
-				Be = 0, T();
+				Ve = 0, t ? Ke() : T();
 			}
 		},
 		updateSectionSeats(e, t) {
@@ -14028,9 +14040,9 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 				deselected: 0
 			};
 			let s = N.get(e);
-			s && (s.soldOut = Mt(n));
+			s && (s.soldOut = Nt(n));
 			for (let e of o) pe(e);
-			return Ge(), a.length && R(), {
+			return Ke(), a.length && R(), {
 				updated: i,
 				deselected: a.length
 			};
@@ -14069,22 +14081,22 @@ function kx({ view: e, platform: t = "h5", width: n, height: r, viewOffset: i = 
 				w: e.ss
 			} : null;
 		},
-		receiveTouch: At,
+		receiveTouch: jt,
 		minimapTap: F,
 		destroy() {
-			qe && clearTimeout(qe), clearTimeout(Je), Oe && H(Oe), Ct && H(Ct), at(), Tt && H(Tt), Et = null, w &&= (w.destroy(), null), g || (e.removeEventListener("pointerdown", yt), e.removeEventListener("pointerup", bt), e._seatPickerResize && (window.removeEventListener("resize", e._seatPickerResize), delete e._seatPickerResize)), x.destroy();
+			Je && clearTimeout(Je), clearTimeout(Ye), ke && Ct(ke), wt && Ct(wt), ot(), Et && Ct(Et), Dt = null, w &&= (w.destroy(), null), g || (e.removeEventListener("pointerdown", bt), e.removeEventListener("pointerup", xt), e._seatPickerResize && (window.removeEventListener("resize", e._seatPickerResize), delete e._seatPickerResize)), x.destroy();
 		},
 		reportTiming(e, t) {
-			e && t != null && (Ce.timing.custom[e] = +Number(t).toFixed(2));
+			e && t != null && (we.timing.custom[e] = +Number(t).toFixed(2));
 		},
 		getDebugInfo() {
-			return Te();
+			return Ee();
 		},
 		getDebugReportText() {
-			return Ee(Te());
+			return De(Ee());
 		},
 		_app: x,
-		_stats: xe
+		_stats: Se
 	};
 }
 //#endregion
